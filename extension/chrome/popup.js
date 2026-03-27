@@ -23,6 +23,25 @@ var DEFAULT_PROFILES = [
 var profiles    = DEFAULT_PROFILES.map(cloneProfile);
 var activePanel = 'flex';
 
+// ── Shortcut helper (shared with content.js logic) ────────────────────────────
+
+function shortcutFromEvent(e) {
+    var key = e.key;
+    if (key === 'Control' || key === 'Alt' || key === 'Shift' || key === 'Meta') return null;
+    var isMac = /Mac|iPhone|iPad/i.test(navigator.platform);
+    var parts = [];
+    if (isMac ? e.metaKey : e.ctrlKey) parts.push('Ctrl');
+    if (e.altKey)   parts.push('Alt');
+    if (e.shiftKey) parts.push('Shift');
+    parts.push(key.length === 1 ? key.toUpperCase() : key);
+    return parts.join('+');
+}
+
+function applyShortcutValue(input, value) {
+    input.value = value || '';
+    input.classList.toggle('has-value', !!value);
+}
+
 // ── Storage helpers ───────────────────────────────────────────────────────────
 
 function storageGet(keys, cb) {
@@ -61,6 +80,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (fc.wrapExe      !== undefined) document.getElementById('flex-wrap-exe').value = fc.wrapExe ? 'yes' : 'no';
         if (fc.txtrefCmd    !== undefined) document.getElementById('flex-txtref').value   = fc.txtrefCmd;
         if (fc.txtrefPrefix !== undefined) document.getElementById('flex-txtpfx').value   = fc.txtrefPrefix;
+        applyShortcutValue(document.getElementById('flex-shortcut'), fc.shortcut);
 
         renderAll();
 
@@ -95,8 +115,25 @@ function attachStaticListeners() {
     // FLEx config inputs → persist + re-convert test area
     ['flex-gl', 'flex-wrap-exe', 'flex-txtref', 'flex-txtpfx'].forEach(function (id) {
         var el = document.getElementById(id);
-        if (el) el.addEventListener('input', function () { saveFLExConfig(); convertFlex(); });
+        if (el) el.addEventListener('input',  function () { saveFLExConfig(); convertFlex(); });
         if (el) el.addEventListener('change', function () { saveFLExConfig(); convertFlex(); });
+    });
+
+    // FLEx shortcut input — capture keydown so the pressed keys are recorded,
+    // not typed into the field
+    var flexScInput = document.getElementById('flex-shortcut');
+    flexScInput.addEventListener('keydown', function (e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        var sc = shortcutFromEvent(e);
+        if (!sc) return;
+        applyShortcutValue(flexScInput, sc);
+        saveFLExConfig();
+        flexScInput.blur();
+    });
+    document.getElementById('flex-shortcut-clear').addEventListener('click', function () {
+        applyShortcutValue(flexScInput, '');
+        saveFLExConfig();
     });
 
     // FLEx test input
@@ -114,6 +151,18 @@ function attachStaticListeners() {
 
     // Event delegation for dynamically generated TSV panels
     var main = document.getElementById('main-content');
+
+    main.addEventListener('keydown', function (e) {
+        if (e.target.dataset.action !== 'shortcut') return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        var sc = shortcutFromEvent(e);
+        if (!sc) return;
+        applyShortcutValue(e.target, sc);
+        var pid = pidOf(e.target);
+        if (pid) { var p = getProfile(pid); if (p) { p.shortcut = sc; saveProfiles(); } }
+        e.target.blur();
+    });
 
     main.addEventListener('input', function (e) {
         var pid = pidOf(e.target);
@@ -139,6 +188,11 @@ function attachStaticListeners() {
         if (action === 'delete-profile') deleteProfile(pid);
         if (action === 'clear-test')     clearTool(pid);
         if (action === 'copy-out' && pid) copyOutput(pid + '-out', btn);
+        if (action === 'clear-shortcut' && pid) {
+            var scInput = btn.closest('.shortcut-row').querySelector('.shortcut-input');
+            if (scInput) applyShortcutValue(scInput, '');
+            var p = getProfile(pid); if (p) { p.shortcut = ''; saveProfiles(); }
+        }
     });
 }
 
@@ -155,7 +209,8 @@ function saveFLExConfig() {
             glCmd:        document.getElementById('flex-gl').value.trim(),
             wrapExe:      document.getElementById('flex-wrap-exe').value === 'yes',
             txtrefCmd:    document.getElementById('flex-txtref').value.trim(),
-            txtrefPrefix: document.getElementById('flex-txtpfx').value
+            txtrefPrefix: document.getElementById('flex-txtpfx').value,
+            shortcut:     document.getElementById('flex-shortcut').value
         }
     });
 }
@@ -278,6 +333,21 @@ function buildPanelHTML(p) {
         '    <div class="cfg-row">' +
         '      <label>Skip rows where</label>' +
         '      <select data-action="skip">' + skipHtml + '</select>' +
+        '    </div>' +
+
+        // Keyboard shortcut
+        '    <div class="cfg-row">' +
+        '      <label>Keyboard shortcut</label>' +
+        '      <div class="shortcut-row">' +
+        '        <input type="text" class="shortcut-input' + (p.shortcut ? ' has-value' : '') + '"' +
+        '          data-action="shortcut" placeholder="Click, then press keys…" readonly' +
+        '          value="' + escHtml(p.shortcut || '') + '">' +
+        '        <button class="btn btn-ghost" data-action="clear-shortcut" title="Clear shortcut">✕</button>' +
+        '      </div>' +
+        '    </div>' +
+        '    <div class="cfg-hint">' +
+        '      Press this shortcut anywhere to instantly read the clipboard, convert' +
+        '      using this profile, and insert at the cursor.' +
         '    </div>' +
 
         // Delete button (user-created tabs only)

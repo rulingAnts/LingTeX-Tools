@@ -246,6 +246,33 @@ main {
 }
 
 /* ── Profile name input ───────────────────────────────────────────────────── */
+/* ── Shortcut input ───────────────────────────────────────────────────────── */
+.shortcut-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.shortcut-input {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  padding: 4px 7px;
+  border: 1px solid var(--slate-300);
+  border-radius: var(--r-sm);
+  background: #fff;
+  color: var(--slate-900);
+  cursor: pointer;
+  user-select: none;
+  min-width: 0;
+}
+.shortcut-input:focus {
+  outline: 2px solid var(--blue-700);
+  outline-offset: -1px;
+  background: var(--blue-50);
+}
+.shortcut-input.has-value { color: var(--blue-700); font-weight: 600; }
+
+/* ── Profile name input ───────────────────────────────────────────────────── */
 .profile-name-input {
   font: 600 0.82rem var(--font);
   color: var(--slate-900);
@@ -394,6 +421,19 @@ textarea.out:focus { outline-color: #93c5fd; border-color: var(--slate-600); }
         </div>
         <div class="cfg-hint">
           Produces e.g. <code>\txtref{TXT:8}</code> on the <code>\glt</code> line.
+        </div>
+
+        <div class="cfg-row">
+          <label>Keyboard shortcut</label>
+          <div class="shortcut-row">
+            <input type="text" id="flex-shortcut" class="shortcut-input"
+              placeholder="Click, then press keys…" readonly>
+            <button class="btn btn-ghost" id="flex-shortcut-clear" title="Clear shortcut">✕</button>
+          </div>
+        </div>
+        <div class="cfg-hint">
+          Press this shortcut anywhere to instantly read the clipboard, convert
+          using these FLEx settings, and insert at the cursor.
         </div>
 
       </div>

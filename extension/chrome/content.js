@@ -103,6 +103,30 @@
 
     function addUniq(arr, v) { if (arr.indexOf(v) === -1) arr.push(v); }
 
+    // ── Shortcut helpers ──────────────────────────────────────────────────────
+
+    // Normalise a KeyboardEvent into a canonical shortcut string, e.g. "Ctrl+Shift+1".
+    // "Ctrl" means Cmd on Mac and Ctrl elsewhere.  Returns null for modifier-only presses.
+    function shortcutFromEvent(e) {
+        var key = e.key;
+        if (key === 'Control' || key === 'Alt' || key === 'Shift' || key === 'Meta') return null;
+        var isMac = /Mac|iPhone|iPad/i.test(navigator.platform);
+        var parts = [];
+        if (isMac ? e.metaKey : e.ctrlKey) parts.push('Ctrl');
+        if (e.altKey)   parts.push('Alt');
+        if (e.shiftKey) parts.push('Shift');
+        parts.push(key.length === 1 ? key.toUpperCase() : key);
+        return parts.join('+');
+    }
+
+    function findProfileForShortcut(shortcut) {
+        if (cfg.flexConfig && cfg.flexConfig.shortcut === shortcut) return 'flex';
+        for (var i = 0; i < cfg.profiles.length; i++) {
+            if (cfg.profiles[i].shortcut === shortcut) return cfg.profiles[i].id;
+        }
+        return null;
+    }
+
     // ── Insert at cursor ──────────────────────────────────────────────────────
     // Works for plain textarea/input, and for contenteditable editors (Overleaf/
     // CodeMirror). execCommand('insertText') is deprecated but remains the most
@@ -148,14 +172,39 @@
     var smartPasteArmed = false;
 
     document.addEventListener('keydown', function (e) {
+        var shortcut = shortcutFromEvent(e);
+
+        // ── Per-profile shortcuts ─────────────────────────────────────────────
+        // Profile shortcuts do a full read-convert-insert in one keystroke using
+        // navigator.clipboard.readText(). This is safe here because these are
+        // custom shortcuts with no browser-native paste conflict.
+        if (shortcut) {
+            var matched = findProfileForShortcut(shortcut);
+            if (matched) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                cfg.activeProfileId = matched;
+                // Keep popup tab in sync
+                chrome.storage.local.set({ 'lingtex-active-profile': matched });
+                navigator.clipboard.readText().then(function (text) {
+                    var out = convert(text);
+                    if (out) insertAtCursor(out);
+                }).catch(function () {});
+                return;
+            }
+        }
+
+        // ── Smart-paste (Ctrl+Shift+V / Cmd+Shift+V) — armed-flag approach ────
+        // We arm a flag rather than calling clipboard.readText() here, because
+        // Ctrl+Shift+V is a native browser shortcut in Firefox that generates its
+        // own paste event — which we intercept below with e.clipboardData available.
         var isMac = /Mac|iPhone|iPad/i.test(navigator.platform);
         var mod   = isMac ? e.metaKey : e.ctrlKey;
-        if (!mod || !e.shiftKey || e.key !== 'V') return;
-
-        smartPasteArmed = true;
-        setTimeout(function () { smartPasteArmed = false; }, 300);
-        // Do NOT preventDefault here — let the browser generate the paste event
-        // so e.clipboardData is populated. We preventDefault on that event instead.
+        if (mod && e.shiftKey && e.key === 'V') {
+            smartPasteArmed = true;
+            setTimeout(function () { smartPasteArmed = false; }, 300);
+            // Do NOT preventDefault — let the browser fire the paste event.
+        }
     }, true);
 
     // ── Unified paste handler (auto-convert + smart-paste) ────────────────────
