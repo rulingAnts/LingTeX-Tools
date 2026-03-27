@@ -40,7 +40,19 @@ jobs:
         # produces extension/lingtex-tools-chrome.zip
         #          extension/lingtex-tools-firefox.zip
 
+      # Upload Chrome + Firefox immediately — before attempting Safari,
+      # so these are guaranteed in the release even if the Safari build fails.
+      - name: Upload Chrome + Firefox artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.ref_name }} \
+            extension/lingtex-tools-chrome.zip \
+            extension/lingtex-tools-firefox.zip
+
       - name: Convert Chrome extension → Safari Xcode project
+        continue-on-error: true
+        id: safari-convert
         run: |
           xcrun safari-web-extension-converter \
             extension/chrome \
@@ -52,6 +64,9 @@ jobs:
             --no-open
 
       - name: Build Safari app (unsigned)
+        if: steps.safari-convert.outcome == 'success'
+        continue-on-error: true
+        id: safari-build
         run: |
           xcodebuild \
             -project "extension/safari/LingTeX Tools/LingTeX Tools.xcodeproj" \
@@ -63,6 +78,9 @@ jobs:
             CODE_SIGNING_ALLOWED=NO
 
       - name: Package Safari app
+        if: steps.safari-build.outcome == 'success'
+        continue-on-error: true
+        id: safari-package
         run: |
           APP="extension/safari/build/Build/Products/Release/LingTeX Tools.app"
           if [ ! -d "$APP" ]; then
@@ -74,13 +92,12 @@ jobs:
           zip -r "$GITHUB_WORKSPACE/extension/lingtex-tools-safari.zip" \
             "LingTeX Tools.app" --exclude "*.DS_Store"
 
-      - name: Upload extension artifacts
+      - name: Upload Safari artifact
+        if: steps.safari-package.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release upload ${{ github.ref_name }} \
-            extension/lingtex-tools-chrome.zip \
-            extension/lingtex-tools-firefox.zip \
             extension/lingtex-tools-safari.zip
 
   # ── 3. Desktop app — macOS ─────────────────────────────────────────────────
@@ -154,9 +171,12 @@ jobs:
           releaseId: ${{ needs.create-release.outputs.release_id }}
 
   # ── 5. Desktop app — Linux ─────────────────────────────────────────────────
+  # Linux is community-maintained and has not been tested by the developer.
+  # continue-on-error ensures a Linux build failure does not block the release.
   desktop-linux:
     needs: create-release
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -198,7 +218,7 @@ jobs:
           projectPath: tauri
           releaseId: ${{ needs.create-release.outputs.release_id }}
 
-  # ── 6. Publish (un-draft) once all artifacts are uploaded ──────────────────
+  # ── 6. Publish (un-draft) once confirmed artifacts are uploaded ────────────
   publish-release:
     needs: [extensions, desktop-macos, desktop-windows, desktop-linux]
     runs-on: ubuntu-latest
