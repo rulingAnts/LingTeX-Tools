@@ -4,7 +4,7 @@ use std::thread;
 use std::time::Duration;
 use tauri::{
     menu::{Menu, MenuItem},
-    tray::{TrayIconBuilder, TrayIconEvent},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, WindowEvent,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
@@ -311,9 +311,16 @@ pub fn run() {
                     "quit" => app.exit(0),
                     _      => {}
                 })
+                .show_menu_on_left_click(false)
                 .on_tray_icon_event(|tray, event| {
-                    // Single click toggles window visibility
-                    if let TrayIconEvent::Click { .. } = event {
+                    // Only respond to left-click release — Windows fires both
+                    // Press and Release as separate Click events, so filtering
+                    // to Up avoids the window flashing on and off.
+                    if let TrayIconEvent::Click {
+                        button:       MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event {
                         let app = tray.app_handle();
                         if let Some(win) = app.get_webview_window("main") {
                             if win.is_visible().unwrap_or(false) {
