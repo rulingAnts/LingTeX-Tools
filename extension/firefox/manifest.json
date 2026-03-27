@@ -1,0 +1,49 @@
+{
+  "manifest_version": 2,
+  "name": "LingTeX Tools",
+  "version": "0.1.0",
+  "description": "Convert FLEx, Phonology Assistant, and TSV data to LaTeX as you paste. Press Ctrl+Shift+V / ⌘⇧V to smart-paste anywhere.",
+
+  "permissions": [
+    "storage",
+    "clipboardRead",
+    "clipboardWrite",
+    "activeTab",
+    "<all_urls>"
+  ],
+
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_title": "LingTeX Tools"
+  },
+
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["core.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "commands": {
+    "smart-paste": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+V",
+        "mac": "Command+Shift+V"
+      },
+      "description": "Paste clipboard as LaTeX (LingTeX conversion)"
+    }
+  },
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "lingtex-tools@rulingAnts",
+      "strict_min_version": "109.0"
+    }
+  }
+}

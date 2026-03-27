@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LingTeX Tools</title>
+<style>
+/* ── Reset ────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Design tokens ────────────────────────────────────────────────────────── */
+:root {
+  --blue-50:   #eff6ff;
+  --blue-100:  #dbeafe;
+  --blue-600:  #2563eb;
+  --blue-700:  #1d4ed8;
+  --blue-800:  #1e40af;
+  --slate-50:  #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+  --green-600: #16a34a;
+  --red-50:    #fef2f2;
+  --red-200:   #fecaca;
+  --red-600:   #dc2626;
+
+  --font: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, 'Cascadia Code', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  --r:    8px;
+  --r-sm: 5px;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+html { font-size: 15px; }
+body {
+  font-family: var(--font);
+  background: var(--slate-100);
+  color: var(--slate-900);
+  width: 430px;
+  max-height: 620px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+code {
+  font-family: var(--mono);
+  font-size: 0.8em;
+  background: var(--slate-100);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+header {
+  background: #fff;
+  border-bottom: 1px solid var(--slate-200);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.hdr-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.hdr-brand h1 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--slate-900);
+}
+.hdr-brand .tag {
+  font-size: 0.72rem;
+  color: var(--slate-500);
+}
+.hdr-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.auto-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.78rem;
+  color: var(--slate-600);
+}
+.auto-toggle input { cursor: pointer; accent-color: var(--blue-700); }
+
+/* ── Shortcut hint bar ────────────────────────────────────────────────────── */
+.shortcut-bar {
+  background: var(--blue-50);
+  border-bottom: 1px solid var(--blue-100);
+  padding: 5px 14px;
+  font-size: 0.73rem;
+  color: var(--blue-700);
+  flex-shrink: 0;
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+.tabs {
+  background: #fff;
+  border-bottom: 1px solid var(--slate-200);
+  padding: 0 14px;
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--slate-500);
+  cursor: pointer;
+  font: 500 0.82rem var(--font);
+  padding: 9px 11px;
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+}
+.tab:hover { color: var(--slate-700); }
+.tab.active { color: var(--blue-700); border-color: var(--blue-700); font-weight: 600; }
+.tab-add {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--slate-400);
+  cursor: pointer;
+  font: 500 1.2rem var(--font);
+  padding: 6px 10px;
+  line-height: 1;
+  transition: color .15s;
+}
+.tab-add:hover { color: var(--blue-700); }
+
+/* ── Main content ─────────────────────────────────────────────────────────── */
+main {
+  padding: 14px;
+  flex: 1;
+  overflow-y: auto;
+}
+.panel      { display: none; }
+.panel.active { display: grid; gap: 14px; }
+
+/* ── Config block ─────────────────────────────────────────────────────────── */
+.cfg {
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--r);
+}
+.cfg summary {
+  padding: 8px 12px;
+  cursor: pointer;
+  font: 600 0.78rem var(--font);
+  color: var(--slate-600);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  user-select: none;
+}
+.cfg summary::before {
+  content: '›';
+  font-size: 1rem;
+  display: inline-block;
+  transition: transform .15s;
+}
+.cfg[open] summary::before { transform: rotate(90deg); }
+.cfg summary::-webkit-details-marker { display: none; }
+.cfg-body {
+  padding: 10px 12px;
+  border-top: 1px solid var(--slate-200);
+  display: grid;
+  gap: 10px;
+}
+.cfg-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: start;
+  gap: 8px;
+}
+.cfg-row label {
+  font-size: 0.78rem;
+  color: var(--slate-600);
+  font-weight: 500;
+  padding-top: 5px;
+}
+.cfg-row input[type="text"],
+.cfg-row select,
+.cfg-row textarea.cfg-input {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  padding: 4px 7px;
+  border: 1px solid var(--slate-300);
+  border-radius: var(--r-sm);
+  background: #fff;
+  color: var(--slate-900);
+  width: 100%;
+}
+.cfg-row input:focus, .cfg-row select:focus, .cfg-row textarea:focus {
+  outline: 2px solid var(--blue-700);
+  outline-offset: -1px;
+}
+.cfg-full {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cfg-full label {
+  font-size: 0.78rem;
+  color: var(--slate-600);
+  font-weight: 500;
+}
+.cfg-full textarea {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  padding: 4px 7px;
+  border: 1px solid var(--slate-300);
+  border-radius: var(--r-sm);
+  background: #fff;
+  color: var(--slate-900);
+  width: 100%;
+  min-height: 52px;
+  resize: vertical;
+  line-height: 1.5;
+}
+.cfg-full textarea:focus {
+  outline: 2px solid var(--blue-700);
+  outline-offset: -1px;
+}
+.cfg-hint {
+  font-size: 0.72rem;
+  color: var(--slate-500);
+  line-height: 1.5;
+}
+
+/* ── Profile name input ───────────────────────────────────────────────────── */
+.profile-name-input {
+  font: 600 0.82rem var(--font);
+  color: var(--slate-900);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  padding: 2px 5px;
+  background: transparent;
+  width: 100%;
+}
+.profile-name-input:hover { border-color: var(--slate-300); background: #fff; }
+.profile-name-input:focus { outline: 2px solid var(--blue-700); outline-offset: -1px;
+  border-color: var(--blue-700); background: #fff; }
+
+/* ── I/O layout ───────────────────────────────────────────────────────────── */
+.io-row    { display: grid; gap: 5px; }
+.io-label  {
+  font: 600 0.78rem var(--font);
+  color: var(--slate-700);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.io-actions { display: flex; gap: 5px; }
+
+textarea {
+  width: 100%;
+  border: 1px solid var(--slate-300);
+  border-radius: var(--r);
+  padding: 8px 10px;
+  font: 0.82rem/1.55 var(--font);
+  resize: vertical;
+  background: #fff;
+  color: var(--slate-900);
+  transition: border-color .15s;
+}
+textarea:focus { outline: 2px solid var(--blue-700); outline-offset: -1px; }
+textarea.tall  { min-height: 90px; }
+textarea.out   {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  background: var(--slate-800);
+  color: #e2e8f0;
+  border-color: var(--slate-700);
+  min-height: 90px;
+}
+textarea.out:focus { outline-color: #93c5fd; border-color: var(--slate-600); }
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font: 500 0.78rem var(--font);
+  padding: 4px 10px;
+  transition: background .15s;
+  white-space: nowrap;
+}
+.btn-primary   { background: var(--blue-700); color: #fff; }
+.btn-primary:hover   { background: var(--blue-800); }
+.btn-secondary { background: #fff; color: var(--slate-700); border: 1px solid var(--slate-300); }
+.btn-secondary:hover { background: var(--slate-50); }
+.btn-ghost     { background: transparent; color: var(--slate-500); padding: 4px 7px; }
+.btn-ghost:hover     { background: var(--slate-100); color: var(--slate-700); }
+.btn-danger    { color: var(--red-600); }
+
+/* ── Status ───────────────────────────────────────────────────────────────── */
+.status { font-size: 0.75rem; color: var(--slate-500); min-height: 16px; }
+.status.ok  { color: var(--green-600); }
+.status.err { color: var(--red-600); }
+.errbox {
+  background: var(--red-50);
+  border: 1px solid var(--red-200);
+  border-radius: var(--r-sm);
+  padding: 7px 10px;
+  font: 0.75rem/1.4 var(--mono);
+  color: var(--red-600);
+  white-space: pre-wrap;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-brand">
+    <h1>LingTeX Tools</h1>
+    <span class="tag">LaTeX for linguistic fieldwork</span>
+  </div>
+  <div class="hdr-controls">
+    <label class="auto-toggle" title="Intercept Ctrl+V paste and convert automatically">
+      <input type="checkbox" id="auto-convert-cb">
+      Auto-convert paste
+    </label>
+  </div>
+</header>
+
+<div class="shortcut-bar">
+  <strong>Ctrl+Shift+V</strong> (Mac: <strong>⌘⇧V</strong>) — smart paste anywhere, always
+</div>
+
+<nav class="tabs" id="tab-nav" role="tablist">
+  <button class="tab active" role="tab" data-panel="flex" id="tab-flex">FLEx Interlinear</button>
+  <!-- Dynamic TSV profile tabs inserted here by popup.js -->
+  <button class="tab-add" id="tab-add-btn" title="Add a new TSV converter tab">+</button>
+</nav>
+
+<main id="main-content">
+
+  <!-- ── FLEx Interlinear (static panel) ───────────────────────────────── -->
+  <section id="panel-flex" class="panel active" role="tabpanel">
+
+    <details class="cfg" id="flex-cfg">
+      <summary>Configuration</summary>
+      <div class="cfg-body">
+
+        <div class="cfg-row">
+          <label for="flex-gl">Gloss command</label>
+          <input type="text" id="flex-gl" value="\gl"
+            placeholder="\gl  or  \textsc  or empty to disable">
+        </div>
+        <div class="cfg-hint">
+          Wraps all-caps abbreviations: <code>PST</code> → <code>\gl{pst}</code>.
+          Leave empty to disable.
+        </div>
+
+        <div class="cfg-row">
+          <label for="flex-wrap-exe">Wrap in <code>\begin{exe}</code></label>
+          <select id="flex-wrap-exe">
+            <option value="yes" selected>Yes — full exe block</option>
+            <option value="no">No — \gll lines only</option>
+          </select>
+        </div>
+
+        <div class="cfg-row">
+          <label for="flex-txtref">Source ref. command</label>
+          <input type="text" id="flex-txtref" value="\txtref"
+            placeholder="\txtref  or empty to omit">
+        </div>
+
+        <div class="cfg-row">
+          <label for="flex-txtpfx">Source ref. prefix</label>
+          <input type="text" id="flex-txtpfx" value="TXT:"
+            placeholder="TXT:  or empty">
+        </div>
+        <div class="cfg-hint">
+          Produces e.g. <code>\txtref{TXT:8}</code> on the <code>\glt</code> line.
+        </div>
+
+      </div>
+    </details>
+
+    <!-- Test area -->
+    <div class="io-row">
+      <div class="io-label">
+        <span>Test input</span>
+        <div class="io-actions">
+          <button class="btn btn-ghost" id="flex-clear-btn">Clear</button>
+        </div>
+      </div>
+      <textarea id="flex-in" class="tall" spellcheck="false"
+        placeholder="Paste FLEx interlinear text here to test conversion…"></textarea>
+    </div>
+    <div class="io-row">
+      <div class="io-label">
+        <span>Output — LaTeX</span>
+        <div class="io-actions">
+          <button class="btn btn-secondary" id="flex-copy-btn">Copy Result</button>
+        </div>
+      </div>
+      <textarea id="flex-out" class="out" readonly spellcheck="false"
+        placeholder="LaTeX output will appear here…"></textarea>
+      <div id="flex-status" class="status"></div>
+    </div>
+
+  </section>
+
+  <!-- Dynamic TSV profile panels rendered by popup.js -->
+
+</main>
+
+<script src="core.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>
