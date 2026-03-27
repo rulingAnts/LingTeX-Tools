@@ -652,14 +652,14 @@ function convertFlex() {
     if (!raw.trim()) { outEl.value = ''; statEl.textContent = ''; statEl.className = 'status'; return; }
 
     try {
-        var parsed = parseFLExBlock(raw);
+        var parsed = LingTeXCore.parseFLExBlock(raw);
         if (parsed.lineTypes.length === 0) {
             outEl.value = '';
             setStatus('flex', 'No recognisable interlinear tiers found. ' +
                 'Lines must start with: Word, Morphemes, Lex. Entries, Lex. Gloss, Word Gloss, Free', 'err');
             return;
         }
-        var latex = renderFLEx(parsed, {
+        var latex = LingTeXCore.renderFLEx(parsed, {
             glCmd:        document.getElementById('flex-gl').value.trim(),
             wrapExe:      document.getElementById('flex-wrap-exe').value === 'yes',
             txtrefCmd:    document.getElementById('flex-txtref').value.trim(),
