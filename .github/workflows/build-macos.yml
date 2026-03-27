@@ -1,0 +1,51 @@
+name: Build macOS (pre-release)
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: 'Version label appended to tag (e.g. beta.1)'
+        required: false
+        default: 'dev'
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync core.js into tauri/src/
+        run: cp docs/core.js tauri/src/core.js
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry + build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workingDirectory: tauri/src-tauri
+
+      - name: Build and publish pre-release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: tauri
+          tagName:      pre-mac-${{ github.run_number }}-${{ inputs.label }}
+          releaseName:  'LingTeX Tools — macOS pre-release #${{ github.run_number }}'
+          releaseBody:  |
+            macOS pre-release build — **not for production use**.
+
+            > **Note:** this build is unsigned. macOS Gatekeeper will block it on first launch.
+            > Right-click the `.app` → **Open** to bypass, or run:
+            > ```
+            > xattr -cr /Applications/LingTeX\ Tools.app
+            > ```
+
+            Triggered manually from branch `${{ github.ref_name }}`.
+          releaseDraft: false
+          prerelease:   true
