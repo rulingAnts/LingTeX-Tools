@@ -124,32 +124,6 @@ fn convert_for_profile(profile_id: &str, text: &str, cfg: &ActiveConfig) -> Opti
     }
 }
 
-/// Simulate a Cmd+V (macOS) or Ctrl+V (Windows/Linux) keystroke so the
-/// converted text is pasted into whatever app the user was working in.
-///
-/// A 50 ms pause before the keystroke gives the clipboard time to settle.
-/// On macOS this requires the app to have Accessibility permission
-/// (System Settings → Privacy & Security → Accessibility).
-fn simulate_paste() {
-    use enigo::{Direction, Enigo, Key, Keyboard, Settings};
-
-    thread::sleep(Duration::from_millis(50));
-    if let Ok(mut en) = Enigo::new(&Settings::default()) {
-        #[cfg(target_os = "macos")]
-        {
-            let _ = en.key(Key::Meta,        Direction::Press);
-            let _ = en.key(Key::Unicode('v'), Direction::Click);
-            let _ = en.key(Key::Meta,        Direction::Release);
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            let _ = en.key(Key::Control,      Direction::Press);
-            let _ = en.key(Key::Unicode('v'),  Direction::Click);
-            let _ = en.key(Key::Control,       Direction::Release);
-        }
-    }
-}
-
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
 /// Write text to the system clipboard. Called from the frontend via invoke().
@@ -240,10 +214,7 @@ fn register_profile_shortcut(
             if let Some(out) = converted {
                 // Record as our own write so the monitor doesn't clobber last_raw_clip
                 app_state.0.lock().unwrap().last_written = out.clone();
-                // Write converted text to clipboard, then simulate a paste
                 if cb.set_text(&out).is_ok() {
-                    drop(cb); // release clipboard before keystroke
-                    simulate_paste();
                     let _ = app.emit("profile-shortcut", serde_json::json!({
                         "profileId": &pid
                     }));
