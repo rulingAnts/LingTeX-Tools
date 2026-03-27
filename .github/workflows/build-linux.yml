@@ -1,0 +1,63 @@
+name: Build Linux (pre-release)
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: 'Version label appended to tag (e.g. beta.1)'
+        required: false
+        default: 'dev'
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync core.js into tauri/src/
+        run: cp docs/core.js tauri/src/core.js
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libxdo-dev
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry + build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workingDirectory: tauri/src-tauri
+
+      - name: Build and publish pre-release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: tauri
+          tagName:      pre-linux-${{ github.run_number }}-${{ inputs.label }}
+          releaseName:  'LingTeX Tools — Linux pre-release #${{ github.run_number }}'
+          releaseBody:  |
+            Linux pre-release build — **untested, but likely works**.
+
+            Produces `.deb` (Debian/Ubuntu) and `.AppImage` (universal) artifacts.
+            Global keyboard shortcuts require X11 or a Wayland compositor with
+            XWayland support. The system tray requires `libappindicator` (available
+            in most GNOME/KDE environments).
+
+            > Linux support is community-maintained. If you find issues or have
+            > fixes, please open a PR — contributions welcome!
+
+            Triggered manually from branch `${{ github.ref_name }}`.
+          releaseDraft: false
+          prerelease:   true

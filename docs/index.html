@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#1d4ed8">
-<meta name="description" content="LingTeX Tools — LaTeX macro tools for linguistic fieldwork. Convert FLEx interlinear exports, Phonology Assistant data, and more.">
+<meta name="description" content="LingTeX Tools — convert FLEx interlinear and Phonology Assistant exports to LaTeX. Desktop app (macOS &amp; Windows) and browser extension (Chrome &amp; Firefox).">
 <title>LingTeX Tools</title>
 <style>
 /* ── Reset ───────────────────────────────────────────────────────────────── */
@@ -27,10 +27,14 @@
   --slate-700: #334155;
   --slate-800: #1e293b;
   --slate-900: #0f172a;
+  --green-50:  #f0fdf4;
+  --green-200: #bbf7d0;
   --green-600: #16a34a;
   --red-50:    #fef2f2;
   --red-200:   #fecaca;
   --red-600:   #dc2626;
+  --amber-50:  #fffbeb;
+  --amber-200: #fde68a;
   --amber-600: #d97706;
 
   --font:      system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -38,10 +42,11 @@
   --r:         8px;
   --r-sm:      5px;
   --r-lg:      12px;
+  --max-w:     860px;
 }
 
 /* ── Base ────────────────────────────────────────────────────────────────── */
-html { font-size: 16px; }
+html { font-size: 16px; scroll-behavior: smooth; }
 body {
   font-family: var(--font);
   background: var(--slate-100);
@@ -53,10 +58,12 @@ body {
 code {
   font-family: var(--mono);
   font-size: 0.8125em;
-  background: var(--slate-100);
+  background: var(--slate-200);
   padding: 1px 5px;
   border-radius: 3px;
 }
+a { color: var(--blue-700); text-decoration: none; }
+a:hover { text-decoration: underline; }
 
 /* ── Update banner ───────────────────────────────────────────────────────── */
 #update-banner {
@@ -80,46 +87,213 @@ code {
 }
 #update-banner button:hover { background: var(--blue-50); }
 
-/* ── Header ──────────────────────────────────────────────────────────────── */
-header {
+/* ── Site navigation ─────────────────────────────────────────────────────── */
+.site-nav {
   background: #fff;
   border-bottom: 1px solid var(--slate-200);
   padding: 0 20px;
-}
-.hdr-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 13px 0 8px;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 16px;
+  height: 52px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
-.hdr-brand {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-.hdr-brand h1 {
-  font-size: 1.25rem;
+.nav-brand {
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--slate-900);
+  white-space: nowrap;
 }
-.hdr-brand .tag {
+.nav-links {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.nav-links a {
+  font-size: 0.8125rem;
+  color: var(--slate-600);
+  padding: 5px 10px;
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.nav-links a:hover { background: var(--slate-100); color: var(--slate-900); text-decoration: none; }
+.nav-links a.nav-gh {
+  border: 1px solid var(--slate-200);
+  color: var(--slate-700);
+}
+.nav-links a.nav-gh:hover { background: var(--slate-50); border-color: var(--slate-300); }
+
+/* ── Hero ────────────────────────────────────────────────────────────────── */
+.hero {
+  background: linear-gradient(160deg, var(--blue-800) 0%, var(--blue-700) 60%, #2563eb 100%);
+  color: #fff;
+  padding: 60px 20px 56px;
+  text-align: center;
+}
+.hero h1 {
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  max-width: 680px;
+  margin: 0 auto 16px;
+}
+.hero-sub {
+  font-size: 1.0625rem;
+  color: #bfdbfe;
+  line-height: 1.65;
+  max-width: 580px;
+  margin: 0 auto 32px;
+}
+.hero-btns {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.hero-btns a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 22px;
+  border-radius: var(--r);
+  font: 600 0.9375rem var(--font);
+  text-decoration: none;
+  transition: background .15s, transform .1s;
+}
+.hero-btns a:hover { transform: translateY(-1px); }
+.btn-hero-mac  { background: #fff; color: var(--blue-800); }
+.btn-hero-mac:hover  { background: var(--blue-50); }
+.btn-hero-win  { background: rgba(255,255,255,0.15); color: #fff; border: 1.5px solid rgba(255,255,255,0.35); }
+.btn-hero-win:hover  { background: rgba(255,255,255,0.25); }
+.btn-hero-ext  { background: rgba(255,255,255,0.10); color: #bfdbfe; border: 1.5px solid rgba(255,255,255,0.20); font-size: 0.875rem; padding: 8px 16px; }
+.btn-hero-ext:hover  { background: rgba(255,255,255,0.18); }
+.hero-note { font-size: 0.8125rem; color: #93c5fd; margin-top: 4px; }
+
+/* ── Products section ────────────────────────────────────────────────────── */
+.products {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 48px 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.product-card {
+  background: #fff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--r-lg);
+  padding: 28px 24px;
+}
+.product-card h2 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--slate-900);
+  margin-bottom: 8px;
+}
+.product-card .card-desc {
+  font-size: 0.9rem;
+  color: var(--slate-600);
+  line-height: 1.65;
+  margin-bottom: 20px;
+}
+.card-features {
+  list-style: none;
+  margin-bottom: 22px;
+}
+.card-features li {
+  font-size: 0.85rem;
+  color: var(--slate-600);
+  padding: 3px 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.card-features li::before { content: '✓'; color: var(--green-600); font-weight: 700; flex-shrink: 0; }
+.dl-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.dl-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: var(--r-sm);
+  font: 500 0.875rem var(--font);
+  text-decoration: none;
+  border: 1px solid var(--slate-200);
+  background: var(--slate-50);
+  color: var(--slate-800);
+  transition: background .15s, border-color .15s;
+}
+.dl-btn:hover { background: var(--blue-50); border-color: var(--blue-100); color: var(--blue-800); text-decoration: none; }
+.dl-btn.primary { background: var(--blue-700); color: #fff; border-color: var(--blue-700); }
+.dl-btn.primary:hover { background: var(--blue-800); border-color: var(--blue-800); }
+.dl-btn.muted { color: var(--slate-500); font-size: 0.8125rem; }
+.dl-btn .os-icon { font-size: 1.05em; }
+
+/* ── Linux note ──────────────────────────────────────────────────────────── */
+.linux-note-section {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 0 20px 40px;
+}
+.linux-note-box {
+  background: var(--amber-50);
+  border: 1px solid var(--amber-200);
+  border-radius: var(--r);
+  padding: 14px 18px;
+  font-size: 0.875rem;
+  color: var(--slate-700);
+  line-height: 1.6;
+}
+.linux-note-box strong { color: var(--slate-900); }
+
+/* ── Try-online divider ──────────────────────────────────────────────────── */
+.try-online-bar {
+  background: #fff;
+  border-top: 1px solid var(--slate-200);
+  border-bottom: 1px solid var(--slate-200);
+  padding: 20px 20px 0;
+}
+.try-online-hdr {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding-bottom: 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.try-online-hdr h2 {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--slate-900);
+  margin-bottom: 4px;
+}
+.try-online-hdr p {
+  font-size: 0.8375rem;
+  color: var(--slate-500);
+  line-height: 1.55;
+  max-width: 560px;
+}
+.app-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
   font-size: 0.8rem;
   color: var(--slate-500);
 }
-.hdr-status {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.75rem;
-  color: var(--slate-500);
-  flex-wrap: wrap;
-}
-.hdr-status-sep { color: var(--slate-300); }
-.auto-toggle { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
-.auto-toggle input { cursor: pointer; accent-color: var(--blue-700); }
 .dot {
   width: 7px; height: 7px;
   border-radius: 50%;
@@ -127,25 +301,9 @@ header {
   transition: background .3s;
 }
 .dot.offline { background: var(--slate-400); }
-
-.hdr-links {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  padding-bottom: 11px;
-}
-.hdr-links a {
-  font-size: 0.8rem;
-  color: var(--blue-700);
-  text-decoration: none;
-  padding: 4px 10px;
-  border: 1px solid var(--slate-200);
-  border-radius: var(--r-sm);
-  background: var(--slate-50);
-  white-space: nowrap;
-  transition: background .15s, border-color .15s;
-}
-.hdr-links a:hover { background: var(--blue-50); border-color: var(--blue-100); }
+.hdr-status-sep { color: var(--slate-300); }
+.auto-toggle { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
+.auto-toggle input { cursor: pointer; accent-color: var(--blue-700); }
 
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
 .tabs {
@@ -175,7 +333,7 @@ header {
 main {
   flex: 1;
   padding: 24px 20px 32px;
-  max-width: 860px;
+  max-width: var(--max-w);
   width: 100%;
   margin: 0 auto;
 }
@@ -374,13 +532,6 @@ footer a { color: var(--blue-700); text-decoration: none; }
 footer a:hover { text-decoration: underline; }
 .footer-links { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 4px; }
 
-/* ── Responsive ──────────────────────────────────────────────────────────── */
-@media (max-width: 560px) {
-  .cfg-row   { grid-template-columns: 1fr; }
-  .cfg-hint  { grid-column: 1; }
-.hdr-brand .tag { display: none; }
-}
-
 /* ── Dynamic TSV tabs ────────────────────────────────────────────────────── */
 .tab-add {
   background: none;
@@ -408,6 +559,14 @@ footer a:hover { text-decoration: underline; }
 .profile-name-input:focus { outline: 2px solid var(--blue-700); outline-offset: -1px; border-color: var(--blue-700); background: #fff; }
 
 .btn-danger { color: var(--red-600); }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .products { grid-template-columns: 1fr; }
+  .cfg-row  { grid-template-columns: 1fr; }
+  .cfg-hint { grid-column: 1; }
+  .try-online-hdr { flex-direction: column; }
+}
 </style>
 </head>
 <body>
@@ -418,29 +577,133 @@ footer a:hover { text-decoration: underline; }
   <button onclick="applyUpdate()">Reload to update</button>
 </div>
 
-<header>
-  <div class="hdr-top">
-    <div class="hdr-brand">
-      <h1>LingTeX Tools</h1>
-      <span class="tag">LaTeX tools for linguistic fieldwork</span>
+<!-- ── Site navigation ───────────────────────────────────────────────────── -->
+<nav class="site-nav">
+  <div class="nav-brand">LingTeX Tools</div>
+  <div class="nav-links">
+    <a href="#download">Desktop App</a>
+    <a href="#extensions">Extensions</a>
+    <a href="#try-online">Try Online</a>
+    <a href="https://github.com/rulingAnts/LingTeX" target="_blank">LingTeX Template</a>
+    <a href="https://github.com/rulingAnts/LingTeX-Tools" class="nav-gh" target="_blank">GitHub</a>
+  </div>
+</nav>
+
+<!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <h1>LaTeX for linguistic fieldwork, without the friction</h1>
+  <p class="hero-sub">
+    Convert FLEx interlinear text, Phonology Assistant exports, and custom
+    tab-separated data to LaTeX — instantly, from anywhere on your computer
+    or in any online editor.
+  </p>
+  <div class="hero-btns">
+    <a href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="btn-hero-mac" target="_blank">
+      ⬇ Download for macOS
+    </a>
+    <a href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="btn-hero-win" target="_blank">
+      ⬇ Download for Windows
+    </a>
+  </div>
+  <div class="hero-btns">
+    <a href="#extensions" class="btn-hero-ext">⬡ Browser Extension — Chrome &amp; Firefox</a>
+  </div>
+  <p class="hero-note">Works with any TeX editor — Overleaf, VS Code, TeXShop, TeXworks, and more</p>
+</section>
+
+<!-- ── Download / Products ───────────────────────────────────────────────── -->
+<div id="download">
+<section class="products">
+
+  <!-- Desktop App -->
+  <div class="product-card">
+    <h2>🖥 Desktop App</h2>
+    <p class="card-desc">
+      Runs silently in the system tray (Windows) or menu bar (macOS).
+      Register keyboard shortcuts that work <em>system-wide</em> in any application.
+    </p>
+    <ul class="card-features">
+      <li>Global keyboard shortcuts — fire from any TeX editor</li>
+      <li>Auto re-copy: converts clipboard on every paste automatically</li>
+      <li>FLEx interlinear + custom TSV profiles</li>
+      <li>No browser needed — works fully offline</li>
+    </ul>
+    <div class="dl-btns">
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn primary" target="_blank">
+        <span class="os-icon"></span> macOS (.dmg)
+      </a>
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn" target="_blank">
+        <span class="os-icon">🪟</span> Windows (.msi / .exe)
+      </a>
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn muted" target="_blank">
+        <span class="os-icon">🐧</span> Linux — see note below
+      </a>
     </div>
-    <div class="hdr-status">
+  </div>
+
+  <!-- Browser Extension -->
+  <div class="product-card" id="extensions">
+    <h2>⬡ Browser Extension</h2>
+    <p class="card-desc">
+      Adds a toolbar button to your browser. Works in Overleaf, Authorea,
+      and any online TeX editor — convert and copy without leaving the page.
+    </p>
+    <ul class="card-features">
+      <li>Works in Overleaf, Authorea, and more</li>
+      <li>Auto re-copy on tab focus</li>
+      <li>FLEx interlinear + custom TSV profiles</li>
+      <li>Settings sync across browser sessions</li>
+    </ul>
+    <div class="dl-btns">
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/tree/main/extension/firefox"
+         class="dl-btn" target="_blank">
+        🦊 Firefox — manual install (store listing coming soon)
+      </a>
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/tree/main/extension/chrome"
+         class="dl-btn" target="_blank">
+        🌐 Chrome — manual install (store listing coming soon)
+      </a>
+    </div>
+  </div>
+
+</section>
+</div>
+
+<!-- ── Linux note ────────────────────────────────────────────────────────── -->
+<div class="linux-note-section">
+  <div class="linux-note-box">
+    <strong>🐧 Linux:</strong> The desktop app has not been tested on Linux — the developer
+    does not have a Linux machine. In principle it should work (Tauri supports Linux, global
+    shortcuts use X11/XWayland, and the system tray requires <code>libappindicator</code>).
+    Pre-built <code>.deb</code> and <code>.AppImage</code> artifacts are available on the
+    <a href="https://github.com/rulingAnts/LingTeX-Tools/releases" target="_blank">releases page</a>.
+    If you try it and find issues — or get it working — please
+    <a href="https://github.com/rulingAnts/LingTeX-Tools/issues" target="_blank">open an issue or PR</a>.
+    Linux contributions are very welcome.
+  </div>
+</div>
+
+<!-- ── Try it online ─────────────────────────────────────────────────────── -->
+<div class="try-online-bar" id="try-online">
+  <div class="try-online-hdr">
+    <div>
+      <h2>Try it in your browser</h2>
+      <p>
+        No installation needed. Good for occasional use or trying it out before installing.
+        Settings are saved in your browser's local storage.
+      </p>
+    </div>
+    <div class="app-controls">
       <span class="dot" id="dot"></span>
       <span id="net-label">Online</span>
       <span class="hdr-status-sep">·</span>
-      <label class="auto-toggle">
+      <label class="auto-toggle" title="Auto-convert clipboard on focus and re-copy the result">
         <input type="checkbox" id="auto-copy-cb" onchange="saveAutoSetting(this.checked)">
         Auto re-copy
       </label>
     </div>
   </div>
-  <nav class="hdr-links">
-    <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest">↓ TeXstudio Macros</a>
-    <a href="https://github.com/rulingAnts/LingTeX-Tools/tree/main/extension">⬡ Browser Extension</a>
-    <a href="https://github.com/rulingAnts/LingTeX">LingTeX Template</a>
-    <a href="https://github.com/rulingAnts/LingTeX-Tools">GitHub</a>
-  </nav>
-</header>
+</div>
 
 <nav class="tabs" id="tab-nav" role="tablist">
   <button class="tab active" role="tab" data-panel="flex" onclick="switchTab(this)">FLEx Interlinear</button>
@@ -476,13 +739,11 @@ footer a:hover { text-decoration: underline; }
           Set to <code>\textsc</code> for standard small-caps, or leave <strong>empty</strong> to disable wrapping entirely.
         </div>
 
-        <div class="cfg-row">
-          <label for="flex-wrap-exe">Wrap in <code>\begin{exe}</code></label>
-          <select id="flex-wrap-exe" onchange="convertFlex()">
-            <option value="yes" selected>Yes — full \begin{exe} … \end{exe} block</option>
-            <option value="no">No — \gll lines only (for manual placement)</option>
-          </select>
-        </div>
+        <!-- TODO (future release): wire up \begin{exe} wrapping toggle;
+             currently has no effect so the control is hidden. Always wraps in exe block. -->
+        <select id="flex-wrap-exe" hidden>
+          <option value="yes" selected>Yes — full \begin{exe} … \end{exe} block</option>
+        </select>
 
         <div class="cfg-row">
           <label for="flex-txtref">Source ref. command</label>
@@ -530,15 +791,14 @@ footer a:hover { text-decoration: underline; }
 
   </section>
 
-
 </main>
 
 <footer>
   <div class="footer-links">
-    <a href="https://github.com/rulingAnts/LingTeX">LingTeX Template</a>
-    <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest">Download TeXstudio Macros</a>
-    <a href="https://github.com/rulingAnts/LingTeX-Tools">GitHub</a>
-    <a href="https://github.com/rulingAnts/LingTeX-Tools/issues">Report an issue</a>
+    <a href="https://github.com/rulingAnts/LingTeX" target="_blank">LingTeX Template</a>
+    <a href="https://github.com/rulingAnts/LingTeX-Tools/releases" target="_blank">Releases</a>
+    <a href="https://github.com/rulingAnts/LingTeX-Tools" target="_blank">GitHub</a>
+    <a href="https://github.com/rulingAnts/LingTeX-Tools/issues" target="_blank">Report an issue</a>
   </div>
   <div>LingTeX Tools — AGPL-3.0 © Seth Johnston</div>
 </footer>
