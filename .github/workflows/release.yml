@@ -264,7 +264,7 @@ jobs:
           projectPath: tauri
           releaseId: ${{ needs.create-release.outputs.release_id }}
 
-  # ── 6. Publish (un-draft) once confirmed artifacts are uploaded ────────────
+  # ── 6. Publish (un-draft) and update download links on the website ──────────
   publish-release:
     needs: [extensions, desktop-macos, desktop-windows, desktop-linux]
     runs-on: ubuntu-latest
@@ -273,3 +273,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release edit ${{ github.ref_name }} --draft=false --repo ${{ github.repository }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update latest-downloads.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view ${{ github.ref_name }} --repo ${{ github.repository }} --json assets \
+            --jq '{
+              macos:           ([ .assets[] | select(.name | endswith(".dmg"))        | .url ] | first),
+              win_exe:         ([ .assets[] | select(.name | endswith("-setup.exe"))  | .url ] | first),
+              win_msi:         ([ .assets[] | select(.name | endswith(".msi"))        | .url ] | first),
+              linux_deb:       ([ .assets[] | select(.name | endswith(".deb"))        | .url ] | first),
+              linux_appimage:  ([ .assets[] | select(.name | endswith(".AppImage"))   | .url ] | first)
+            }' > docs/latest-downloads.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/latest-downloads.json
+          git commit -m "chore: update latest-downloads.json for ${{ github.ref_name }} [skip ci]"
+          git push

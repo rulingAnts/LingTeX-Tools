@@ -651,10 +651,12 @@ footer a:hover { text-decoration: underline; }
       <a id="dl-win-msi" href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn" target="_blank">
         <span class="os-icon">🪟</span> Windows (.msi)
       </a>
-      <a id="dl-linux-deb" href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn muted" target="_blank">
+      <a id="dl-linux-deb" href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn muted" target="_blank"
+         title="⚠️ Linux builds have not been tested by the developer — use at your own risk">
         <span class="os-icon">🐧</span> Linux (.deb)
       </a>
-      <a id="dl-linux-appimage" href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn muted" target="_blank">
+      <a id="dl-linux-appimage" href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn muted" target="_blank"
+         title="⚠️ Linux builds have not been tested by the developer — use at your own risk">
         <span class="os-icon">🐧</span> Linux (.AppImage)
       </a>
     </div>
@@ -696,6 +698,24 @@ footer a:hover { text-decoration: underline; }
       <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-chrome.zip" class="dl-btn" target="_blank">
         🌐 Chrome / Edge (.zip)
       </a>
+    </div>
+    <div class="macos-note" style="margin-top:14px">
+      <strong>Manual install required</strong> — not yet in the browser stores.
+      <ol>
+        <li>
+          <strong>Chrome / Edge:</strong> unzip the download somewhere permanent,
+          go to <code>chrome://extensions</code>, enable <strong>Developer mode</strong>,
+          click <strong>Load unpacked</strong>, and select the unzipped folder.
+          Pin the icon from the puzzle-piece menu.
+        </li>
+        <li>
+          <strong>Firefox:</strong> unzip the download, go to
+          <code>about:debugging#/runtime/this-firefox</code>,
+          click <strong>Load Temporary Add-on…</strong>, and select
+          <code>manifest.json</code> inside the unzipped folder.
+          <em>Note: Firefox unloads temporary add-ons on quit — repeat after each restart.</em>
+        </li>
+      </ol>
     </div>
     <p class="cfg-hint" style="margin-top:10px">
       🧭 <strong>Safari</strong> support is planned for a future release.
@@ -840,25 +860,22 @@ footer a:hover { text-decoration: underline; }
 <script src="core.js"></script>
 
 <script>
-// ── Download button URLs — resolved from latest GitHub release ────────────────
+// ── Download button URLs — resolved from latest-downloads.json ───────────────
 (function () {
-  var REPO = 'rulingAnts/LingTeX-Tools';
-  fetch('https://api.github.com/repos/' + REPO + '/releases/latest')
+  fetch('latest-downloads.json')
     .then(function (r) { return r.json(); })
     .then(function (data) {
-      var assets = data.assets || [];
       var map = {
-        'dl-macos':          function (n) { return n.endsWith('.dmg'); },
-        'dl-win-exe':        function (n) { return n.endsWith('-setup.exe'); },
-        'dl-win-msi':        function (n) { return n.endsWith('.msi'); },
-        'dl-linux-deb':      function (n) { return n.endsWith('.deb'); },
-        'dl-linux-appimage': function (n) { return n.endsWith('.AppImage'); }
+        'dl-macos':          data.macos,
+        'dl-win-exe':        data.win_exe,
+        'dl-win-msi':        data.win_msi,
+        'dl-linux-deb':      data.linux_deb,
+        'dl-linux-appimage': data.linux_appimage
       };
       Object.keys(map).forEach(function (id) {
-        var asset = assets.find(function (a) { return map[id](a.name); });
-        if (asset) {
+        if (map[id]) {
           var el = document.getElementById(id);
-          if (el) el.href = asset.browser_download_url;
+          if (el) el.href = map[id];
         }
       });
     })

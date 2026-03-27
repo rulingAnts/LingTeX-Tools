@@ -1,0 +1,7 @@
+{
+  "macos": "https://github.com/rulingAnts/LingTeX-Tools/releases/download/v0.1.0/LingTeX.Tools_0.1.0_aarch64.dmg",
+  "win_exe": "https://github.com/rulingAnts/LingTeX-Tools/releases/download/v0.1.0/LingTeX.Tools_0.1.0_x64-setup.exe",
+  "win_msi": "https://github.com/rulingAnts/LingTeX-Tools/releases/download/v0.1.0/LingTeX.Tools_0.1.0_x64_en-US.msi",
+  "linux_deb": "https://github.com/rulingAnts/LingTeX-Tools/releases/download/v0.1.0/LingTeX.Tools_0.1.0_amd64.deb",
+  "linux_appimage": "https://github.com/rulingAnts/LingTeX-Tools/releases/download/v0.1.0/LingTeX.Tools_0.1.0_amd64.AppImage"
+}
