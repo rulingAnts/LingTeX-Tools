@@ -317,8 +317,6 @@ a:hover { text-decoration: underline; }
 }
 .dot.offline { background: var(--slate-400); }
 .hdr-status-sep { color: var(--slate-300); }
-.auto-toggle { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
-.auto-toggle input { cursor: pointer; accent-color: var(--blue-700); }
 
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
 .tabs {
@@ -727,11 +725,6 @@ footer a:hover { text-decoration: underline; }
     <div class="app-controls">
       <span class="dot" id="dot"></span>
       <span id="net-label">Online</span>
-      <span class="hdr-status-sep">·</span>
-      <label class="auto-toggle" title="Auto-convert clipboard on focus and re-copy the result">
-        <input type="checkbox" id="auto-copy-cb" onchange="saveAutoSetting(this.checked)">
-        Auto re-copy
-      </label>
     </div>
   </div>
 </div>
@@ -872,58 +865,6 @@ async function copyOutput(outId, btn) {
     }
 }
 
-// Auto re-copy toggle — persisted in localStorage
-var autoCopyEnabled = true;
-
-function loadAutoSetting() {
-    var stored = localStorage.getItem('lingtex-auto-copy');
-    autoCopyEnabled = stored !== 'off';
-    var cb = document.getElementById('auto-copy-cb');
-    if (cb) cb.checked = autoCopyEnabled;
-}
-
-function saveAutoSetting(val) {
-    autoCopyEnabled = val;
-    localStorage.setItem('lingtex-auto-copy', val ? 'on' : 'off');
-}
-
-// Auto-process: fires when the page regains focus (tab switch or app switch).
-// Always reads clipboard and converts if content is new.
-// Only writes back to clipboard if autoCopyEnabled is true.
-var lastAutoClip = null;
-
-async function autoProcess() {
-    try {
-        var text = await navigator.clipboard.readText();
-        if (!text || !text.trim() || text === lastAutoClip) return;
-        lastAutoClip = text;
-
-        var tool  = activePanel;
-        var inId  = tool === 'flex' ? 'flex-in'  : tool + '-in';
-        var outId = tool === 'flex' ? 'flex-out' : tool + '-out';
-        var inEl  = document.getElementById(inId);
-        if (!inEl) return;
-
-        inEl.value = text;
-        inEl.dispatchEvent(new Event('input')); // triggers convert + setStatus
-
-        var out = document.getElementById(outId).value;
-        if (!out.trim()) return;
-
-        if (autoCopyEnabled) {
-            await navigator.clipboard.writeText(out);
-            var statEl = document.getElementById(tool + '-status');
-            if (statEl) { statEl.textContent += ' · ✓ auto-copied'; statEl.className = 'status ok'; }
-        }
-    } catch (e) {
-        // Clipboard permission denied or unavailable — fail silently
-    }
-}
-
-document.addEventListener('visibilitychange', function() {
-    if (!document.hidden) autoProcess();
-});
-window.addEventListener('focus', autoProcess);
 
 function clearTool(id) {
     document.getElementById(id + '-in').value  = '';
@@ -1255,7 +1196,6 @@ function convertTSV(id) {
 
 // Initialise profiles, settings, and render
 loadProfiles();
-loadAutoSetting();
 renderAll();
 // Activate first TSV profile tab by default (flex starts active)
 // (user stays on flex tab on page load; TSV tabs render in background)
