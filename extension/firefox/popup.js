@@ -387,13 +387,13 @@ function convertFlex() {
     }
 
     try {
-        var parsed = parseFLExBlock(raw);
+        var parsed = LingTeXCore.parseFLExBlock(raw);
         if (!parsed.lineTypes || parsed.lineTypes.length === 0) {
             outEl.value = '';
             setStatus('flex', 'No recognisable interlinear tiers found.', 'err');
             return;
         }
-        var latex = renderFLEx(parsed, {
+        var latex = LingTeXCore.renderFLEx(parsed, {
             glCmd:        document.getElementById('flex-gl').value.trim(),
             wrapExe:      document.getElementById('flex-wrap-exe').value === 'yes',
             txtrefCmd:    document.getElementById('flex-txtref').value.trim(),
