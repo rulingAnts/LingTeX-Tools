@@ -139,51 +139,50 @@
     }
 
     // ── Smart-paste shortcut  Ctrl+Shift+V / Cmd+Shift+V ─────────────────────
-    // Captured at the top of the event chain so it fires regardless of which
-    // element has focus, and before the page or editor can intercept the key.
+    // Rather than calling navigator.clipboard.readText() (unreliable in Firefox
+    // content scripts), we arm a flag in keydown and let the browser's own paste
+    // action fire — which produces a paste event with e.clipboardData available.
+    // The unified paste handler below converts when either the flag or
+    // autoConvert is set.
+
+    var smartPasteArmed = false;
 
     document.addEventListener('keydown', function (e) {
         var isMac = /Mac|iPhone|iPad/i.test(navigator.platform);
         var mod   = isMac ? e.metaKey : e.ctrlKey;
         if (!mod || !e.shiftKey || e.key !== 'V') return;
 
-        e.preventDefault();
-        e.stopImmediatePropagation();
-
-        navigator.clipboard.readText().then(function (text) {
-            insertAtCursor(convert(text) || text);
-        }).catch(function () {
-            // Clipboard permission denied — nothing we can do here
-        });
+        smartPasteArmed = true;
+        setTimeout(function () { smartPasteArmed = false; }, 300);
+        // Do NOT preventDefault here — let the browser generate the paste event
+        // so e.clipboardData is populated. We preventDefault on that event instead.
     }, true);
 
-    // ── Auto-convert paste intercept ──────────────────────────────────────────
-    // Only active when cfg.autoConvert is true (set via the popup toggle).
-    // If conversion produces no output (e.g. unrecognised format), falls through
-    // to normal paste behaviour.
+    // ── Unified paste handler (auto-convert + smart-paste) ────────────────────
+    // Handles both Ctrl+V with autoConvert ON, and Ctrl+Shift+V (armed above).
+    // e.clipboardData is always available here — no clipboard API permission needed.
 
     document.addEventListener('paste', function (e) {
-        if (!cfg.autoConvert) return;
+        var shouldConvert = cfg.autoConvert || smartPasteArmed;
+        smartPasteArmed = false;
+        if (!shouldConvert) return;
+
         var text = e.clipboardData && e.clipboardData.getData('text/plain');
         if (!text) return;
 
         var out = convert(text);
-        if (!out || out === text) return;   // nothing changed — let it fall through
+        if (!out || out === text) return;   // unrecognised format — fall through
 
         e.preventDefault();
         e.stopImmediatePropagation();
         insertAtCursor(out);
     }, true);
 
-    // ── Message from background service worker ────────────────────────────────
-    // Background forwards the keyboard-command event here as a fallback for
-    // cases where the keydown listener might be suppressed by the page.
-
+    // ── Message from background (keyboard command API fallback) ───────────────
     chrome.runtime.onMessage.addListener(function (msg) {
         if (msg.type !== 'SMART_PASTE') return;
-        navigator.clipboard.readText().then(function (text) {
-            insertAtCursor(convert(text) || text);
-        }).catch(function () {});
+        smartPasteArmed = true;
+        setTimeout(function () { smartPasteArmed = false; }, 300);
     });
 
 }());

@@ -47,23 +47,56 @@ For permanent Firefox installation, sign via [addons.mozilla.org](https://addons
 
 ## Safari
 
-Convert the Chrome extension to a Safari extension using Apple's tool:
+The GitHub Actions release workflow builds the Safari extension automatically and
+attaches it as a `.zip` containing a macOS `.app` bundle. Because this release is
+**not signed with an Apple Developer certificate** (which requires a $99/year Apple
+Developer Program membership), there are a few extra steps to install it:
+
+### Installing the unsigned Safari extension
+
+1. Download `lingtex-tools-safari.zip` from the [latest release](https://github.com/rulingAnts/LingTeX-Tools/releases/latest) and unzip it
+2. Move **LingTeX Tools.app** to your Applications folder
+3. Run the app once — a small window appears confirming the extension is installed
+4. Open **Safari → Settings → Extensions** and toggle **LingTeX Tools** on
+5. Enable unsigned extensions (required every time Safari relaunches):
+   - If you don't see a Develop menu: **Safari → Settings → Advanced → check "Show features for web developers"**
+   - Then: **Develop → Allow Unsigned Extensions** (enter your password when prompted)
+
+> **Note:** "Allow Unsigned Extensions" resets each time Safari quits, so you'll need to
+> re-enable it after every restart. This is an Apple security restriction for unsigned extensions.
+> If you find this too cumbersome, Chrome or Firefox have no such limitation.
+
+### Want to distribute a signed version?
+
+If you have an Apple Developer Program account and want to build a properly signed version
+for yourself or others, you're welcome to **fork this repository** and add your own signing
+credentials to the GitHub Actions workflow. The signing steps are standard Xcode CI/CD —
+see [Apple's documentation](https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases).
+
+### Building manually
+
+If you have the full Xcode app installed locally:
 
 ```bash
+# Generate the Xcode project from the Chrome extension
 xcrun safari-web-extension-converter extension/chrome \
     --project-location extension/safari \
-    --app-name "LingTeX Tools"
+    --app-name "LingTeX Tools" \
+    --bundle-identifier com.rulingants.lingtex-tools
+
+# Build (headless, no GUI needed)
+xcodebuild -project "extension/safari/LingTeX Tools/LingTeX Tools.xcodeproj" \
+    -scheme "LingTeX Tools (macOS)" \
+    CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
 ```
 
-Then open `extension/safari/LingTeX Tools/LingTeX Tools.xcodeproj` in Xcode,
-build, and enable in Safari → Preferences → Extensions.
-
-Requires macOS 12+, Xcode 14+, and an Apple Developer account for distribution.
+Requires macOS 12+ and Xcode 14+.
 
 ## Release zips (GitHub Actions)
 
 The release workflow automatically runs `./build.sh --zip` and attaches
-`lingtex-tools-chrome.zip` and `lingtex-tools-firefox.zip` to each GitHub release.
+`lingtex-tools-chrome.zip`, `lingtex-tools-firefox.zip`, and
+`lingtex-tools-safari.zip` to each GitHub release.
 
 ## File structure
 

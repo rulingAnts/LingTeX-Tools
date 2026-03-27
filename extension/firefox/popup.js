@@ -44,10 +44,12 @@ document.addEventListener('DOMContentLoaded', function () {
             profiles = data['lingtex-profiles'];
         }
 
-        // Active panel
+        // Active panel — read stored value, then write it back so the
+        // content script is always in sync with the popup's current state.
         if (data['lingtex-active-profile']) {
             activePanel = data['lingtex-active-profile'];
         }
+        storageSet({ 'lingtex-active-profile': activePanel });
 
         // Auto-convert toggle
         var autoCb = document.getElementById('auto-convert-cb');
