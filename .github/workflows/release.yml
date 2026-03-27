@@ -94,6 +94,14 @@ jobs:
       - name: Sync core.js into tauri/src/
         run: cp docs/core.js tauri/src/core.js
 
+      - name: Set version from tag
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          jq --arg v "$VERSION" '.version = $v' tauri/src-tauri/tauri.conf.json > tmp.json
+          mv tmp.json tauri/src-tauri/tauri.conf.json
+
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
 
@@ -121,6 +129,14 @@ jobs:
       - name: Sync core.js into tauri/src/
         run: cp docs/core.js tauri/src/core.js
 
+      - name: Set version from tag
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          jq --arg v "$VERSION" '.version = $v' tauri/src-tauri/tauri.conf.json > tmp.json
+          mv tmp.json tauri/src-tauri/tauri.conf.json
+
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
 
@@ -147,6 +163,14 @@ jobs:
 
       - name: Sync core.js into tauri/src/
         run: cp docs/core.js tauri/src/core.js
+
+      - name: Set version from tag
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          jq --arg v "$VERSION" '.version = $v' tauri/src-tauri/tauri.conf.json > tmp.json
+          mv tmp.json tauri/src-tauri/tauri.conf.json
 
       - name: Install system dependencies
         run: |

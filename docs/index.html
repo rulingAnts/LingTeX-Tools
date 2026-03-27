@@ -684,14 +684,47 @@ footer a:hover { text-decoration: underline; }
       <li>Settings sync across browser sessions</li>
     </ul>
     <div class="dl-btns">
-      <a href="https://github.com/rulingAnts/LingTeX-Tools/tree/main/extension/firefox"
-         class="dl-btn" target="_blank">
-        🦊 Firefox — manual install (store listing coming soon)
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn" target="_blank">
+        🦊 Firefox (.zip)
       </a>
-      <a href="https://github.com/rulingAnts/LingTeX-Tools/tree/main/extension/chrome"
-         class="dl-btn" target="_blank">
-        🌐 Chrome — manual install (store listing coming soon)
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn" target="_blank">
+        🌐 Chrome / Edge (.zip)
       </a>
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn" target="_blank">
+        🧭 Safari (.zip) — see note below
+      </a>
+    </div>
+    <div class="macos-note">
+      <strong>🧭 Safari users (macOS only):</strong>
+      <p style="margin-top:6px">
+        The Safari extension is <strong>unsigned</strong> (signing requires an Apple Developer
+        Program membership). A few extra steps are needed:
+      </p>
+      <ol>
+        <li>
+          Download <code>lingtex-tools-safari.zip</code>, unzip it, and move
+          <strong>LingTeX Tools.app</strong> to your Applications folder.
+        </li>
+        <li>
+          Run the app once — a small window confirms the extension is registered with Safari.
+          Close it when done.
+        </li>
+        <li>
+          Open <strong>Safari → Settings → Extensions</strong> and toggle
+          <strong>LingTeX Tools</strong> on.
+        </li>
+        <li>
+          Enable unsigned extensions — you must do this <em>each time Safari relaunches</em>:
+          <br>If you don't see a Develop menu:
+          <strong>Safari → Settings → Advanced → Show features for web developers</strong>
+          <br>Then: <strong>Develop → Allow Unsigned Extensions</strong> (enter your password)
+        </li>
+      </ol>
+      <p style="margin-top:6px">
+        The "Allow Unsigned Extensions" toggle resets every time Safari quits — this is an
+        Apple security requirement. Chrome and Firefox have no such limitation and are
+        recommended for daily use.
+      </p>
     </div>
   </div>
 
