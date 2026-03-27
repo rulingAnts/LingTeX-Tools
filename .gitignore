@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+
+# Node / web tooling (if added later)
+node_modules/
+dist/
+.env
+
+# Editor
+.vscode/
+*.swp

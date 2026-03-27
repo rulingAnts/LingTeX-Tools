@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1d4ed8">
+<meta name="description" content="LingTeX Tools — LaTeX macro tools for linguistic fieldwork. Convert FLEx interlinear exports, Phonology Assistant data, and more.">
+<title>LingTeX Tools</title>
+<style>
+/* ── Reset ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Design tokens ───────────────────────────────────────────────────────── */
+:root {
+  --blue-50:   #eff6ff;
+  --blue-100:  #dbeafe;
+  --blue-600:  #2563eb;
+  --blue-700:  #1d4ed8;
+  --blue-800:  #1e40af;
+  --slate-50:  #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+  --green-600: #16a34a;
+  --red-50:    #fef2f2;
+  --red-200:   #fecaca;
+  --red-600:   #dc2626;
+  --amber-600: #d97706;
+
+  --font:      system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono:      ui-monospace, 'Cascadia Code', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  --r:         8px;
+  --r-sm:      5px;
+  --r-lg:      12px;
+}
+
+/* ── Base ────────────────────────────────────────────────────────────────── */
+html { font-size: 16px; }
+body {
+  font-family: var(--font);
+  background: var(--slate-100);
+  color: var(--slate-900);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+code {
+  font-family: var(--mono);
+  font-size: 0.8125em;
+  background: var(--slate-100);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* ── Update banner ───────────────────────────────────────────────────────── */
+#update-banner {
+  display: none;
+  background: var(--blue-700);
+  color: #fff;
+  padding: 9px 16px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 0.875rem;
+}
+#update-banner button {
+  background: #fff;
+  color: var(--blue-700);
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 4px 12px;
+  font: 600 0.8125rem var(--font);
+  cursor: pointer;
+}
+#update-banner button:hover { background: var(--blue-50); }
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+header {
+  background: #fff;
+  border-bottom: 1px solid var(--slate-200);
+  padding: 0 20px;
+}
+.hdr-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 0 8px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.hdr-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.hdr-brand h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--slate-900);
+}
+.hdr-brand .tag {
+  font-size: 0.8rem;
+  color: var(--slate-500);
+}
+.hdr-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: var(--slate-500);
+  flex-wrap: wrap;
+}
+.hdr-status-sep { color: var(--slate-300); }
+.auto-toggle { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
+.auto-toggle input { cursor: pointer; accent-color: var(--blue-700); }
+.dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green-600);
+  transition: background .3s;
+}
+.dot.offline { background: var(--slate-400); }
+
+.hdr-links {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-bottom: 11px;
+}
+.hdr-links a {
+  font-size: 0.8rem;
+  color: var(--blue-700);
+  text-decoration: none;
+  padding: 4px 10px;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--r-sm);
+  background: var(--slate-50);
+  white-space: nowrap;
+  transition: background .15s, border-color .15s;
+}
+.hdr-links a:hover { background: var(--blue-50); border-color: var(--blue-100); }
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+.tabs {
+  background: #fff;
+  border-bottom: 1px solid var(--slate-200);
+  padding: 0 20px;
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--slate-500);
+  cursor: pointer;
+  font: 500 0.875rem var(--font);
+  padding: 11px 14px;
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+}
+.tab:hover { color: var(--slate-700); }
+.tab.active { color: var(--blue-700); border-color: var(--blue-700); font-weight: 600; }
+
+/* ── Main layout ─────────────────────────────────────────────────────────── */
+main {
+  flex: 1;
+  padding: 24px 20px 32px;
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.panel { display: none; }
+.panel.active { display: grid; gap: 18px; }
+
+.tool-desc {
+  color: var(--slate-600);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+
+/* ── Config block ────────────────────────────────────────────────────────── */
+.cfg {
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--r);
+}
+.cfg summary {
+  padding: 9px 14px;
+  cursor: pointer;
+  font: 600 0.8125rem var(--font);
+  color: var(--slate-600);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+.cfg summary::before {
+  content: '›';
+  font-size: 1.1rem;
+  display: inline-block;
+  transition: transform .15s;
+}
+.cfg[open] summary::before { transform: rotate(90deg); }
+.cfg summary::-webkit-details-marker { display: none; }
+.cfg-body {
+  padding: 12px 14px;
+  border-top: 1px solid var(--slate-200);
+  display: grid;
+  gap: 12px;
+}
+.cfg-row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  align-items: start;
+  gap: 10px;
+}
+.cfg-row label {
+  font-size: 0.8125rem;
+  color: var(--slate-600);
+  font-weight: 500;
+  padding-top: 6px;
+}
+.cfg-row input[type="text"],
+.cfg-row select,
+.cfg-row textarea.cfg-input {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  padding: 5px 8px;
+  border: 1px solid var(--slate-300);
+  border-radius: var(--r-sm);
+  background: #fff;
+  color: var(--slate-900);
+  width: 100%;
+}
+.cfg-row textarea.cfg-input {
+  min-height: 60px;
+  resize: vertical;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.cfg-row input:focus, .cfg-row select:focus, .cfg-row textarea:focus {
+  outline: 2px solid var(--blue-700);
+  outline-offset: -1px;
+}
+.cfg-full {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cfg-full label {
+  font-size: 0.8125rem;
+  color: var(--slate-600);
+  font-weight: 500;
+}
+.cfg-full textarea {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  padding: 5px 8px;
+  border: 1px solid var(--slate-300);
+  border-radius: var(--r-sm);
+  background: #fff;
+  color: var(--slate-900);
+  width: 100%;
+  min-height: 60px;
+  resize: vertical;
+  line-height: 1.5;
+}
+.cfg-full textarea:focus {
+  outline: 2px solid var(--blue-700);
+  outline-offset: -1px;
+}
+.cfg-hint {
+  font-size: 0.75rem;
+  color: var(--slate-500);
+  line-height: 1.5;
+  margin-top: -2px;
+}
+
+/* ── I/O layout ──────────────────────────────────────────────────────────── */
+.io-row {
+  display: grid;
+  gap: 6px;
+}
+.io-label {
+  font: 600 0.8125rem var(--font);
+  color: var(--slate-700);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.io-actions { display: flex; gap: 6px; }
+
+textarea {
+  width: 100%;
+  border: 1px solid var(--slate-300);
+  border-radius: var(--r);
+  padding: 11px 12px;
+  font: 0.875rem/1.6 var(--font);
+  resize: vertical;
+  background: #fff;
+  color: var(--slate-900);
+  transition: border-color .15s;
+}
+textarea:focus { outline: 2px solid var(--blue-700); outline-offset: -1px; }
+textarea.tall  { min-height: 130px; }
+textarea.out   {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  background: var(--slate-800);
+  color: #e2e8f0;
+  border-color: var(--slate-700);
+  min-height: 150px;
+}
+textarea.out:focus { outline-color: #93c5fd; border-color: var(--slate-600); }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font: 500 0.8125rem var(--font);
+  padding: 5px 12px;
+  transition: background .15s;
+  white-space: nowrap;
+}
+.btn-primary   { background: var(--blue-700); color: #fff; }
+.btn-primary:hover   { background: var(--blue-800); }
+.btn-secondary { background: #fff; color: var(--slate-700); border: 1px solid var(--slate-300); }
+.btn-secondary:hover { background: var(--slate-50); }
+.btn-ghost     { background: transparent; color: var(--slate-500); padding: 5px 8px; }
+.btn-ghost:hover     { background: var(--slate-100); color: var(--slate-700); }
+
+/* ── Status / errors ─────────────────────────────────────────────────────── */
+.status { font-size: 0.8125rem; color: var(--slate-500); min-height: 18px; }
+.status.ok  { color: var(--green-600); }
+.status.err { color: var(--red-600); }
+
+.errbox {
+  background: var(--red-50);
+  border: 1px solid var(--red-200);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  font: 0.8rem/1.5 var(--mono);
+  color: var(--red-600);
+  white-space: pre-wrap;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+footer {
+  background: #fff;
+  border-top: 1px solid var(--slate-200);
+  padding: 18px 20px;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--slate-500);
+  line-height: 1.9;
+}
+footer a { color: var(--blue-700); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+.footer-links { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 4px; }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .cfg-row   { grid-template-columns: 1fr; }
+  .cfg-hint  { grid-column: 1; }
+.hdr-brand .tag { display: none; }
+}
+
+/* ── Dynamic TSV tabs ────────────────────────────────────────────────────── */
+.tab-add {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--slate-400);
+  cursor: pointer;
+  font: 500 1.25rem var(--font);
+  padding: 8px 12px;
+  line-height: 1;
+  transition: color .15s;
+}
+.tab-add:hover { color: var(--blue-700); }
+
+.profile-name-input {
+  font: 600 0.875rem var(--font);
+  color: var(--slate-900);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  padding: 2px 6px;
+  background: transparent;
+  width: 100%;
+}
+.profile-name-input:hover { border-color: var(--slate-300); background: #fff; }
+.profile-name-input:focus { outline: 2px solid var(--blue-700); outline-offset: -1px; border-color: var(--blue-700); background: #fff; }
+
+.btn-danger { color: var(--red-600); }
+</style>
+</head>
+<body>
+
+<!-- Update notification (shown when new SW is waiting) -->
+<div id="update-banner">
+  <span>A new version of LingTeX Tools is available.</span>
+  <button onclick="applyUpdate()">Reload to update</button>
+</div>
+
+<header>
+  <div class="hdr-top">
+    <div class="hdr-brand">
+      <h1>LingTeX Tools</h1>
+      <span class="tag">LaTeX tools for linguistic fieldwork</span>
+    </div>
+    <div class="hdr-status">
+      <span class="dot" id="dot"></span>
+      <span id="net-label">Online</span>
+      <span class="hdr-status-sep">·</span>
+      <label class="auto-toggle">
+        <input type="checkbox" id="auto-copy-cb" onchange="saveAutoSetting(this.checked)">
+        Auto re-copy
+      </label>
+    </div>
+  </div>
+  <nav class="hdr-links">
+    <a href="https://github.com/sethjohnston/LingTeX-Tools/releases/latest">↓ TeXstudio Macros</a>
+    <a href="https://github.com/sethjohnston/LingTeX-Tools/tree/main/extension">⬡ Browser Extension <small style="opacity:.7">(coming soon)</small></a>
+    <a href="https://github.com/sethjohnston/LingTeX">LingTeX Template</a>
+    <a href="https://github.com/sethjohnston/LingTeX-Tools">GitHub</a>
+  </nav>
+</header>
+
+<nav class="tabs" id="tab-nav" role="tablist">
+  <button class="tab active" role="tab" data-panel="flex" onclick="switchTab(this)">FLEx Interlinear</button>
+  <!-- TSV profile tabs rendered here by JS -->
+  <button class="tab-add" id="tab-add-btn" title="Add a new TSV converter tab" onclick="addProfile()">+</button>
+</nav>
+
+<main>
+
+  <!-- ── FLEx Interlinear ─────────────────────────────────────────────── -->
+  <section id="panel-flex" class="panel active" role="tabpanel">
+
+    <p class="tool-desc">
+      Paste interlinear text copied from <strong>FieldWorks Language Explorer (FLEx)</strong> and
+      convert it to a <code>\gll</code> block for <em>langsci-gb4e</em> or <em>gb4e</em>.
+      Handles morpheme boundary alignment, grammatical gloss tagging, free translations,
+      and source text references.
+    </p>
+
+    <details class="cfg">
+      <summary>Configuration</summary>
+      <div class="cfg-body">
+
+        <div class="cfg-row">
+          <label for="flex-gl">Grammatical gloss command</label>
+          <input type="text" id="flex-gl" value="\gl"
+            placeholder="\gl  or  \textsc  or leave empty for no wrapping"
+            oninput="convertFlex()">
+        </div>
+        <div class="cfg-hint">
+          Wraps all-caps abbreviations like <code>PST</code>, <code>3SG</code>.
+          Default: <code>\gl{pst}</code>.
+          Set to <code>\textsc</code> for standard small-caps, or leave <strong>empty</strong> to disable wrapping entirely.
+        </div>
+
+        <div class="cfg-row">
+          <label for="flex-wrap-exe">Wrap in <code>\begin{exe}</code></label>
+          <select id="flex-wrap-exe" onchange="convertFlex()">
+            <option value="yes" selected>Yes — full \begin{exe} … \end{exe} block</option>
+            <option value="no">No — \gll lines only (for manual placement)</option>
+          </select>
+        </div>
+
+        <div class="cfg-row">
+          <label for="flex-txtref">Source ref. command</label>
+          <input type="text" id="flex-txtref" value="\txtref"
+            placeholder="\txtref  or leave empty to omit"
+            oninput="convertFlex()">
+        </div>
+        <div class="cfg-row">
+          <label for="flex-txtpfx">Source ref. prefix</label>
+          <input type="text" id="flex-txtpfx" value="TXT:"
+            placeholder="TXT:  or leave empty"
+            oninput="convertFlex()">
+        </div>
+        <div class="cfg-hint">
+          Together produce e.g. <code>\txtref{TXT:8}</code> at the end of the <code>\glt</code> line.
+          Leave <em>Source ref. command</em> empty to omit entirely.
+        </div>
+
+      </div>
+    </details>
+
+    <div class="io-row">
+      <div class="io-label">
+        <span>Input — paste FLEx interlinear text</span>
+        <div class="io-actions">
+          <button class="btn btn-ghost" onclick="clearTool('flex')">Clear</button>
+        </div>
+      </div>
+      <textarea id="flex-in" class="tall" spellcheck="false"
+        placeholder="Paste interlinear text copied from FLEx here.&#10;&#10;Example:&#10;Morphemes  na -a    ti -o&#10;Lex. Gloss 1SG -COMPL 2SG -INCOMPL&#10;Free Eng   I arrived and you left."
+        oninput="convertFlex()"></textarea>
+    </div>
+
+    <div class="io-row">
+      <div class="io-label">
+        <span>Output — LaTeX</span>
+        <div class="io-actions">
+          <button class="btn btn-secondary" onclick="copyOutput('flex-out', this)">Copy Result</button>
+        </div>
+      </div>
+      <textarea id="flex-out" class="out" readonly spellcheck="false"
+        placeholder="LaTeX output will appear here…"></textarea>
+      <div id="flex-status" class="status"></div>
+    </div>
+
+  </section>
+
+
+</main>
+
+<footer>
+  <div class="footer-links">
+    <a href="https://github.com/sethjohnston/LingTeX">LingTeX Template</a>
+    <a href="https://github.com/sethjohnston/LingTeX-Tools/releases/latest">Download TeXstudio Macros</a>
+    <a href="https://github.com/sethjohnston/LingTeX-Tools">GitHub</a>
+    <a href="https://github.com/sethjohnston/LingTeX-Tools/issues">Report an issue</a>
+  </div>
+  <div>LingTeX Tools — AGPL-3.0 © Seth Johnston</div>
+</footer>
+
+<script src="core.js"></script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// APP
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(btn) {
+    document.querySelectorAll('.tab').forEach(function(b) {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+    });
+    document.querySelectorAll('.panel').forEach(function(p) {
+        p.classList.remove('active');
+    });
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
+    activePanel = btn.dataset.panel;
+}
+
+// ── Clipboard helpers ─────────────────────────────────────────────────────────
+
+// Copy Result button: copies current output without re-reading clipboard
+async function copyOutput(outId, btn) {
+    var text = document.getElementById(outId).value;
+    if (!text.trim()) return;
+    try {
+        await navigator.clipboard.writeText(text);
+        var orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = orig; }, 1500);
+    } catch (e) {
+        alert('Could not copy. Please select the text and copy manually.');
+    }
+}
+
+// Auto re-copy toggle — persisted in localStorage
+var autoCopyEnabled = true;
+
+function loadAutoSetting() {
+    var stored = localStorage.getItem('lingtex-auto-copy');
+    autoCopyEnabled = stored !== 'off';
+    var cb = document.getElementById('auto-copy-cb');
+    if (cb) cb.checked = autoCopyEnabled;
+}
+
+function saveAutoSetting(val) {
+    autoCopyEnabled = val;
+    localStorage.setItem('lingtex-auto-copy', val ? 'on' : 'off');
+}
+
+// Auto-process: fires when the page regains focus (tab switch or app switch).
+// Always reads clipboard and converts if content is new.
+// Only writes back to clipboard if autoCopyEnabled is true.
+var lastAutoClip = null;
+
+async function autoProcess() {
+    try {
+        var text = await navigator.clipboard.readText();
+        if (!text || !text.trim() || text === lastAutoClip) return;
+        lastAutoClip = text;
+
+        var tool  = activePanel;
+        var inId  = tool === 'flex' ? 'flex-in'  : tool + '-in';
+        var outId = tool === 'flex' ? 'flex-out' : tool + '-out';
+        var inEl  = document.getElementById(inId);
+        if (!inEl) return;
+
+        inEl.value = text;
+        inEl.dispatchEvent(new Event('input')); // triggers convert + setStatus
+
+        var out = document.getElementById(outId).value;
+        if (!out.trim()) return;
+
+        if (autoCopyEnabled) {
+            await navigator.clipboard.writeText(out);
+            var statEl = document.getElementById(tool + '-status');
+            if (statEl) { statEl.textContent += ' · ✓ auto-copied'; statEl.className = 'status ok'; }
+        }
+    } catch (e) {
+        // Clipboard permission denied or unavailable — fail silently
+    }
+}
+
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) autoProcess();
+});
+window.addEventListener('focus', autoProcess);
+
+function clearTool(id) {
+    document.getElementById(id + '-in').value  = '';
+    document.getElementById(id + '-out').value = '';
+    var s = document.getElementById(id + '-status');
+    if (s) { s.textContent = ''; s.className = 'status'; }
+    var eb = document.getElementById(id + '-errbox');
+    if (eb) { eb.style.display = 'none'; eb.textContent = ''; }
+}
+
+// ── FLEx converter ────────────────────────────────────────────────────────────
+function convertFlex() {
+    var raw    = document.getElementById('flex-in').value;
+    var outEl  = document.getElementById('flex-out');
+    var statEl = document.getElementById('flex-status');
+
+    if (!raw.trim()) { outEl.value = ''; statEl.textContent = ''; statEl.className = 'status'; return; }
+
+    try {
+        var parsed = parseFLExBlock(raw);
+        if (parsed.lineTypes.length === 0) {
+            outEl.value = '';
+            setStatus('flex', 'No recognisable interlinear tiers found. ' +
+                'Lines must start with: Word, Morphemes, Lex. Entries, Lex. Gloss, Word Gloss, Free', 'err');
+            return;
+        }
+        var latex = renderFLEx(parsed, {
+            glCmd:        document.getElementById('flex-gl').value.trim(),
+            wrapExe:      document.getElementById('flex-wrap-exe').value === 'yes',
+            txtrefCmd:    document.getElementById('flex-txtref').value.trim(),
+            txtrefPrefix: document.getElementById('flex-txtpfx').value
+        });
+        outEl.value = latex;
+        var words = (parsed.lineArrays[0] || []).length - 1;
+        setStatus('flex', 'Converted ' + words + ' word(s)' +
+            (parsed.freeLines.length ? ' · free: \u201c' + parsed.freeLines[0] + '\u201d' : ''), 'ok');
+    } catch (e) {
+        outEl.value = '';
+        setStatus('flex', 'Error: ' + e.message, 'err');
+    }
+}
+
+// ── TSV Profile system ────────────────────────────────────────────────────────
+// Profiles are stored in localStorage. Each profile has: id, name, tmpl, skip.
+// The FLEx tab is static; all TSV converter tabs are dynamic profiles.
+
+// Columns: $WORD=col2  $GLOSS=col3  $ID=col6  $COLn=any column
+// Dekereke default columns: COL1=Reference COL2=Phonetic COL3=Gloss COL4=Category COL5=SoundFile
+var DEFAULT_PROFILES = [
+    { id: 'tsv-pa',  name: 'Phonology Assistant', isDefault: true,
+      tmpl: '\\exampleentry{}{$WORD}{$GLOSS}{\\phonrec{$ID}}', skip: 'referenced' },
+    { id: 'tsv-dek', name: 'Dekereke',             isDefault: true,
+      tmpl: '\\exampleentry{}{$COL2}{$COL3}{\\phonrec{$COL1}}', skip: 'referenced' }
+];
+
+var profiles    = [];
+var activePanel = 'flex';   // 'flex' or a profile id
+
+function loadProfiles() {
+    try {
+        var stored = localStorage.getItem('lingtex-tsv-profiles');
+        profiles = stored ? JSON.parse(stored) : DEFAULT_PROFILES.map(cloneProfile);
+    } catch (e) {
+        profiles = DEFAULT_PROFILES.map(cloneProfile);
+    }
+    if (!profiles.length) profiles = DEFAULT_PROFILES.map(cloneProfile);
+}
+
+function saveProfiles() {
+    try { localStorage.setItem('lingtex-tsv-profiles', JSON.stringify(profiles)); } catch(e) {}
+}
+
+function cloneProfile(p) {
+    return { id: p.id, name: p.name, tmpl: p.tmpl, skip: p.skip, isDefault: p.isDefault || false };
+}
+
+function getProfile(id) {
+    return profiles.filter(function(p) { return p.id === id; })[0] || null;
+}
+
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Rendering ────────────────────────────────────────────────────────────────
+
+function renderTSVTabs() {
+    var nav    = document.getElementById('tab-nav');
+    var addBtn = document.getElementById('tab-add-btn');
+
+    // Remove previously rendered profile buttons
+    nav.querySelectorAll('[data-profile]').forEach(function(el) { el.remove(); });
+
+    profiles.forEach(function(p) {
+        var btn = document.createElement('button');
+        btn.className = 'tab' + (activePanel === p.id ? ' active' : '');
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('data-profile', p.id);
+        btn.textContent = p.name;
+        btn.onclick = function() { switchToProfile(p.id); };
+        nav.insertBefore(btn, addBtn);
+    });
+}
+
+function renderTSVPanels() {
+    var main = document.querySelector('main');
+
+    // Remove previously rendered profile panels
+    main.querySelectorAll('.tsv-panel').forEach(function(el) { el.remove(); });
+
+    profiles.forEach(function(p) {
+        var sec = document.createElement('section');
+        sec.id        = 'panel-' + p.id;
+        sec.className = 'panel tsv-panel' + (activePanel === p.id ? ' active' : '');
+        sec.setAttribute('role', 'tabpanel');
+        sec.innerHTML  = buildPanelHTML(p);
+        main.appendChild(sec);
+    });
+}
+
+function buildPanelHTML(p) {
+    var id   = escHtml(p.id);
+    var name = escHtml(p.name);
+    var tmpl = escHtml(p.tmpl);
+    var skipOpts = ['referenced','col1','none'];
+    var skipLabels = {
+        referenced: 'any column used in template is empty',
+        col1:       'column 1 is empty',
+        none:       'never skip (include all rows)'
+    };
+    var skipHtml = skipOpts.map(function(v) {
+        return '<option value="' + v + '"' + (p.skip === v ? ' selected' : '') + '>' +
+               skipLabels[v] + '</option>';
+    }).join('');
+
+    return '' +
+        '<details class="cfg">' +
+        '  <summary>Configuration</summary>' +
+        '  <div class="cfg-body">' +
+        (!p.isDefault ?
+        '    <div class="cfg-row">' +
+        '      <label>Tab name</label>' +
+        '      <input class="profile-name-input" type="text" value="' + name + '"' +
+        '        onchange="renameProfile(\'' + id + '\', this.value)">' +
+        '    </div>' : '') +
+        '    <div class="cfg-full">' +
+        '      <label for="' + id + '-tmpl">Row template</label>' +
+        '      <textarea id="' + id + '-tmpl" spellcheck="false"' +
+        '        oninput="updateAndConvert(\'' + id + '\')">' + tmpl + '</textarea>' +
+        '      <div class="cfg-hint">' +
+        '        Named: <code>$WORD</code> = col 2 &nbsp;·&nbsp; <code>$GLOSS</code> = col 3 &nbsp;·&nbsp; <code>$ID</code> = col 6<br>' +
+        '        Positional: <code>$COL<em>n</em></code> = any column by number (1-based). &nbsp;Reorder, repeat, or omit freely.' +
+        '      </div>' +
+        '    </div>' +
+        '    <div class="cfg-row">' +
+        '      <label for="' + id + '-skip">Skip rows where</label>' +
+        '      <select id="' + id + '-skip" onchange="updateAndConvert(\'' + id + '\')">' +
+        skipHtml +
+        '      </select>' +
+        '    </div>' +
+        (!p.isDefault ?
+        '    <div class="cfg-row">' +
+        '      <label></label>' +
+        '      <button class="btn btn-secondary btn-danger" onclick="deleteProfile(\'' + id + '\')">' +
+        '        Delete this tab' +
+        '      </button>' +
+        '    </div>' : '') +
+        '  </div>' +
+        '</details>' +
+
+        '<div class="io-row">' +
+        '  <div class="io-label">' +
+        '    <span>Input — paste tab-separated rows</span>' +
+        '    <div class="io-actions">' +
+        '      <button class="btn btn-ghost" onclick="clearTool(\'' + id + '\')">Clear</button>' +
+        '    </div>' +
+        '  </div>' +
+        '  <textarea id="' + id + '-in" class="tall" spellcheck="false"' +
+        '    placeholder="Paste tab-separated rows here.&#10;&#10;$1 = column 1  $2 = column 2  $3 = column 3  \u2026"' +
+        '    oninput="convertTSV(\'' + id + '\')"></textarea>' +
+        '</div>' +
+
+        '<div class="io-row">' +
+        '  <div class="io-label">' +
+        '    <span>Output — LaTeX</span>' +
+        '    <div class="io-actions">' +
+        '      <button class="btn btn-secondary" onclick="copyOutput(\'' + id + '-out\', this)">Copy Result</button>' +
+        '    </div>' +
+        '  </div>' +
+        '  <textarea id="' + id + '-out" class="out" readonly spellcheck="false"' +
+        '    placeholder="LaTeX output will appear here\u2026"></textarea>' +
+        '  <div id="' + id + '-status" class="status"></div>' +
+        '  <div id="' + id + '-errbox" style="display:none" class="errbox"></div>' +
+        '</div>';
+}
+
+function renderAll() {
+    renderTSVTabs();
+    renderTSVPanels();
+}
+
+// ── Profile actions ──────────────────────────────────────────────────────────
+
+function switchToProfile(id) {
+    activePanel = id;
+    // Update flex tab button
+    document.querySelectorAll('.tab').forEach(function(b) {
+        b.classList.remove('active');
+    });
+    document.querySelectorAll('.panel').forEach(function(p) {
+        p.classList.remove('active');
+    });
+    var panel = document.getElementById('panel-' + id);
+    if (panel) panel.classList.add('active');
+    var btn = document.querySelector('[data-profile="' + id + '"]');
+    if (btn) btn.classList.add('active');
+}
+
+function addProfile() {
+    var newP = {
+        id:   'tsv-' + Date.now(),
+        name: 'New Tab',
+        tmpl: '$1',
+        skip: 'referenced'
+    };
+    profiles.push(newP);
+    saveProfiles();
+    renderAll();
+    switchToProfile(newP.id);
+    setTimeout(function() {
+        var nameIn = document.querySelector('#panel-' + newP.id + ' .profile-name-input');
+        if (nameIn) { nameIn.select(); nameIn.focus(); }
+    }, 30);
+}
+
+function deleteProfile(id) {
+    var p = getProfile(id);
+    if (p && p.isDefault) {
+        alert('The Phonology Assistant and Dekereke tabs are always present.\nYou can rename them or change their templates, but not delete them.');
+        return;
+    }
+    profiles = profiles.filter(function(p) { return p.id !== id; });
+    saveProfiles();
+    if (activePanel === id) activePanel = profiles[0].id;
+    renderAll();
+    switchToProfile(activePanel);
+}
+
+function renameProfile(id, name) {
+    var p = getProfile(id);
+    if (!p) return;
+    p.name = name.trim() || 'Untitled';
+    saveProfiles();
+    var btn = document.querySelector('[data-profile="' + id + '"]');
+    if (btn) btn.textContent = p.name;
+}
+
+function updateAndConvert(id) {
+    var p = getProfile(id);
+    if (!p) return;
+    var tmplEl = document.getElementById(id + '-tmpl');
+    var skipEl = document.getElementById(id + '-skip');
+    if (tmplEl) p.tmpl = tmplEl.value;
+    if (skipEl) p.skip = skipEl.value;
+    saveProfiles();
+    convertTSV(id);
+}
+
+// ── TSV converter ─────────────────────────────────────────────────────────────
+function convertTSV(id) {
+    var raw   = document.getElementById(id + '-in').value;
+    var outEl = document.getElementById(id + '-out');
+    var errEl = document.getElementById(id + '-errbox');
+    var tmpl  = document.getElementById(id + '-tmpl').value;
+    var skip  = document.getElementById(id + '-skip').value;
+
+    if (!raw.trim()) {
+        outEl.value = ''; errEl.style.display = 'none';
+        setStatus(id, '', ''); return;
+    }
+
+    // Pre-compute which 1-based column numbers are referenced in the template.
+    // Handles: $WORD→2, $GLOSS→3, $ID→6, $COLn→n
+    var usedCols = [];
+    if (skip === 'referenced') {
+        function addCol(n) { if (usedCols.indexOf(n) === -1) usedCols.push(n); }
+        if (/\$WORD\b/.test(tmpl))  addCol(2);
+        if (/\$GLOSS\b/.test(tmpl)) addCol(3);
+        if (/\$ID\b/.test(tmpl))    addCol(6);
+        var m, re = /\$COL(\d+)/g;
+        while ((m = re.exec(tmpl)) !== null) addCol(parseInt(m[1], 10));
+    }
+
+    var lines   = raw.replace(/\r\n?/g, '\n').split('\n')
+                     .filter(function(l) { return l.trim() !== ''; });
+    var results = [], errors = [];
+
+    lines.forEach(function(line, i) {
+        var fields = LingTeXCore.parseTSVRow(line);
+        var rowNum = i + 1;
+
+        if (skip === 'referenced' && usedCols.length) {
+            var empty = usedCols.filter(function(n) { return !fields[n - 1]; });
+            if (empty.length) {
+                errors.push('Row ' + rowNum + ': skipped (col ' + empty.join(', ') + ' empty)');
+                return;
+            }
+        }
+        if (skip === 'col1' && !fields[0]) {
+            errors.push('Row ' + rowNum + ': skipped (col 1 empty)');
+            return;
+        }
+
+        results.push(LingTeXCore.applyRowTemplate(tmpl, fields));
+    });
+
+    outEl.value = results.join('\n');
+
+    if (results.length === 0) {
+        setStatus(id, 'No output — ' + errors.length + ' row(s) skipped.', 'err');
+    } else {
+        setStatus(id, 'Converted ' + results.length + ' row(s)' +
+            (errors.length ? ' · ' + errors.length + ' skipped' : ''), errors.length ? '' : 'ok');
+    }
+
+    errEl.textContent   = errors.join('\n');
+    errEl.style.display = errors.length ? 'block' : 'none';
+}
+
+// Initialise profiles, settings, and render
+loadProfiles();
+loadAutoSetting();
+renderAll();
+// Activate first TSV profile tab by default (flex starts active)
+// (user stays on flex tab on page load; TSV tabs render in background)
+
+function setStatus(tool, msg, cls) {
+    var el = document.getElementById(tool + '-status');
+    el.textContent = msg;
+    el.className   = 'status' + (cls ? ' ' + cls : '');
+}
+
+// ── Network status ────────────────────────────────────────────────────────────
+function syncNetStatus() {
+    var dot   = document.getElementById('dot');
+    var label = document.getElementById('net-label');
+    if (navigator.onLine) {
+        dot.classList.remove('offline');
+        label.textContent = 'Online';
+    } else {
+        dot.classList.add('offline');
+        label.textContent = 'Offline';
+    }
+}
+window.addEventListener('online',  syncNetStatus);
+window.addEventListener('offline', syncNetStatus);
+syncNetStatus();
+
+// ── Service worker & update banner ────────────────────────────────────────────
+var swReg = null;
+
+function applyUpdate() {
+    if (swReg && swReg.waiting) swReg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    window.location.reload();
+}
+
+function showUpdateBanner() {
+    document.getElementById('update-banner').style.display = 'flex';
+}
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+        .then(function(reg) {
+            swReg = reg;
+
+            // New SW found while page is open
+            reg.addEventListener('updatefound', function() {
+                var sw = reg.installing;
+                sw.addEventListener('statechange', function() {
+                    if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                        showUpdateBanner();
+                    }
+                });
+            });
+
+            // SW was already waiting on load (e.g. user navigated back)
+            if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner();
+
+            // Aggressive update checks: on focus and on tab visibility restore
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) reg.update();
+            });
+            window.addEventListener('focus', function() { reg.update(); });
+        })
+        .catch(function(e) { console.warn('SW registration failed:', e); });
+
+        // When a new SW takes control, reload to serve the fresh version
+        var firstCtrl = navigator.serviceWorker.controller;
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+            if (firstCtrl) window.location.reload();
+            firstCtrl = navigator.serviceWorker.controller;
+        });
+    });
+}
+</script>
+</body>
+</html>
