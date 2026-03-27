@@ -65,28 +65,6 @@ code {
 a { color: var(--blue-700); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-/* ── Update banner ───────────────────────────────────────────────────────── */
-#update-banner {
-  display: none;
-  background: var(--blue-700);
-  color: #fff;
-  padding: 9px 16px;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-size: 0.875rem;
-}
-#update-banner button {
-  background: #fff;
-  color: var(--blue-700);
-  border: none;
-  border-radius: var(--r-sm);
-  padding: 4px 12px;
-  font: 600 0.8125rem var(--font);
-  cursor: pointer;
-}
-#update-banner button:hover { background: var(--blue-50); }
-
 /* ── Site navigation ─────────────────────────────────────────────────────── */
 .site-nav {
   background: #fff;
@@ -583,12 +561,6 @@ footer a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
-
-<!-- Update notification (shown when new SW is waiting) -->
-<div id="update-banner">
-  <span>A new version of LingTeX Tools is available.</span>
-  <button onclick="applyUpdate()">Reload to update</button>
-</div>
 
 <!-- ── Site navigation ───────────────────────────────────────────────────── -->
 <nav class="site-nav">
@@ -1252,52 +1224,11 @@ window.addEventListener('online',  syncNetStatus);
 window.addEventListener('offline', syncNetStatus);
 syncNetStatus();
 
-// ── Service worker & update banner ────────────────────────────────────────────
-var swReg = null;
-
-function applyUpdate() {
-    if (swReg && swReg.waiting) swReg.waiting.postMessage({ type: 'SKIP_WAITING' });
-    window.location.reload();
-}
-
-function showUpdateBanner() {
-    document.getElementById('update-banner').style.display = 'flex';
-}
-
+// ── Service worker cleanup ─────────────────────────────────────────────────────
+// The SW has been removed. Register the stub sw.js so existing users get
+// their caches cleared and the SW unregistered automatically.
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
-        .then(function(reg) {
-            swReg = reg;
-
-            // New SW found while page is open
-            reg.addEventListener('updatefound', function() {
-                var sw = reg.installing;
-                sw.addEventListener('statechange', function() {
-                    if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-                        showUpdateBanner();
-                    }
-                });
-            });
-
-            // SW was already waiting on load (e.g. user navigated back)
-            if (reg.waiting && navigator.serviceWorker.controller) showUpdateBanner();
-
-            // Aggressive update checks: on focus and on tab visibility restore
-            document.addEventListener('visibilitychange', function() {
-                if (!document.hidden) reg.update();
-            });
-            window.addEventListener('focus', function() { reg.update(); });
-        })
-        .catch(function(e) { console.warn('SW registration failed:', e); });
-
-        // When a new SW takes control, reload to serve the fresh version
-        var firstCtrl = navigator.serviceWorker.controller;
-        navigator.serviceWorker.addEventListener('controllerchange', function() {
-            if (firstCtrl) window.location.reload();
-            firstCtrl = navigator.serviceWorker.controller;
-        });
-    });
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
 }
 </script>
 </body>
