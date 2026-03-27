@@ -269,8 +269,12 @@ pub fn run() {
             let quit = MenuItem::with_id(app, "quit", "Quit",               true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &quit])?;
 
+            // Use the small [ŋ] sidebar icon for the tray/menu-bar slot.
+            // The large [liŋtɛx] icon is used for the app bundle (Dock, Finder, taskbar).
+            let tray_image = tauri::include_image!("icons/tray-icon.png");
+
             TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tray_image)
                 .menu(&menu)
                 .tooltip("LingTeX Tools")
                 .on_menu_event(|app, event| match event.id.as_ref() {
