@@ -242,6 +242,15 @@ target platform:
 
 ---
 
+## Coming in a future release
+
+| Feature | Scope |
+|---|---|
+| **Multi-line FLEx group paste** — convert multiple interlinear line groups from one FLEx text in a single operation | Desktop &amp; extension |
+| **FLEx corpus → LaTeX export** — export an entire FLEx corpus as a structured LaTeX document (full example appendix or corpus reference) | Extension |
+
+---
+
 ## Related project
 
 [LingTeX](https://github.com/rulingAnts/LingTeX) — a TeXstudio project template for
