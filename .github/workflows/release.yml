@@ -12,27 +12,34 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    # macOS runner required for Safari extension build (xcrun / xcodebuild)
-    runs-on: macos-latest
 
+  # ── 1. Create the draft release ────────────────────────────────────────────
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create.outputs.id }}
+    steps:
+      - name: Create draft release
+        id: create
+        uses: softprops/action-gh-release@v2
+        with:
+          name: 'LingTeX Tools ${{ github.ref_name }}'
+          draft: true
+          generate_release_notes: true
+
+  # ── 2. Browser extensions (macOS runner — required for Safari / Xcode) ─────
+  extensions:
+    needs: create-release
+    runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── TeXstudio Macros ──────────────────────────────────────────────────────
-      - name: Package TeXstudio macros
-        run: |
-          zip -r lingtex-tools-texstudio-macros.zip texstudio/ \
-            --exclude "*.DS_Store" --exclude "__MACOSX/*"
-
-      # ── Chrome & Firefox extensions ───────────────────────────────────────────
       - name: Build Chrome + Firefox extensions
         run: bash extension/build.sh --zip
         # produces extension/lingtex-tools-chrome.zip
         #          extension/lingtex-tools-firefox.zip
 
-      # ── Safari extension ──────────────────────────────────────────────────────
       - name: Convert Chrome extension → Safari Xcode project
         run: |
           xcrun safari-web-extension-converter \
@@ -67,13 +74,112 @@ jobs:
           zip -r "$GITHUB_WORKSPACE/extension/lingtex-tools-safari.zip" \
             "LingTeX Tools.app" --exclude "*.DS_Store"
 
-      # ── GitHub Release ────────────────────────────────────────────────────────
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: |
-            lingtex-tools-texstudio-macros.zip
-            extension/lingtex-tools-chrome.zip
-            extension/lingtex-tools-firefox.zip
+      - name: Upload extension artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.ref_name }} \
+            extension/lingtex-tools-chrome.zip \
+            extension/lingtex-tools-firefox.zip \
             extension/lingtex-tools-safari.zip
+
+  # ── 3. Desktop app — macOS ─────────────────────────────────────────────────
+  desktop-macos:
+    needs: create-release
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync core.js into tauri/src/
+        run: cp docs/core.js tauri/src/core.js
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry + build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workingDirectory: tauri/src-tauri
+
+      - name: Build and upload macOS desktop app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: tauri
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+
+  # ── 4. Desktop app — Windows ───────────────────────────────────────────────
+  desktop-windows:
+    needs: create-release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync core.js into tauri/src/
+        run: cp docs/core.js tauri/src/core.js
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry + build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workingDirectory: tauri/src-tauri
+
+      - name: Build and upload Windows desktop app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: tauri
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+
+  # ── 5. Desktop app — Linux ─────────────────────────────────────────────────
+  desktop-linux:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync core.js into tauri/src/
+        run: cp docs/core.js tauri/src/core.js
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libxdo-dev
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry + build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workingDirectory: tauri/src-tauri
+
+      - name: Build and upload Linux desktop app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: tauri
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+
+  # ── 6. Publish (un-draft) once all artifacts are uploaded ──────────────────
+  publish-release:
+    needs: [extensions, desktop-macos, desktop-windows, desktop-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit ${{ github.ref_name }} --draft=false --repo ${{ github.repository }}

@@ -1,6 +1,6 @@
 # LingTeX Tools
 
-Linguistic fieldwork macro tools for LaTeX — available in five formats:
+Linguistic fieldwork macro tools for LaTeX — available in four formats:
 
 | Platform | Location | Notes |
 |---|---|---|
@@ -9,15 +9,12 @@ Linguistic fieldwork macro tools for LaTeX — available in five formats:
 | **Firefox extension** | `extension/firefox/` | MV2; same features as Chrome |
 | **Safari extension** | built from Chrome source in CI | Unsigned; macOS only; see INSTALL.md |
 | **Desktop app (Tauri)** | `tauri/` | Menu-bar / system-tray; OS-wide clipboard auto-convert |
-| **TeXstudio macros** | `texstudio/` | ⚠️ Deprecated — superseded by the desktop app |
 
 ## What it does
 
 - **FLEx Interlinear** — converts copied FLEx interlinear text into a `\gll` block (langsci-gb4e / gb4e)
 - **Phonology Assistant** — converts PA tab-separated clipboard rows into `\exampleentry` rows
 - **Custom TSV profiles** — user-configurable row templates for any tab-separated source
-- **TeXstudio macros** — Tag Gloss, Tag LangData, Example Emphasis (wraps selected text)
-  *(deprecated — the desktop app provides the same functionality OS-wide without TeXstudio)*
 
 Works with the [LingTeX template](https://github.com/rulingAnts/LingTeX) out of the box.
 Every command name is configurable so the tools work with any LaTeX preamble.
@@ -61,11 +58,11 @@ LingTeX-Tools/
 │   ├── build.sh                 #   Syncs core.js, then runs cargo tauri build/dev
 │   └── README.md                #   Tauri-specific setup instructions
 │
-├── texstudio/                   # TeXstudio macro scripts (standalone, deprecated)
-│   └── *.txsMacro               #   Self-contained JS macros; superseded by Tauri desktop app
-│
 ├── .github/workflows/
-│   └── release.yml              # CI: builds all artifacts on version tag push
+│   ├── release.yml              # CI: builds all artifacts on version tag push
+│   ├── build-macos.yml          # Manual pre-release build (macOS)
+│   ├── build-windows.yml        # Manual pre-release build (Windows)
+│   └── build-linux.yml          # Manual pre-release build (Linux)
 ├── .githooks/
 │   └── pre-commit               # Blocks commits with files > 25 MB
 ├── .gitignore
@@ -165,24 +162,32 @@ it has two key adaptations:
 
 ### CI release workflow (`.github/workflows/release.yml`)
 
-Triggered by pushing a `v*` tag. Runs on `macos-latest` (required for Safari / Xcode).
+Triggered by pushing a `v*` tag. Runs five parallel jobs, then publishes.
 
 ```
 git tag v0.1.0 && git push origin v0.1.0
           │
           ▼
-  GitHub Actions (macos-latest)
+  create-release (ubuntu)
+    └── softprops/action-gh-release → draft release (outputs release_id)
           │
-          ├── zip texstudio/            → lingtex-tools-texstudio-macros.zip
-          │
-          ├── extension/build.sh --zip  → lingtex-tools-chrome.zip
-          │                               lingtex-tools-firefox.zip
-          │
-          ├── xcrun safari-web-extension-converter (from assembled chrome/)
-          │      └── xcodebuild (unsigned)
-          │              └── zip .app   → lingtex-tools-safari.zip
-          │
-          └── softprops/action-gh-release → attaches all four zips to the release
+          ├── extensions (macos-latest) ─────────────────────────────────┐
+          │     ├── extension/build.sh --zip  → chrome.zip, firefox.zip  │
+          │     ├── xcrun safari-web-extension-converter                  │
+          │     │      └── xcodebuild (unsigned) → safari.zip            │
+          │     └── gh release upload → attaches 3 extension zips        │
+          │                                                               │
+          ├── desktop-macos (macos-latest)                                │
+          │     └── tauri-apps/tauri-action → .dmg + .app                │
+          │                                                               │
+          ├── desktop-windows (windows-latest)                            │
+          │     └── tauri-apps/tauri-action → .msi + .exe                │
+          │                                                               │
+          └── desktop-linux (ubuntu-latest)                               │
+                └── tauri-apps/tauri-action → .deb + .AppImage           │
+                                                                          │
+          publish-release (ubuntu) ◄────────────────────────────────────-┘
+            └── gh release edit --draft=false → release goes live
 ```
 
 ---

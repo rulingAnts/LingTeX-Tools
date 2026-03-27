@@ -4,6 +4,52 @@ All downloadable files are attached to each [GitHub Release](https://github.com/
 
 ---
 
+## Desktop App (macOS, Windows, Linux)
+
+Download the installer for your platform from the [latest release](https://github.com/rulingAnts/LingTeX-Tools/releases/latest):
+
+| Platform | File | Notes |
+|---|---|---|
+| **macOS** | `.dmg` | Unsigned — see steps below |
+| **Windows** | `.msi` or `.exe` | Standard installer |
+| **Linux** | `.deb` (Debian/Ubuntu) or `.AppImage` | See note below |
+
+### macOS — first-launch steps
+
+The app is currently **unsigned** (code-signing requires an Apple Developer Program membership).
+macOS Gatekeeper will block it on first launch. Two things to do:
+
+**Step 1 — Bypass Gatekeeper**
+
+After installing the `.dmg`, right-click `LingTeX Tools.app` in your Applications folder and
+choose **Open**, then click **Open** again in the security dialog.
+
+Alternatively, run this once in Terminal:
+
+```bash
+xattr -cr "/Applications/LingTeX Tools.app"
+```
+
+**Step 2 — Grant Accessibility access**
+
+When you first launch the app, macOS will prompt you to grant
+**Accessibility** permission. Click **Open System Settings** and toggle LingTeX Tools on in
+**Privacy & Security → Accessibility**.
+
+This permission is required for global keyboard shortcuts and Auto re-copy to work.
+If you accidentally dismiss the prompt, you can grant it manually in System Settings.
+
+### Linux — community-maintained
+
+The Linux build has **not been tested by the developer** — there is no Linux test machine.
+In principle it should work: Tauri supports Linux, global shortcuts use X11/XWayland, and
+the system tray requires `libappindicator` (available in most GNOME/KDE environments).
+
+If you try it and run into issues — or get it working — please
+[open an issue or PR](https://github.com/rulingAnts/LingTeX-Tools/issues). Contributions welcome.
+
+---
+
 ## Web App
 
 No installation needed. Open in any browser:
@@ -84,85 +130,3 @@ Once installed in any browser:
 The popup lets you configure LaTeX command names, row templates, and create
 custom TSV converter tabs. Settings persist across sessions.
 
----
-
-## TeXstudio Macros
-
-> These macros run directly inside TeXstudio. They do **not** require Overleaf
-> or a browser extension, and they work with or without the LingTeX template.
-
-### Download and import
-
-1. Download **`lingtex-tools-texstudio-macros.zip`** from the
-   [latest release](https://github.com/rulingAnts/LingTeX-Tools/releases/latest)
-   and unzip it
-2. In TeXstudio: **Macros → Edit Macros…**
-3. In the macro editor, click **Import** (folder icon or File menu inside the editor)
-4. Select all five **`.txsMacro`** files from the unzipped folder and import them
-5. Click **OK** — the macros are now available under the **Macros** menu and
-   via their keyboard shortcuts
-
-### Customize the CONFIGURATION block
-
-Each macro has a clearly marked `CONFIGURATION` block near the top of its script.
-Open the macro editor (**Macros → Edit Macros…**), select a macro, and edit the
-variables to match the LaTeX commands in your preamble.
-
-#### Paste FLEx Interlinear  `Ctrl+Shift+I`
-
-Reads FLEx interlinear text from the clipboard and inserts a `\gll…\glt` block.
-
-```javascript
-var GL_CMD       = "\\gl";      // wraps gloss abbreviations: \gl{pst}
-                                // Use "\\textsc" for plain small-caps,
-                                // or "" to disable wrapping entirely
-var TXTREF_CMD   = "\\txtref";  // source reference command, e.g. \txtref{TXT:8}
-                                // Set to "" to omit source references
-var TXTREF_PREFIX = "TXT:";     // prefix inside \txtref — set to "" for bare number
-```
-
-#### Paste from Phonology Assistant  `Ctrl+Shift+P`
-
-Reads tab-separated rows copied from Phonology Assistant and inserts LaTeX entries.
-
-```javascript
-var ENTRY_CMD   = "\\exampleentry"; // command for each row
-                                    // arguments: {category}{word}{gloss}{source-ref}
-                                    // Use "\\item" inside itemize as a generic fallback
-var PHONREC_CMD = "\\phonrec";      // wraps the phonology record ID (source reference)
-                                    // Set to "" to omit source references entirely
-```
-
-#### Tag Gloss  `Ctrl+Shift+G`
-
-Wraps the selected text in a grammatical gloss command (select the abbreviation first).
-
-```javascript
-var OUTPUT    = "\\gl{$TEXT}";   // e.g. select "PST" → \gl{pst}
-                                  // Use "\\textsc{$TEXT}" for plain small-caps
-var TRANSFORM = "lowercase";      // "lowercase", "uppercase", or "none"
-```
-
-#### Tag LangData  `Ctrl+Shift+L`
-
-Wraps selected vernacular/object-language text in a styling command.
-
-```javascript
-var OUTPUT = "\\langdata{$TEXT}"; // e.g. select a word → \langdata{word}
-                                   // Use "\\textit{$TEXT}" as a plain italic fallback
-```
-
-#### Example Emphasis  `Ctrl+Shift+E`
-
-Wraps selected text in an in-example emphasis command.
-
-```javascript
-var OUTPUT = "\\exemph{$TEXT}";   // e.g. select a word → \exemph{word}
-                                   // Use "\\textbf{$TEXT}" as a plain bold fallback
-```
-
-### Using without the LingTeX template
-
-All macros include plain LaTeX fallback values in comments. If you are not using
-the LingTeX template, substitute the fallback values shown — `\textsc`, `\textit`,
-`\textbf`, `\item`, etc. — so the macros work with any standard LaTeX preamble.
