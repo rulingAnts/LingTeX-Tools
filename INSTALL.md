@@ -77,7 +77,7 @@ Once installed in any browser:
 
 | Method | Steps |
 |--------|-------|
-| **Smart paste** | Copy data from FLEx / Phonology Assistant / your spreadsheet. Click into your Overleaf document. Press **Ctrl+Shift+V** (Windows/Linux) or **⌘⇧V** (Mac). Converted LaTeX is inserted at the cursor. |
+| **Profile shortcut** | In the popup, open any profile's Configuration and click the **Keyboard shortcut** field, then press your chosen key combo (e.g. Ctrl+Shift+1). From then on, pressing that shortcut anywhere reads the clipboard, converts using that profile, and inserts at the cursor — no tab-switching needed. |
 | **Auto-convert paste** | Click the extension icon → toggle **Auto-convert paste** ON. Now regular **Ctrl+V** in Overleaf automatically converts before inserting. |
 | **Test / configure** | Click the extension icon to open the popup. Paste sample data into the test area to verify your template before using it in a document. |
 

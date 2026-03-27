@@ -169,69 +169,43 @@
     // The unified paste handler below converts when either the flag or
     // autoConvert is set.
 
-    var smartPasteArmed = false;
-
     document.addEventListener('keydown', function (e) {
-        var shortcut = shortcutFromEvent(e);
-
         // ── Per-profile shortcuts ─────────────────────────────────────────────
-        // Profile shortcuts do a full read-convert-insert in one keystroke using
-        // navigator.clipboard.readText(). This is safe here because these are
-        // custom shortcuts with no browser-native paste conflict.
-        if (shortcut) {
-            var matched = findProfileForShortcut(shortcut);
-            if (matched) {
-                e.preventDefault();
-                e.stopImmediatePropagation();
-                cfg.activeProfileId = matched;
-                // Keep popup tab in sync
-                chrome.storage.local.set({ 'lingtex-active-profile': matched });
-                navigator.clipboard.readText().then(function (text) {
-                    var out = convert(text);
-                    if (out) insertAtCursor(out);
-                }).catch(function () {});
-                return;
-            }
-        }
+        // Each profile can have a custom shortcut (e.g. Ctrl+Shift+1).
+        // Pressing it reads the clipboard, converts, and inserts at the cursor.
+        var shortcut = shortcutFromEvent(e);
+        if (!shortcut) return;
 
-        // ── Smart-paste (Ctrl+Shift+V / Cmd+Shift+V) — armed-flag approach ────
-        // We arm a flag rather than calling clipboard.readText() here, because
-        // Ctrl+Shift+V is a native browser shortcut in Firefox that generates its
-        // own paste event — which we intercept below with e.clipboardData available.
-        var isMac = /Mac|iPhone|iPad/i.test(navigator.platform);
-        var mod   = isMac ? e.metaKey : e.ctrlKey;
-        if (mod && e.shiftKey && e.key === 'V') {
-            smartPasteArmed = true;
-            setTimeout(function () { smartPasteArmed = false; }, 300);
-            // Do NOT preventDefault — let the browser fire the paste event.
-        }
+        var matched = findProfileForShortcut(shortcut);
+        if (!matched) return;
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        cfg.activeProfileId = matched;
+        chrome.storage.local.set({ 'lingtex-active-profile': matched });
+        navigator.clipboard.readText().then(function (text) {
+            var out = convert(text);
+            if (out) insertAtCursor(out);
+        }).catch(function () {});
     }, true);
 
-    // ── Unified paste handler (auto-convert + smart-paste) ────────────────────
-    // Handles both Ctrl+V with autoConvert ON, and Ctrl+Shift+V (armed above).
-    // e.clipboardData is always available here — no clipboard API permission needed.
+    // ── Auto-convert paste intercept ──────────────────────────────────────────
+    // Only active when cfg.autoConvert is true (set via the popup toggle).
+    // If conversion produces no output (unrecognised format), falls through
+    // to normal paste behaviour.
 
     document.addEventListener('paste', function (e) {
-        var shouldConvert = cfg.autoConvert || smartPasteArmed;
-        smartPasteArmed = false;
-        if (!shouldConvert) return;
+        if (!cfg.autoConvert) return;
 
         var text = e.clipboardData && e.clipboardData.getData('text/plain');
         if (!text) return;
 
         var out = convert(text);
-        if (!out || out === text) return;   // unrecognised format — fall through
+        if (!out || out === text) return;
 
         e.preventDefault();
         e.stopImmediatePropagation();
         insertAtCursor(out);
     }, true);
-
-    // ── Message from background (keyboard command API fallback) ───────────────
-    chrome.runtime.onMessage.addListener(function (msg) {
-        if (msg.type !== 'SMART_PASTE') return;
-        smartPasteArmed = true;
-        setTimeout(function () { smartPasteArmed = false; }, 300);
-    });
 
 }());

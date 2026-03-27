@@ -30,13 +30,4 @@
     }
   ],
 
-  "commands": {
-    "smart-paste": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+V",
-        "mac": "Command+Shift+V"
-      },
-      "description": "Paste clipboard as LaTeX (LingTeX conversion)"
-    }
-  }
 }
