@@ -257,6 +257,21 @@ a:hover { text-decoration: underline; }
 }
 .linux-note-box strong { color: var(--slate-900); }
 
+/* ── macOS note (inside product card) ───────────────────────────────────── */
+.macos-note {
+  margin-top: 14px;
+  background: var(--blue-50);
+  border: 1px solid var(--blue-100);
+  border-radius: var(--r-sm);
+  padding: 12px 16px;
+  font-size: 0.8125rem;
+  color: var(--slate-700);
+  line-height: 1.6;
+}
+.macos-note strong { color: var(--slate-900); }
+.macos-note ol { margin: 8px 0 0 18px; display: flex; flex-direction: column; gap: 8px; }
+.macos-note code { background: var(--blue-100); }
+
 /* ── Try-online divider ──────────────────────────────────────────────────── */
 .try-online-bar {
   background: #fff;
@@ -638,6 +653,22 @@ footer a:hover { text-decoration: underline; }
       <a href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn muted" target="_blank">
         <span class="os-icon">🐧</span> Linux — see note below
       </a>
+    </div>
+    <div class="macos-note">
+      <strong> macOS users:</strong>
+      <ol>
+        <li>
+          <strong>Bypass Gatekeeper</strong> — the app is currently unsigned.
+          After downloading, right-click the <code>.app</code> and choose <strong>Open</strong>,
+          then click Open again in the dialog. Alternatively, run once in Terminal:
+          <br><code>xattr -cr "/Applications/LingTeX Tools.app"</code>
+        </li>
+        <li>
+          <strong>Grant Accessibility access</strong> — when prompted, allow
+          LingTeX Tools in <em>System Settings → Privacy &amp; Security → Accessibility</em>.
+          This is required for global keyboard shortcuts and auto re-copy to work.
+        </li>
+      </ol>
     </div>
   </div>
 
