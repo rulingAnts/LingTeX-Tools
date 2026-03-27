@@ -642,20 +642,20 @@ footer a:hover { text-decoration: underline; }
       <li>No browser needed — works fully offline</li>
     </ul>
     <div class="dl-btns">
-      <a id="dl-macos" href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn primary" target="_blank">
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-macos.dmg" class="dl-btn primary" target="_blank">
         <span class="os-icon"></span> macOS (.dmg)
       </a>
-      <a id="dl-win-exe" href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn" target="_blank">
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-windows-setup.exe" class="dl-btn" target="_blank">
         <span class="os-icon">🪟</span> Windows (.exe)
       </a>
-      <a id="dl-win-msi" href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn" target="_blank">
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-windows.msi" class="dl-btn" target="_blank">
         <span class="os-icon">🪟</span> Windows (.msi)
       </a>
-      <a id="dl-linux-deb" href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn muted" target="_blank"
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-linux.deb" class="dl-btn muted" target="_blank"
          title="⚠️ Linux builds have not been tested by the developer — use at your own risk">
         <span class="os-icon">🐧</span> Linux (.deb)
       </a>
-      <a id="dl-linux-appimage" href="https://github.com/rulingAnts/LingTeX-Tools/releases" class="dl-btn muted" target="_blank"
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-linux.AppImage" class="dl-btn muted" target="_blank"
          title="⚠️ Linux builds have not been tested by the developer — use at your own risk">
         <span class="os-icon">🐧</span> Linux (.AppImage)
       </a>
@@ -860,28 +860,6 @@ footer a:hover { text-decoration: underline; }
 <script src="core.js"></script>
 
 <script>
-// ── Download button URLs — resolved from latest-downloads.json ───────────────
-(function () {
-  fetch('latest-downloads.json')
-    .then(function (r) { return r.json(); })
-    .then(function (data) {
-      var map = {
-        'dl-macos':          data.macos,
-        'dl-win-exe':        data.win_exe,
-        'dl-win-msi':        data.win_msi,
-        'dl-linux-deb':      data.linux_deb,
-        'dl-linux-appimage': data.linux_appimage
-      };
-      Object.keys(map).forEach(function (id) {
-        if (map[id]) {
-          var el = document.getElementById(id);
-          if (el) el.href = map[id];
-        }
-      });
-    })
-    .catch(function () { /* leave fallback release-page hrefs in place */ });
-}());
-
 // ══════════════════════════════════════════════════════════════════════════════
 // APP
 // ══════════════════════════════════════════════════════════════════════════════

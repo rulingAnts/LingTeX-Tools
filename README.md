@@ -7,7 +7,7 @@ Linguistic fieldwork macro tools for LaTeX — available in four formats:
 | **Web app** | `docs/` · [rulingants.github.io/LingTeX-Tools](https://rulingants.github.io/LingTeX-Tools/) | Hosted on GitHub Pages; works offline via service worker |
 | **Chrome / Edge extension** | `extension/chrome/` | MV3; auto-convert paste, per-profile keyboard shortcuts |
 | **Firefox extension** | `extension/firefox/` | MV2; same features as Chrome |
-| **Safari extension** | built from Chrome source in CI | Unsigned; macOS only; see INSTALL.md |
+| **Safari extension** | planned | Not yet available — Safari CI build currently failing |
 | **Desktop app (Tauri)** | `tauri/` | Menu-bar / system-tray; OS-wide clipboard auto-convert |
 
 ## What it does

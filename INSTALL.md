@@ -94,28 +94,11 @@ and follow the steps for your browser.
 > would need to be signed through Mozilla's Add-on Developer Hub — see the
 > [extension README](extension/README.md) for details.
 
-### Safari (unsigned — macOS only)
+### Safari
 
-The Safari extension is **unsigned** (signing requires an Apple Developer Program
-membership). This means a couple of extra steps each session.
-
-1. Download **`lingtex-tools-safari.zip`** and unzip it
-2. Move **LingTeX Tools.app** to your `/Applications` folder
-3. Run **LingTeX Tools.app** once — a small window appears confirming the
-   extension was registered with Safari; you can close it after
-4. Open **Safari → Settings → Extensions** and toggle **LingTeX Tools** on
-5. Enable unsigned extensions — you need to do this every time Safari relaunches:
-   - If you don't see a **Develop** menu:
-     **Safari → Settings → Advanced → ✓ Show features for web developers**
-   - Then: **Develop → Allow Unsigned Extensions** (enter your password)
-
-> **Why the Develop menu toggle resets:** Apple requires this as a security
-> measure for unsigned extensions. If you find it too cumbersome, Chrome or
-> Firefox have no such limitation and are recommended for daily use.
-
-> **Want a signed version?** If you have an Apple Developer account, you're
-> welcome to fork this repository and add your own signing credentials to the
-> GitHub Actions workflow. See [extension/README.md](extension/README.md).
+Safari support is planned for a future release. In the meantime, macOS users
+can use the [Desktop App](#desktop-app-macos--windows--linux) or the
+[web version](https://rulingants.github.io/LingTeX-Tools/).
 
 ### Using the extension
 

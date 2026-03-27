@@ -277,20 +277,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Update latest-downloads.json
+      # Upload version-agnostic aliases so the website's releases/latest/download/ links
+      # always resolve to the correct file regardless of version number in the filename.
+      - name: Upload version-agnostic download aliases
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view ${{ github.ref_name }} --repo ${{ github.repository }} --json assets \
-            --jq '{
-              macos:           ([ .assets[] | select(.name | endswith(".dmg"))        | .url ] | first),
-              win_exe:         ([ .assets[] | select(.name | endswith("-setup.exe"))  | .url ] | first),
-              win_msi:         ([ .assets[] | select(.name | endswith(".msi"))        | .url ] | first),
-              linux_deb:       ([ .assets[] | select(.name | endswith(".deb"))        | .url ] | first),
-              linux_appimage:  ([ .assets[] | select(.name | endswith(".AppImage"))   | .url ] | first)
-            }' > docs/latest-downloads.json
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/latest-downloads.json
-          git commit -m "chore: update latest-downloads.json for ${{ github.ref_name }} [skip ci]"
-          git push
+          mkdir -p /tmp/aliases
+          gh release download ${{ github.ref_name }} --repo ${{ github.repository }} \
+            --pattern "*.dmg" --pattern "*-setup.exe" --pattern "*.msi" \
+            --pattern "*.deb" --pattern "*.AppImage" \
+            --dir /tmp/aliases
+          cd /tmp/aliases
+          for f in *.dmg;        do cp "$f" lingtex-tools-macos.dmg;            done
+          for f in *-setup.exe;  do cp "$f" lingtex-tools-windows-setup.exe;    done
+          for f in *_en-US.msi;  do cp "$f" lingtex-tools-windows.msi;          done
+          for f in *.deb;        do cp "$f" lingtex-tools-linux.deb;             done
+          for f in *.AppImage;   do cp "$f" lingtex-tools-linux.AppImage;        done
+          gh release upload ${{ github.ref_name }} --repo ${{ github.repository }} --clobber \
+            lingtex-tools-macos.dmg \
+            lingtex-tools-windows-setup.exe \
+            lingtex-tools-windows.msi \
+            lingtex-tools-linux.deb \
+            lingtex-tools-linux.AppImage
