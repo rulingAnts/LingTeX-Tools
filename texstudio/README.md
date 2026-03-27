@@ -1,7 +1,7 @@
 # LingTeX Tools — TeXstudio Macros
 
 Five TeXstudio script macros for linguistic fieldwork in LaTeX.
-Each macro works **with or without** the [LingTeX template](https://github.com/sethjohnston/LingTeX) —
+Each macro works **with or without** the [LingTeX template](https://github.com/rulingAnts/LingTeX) —
 adjust the `CONFIGURATION` block at the top of each file to match your own preamble.
 
 ## Macros
