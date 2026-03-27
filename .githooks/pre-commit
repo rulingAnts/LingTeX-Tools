@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# pre-commit — block commits that include files larger than 25 MB
+#
+# Install once per clone:
+#   git config core.hooksPath .githooks
+#
+# (The root README mentions this under "Development setup".)
+
+set -e
+
+LIMIT_MB=25
+LIMIT_BYTES=$(( LIMIT_MB * 1024 * 1024 ))
+FAILED=0
+
+while IFS= read -r -d '' file; do
+    # git diff-index gives us the blob SHA; stat it for size
+    size=$(git cat-file -s ":$file" 2>/dev/null || echo 0)
+    if (( size > LIMIT_BYTES )); then
+        size_mb=$(echo "scale=1; $size / 1048576" | bc)
+        echo "  ✗  $file  (${size_mb} MB)" >&2
+        FAILED=1
+    fi
+done < <(git diff --cached --name-only -z)
+
+if (( FAILED )); then
+    echo "" >&2
+    echo "pre-commit: commit aborted — staged file(s) exceed the ${LIMIT_MB} MB limit." >&2
+    echo "Add them to .gitignore, or use Git LFS if they must be tracked." >&2
+    exit 1
+fi
+
+exit 0
