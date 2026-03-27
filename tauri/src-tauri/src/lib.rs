@@ -31,14 +31,8 @@ fn default_skip() -> String { "referenced".to_string() }
 
 #[derive(Debug, Default)]
 struct ActiveConfig {
-    flex_opts:     convert::FlexOpts,
-    tsv_profiles:  Vec<TsvProfile>,
-    /// Last clipboard text the *user* copied (not written by us).
-    /// Shortcuts use this as their source so auto-convert doesn't interfere.
-    last_raw_clip: String,
-    /// Last text we wrote to the clipboard (auto-convert output or shortcut output).
-    /// The clipboard monitor skips updating last_raw_clip when it sees this value.
-    last_written:  String,
+    flex_opts:    convert::FlexOpts,
+    tsv_profiles: Vec<TsvProfile>,
 }
 
 struct AppState(Mutex<ActiveConfig>);
@@ -124,16 +118,39 @@ fn convert_for_profile(profile_id: &str, text: &str, cfg: &ActiveConfig) -> Opti
     }
 }
 
+/// Simulate a Cmd+V (macOS) or Ctrl+V (Windows/Linux) keystroke so the
+/// converted text is pasted into whatever app the user was working in.
+///
+/// A 50 ms pause before the keystroke gives the clipboard time to settle.
+/// On macOS this requires Accessibility permission:
+/// System Settings → Privacy & Security → Accessibility.
+fn simulate_paste() {
+    use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+
+    thread::sleep(Duration::from_millis(50));
+    if let Ok(mut en) = Enigo::new(&Settings::default()) {
+        #[cfg(target_os = "macos")]
+        {
+            let _ = en.key(Key::Meta,        Direction::Press);
+            let _ = en.key(Key::Unicode('v'), Direction::Click);
+            let _ = en.key(Key::Meta,        Direction::Release);
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = en.key(Key::Control,      Direction::Press);
+            let _ = en.key(Key::Unicode('v'),  Direction::Click);
+            let _ = en.key(Key::Control,       Direction::Release);
+        }
+    }
+}
+
 // ── Tauri commands ────────────────────────────────────────────────────────────
 
 /// Write text to the system clipboard. Called from the frontend via invoke().
-/// Also records the written text so the clipboard monitor doesn't treat it
-/// as a new user copy.
 #[tauri::command]
-fn write_clipboard(text: String, state: tauri::State<AppState>) -> Result<(), String> {
+fn write_clipboard(text: String) -> Result<(), String> {
     let mut cb = arboard::Clipboard::new().map_err(|e| e.to_string())?;
-    cb.set_text(&text).map_err(|e| e.to_string())?;
-    state.0.lock().unwrap().last_written = text;
+    cb.set_text(text).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -189,21 +206,9 @@ fn register_profile_shortcut(
                 Ok(c)  => c,
                 Err(_) => return,
             };
-
-            // Use last_raw_clip (the last text the *user* copied) as the source.
-            // This prevents double-conversion when auto-convert is on (which would
-            // have already overwritten the clipboard with LaTeX) and also prevents
-            // the "press shortcut twice → garbage" problem.
-            let text = {
-                let cfg = app_state.0.lock().unwrap();
-                if !cfg.last_raw_clip.is_empty() {
-                    cfg.last_raw_clip.clone()
-                } else {
-                    match cb.get_text() {
-                        Ok(t) if !t.trim().is_empty() => t,
-                        _ => return,
-                    }
-                }
+            let text = match cb.get_text() {
+                Ok(t) if !t.trim().is_empty() => t,
+                _ => return,
             };
 
             // Convert in Rust — works even when the webview is hidden/throttled
@@ -212,9 +217,9 @@ fn register_profile_shortcut(
             drop(cfg);
 
             if let Some(out) = converted {
-                // Record as our own write so the monitor doesn't clobber last_raw_clip
-                app_state.0.lock().unwrap().last_written = out.clone();
                 if cb.set_text(&out).is_ok() {
+                    drop(cb); // release clipboard before keystroke
+                    simulate_paste();
                     let _ = app.emit("profile-shortcut", serde_json::json!({
                         "profileId": &pid
                     }));
@@ -243,15 +248,6 @@ fn start_clipboard_monitor(app: AppHandle) {
             if let Ok(text) = cb.get_text() {
                 if !text.is_empty() && text != last {
                     last = text.clone();
-                    // Only update last_raw_clip if this content came from the user,
-                    // not from our own write_clipboard / shortcut handler.
-                    {
-                        let app_state = app.state::<AppState>();
-                        let mut cfg = app_state.0.lock().unwrap();
-                        if text != cfg.last_written {
-                            cfg.last_raw_clip = text.clone();
-                        }
-                    }
                     let _ = app.emit("clipboard-changed", text);
                 }
             }
