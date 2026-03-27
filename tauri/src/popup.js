@@ -372,7 +372,9 @@ function buildPanelHTML(p) {
         '    </div>' +
         '    <div class="cfg-hint">' +
         '      Press this shortcut anywhere to instantly read the clipboard, convert' +
-        '      using this profile, and re-copy the result.' +
+        '      using this profile, and re-copy the result.<br>' +
+        '      <strong>Note:</strong> keyboard shortcuts and <em>Auto re-copy</em> cannot' +
+        '      be used at the same time — turn off Auto re-copy when using shortcuts.' +
         '    </div>' +
 
         (!p.isDefault
