@@ -26,6 +26,52 @@ jobs:
           name: 'LingTeX Tools ${{ github.ref_name }}'
           draft: true
           generate_release_notes: true
+          body: |
+            ## Installation
+
+            > **⚠️ Linux builds are untested.** The developer does not have a Linux machine.
+            > The `.deb` and `.AppImage` artifacts are provided on a best-effort basis.
+            > If you try them and run into issues — or get them working — please
+            > [open an issue or PR](https://github.com/rulingAnts/LingTeX-Tools/issues).
+            > Linux contributions are very welcome.
+
+            ---
+
+            ### 🖥 Desktop App (macOS / Windows / Linux)
+
+            Download the installer for your platform from the assets below.
+
+            **macOS — required first-launch steps (app is unsigned):**
+
+            1. After installing, right-click `LingTeX Tools.app` → **Open**, then click **Open** again in the security dialog.
+               Or run once in Terminal:
+               ```
+               xattr -cr "/Applications/LingTeX Tools.app"
+               ```
+            2. When prompted, grant **Accessibility** access in
+               **System Settings → Privacy & Security → Accessibility**.
+               This is required for global keyboard shortcuts and Auto re-copy to work.
+
+            ---
+
+            ### ⬡ Browser Extension (Chrome / Firefox)
+
+            The extension is not yet in the browser stores — manual install is required.
+
+            **Chrome / Edge:**
+            1. Download `lingtex-tools-chrome.zip` and unzip it somewhere permanent
+               (Chrome loads directly from this folder — don't delete it)
+            2. Go to `chrome://extensions`, enable **Developer mode**, click **Load unpacked**,
+               and select the unzipped folder
+            3. Pin the LingTeX Tools icon from the puzzle-piece menu
+
+            **Firefox:**
+            1. Download `lingtex-tools-firefox.zip` and unzip it
+            2. Go to `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on…**,
+               and select `manifest.json` inside the unzipped folder
+            > **Note:** Firefox unloads temporary add-ons on quit. Repeat steps 2–3 after each restart.
+
+            ---
 
   # ── 2. Browser extensions (macOS runner — required for Safari / Xcode) ─────
   extensions:
