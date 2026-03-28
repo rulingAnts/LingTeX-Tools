@@ -338,7 +338,9 @@
             wrapExe:      false
         };
         var items = blocks.map(function (block) {
-            return '\\ex ' + renderFLEx(block, subOpts).trim();
+            var body = renderFLEx(block, subOpts).trim();
+            var indented = body.split('\n').map(function (l) { return '    ' + l; }).join('\n');
+            return '\\ex % \\label{ex:KEY}\n' + indented;
         });
         return '\n% Interlinear examples\n\n'
              + '\\begin{exe}\n'
