@@ -386,13 +386,12 @@ textarea.out:focus { outline-color: #93c5fd; border-color: var(--slate-600); }
           Leave empty to disable.
         </div>
 
-        <div class="cfg-row">
-          <label for="flex-wrap-exe">Wrap in <code>\begin{exe}</code></label>
-          <select id="flex-wrap-exe">
-            <option value="yes" selected>Yes — full exe block</option>
-            <option value="no">No — \gll lines only</option>
-          </select>
-        </div>
+        <!-- TODO (future release): wire up \begin{exe} wrapping toggle;
+             currently has no effect so the control is hidden for now.
+             Always wraps in exe block. -->
+        <select id="flex-wrap-exe" hidden>
+          <option value="yes" selected>Yes — full exe block</option>
+        </select>
 
         <div class="cfg-row">
           <label for="flex-txtref">Source ref. command</label>

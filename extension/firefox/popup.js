@@ -459,21 +459,24 @@ function convertFlex() {
     }
 
     try {
-        var parsed = LingTeXCore.parseFLExBlock(raw);
-        if (!parsed.lineTypes || parsed.lineTypes.length === 0) {
+        var blocks = LingTeXCore.parseFLExBlocks(raw);
+        if (!blocks.length) {
             outEl.value = '';
             setStatus('flex', 'No recognisable interlinear tiers found.', 'err');
             return;
         }
-        var latex = LingTeXCore.renderFLEx(parsed, {
+        var latex = LingTeXCore.renderFLExAuto(blocks, {
             glCmd:        document.getElementById('flex-gl').value.trim(),
             wrapExe:      document.getElementById('flex-wrap-exe').value === 'yes',
             txtrefCmd:    document.getElementById('flex-txtref').value.trim(),
             txtrefPrefix: document.getElementById('flex-txtpfx').value
         });
         outEl.value = latex;
-        var words = (parsed.lineArrays[0] || []).length - 1;
-        setStatus('flex', 'Converted ' + words + ' word(s)', 'ok');
+        var words = (blocks[0].lineArrays[0] || []).length - 1;
+        var msg = blocks.length > 1
+            ? 'Converted ' + blocks.length + ' blocks'
+            : 'Converted ' + words + ' word(s)';
+        setStatus('flex', msg, 'ok');
     } catch (e) {
         outEl.value = '';
         setStatus('flex', 'Error: ' + e.message, 'err');

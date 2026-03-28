@@ -299,6 +299,91 @@
              + '\\end{exe}\n';
     }
 
+    // ── Multi-block FLEx support ─────────────────────────────────────────────
+
+    /**
+     * Parse all interlinear blocks from raw FLEx clipboard text.
+     * Blocks are separated by one or more blank lines.
+     * Returns an array of parsed block objects (result of parseFLExBlock).
+     * Blocks with no recognisable tier lines are silently dropped.
+     * @param  {string} raw
+     * @returns {Array<{ lineTypes: string[], lineArrays: string[][], freeLines: string[], lineNum: string|null }>}
+     */
+    function parseFLExBlocks(raw) {
+        var text = raw.replace(/\r\n?/g, '\n');
+
+        // Phase 1: split on blank lines (including whitespace-only lines)
+        var chunks = text.split(/\n[ \t]*\n+/);
+        chunks = chunks.filter(function (c) { return c.trim() !== ''; });
+
+        // Phase 2: if still only one chunk, blocks may not be separated by blank
+        // lines at all — split on numbered-example boundaries instead.
+        if (chunks.length <= 1) {
+            var lines = text.split('\n');
+            var groups = [[]];
+            for (var i = 0; i < lines.length; i++) {
+                var stripped = stripInvisible(lines[i]).trim();
+                if (groups[groups.length - 1].length > 0 &&
+                        /^\d+(?:\.\d+)?(\s|$)/.test(stripped)) {
+                    groups.push([]);
+                }
+                groups[groups.length - 1].push(lines[i]);
+            }
+            chunks = groups.map(function (g) { return g.join('\n'); });
+        }
+
+        var blocks = [];
+        for (var j = 0; j < chunks.length; j++) {
+            var chunk = chunks[j].trim();
+            if (!chunk) continue;
+            var parsed = parseFLExBlock(chunk);
+            if (parsed.lineTypes.length > 0) blocks.push(parsed);
+        }
+        return blocks;
+    }
+
+    /**
+     * Render multiple parsed FLEx blocks into a langsci-gb4e xlist environment.
+     * Each block becomes one \ex sub-item inside \begin{xlist}...\end{xlist}.
+     * @param  {Array}  blocks  Result of parseFLExBlocks()
+     * @param  {object} [opts]  Same options as renderFLEx(); wrapExe is ignored here
+     * @returns {string}
+     */
+    function renderFLExXlist(blocks, opts) {
+        opts = opts || {};
+        var subOpts = {
+            glCmd:        opts.glCmd,
+            txtrefCmd:    opts.txtrefCmd,
+            txtrefPrefix: opts.txtrefPrefix,
+            wrapExe:      false
+        };
+        var items = blocks.map(function (block) {
+            var body = renderFLEx(block, subOpts).trim();
+            var indented = body.split('\n').map(function (l) { return '    ' + l; }).join('\n');
+            return '\\ex % \\label{ex:KEY}\n' + indented;
+        });
+        return '\n% Interlinear examples\n\n'
+             + '\\begin{exe}\n'
+             + '\\ex % \\label{ex:KEY}\n'
+             + '\\begin{xlist}\n'
+             + items.join('\n\n') + '\n'
+             + '\\end{xlist}\n'
+             + '\\end{exe}\n';
+    }
+
+    /**
+     * Auto-detect single vs. multiple FLEx blocks and render accordingly.
+     * - One block  → renderFLEx()   (existing \begin{exe}\ex...\end{exe})
+     * - Many blocks → renderFLExXlist()  (\begin{exe}\ex\begin{xlist}...\end{xlist}\end{exe})
+     * @param  {Array}  blocks  Result of parseFLExBlocks()
+     * @param  {object} [opts]  Same options as renderFLEx()
+     * @returns {string}
+     */
+    function renderFLExAuto(blocks, opts) {
+        if (blocks.length === 1) return renderFLEx(blocks[0], opts);
+        return renderFLExXlist(blocks, opts);
+    }
+
     // ── Phonology Assistant parser/renderer ──────────────────────────────────
 
     /**
@@ -421,7 +506,10 @@
 
     return {
         parseFLExBlock:            parseFLExBlock,
+        parseFLExBlocks:           parseFLExBlocks,
         renderFLEx:                renderFLEx,
+        renderFLExXlist:           renderFLExXlist,
+        renderFLExAuto:            renderFLExAuto,
         parsePhonologyAssistant:   parsePhonologyAssistant,   // old fixed-column API
         renderPhonologyAssistant:  renderPhonologyAssistant,  // old fixed-column API
         parseTSVRow:               parseTSVRow,               // generic TSV API

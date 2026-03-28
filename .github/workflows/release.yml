@@ -81,6 +81,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set version from tag
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          jq --arg v "$VERSION" '.version = $v' extension/chrome/manifest.json > tmp.json && mv tmp.json extension/chrome/manifest.json
+          jq --arg v "$VERSION" '.version = $v' extension/firefox/manifest.json > tmp.json && mv tmp.json extension/firefox/manifest.json
+
       - name: Build Chrome + Firefox extensions
         run: bash extension/build.sh --zip
         # produces extension/lingtex-tools-chrome.zip

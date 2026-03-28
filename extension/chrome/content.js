@@ -65,9 +65,9 @@
 
     function convertFLEx(text) {
         try {
-            var parsed = LingTeXCore.parseFLExBlock(text);
-            if (!parsed || !parsed.lineTypes || parsed.lineTypes.length === 0) return null;
-            return LingTeXCore.renderFLEx(parsed, cfg.flexConfig);
+            var blocks = LingTeXCore.parseFLExBlocks(text);
+            if (!blocks || !blocks.length) return null;
+            return LingTeXCore.renderFLExAuto(blocks, cfg.flexConfig);
         } catch (e) { return null; }
     }
 
