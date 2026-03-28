@@ -66,10 +66,9 @@ jobs:
             3. Pin the LingTeX Tools icon from the puzzle-piece menu
 
             **Firefox:**
-            1. Download `lingtex-tools-firefox.zip` and unzip it
-            2. Go to `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on…**,
-               and select `manifest.json` inside the unzipped folder
-            > **Note:** Firefox unloads temporary add-ons on quit. Repeat steps 2–3 after each restart.
+            1. Download `lingtex-tools-firefox.xpi`
+            2. Open the file (or drag it onto a Firefox tab) and click **Add** when prompted
+            > The extension is permanently installed — no repeat after restart.
 
             ---
 

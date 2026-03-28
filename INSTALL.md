@@ -84,15 +84,10 @@ and follow the steps for your browser.
 
 ### Firefox
 
-1. Download **`lingtex-tools-firefox.zip`** and unzip it
-2. Open **`about:debugging#/runtime/this-firefox`** in Firefox
-3. Click **Load Temporary Add-on…**
-4. Navigate into the unzipped `firefox/` folder and select **`manifest.json`**
+1. Download **`lingtex-tools-firefox.xpi`**
+2. Open the file (or drag it onto a Firefox tab) and click **Add** when prompted
 
-> **Note:** Firefox unloads temporary add-ons when it quits. To reload after
-> restarting Firefox, repeat steps 2–4. For a persistent install, the extension
-> would need to be signed through Mozilla's Add-on Developer Hub — see the
-> [extension README](extension/README.md) for details.
+The extension is permanently installed — no need to repeat after restart.
 
 ### Safari
 

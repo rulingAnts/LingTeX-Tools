@@ -127,7 +127,9 @@ differ in manifest version (MV3 vs MV2), action key names (`action` vs `browser_
 and background script format.
 
 For distribution, `extension/build.sh --zip` additionally creates
-`lingtex-tools-chrome.zip` and `lingtex-tools-firefox.zip`.
+`lingtex-tools-chrome.zip` and `lingtex-tools-firefox.zip`. In CI, the Firefox zip
+is also signed via `web-ext sign --channel=unlisted` (AMO unlisted) and uploaded
+as `lingtex-tools-firefox.xpi` — a permanently installable signed extension.
 
 ### Safari extension (CI only)
 
@@ -199,9 +201,11 @@ git tag v0.1.0 && git push origin v0.1.0
           │
           ├── extensions (macos-latest) ─────────────────────────────────┐
           │     ├── extension/build.sh --zip  → chrome.zip, firefox.zip  │
+          │     ├── web-ext sign (AMO unlisted) → firefox.xpi            │
           │     ├── xcrun safari-web-extension-converter                  │
           │     │      └── xcodebuild (unsigned) → safari.zip            │
-          │     └── gh release upload → attaches 3 extension zips        │
+          │     └── gh release upload → chrome.zip, firefox.zip,        │
+          │                             firefox.xpi, safari.zip          │
           │                                                               │
           ├── desktop-macos (macos-latest)                                │
           │     └── tauri-apps/tauri-action → .dmg + .app                │
