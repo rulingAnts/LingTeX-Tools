@@ -277,6 +277,7 @@ web app.
 | Issue | Affected tabs |
 |---|---|
 | **Header row included in copy** — when selecting rows from the top of a Phonology Assistant or Dekereke table, the column-header row may be included in the clipboard selection. The converter will attempt to process it as data, producing a garbled first entry. Delete that entry from the output manually. | Phonology Assistant, Dekereke |
+| **Custom shortcut replaces clipboard on each use** — the keyboard shortcut converts the clipboard content and replaces it with LaTeX. If you want to paste the same content a second time, use the regular paste command (Cmd+V / Ctrl+V) rather than the shortcut again — the shortcut will attempt to convert the already-converted LaTeX. | Desktop app (all profiles) |
 
 ---
 
