@@ -939,9 +939,11 @@ function convertFlex() {
         outEl.value = latex;
         var first = blocks[0];
         var words = (first.lineArrays[0] || []).length - 1;
-        var blockInfo = blocks.length > 1 ? blocks.length + ' blocks, ' : '';
-        setStatus('flex', 'Converted ' + blockInfo + words + ' word(s) in first block' +
-            (first.freeLines.length ? ' · free: \u201c' + first.freeLines[0] + '\u201d' : ''), 'ok');
+        var msg = blocks.length > 1
+            ? 'Converted ' + blocks.length + ' blocks'
+            : 'Converted ' + words + ' word(s)' +
+              (first.freeLines.length ? ' \u00b7 free: \u201c' + first.freeLines[0] + '\u201d' : '');
+        setStatus('flex', msg, 'ok');
     } catch (e) {
         outEl.value = '';
         setStatus('flex', 'Error: ' + e.message, 'err');

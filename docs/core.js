@@ -310,11 +310,31 @@
      * @returns {Array<{ lineTypes: string[], lineArrays: string[][], freeLines: string[], lineNum: string|null }>}
      */
     function parseFLExBlocks(raw) {
-        var text   = raw.replace(/\r\n?/g, '\n');
-        var chunks = text.split(/\n{2,}/);
+        var text = raw.replace(/\r\n?/g, '\n');
+
+        // Phase 1: split on blank lines (including whitespace-only lines)
+        var chunks = text.split(/\n[ \t]*\n+/);
+        chunks = chunks.filter(function (c) { return c.trim() !== ''; });
+
+        // Phase 2: if still only one chunk, blocks may not be separated by blank
+        // lines at all — split on numbered-example boundaries instead.
+        if (chunks.length <= 1) {
+            var lines = text.split('\n');
+            var groups = [[]];
+            for (var i = 0; i < lines.length; i++) {
+                var stripped = stripInvisible(lines[i]).trim();
+                if (groups[groups.length - 1].length > 0 &&
+                        /^\d+(?:\.\d+)?(\s|$)/.test(stripped)) {
+                    groups.push([]);
+                }
+                groups[groups.length - 1].push(lines[i]);
+            }
+            chunks = groups.map(function (g) { return g.join('\n'); });
+        }
+
         var blocks = [];
-        for (var i = 0; i < chunks.length; i++) {
-            var chunk = chunks[i].trim();
+        for (var j = 0; j < chunks.length; j++) {
+            var chunk = chunks[j].trim();
             if (!chunk) continue;
             var parsed = parseFLExBlock(chunk);
             if (parsed.lineTypes.length > 0) blocks.push(parsed);

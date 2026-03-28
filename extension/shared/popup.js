@@ -473,8 +473,10 @@ function convertFlex() {
         });
         outEl.value = latex;
         var words = (blocks[0].lineArrays[0] || []).length - 1;
-        var blockInfo = blocks.length > 1 ? blocks.length + ' blocks, ' : '';
-        setStatus('flex', 'Converted ' + blockInfo + words + ' word(s)', 'ok');
+        var msg = blocks.length > 1
+            ? 'Converted ' + blocks.length + ' blocks'
+            : 'Converted ' + words + ' word(s)';
+        setStatus('flex', msg, 'ok');
     } catch (e) {
         outEl.value = '';
         setStatus('flex', 'Error: ' + e.message, 'err');
