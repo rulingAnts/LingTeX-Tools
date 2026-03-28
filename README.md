@@ -148,7 +148,26 @@ tauri/src/core.js (synced above) ───────────────�
 
 tauri/src-tauri/src/lib.rs ───────────────────────────────►  Rust binary
   (clipboard monitor, system tray, write_clipboard command)     (gitignored in target/)
+tauri/src-tauri/src/convert.rs  ◄── Rust port of docs/core.js
+  (used by global shortcut handler)
 ```
+
+#### Two conversion paths in the desktop app
+
+The desktop app has two distinct conversion paths that use **different implementations**:
+
+| Path | Where it runs | Source |
+|---|---|---|
+| Test area UI / auto re-copy | JavaScript (webview) | `tauri/src/core.js` (synced from `docs/core.js`) |
+| Global keyboard shortcut | Rust (background thread) | `tauri/src-tauri/src/convert.rs` |
+
+The keyboard shortcut runs from a background OS thread where the webview may be
+hidden or throttled. Rust converts the clipboard directly without a JS round-trip,
+which is more reliable. **`convert.rs` is a Rust port of `docs/core.js` and must be
+kept in sync with it** — if you add or change conversion logic in `docs/core.js`,
+make the same change in `convert.rs`.
+
+---
 
 `tauri/src/popup.js` is based on `extension/shared/popup.js` but is **not** a copy —
 it has two key adaptations:

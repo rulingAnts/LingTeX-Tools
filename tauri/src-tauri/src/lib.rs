@@ -83,9 +83,9 @@ fn convert_for_profile(profile_id: &str, text: &str, cfg: &ActiveConfig) -> Opti
     if text.trim().is_empty() { return None; }
 
     if profile_id == "flex" {
-        let parsed = convert::parse_flex_block(text);
-        if parsed.line_types.is_empty() { return None; }
-        let result = convert::render_flex(&parsed, &cfg.flex_opts);
+        let blocks = convert::parse_flex_blocks(text);
+        if blocks.is_empty() { return None; }
+        let result = convert::render_flex_auto(&blocks, &cfg.flex_opts);
         if result.trim().is_empty() { return None; }
         Some(result)
     } else {

@@ -149,6 +149,81 @@ fn massage_line(line: &str) -> String {
     format!("{}{}", label, body)
 }
 
+// ── FLEx block splitter ───────────────────────────────────────────────────────
+
+/// Returns true if `stripped` (already stripped of invisibles and whitespace-trimmed)
+/// looks like the start of a new numbered example block (e.g. "1 …", "2\t…", "3").
+fn is_block_start(stripped: &str) -> bool {
+    if stripped.is_empty() { return false; }
+    let num_end = stripped.chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .count();
+    if num_end == 0 { return false; }
+    let after = &stripped[num_end..];
+    after.is_empty() || after.starts_with(char::is_whitespace)
+}
+
+/// Split `text` into chunks separated by blank (whitespace-only) lines.
+fn split_on_blank_lines(text: &str) -> Vec<String> {
+    let mut chunks: Vec<String> = Vec::new();
+    let mut current: Vec<&str> = Vec::new();
+    for line in text.lines() {
+        if line.trim().is_empty() {
+            if !current.is_empty() {
+                chunks.push(current.join("\n"));
+                current.clear();
+            }
+        } else {
+            current.push(line);
+        }
+    }
+    if !current.is_empty() { chunks.push(current.join("\n")); }
+    chunks
+}
+
+/// Parse all interlinear blocks from raw FLEx clipboard text.
+///
+/// Phase 1: split on blank lines (including whitespace-only lines).
+/// Phase 2 (fallback): if only one chunk, split on numbered-example boundaries
+///   (lines matching /^\d+(\.\d+)?[\s]/) so that FLEx exports with no blank
+///   separators between blocks are handled correctly.
+pub fn parse_flex_blocks(raw: &str) -> Vec<FlexParsed> {
+    let text = raw.replace("\r\n", "\n").replace('\r', "\n");
+
+    // Phase 1 ─────────────────────────────────────────────────────────────────
+    let chunks = split_on_blank_lines(&text);
+    let valid: Vec<&str> = chunks.iter()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    if valid.len() > 1 {
+        let blocks: Vec<FlexParsed> = valid.iter()
+            .map(|c| parse_flex_block(c))
+            .filter(|b| !b.line_types.is_empty())
+            .collect();
+        if !blocks.is_empty() { return blocks; }
+    }
+
+    // Phase 2 — split on numbered-line boundaries ─────────────────────────────
+    let mut groups: Vec<Vec<String>> = vec![Vec::new()];
+    for line in text.lines() {
+        let stripped = strip_invisible(line.trim());
+        let last_len = groups.last().map(|g| g.len()).unwrap_or(0);
+        if last_len > 0 && is_block_start(&stripped) {
+            groups.push(Vec::new());
+        }
+        groups.last_mut().unwrap().push(line.to_string());
+    }
+
+    groups.iter()
+        .map(|g| g.join("\n"))
+        .filter(|c| !c.trim().is_empty())
+        .map(|c| parse_flex_block(&c))
+        .filter(|b| !b.line_types.is_empty())
+        .collect()
+}
+
 // ── FLEx parser ───────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -405,6 +480,36 @@ pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
         "\n% Interlinear example\n\n\\begin{{exe}}\n\\ex % \\label{{ex:KEY}}\n{}\n\\end{{exe}}\n",
         body
     )
+}
+
+/// Render multiple parsed FLEx blocks into a langsci-gb4e xlist environment.
+/// Each block becomes one `\ex` sub-item inside `\begin{xlist}…\end{xlist}`.
+pub fn render_flex_xlist(blocks: &[FlexParsed], opts: &FlexOpts) -> String {
+    let sub_opts = FlexOpts { wrap_exe: false, ..opts.clone() };
+    let items: Vec<String> = blocks.iter().map(|block| {
+        let body = render_flex(block, &sub_opts);
+        let indented = body.trim().lines()
+            .map(|l| format!("    {}", l))
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!("\\ex % \\label{{ex:KEY}}\n{}", indented)
+    }).collect();
+
+    format!(
+        "\n% Interlinear examples\n\n\\begin{{exe}}\n\\ex % \\label{{ex:KEY}}\n\\begin{{xlist}}\n{}\n\\end{{xlist}}\n\\end{{exe}}\n",
+        items.join("\n\n")
+    )
+}
+
+/// Auto-detect single vs. multiple blocks and render accordingly.
+/// - One block  → render_flex()       (\begin{exe}\ex …\end{exe})
+/// - Many blocks → render_flex_xlist() (\begin{exe}\ex\begin{xlist}…\end{xlist}\end{exe})
+pub fn render_flex_auto(blocks: &[FlexParsed], opts: &FlexOpts) -> String {
+    if blocks.len() == 1 {
+        render_flex(&blocks[0], opts)
+    } else {
+        render_flex_xlist(blocks, opts)
+    }
 }
 
 // ── TSV row template ──────────────────────────────────────────────────────────
