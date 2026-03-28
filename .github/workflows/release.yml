@@ -86,8 +86,8 @@ jobs:
         # produces extension/lingtex-tools-chrome.zip
         #          extension/lingtex-tools-firefox.zip
 
-      # Upload Chrome + Firefox immediately — before attempting Safari,
-      # so these are guaranteed in the release even if the Safari build fails.
+      # Upload Chrome + Firefox zips immediately — before signing or Safari,
+      # so these are guaranteed in the release even if later steps fail.
       - name: Upload Chrome + Firefox artifacts
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -95,6 +95,37 @@ jobs:
           gh release upload ${{ github.ref_name }} \
             extension/lingtex-tools-chrome.zip \
             extension/lingtex-tools-firefox.zip
+
+      - name: Sign Firefox extension (AMO unlisted)
+        continue-on-error: true
+        id: firefox-sign
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          npm install -g web-ext
+          web-ext sign \
+            --channel=unlisted \
+            --api-key="$AMO_JWT_ISSUER" \
+            --api-secret="$AMO_JWT_SECRET" \
+            --source-dir=extension/firefox \
+            --artifacts-dir=extension/signed
+          # Rename to a predictable filename
+          XPI=$(find extension/signed -name "*.xpi" | head -1)
+          if [ -n "$XPI" ]; then
+            mv "$XPI" extension/lingtex-tools-firefox.xpi
+          else
+            echo "ERROR: no .xpi found after signing"
+            exit 1
+          fi
+
+      - name: Upload signed Firefox .xpi
+        if: steps.firefox-sign.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.ref_name }} \
+            extension/lingtex-tools-firefox.xpi
 
       - name: Convert Chrome extension → Safari Xcode project
         continue-on-error: true
