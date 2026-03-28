@@ -272,12 +272,21 @@ web app.
 
 ---
 
+## Known issues
+
+| Issue | Affected tabs |
+|---|---|
+| **Header row included in copy** — when selecting rows from the top of a Phonology Assistant or Dekereke table, the column-header row may be included in the clipboard selection. The converter will attempt to process it as data, producing a garbled first entry. Delete that entry from the output manually. | Phonology Assistant, Dekereke |
+
+---
+
 ## Coming in a future release
 
 | Feature | Scope |
 |---|---|
-| **Multi-line FLEx group paste** — convert multiple interlinear line groups from one FLEx text in a single operation | Desktop &amp; extension |
 | **FLEx corpus → LaTeX export** — export an entire FLEx corpus as a structured LaTeX document (full example appendix or corpus reference) | Extension |
+| **Figure insertion** — insert `\includegraphics` blocks from a file picker or clipboard image | Desktop &amp; extension |
+| **Excel table round-trip** — paste a table from Excel as LaTeX `tabular` / copy a LaTeX table back to Excel for editing | Desktop &amp; extension |
 
 ---
 
