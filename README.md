@@ -28,13 +28,12 @@ LingTeX-Tools/
 │
 ├── docs/                        # Web app (GitHub Pages root)
 │   ├── index.html               #   Single-page app — all UI + app logic inline
-│   ├── core.js                  #   Synced copy of extension/shared/core.js (served by GitHub Pages)
+│   ├── core.js                  # ★ Conversion library — SINGLE SOURCE OF TRUTH
 │   ├── sw.js                    #   Service worker for offline caching
 │   └── manifest.json            #   Web app manifest (PWA)
 │
 ├── extension/
-│   ├── shared/                  # ★ Source for all shared logic
-│   │   ├── core.js              #   ★ Conversion library — SINGLE SOURCE OF TRUTH
+│   ├── shared/                  # Source for all browser extension UI
 │   │   ├── popup.html           #   Extension popup UI
 │   │   ├── popup.js             #   Popup logic (chrome.storage.local, event delegation)
 │   │   ├── content.js           #   Content script (paste intercept, keyboard shortcuts)
@@ -44,7 +43,7 @@ LingTeX-Tools/
 │   │   └── manifest.json        #   Chrome MV3 manifest (only tracked source file here)
 │   ├── firefox/
 │   │   └── manifest.json        #   Firefox MV2 manifest (only tracked source file here)
-│   └── build.sh                 #   Syncs shared/core.js out to docs/, tauri/, chrome/, firefox/
+│   └── build.sh                 #   Syncs docs/core.js out to tauri/, chrome/, firefox/
 │
 ├── tauri/
 │   ├── src/                     # Tauri webview frontend
@@ -83,7 +82,7 @@ they are all build outputs and are gitignored.
 ### Source of truth
 
 ```
-extension/shared/core.js
+docs/core.js
 ```
 
 This is the **only** copy of the parsing and rendering library. It is a plain UMD script
@@ -91,37 +90,41 @@ that exposes `LingTeXCore.parseFLExBlock`, `LingTeXCore.renderFLEx`,
 `LingTeXCore.parseTSVRow`, and `LingTeXCore.applyRowTemplate`. All platforms consume
 this exact file — none of them have their own copy of the conversion logic.
 
+`docs/core.js` is tracked in git and served directly by GitHub Pages to the web app.
+**To edit the conversion logic, edit `docs/core.js`.**
+Build scripts then distribute it to the other targets.
+
 ### How each platform gets core.js
 
 | Platform | Mechanism |
 |---|---|
-| Web app | `extension/build.sh` copies `shared/core.js` → `docs/core.js`; served by GitHub Pages |
-| Chrome extension | Same script, copied to `extension/chrome/core.js` |
+| Web app | `docs/core.js` is tracked and served directly by GitHub Pages |
+| Chrome extension | `extension/build.sh` copies `docs/core.js` → `extension/chrome/core.js` |
 | Firefox extension | Same script, copied to `extension/firefox/core.js` |
 | Safari extension | Built from the assembled Chrome directory, so it inherits the copy |
-| Desktop app | `extension/build.sh` (or `tauri/build.sh`) copies `shared/core.js` → `tauri/src/core.js` |
+| Desktop app | `extension/build.sh` (or `tauri/build.sh`) copies `docs/core.js` → `tauri/src/core.js` |
 
 ### Extension assembly (`extension/build.sh`)
 
 ```
-extension/shared/core.js ──────────────────────────────────► docs/core.js         (tracked)
-                          ──────────────────────────────────► tauri/src/core.js    (gitignored)
-                          ──────┬────────────────────────────► extension/chrome/
-extension/shared/popup.html ───┤                              extension/firefox/
-extension/shared/popup.js ─────┤
-extension/shared/content.js ───┤                                   (gitignored)
-extension/shared/background.js ┤
-extension/shared/icons/ ───────┘
-                                    +
-extension/chrome/manifest.json ──────────────────────────────► extension/chrome/  (tracked)
-extension/firefox/manifest.json ─────────────────────────────► extension/firefox/ (tracked)
+docs/core.js ────────────────────────────────────► tauri/src/core.js    (gitignored)
+             ────────┬───────────────────────────► extension/chrome/
+extension/shared/    │                             extension/firefox/
+  popup.html ────────┤
+  popup.js ──────────┤                                  (gitignored)
+  content.js ────────┤
+  background.js ─────┤
+  icons/ ────────────┘
+                         +
+extension/chrome/manifest.json ──────────────────► extension/chrome/  (tracked)
+extension/firefox/manifest.json ─────────────────► extension/firefox/ (tracked)
 ```
 
-Running `extension/build.sh` first syncs `shared/core.js` out to `docs/` and `tauri/src/`,
-then copies every file from `extension/shared/` into both `extension/chrome/` and
-`extension/firefox/`. The only browser-specific tracked source files are the `manifest.json`
-files — these differ in manifest version (MV3 vs MV2), action key names (`action` vs
-`browser_action`), and background script format.
+Running `extension/build.sh` syncs `docs/core.js` out to `tauri/src/` and copies every
+file from `extension/shared/` into both `extension/chrome/` and `extension/firefox/`.
+The only browser-specific tracked source files are the `manifest.json` files — these
+differ in manifest version (MV3 vs MV2), action key names (`action` vs `browser_action`),
+and background script format.
 
 For distribution, `extension/build.sh --zip` additionally creates
 `lingtex-tools-chrome.zip` and `lingtex-tools-firefox.zip`.
@@ -137,7 +140,7 @@ the GitHub release. Local Safari development requires macOS + Xcode and is docum
 ### Desktop app (`tauri/build.sh`)
 
 ```
-extension/shared/core.js ─────────────────────────────────► tauri/src/core.js
+docs/core.js ───────────────────────────────────► tauri/src/core.js
                                                                  (gitignored)
 tauri/src/index.html ─────────────────────────────────────┐
 tauri/src/popup.js ───────────────────────────────────────┤──► Tauri webview
@@ -235,7 +238,7 @@ bash build.sh --dev    # syncs core.js and launches cargo tauri dev
 
 ### Making changes to the conversion logic
 
-Edit **`extension/shared/core.js`** only — never edit the copies in `docs/`, `tauri/src/`,
+Edit **`shared/core.js`** only — never edit the copies in `docs/`, `tauri/src/`,
 `extension/chrome/`, or `extension/firefox/`. Then run the build script to propagate the
 change to all targets:
 
@@ -244,7 +247,7 @@ cd extension && bash build.sh
 ```
 
 This copies `shared/core.js` to `docs/core.js`, `tauri/src/core.js`, and both browser
-extension directories in one step. Commit both `extension/shared/core.js` and
+extension directories in one step. Commit both `shared/core.js` and
 `docs/core.js` — the `docs/` copy must be pushed so GitHub Pages serves the updated
 web app.
 

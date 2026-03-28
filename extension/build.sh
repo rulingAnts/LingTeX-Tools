@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # build.sh — Assemble browser extension packages
 #
-# Copies shared/ files and docs/core.js into each browser's directory,
-# then optionally zips them for distribution.
+# Copies extension/shared/ UI files and docs/core.js (source of truth) into
+# each browser's directory, then optionally zips them for distribution.
 #
 # Usage:
 #   ./build.sh            # copy files only
@@ -13,18 +13,18 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SHARED="$SCRIPT_DIR/shared"
+CORE="$ROOT/docs/core.js"          # docs/core.js is the single source of truth
 BROWSERS=("chrome" "firefox")
 
-# Sync core.js from shared/ (source of truth) out to docs/ and tauri/
-cp "$SHARED/core.js" "$ROOT/docs/core.js"
-cp "$SHARED/core.js" "$ROOT/tauri/src/core.js"
+# Sync core.js out to tauri/ (docs/ already has it — it IS the source)
+cp "$CORE" "$ROOT/tauri/src/core.js"
 
 for BROWSER in "${BROWSERS[@]}"; do
     DEST="$SCRIPT_DIR/$BROWSER"
     echo "→ Building $BROWSER..."
 
     # Copy shared assets
-    cp "$SHARED/core.js"       "$DEST/core.js"
+    cp "$CORE"                 "$DEST/core.js"
     cp "$SHARED/content.js"    "$DEST/content.js"
     cp "$SHARED/background.js" "$DEST/background.js"
     cp "$SHARED/popup.html"    "$DEST/popup.html"
