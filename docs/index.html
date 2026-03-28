@@ -923,23 +923,25 @@ function convertFlex() {
     if (!raw.trim()) { outEl.value = ''; statEl.textContent = ''; statEl.className = 'status'; return; }
 
     try {
-        var parsed = LingTeXCore.parseFLExBlock(raw);
-        if (parsed.lineTypes.length === 0) {
+        var blocks = LingTeXCore.parseFLExBlocks(raw);
+        if (!blocks.length) {
             outEl.value = '';
             setStatus('flex', 'No recognisable interlinear tiers found. ' +
                 'Lines must start with: Word, Morphemes, Lex. Entries, Lex. Gloss, Word Gloss, Free', 'err');
             return;
         }
-        var latex = LingTeXCore.renderFLEx(parsed, {
+        var latex = LingTeXCore.renderFLExAuto(blocks, {
             glCmd:        document.getElementById('flex-gl').value.trim(),
             wrapExe:      document.getElementById('flex-wrap-exe').value === 'yes',
             txtrefCmd:    document.getElementById('flex-txtref').value.trim(),
             txtrefPrefix: document.getElementById('flex-txtpfx').value
         });
         outEl.value = latex;
-        var words = (parsed.lineArrays[0] || []).length - 1;
-        setStatus('flex', 'Converted ' + words + ' word(s)' +
-            (parsed.freeLines.length ? ' · free: \u201c' + parsed.freeLines[0] + '\u201d' : ''), 'ok');
+        var first = blocks[0];
+        var words = (first.lineArrays[0] || []).length - 1;
+        var blockInfo = blocks.length > 1 ? blocks.length + ' blocks, ' : '';
+        setStatus('flex', 'Converted ' + blockInfo + words + ' word(s) in first block' +
+            (first.freeLines.length ? ' · free: \u201c' + first.freeLines[0] + '\u201d' : ''), 'ok');
     } catch (e) {
         outEl.value = '';
         setStatus('flex', 'Error: ' + e.message, 'err');
