@@ -57,15 +57,16 @@ No installation needed. Open in any browser:
 **[https://rulingants.github.io/LingTeX-Tools/](https://rulingants.github.io/LingTeX-Tools/)**
 
 The web app works offline after your first visit (cached by a service worker).
-It is the easiest way to get started, and is functionally identical to the
-browser extensions — the difference is that the extension can intercept your
-paste in Overleaf directly, while the web app requires a manual copy step.
+It is the easiest way to get started. The difference from the other versions is
+that it requires a manual copy step — unlike the browser extension (which intercepts
+paste directly in Overleaf) or the desktop app (which converts system-wide so you
+can paste into any editor, web-based or desktop).
 
 ---
 
 ## Browser Extensions
 
-Download the appropriate zip from the [latest release](https://github.com/rulingAnts/LingTeX-Tools/releases/latest)
+Download the appropriate file from the [latest release](https://github.com/rulingAnts/LingTeX-Tools/releases/latest)
 and follow the steps for your browser.
 
 ### Chrome / Edge / Chromium
@@ -91,7 +92,7 @@ The extension is permanently installed — no need to repeat after restart.
 
 ### Safari
 
-Safari support is planned for a future release. In the meantime, macOS users
+Safari support is planned for a future release. Safari users
 can use the [Desktop App](#desktop-app-macos--windows--linux) or the
 [web version](https://rulingants.github.io/LingTeX-Tools/).
 
