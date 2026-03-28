@@ -286,7 +286,7 @@ web app.
 |---|---|
 | **FLEx corpus → LaTeX export** — export an entire FLEx corpus as a structured LaTeX document (full example appendix or corpus reference) | Extension |
 | **Figure insertion** — insert `\includegraphics` blocks from a file picker or clipboard image | Desktop &amp; extension |
-| **Excel table round-trip** — paste a table from Excel as LaTeX `tabular` / copy a LaTeX table back to Excel for editing | Desktop &amp; extension |
+| **Spreadsheet/Word table round-trip** — paste a table from Excel or Word as LaTeX `tabular` / copy a LaTeX table back for editing | Desktop &amp; extension |
 
 ---
 
