@@ -285,6 +285,7 @@ web app.
 
 | Feature | Scope |
 |---|---|
+| **Text abbreviation prompt** — optional setting to show a prompt on each conversion (auto re-copy, keyboard shortcut, and UI copy) asking for the text/example abbreviation, so the `\txtref{}` value is filled in correctly without manually editing each pasted block | All platforms |
 | **FLEx corpus → LaTeX export** — export an entire FLEx corpus as a structured LaTeX document (full example appendix or corpus reference) | Extension |
 | **Figure insertion** — insert `\includegraphics` blocks from a file picker or clipboard image | Desktop &amp; extension |
 | **Spreadsheet/Word table round-trip** — paste a table from Excel or Word as LaTeX `tabular` / copy a LaTeX table back for editing | Desktop &amp; extension |
