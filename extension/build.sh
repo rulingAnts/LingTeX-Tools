@@ -15,8 +15,9 @@ ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SHARED="$SCRIPT_DIR/shared"
 BROWSERS=("chrome" "firefox")
 
-# Copy core.js from the web app (single source of truth) into shared/ first
-cp "$ROOT/docs/core.js" "$SHARED/core.js"
+# Sync core.js from shared/ (source of truth) out to docs/ and tauri/
+cp "$SHARED/core.js" "$ROOT/docs/core.js"
+cp "$SHARED/core.js" "$ROOT/tauri/src/core.js"
 
 for BROWSER in "${BROWSERS[@]}"; do
     DEST="$SCRIPT_DIR/$BROWSER"

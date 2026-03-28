@@ -25,7 +25,7 @@ tauri/src-tauri/target/
 # Tauri-generated capability schemas — recreated on every `cargo tauri build/dev`
 tauri/src-tauri/gen/
 
-# core.js is synced from docs/ by tauri/build.sh — not a source file
+# core.js is synced from extension/shared/ by build scripts — not a source file
 tauri/src/core.js
 
 # Windows installer toolchain downloaded by Tauri on first Windows build

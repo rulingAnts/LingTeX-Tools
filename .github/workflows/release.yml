@@ -155,7 +155,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Sync core.js into tauri/src/
-        run: cp docs/core.js tauri/src/core.js
+        run: cp extension/shared/core.js tauri/src/core.js
 
       - name: Set version from tag
         shell: bash
@@ -190,7 +190,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Sync core.js into tauri/src/
-        run: cp docs/core.js tauri/src/core.js
+        run: cp extension/shared/core.js tauri/src/core.js
 
       - name: Set version from tag
         shell: bash
@@ -228,7 +228,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Sync core.js into tauri/src/
-        run: cp docs/core.js tauri/src/core.js
+        run: cp extension/shared/core.js tauri/src/core.js
 
       - name: Set version from tag
         shell: bash

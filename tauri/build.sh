@@ -11,8 +11,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(dirname "$SCRIPT_DIR")"
 
 # ── Sync shared core.js ───────────────────────────────────────────────────────
-echo "[tauri] syncing core.js from docs/ → src/"
-cp "$ROOT/docs/core.js" "$SCRIPT_DIR/src/core.js"
+echo "[tauri] syncing core.js from extension/shared/ → src/"
+cp "$ROOT/extension/shared/core.js" "$SCRIPT_DIR/src/core.js"
 
 if [[ "$1" == "--sync" ]]; then
     echo "[tauri] sync complete"
