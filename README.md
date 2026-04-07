@@ -5,10 +5,10 @@ Linguistic fieldwork macro tools for LaTeX — available in four formats:
 | Platform | Location | Notes |
 |---|---|---|
 | **Web app** | `docs/` · [rulingants.github.io/LingTeX-Tools](https://rulingants.github.io/LingTeX-Tools/) | Hosted on GitHub Pages; works offline via service worker |
-| **Chrome / Edge extension** | `extension/chrome/` | MV3; auto-convert paste, per-profile keyboard shortcuts |
+| **Chrome / Edge extension** | `extension/chrome/` | MV3; per-profile keyboard shortcuts, insert at cursor |
 | **Firefox extension** | `extension/firefox/` | MV2; same features as Chrome |
 | **Safari extension** | planned | Not yet available — Safari CI build currently failing |
-| **Desktop app (Tauri)** | `tauri/` | Menu-bar / system-tray; OS-wide clipboard auto-convert |
+| **Desktop app (Tauri)** | `tauri/` | Menu-bar / system-tray; OS-wide keyboard shortcuts type converted text at the cursor |
 
 ## What it does
 
@@ -50,7 +50,7 @@ LingTeX-Tools/
 │   │   ├── index.html           #   Window HTML (based on extension popup)
 │   │   └── popup.js             #   App logic (localStorage shim + Tauri API integration)
 │   ├── src-tauri/               # Rust backend
-│   │   ├── src/lib.rs           #   Clipboard monitor, system tray, Tauri commands
+│   │   ├── src/lib.rs           #   System tray, global shortcuts → type_text via enigo, Tauri commands
 │   │   ├── tauri.conf.json      #   Tauri 2 configuration
 │   │   ├── Cargo.toml           #   Rust dependencies
 │   │   ├── capabilities/        #   Tauri permission declarations
@@ -160,14 +160,15 @@ The desktop app has two distinct conversion paths that use **different implement
 
 | Path | Where it runs | Source |
 |---|---|---|
-| Test area UI / auto re-copy | JavaScript (webview) | `tauri/src/core.js` (synced from `docs/core.js`) |
-| Global keyboard shortcut | Rust (background thread) | `tauri/src-tauri/src/convert.rs` |
+| Test area UI | JavaScript (webview) | `tauri/src/core.js` (synced from `docs/core.js`) |
+| Global keyboard shortcut | Rust (OS thread) | `tauri/src-tauri/src/convert.rs` |
 
-The keyboard shortcut runs from a background OS thread where the webview may be
-hidden or throttled. Rust converts the clipboard directly without a JS round-trip,
-which is more reliable. **`convert.rs` is a Rust port of `docs/core.js` and must be
-kept in sync with it** — if you add or change conversion logic in `docs/core.js`,
-make the same change in `convert.rs`.
+The keyboard shortcut runs from an OS thread where the webview may be hidden or
+throttled. Rust reads the clipboard, converts without a JS round-trip, then uses
+`enigo` to **type** the result directly at the cursor — the clipboard itself is never
+written to. **`convert.rs` is a Rust port of `docs/core.js` and must be kept in sync
+with it** — if you add or change conversion logic in `docs/core.js`, make the same
+change in `convert.rs`.
 
 ---
 
@@ -180,13 +181,11 @@ it has two key adaptations:
 
 2. **Tauri clipboard integration** — `copyOutput()` calls
    `window.__TAURI__.core.invoke('write_clipboard', { text })` instead of
-   `navigator.clipboard.writeText()`. An `initTauri()` function listens for two Rust
-   events:
-   - `clipboard-changed` — emitted by the Rust background thread every time the OS
-     clipboard changes; if Auto re-copy is enabled, the payload is converted and written
-     back to the clipboard via `write_clipboard`
+   `navigator.clipboard.writeText()`. An `initTauri()` function listens for one Rust
+   event:
    - `profile-shortcut` — emitted when a registered global OS shortcut fires; carries
-     the profile ID and the clipboard text at time of press
+     the profile ID so the UI can highlight the active profile. Conversion and typing are
+     handled entirely in Rust — the webview is not involved in the output path.
 
 ### CI release workflow (`.github/workflows/release.yml`)
 
@@ -244,7 +243,7 @@ python3 -m http.server 8080 --directory docs
 
 ```bash
 cd extension
-bash build.sh          # syncs shared/core.js → docs/, tauri/src/, chrome/, firefox/
+bash build.sh          # syncs docs/core.js → tauri/src/, chrome/, firefox/
 ```
 
 Then load `extension/chrome/` (or `extension/firefox/`) as an unpacked extension.
@@ -261,7 +260,7 @@ bash build.sh --dev    # syncs core.js and launches cargo tauri dev
 
 ### Making changes to the conversion logic
 
-Edit **`shared/core.js`** only — never edit the copies in `docs/`, `tauri/src/`,
+Edit **`docs/core.js`** only — never edit the copies in `tauri/src/`,
 `extension/chrome/`, or `extension/firefox/`. Then run the build script to propagate the
 change to all targets:
 
@@ -269,10 +268,9 @@ change to all targets:
 cd extension && bash build.sh
 ```
 
-This copies `shared/core.js` to `docs/core.js`, `tauri/src/core.js`, and both browser
-extension directories in one step. Commit both `shared/core.js` and
-`docs/core.js` — the `docs/` copy must be pushed so GitHub Pages serves the updated
-web app.
+This copies `docs/core.js` to `tauri/src/core.js` and both browser extension directories
+in one step. Commit `docs/core.js` — it is the tracked source and the copy that GitHub
+Pages serves.
 
 ---
 
@@ -281,7 +279,6 @@ web app.
 | Issue | Affected tabs |
 |---|---|
 | **Header row included in copy** — when selecting rows from the top of a Phonology Assistant or Dekereke table, the column-header row may be included in the clipboard selection. The converter will attempt to process it as data, producing a garbled first entry. Delete that entry from the output manually. | Phonology Assistant, Dekereke |
-| **Custom shortcut replaces clipboard on each use** — the keyboard shortcut converts the clipboard content and replaces it with LaTeX. If you want to paste the same content a second time, use the regular paste command (Cmd+V / Ctrl+V) rather than the shortcut again — the shortcut will attempt to convert the already-converted LaTeX. | Desktop app (all profiles) |
 
 ---
 
@@ -289,7 +286,7 @@ web app.
 
 | Feature | Scope |
 |---|---|
-| **Text abbreviation prompt** — optional setting to show a prompt on each conversion (auto re-copy, keyboard shortcut, and UI copy) asking for the text/example abbreviation, so the `\txtref{}` value is filled in correctly without manually editing each pasted block | All platforms |
+| **Text abbreviation prompt** — optional setting to show a prompt on each conversion (keyboard shortcut and UI copy) asking for the text/example abbreviation, so the `\txtref{}` value is filled in correctly without manually editing each pasted block | All platforms |
 | **FLEx corpus → LaTeX export** — export an entire FLEx corpus as a structured LaTeX document (full example appendix or corpus reference) | Extension |
 | **Figure insertion** — insert `\includegraphics` blocks from a file picker or clipboard image | Desktop &amp; extension |
 | **Spreadsheet/Word table round-trip** — paste a table from Excel or Word as LaTeX `tabular` / copy a LaTeX table back for editing | Desktop &amp; extension |
@@ -304,3 +301,7 @@ writing linguistic grammar descriptions, built on XeLaTeX, langsci-gb4e, and bib
 ## License
 
 AGPL-3.0 — Copyright © Seth Johnston
+
+The FLEx interlinear and Phonology Assistant conversion logic is based on
+original TeXstudio macro code by **Moss Doerksen (SIL PNG)**, used by permission.
+JavaScript and Rust ports by Seth Johnston.

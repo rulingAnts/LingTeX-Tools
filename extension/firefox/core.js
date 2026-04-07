@@ -1,6 +1,9 @@
 /**
  * LingTeX Tools — shared core logic
  *
+ * Based on the original TeXstudio macro code by Moss Doerksen (SIL PNG),
+ * used by permission. JavaScript and Rust ports by Seth Johnston.
+ *
  * Platform-agnostic JavaScript module used by:
  *   - the web app  (webapp/)
  *   - browser extensions  (extension/)

@@ -3,10 +3,9 @@
  *
  * Based on the browser extension popup.js, adapted for the Tauri desktop app:
  *   - chrome.storage.local is shimmed with localStorage (no extension runtime needed)
- *   - Clipboard writes go through Tauri's write_clipboard command (arboard, reliable)
- *   - The Rust backend emits "clipboard-changed" events from its background monitor;
- *     when auto re-copy is ON, incoming clipboard text is auto-converted and written back
- *   - Keyboard shortcuts fire Tauri global shortcuts OS-wide (registered via Rust)
+ *   - The manual ‘Copy Result’ button uses Tauri’s write_clipboard command (arboard)
+ *   - Keyboard shortcuts fire Tauri global shortcuts OS-wide (registered via Rust);
+ *     Rust reads the clipboard, converts, and types the result at the cursor
  *   - No service worker, no online/offline, no browser extension APIs
  */
 
@@ -18,7 +17,6 @@
 var ALL_KEYS = [
     'lingtex-profiles',
     'lingtex-active-profile',
-    'lingtex-auto-convert',
     'lingtex-flex-config'
 ];
 
@@ -53,9 +51,9 @@ var chrome = {
 
 var DEFAULT_PROFILES = [
     { id: 'tsv-pa',  name: 'Phonology Assistant', isDefault: true,
-      tmpl: '\\exampleentry{}{$WORD}{$GLOSS}{\\phonrec{$ID}}', skip: 'referenced' },
+      tmpl: '\\exampleentry{}{$WORD}{$GLOSS}{\\phonrec{$ID}}', skip: 'referenced', trimLeading: true },
     { id: 'tsv-dek', name: 'Dekereke', isDefault: true,
-      tmpl: '\\exampleentry{}{$COL2}{$COL3}{\\phonrec{$COL1}}', skip: 'referenced' }
+      tmpl: '\\exampleentry{}{$COL2}{$COL3}{\\phonrec{$COL1}}', skip: 'referenced', trimLeading: false }
 ];
 
 var profiles    = DEFAULT_PROFILES.map(cloneProfile);
@@ -106,10 +104,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         storageSet({ 'lingtex-active-profile': activePanel });
 
-        // Auto re-copy toggle
-        var autoCb = document.getElementById('auto-convert-cb');
-        if (autoCb) autoCb.checked = !!data['lingtex-auto-convert'];
-
         // FLEx config
         var fc = data['lingtex-flex-config'] || {};
         if (fc.glCmd        !== undefined) document.getElementById('flex-gl').value       = fc.glCmd;
@@ -134,10 +128,6 @@ document.addEventListener('DOMContentLoaded', function () {
 // ── Static event listeners ────────────────────────────────────────────────────
 
 function attachStaticListeners() {
-
-    document.getElementById('auto-convert-cb').addEventListener('change', function (e) {
-        storageSet({ 'lingtex-auto-convert': e.target.checked });
-    });
 
     document.getElementById('tab-flex').addEventListener('click', function () {
         switchTab('flex');
@@ -204,7 +194,8 @@ function attachStaticListeners() {
     main.addEventListener('change', function (e) {
         var pid = pidOf(e.target);
         if (!pid) return;
-        if (e.target.dataset.action === 'skip') updateAndConvert(pid);
+        var action = e.target.dataset.action;
+        if (action === 'skip' || action === 'trim-leading') updateAndConvert(pid);
     });
 
     main.addEventListener('click', function (e) {
@@ -263,7 +254,8 @@ function activatePanel(panelId) {
 // ── Profile helpers ───────────────────────────────────────────────────────────
 
 function cloneProfile(p) {
-    return { id: p.id, name: p.name, tmpl: p.tmpl, skip: p.skip, isDefault: !!p.isDefault };
+    return { id: p.id, name: p.name, tmpl: p.tmpl, skip: p.skip,
+             trimLeading: !!p.trimLeading, isDefault: !!p.isDefault };
 }
 
 function getProfile(id) {
@@ -362,6 +354,13 @@ function buildPanelHTML(p) {
         '    </div>' +
 
         '    <div class="cfg-row">' +
+        '      <label class="cb-label"><input type="checkbox" data-action="trim-leading"' +
+               (p.trimLeading ? ' checked' : '') + '> ' +
+        '        Auto-detect and trim extra column from grouped view</label>' +
+        '      <span class="cfg-hint-inline">When enabled, automatically strips the extra blank leading column that Phonology Assistant adds in grouped/minimal-pair view — has no effect on normal view rows</span>' +
+        '    </div>' +
+
+        '    <div class="cfg-row">' +
         '      <label>Keyboard shortcut</label>' +
         '      <div class="shortcut-row">' +
         '        <input type="text" class="shortcut-input' + (p.shortcut ? ' has-value' : '') + '"' +
@@ -372,9 +371,7 @@ function buildPanelHTML(p) {
         '    </div>' +
         '    <div class="cfg-hint">' +
         '      Press this shortcut anywhere to instantly read the clipboard, convert' +
-        '      using this profile, and re-copy the result.<br>' +
-        '      <strong>Note:</strong> keyboard shortcuts and <em>Auto re-copy</em> cannot' +
-        '      be used at the same time — turn off Auto re-copy when using shortcuts.' +
+        '      using this profile, and insert at the cursor.' +
         '    </div>' +
 
         (!p.isDefault
@@ -418,10 +415,11 @@ function buildPanelHTML(p) {
 
 function addProfile() {
     var newP = {
-        id:   'tsv-' + Date.now(),
-        name: 'New Tab',
-        tmpl: '$COL1',
-        skip: 'referenced'
+        id:          'tsv-' + Date.now(),
+        name:        'New Tab',
+        tmpl:        '$COL1',
+        skip:        'referenced',
+        trimLeading: false
     };
     profiles.push(newP);
     saveProfiles();
@@ -461,10 +459,12 @@ function updateAndConvert(id) {
     if (!p) return;
     var panel = document.getElementById('panel-' + id);
     if (!panel) return;
-    var tmplEl = panel.querySelector('[data-action="tmpl"]');
-    var skipEl = panel.querySelector('[data-action="skip"]');
-    if (tmplEl) p.tmpl = tmplEl.value;
-    if (skipEl) p.skip = skipEl.value;
+    var tmplEl        = panel.querySelector('[data-action="tmpl"]');
+    var skipEl        = panel.querySelector('[data-action="skip"]');
+    var trimLeadingEl = panel.querySelector('[data-action="trim-leading"]');
+    if (tmplEl)        p.tmpl        = tmplEl.value;
+    if (skipEl)        p.skip        = skipEl.value;
+    if (trimLeadingEl) p.trimLeading = trimLeadingEl.checked;
     saveProfiles();
     convertTSV(id);
 }
@@ -522,6 +522,8 @@ function convertTSV(id) {
     var raw  = inEl.value;
     var tmpl = tmplEl ? tmplEl.value : '';
     var skip = skipEl ? skipEl.value : 'referenced';
+    var p    = getProfile(id);
+    var trimLeading = p ? !!p.trimLeading : false;
 
     if (!raw.trim()) {
         outEl.value = '';
@@ -544,6 +546,9 @@ function convertTSV(id) {
 
     lines.forEach(function (line, i) {
         var fields = LingTeXCore.parseTSVRow(line);
+        if (trimLeading) {
+            if (fields.length >= 2 && fields[0] === '' && fields[1] === '') fields.shift();
+        }
         var rowNum = i + 1;
 
         if (skip === 'referenced' && usedCols.length) {
@@ -634,59 +639,9 @@ function copyOutput(outId, btn) {
     }
 }
 
-// ── Convert for profile (used by auto re-copy) ────────────────────────────────
-// Converts raw text with the given profile without touching the test UI.
-
-function convertForProfile(profileId, text) {
-    if (!text || !text.trim()) return null;
-
-    if (profileId === 'flex') {
-        try {
-            var blocks = LingTeXCore.parseFLExBlocks(text);
-            if (!blocks.length) return null;
-            return LingTeXCore.renderFLExAuto(blocks, {
-                glCmd:        document.getElementById('flex-gl').value.trim(),
-                wrapExe:      document.getElementById('flex-wrap-exe').value === 'yes',
-                txtrefCmd:    document.getElementById('flex-txtref').value.trim(),
-                txtrefPrefix: document.getElementById('flex-txtpfx').value
-            });
-        } catch (e) { return null; }
-    }
-
-    var p = getProfile(profileId);
-    if (!p) return null;
-
-    var tmpl = p.tmpl;
-    var skip = p.skip;
-
-    var usedCols = [];
-    if (skip === 'referenced') {
-        if (/\$WORD\b/.test(tmpl))  addUniq(usedCols, 2);
-        if (/\$GLOSS\b/.test(tmpl)) addUniq(usedCols, 3);
-        if (/\$ID\b/.test(tmpl))    addUniq(usedCols, 6);
-        var m, re = /\$COL(\d+)/g;
-        while ((m = re.exec(tmpl)) !== null) addUniq(usedCols, parseInt(m[1], 10));
-    }
-
-    var lines   = text.replace(/\r\n?/g, '\n').split('\n').filter(function (l) { return l.trim(); });
-    var results = [];
-
-    lines.forEach(function (line) {
-        var fields = LingTeXCore.parseTSVRow(line);
-        if (skip === 'referenced' && usedCols.length) {
-            var empty = usedCols.filter(function (n) { return !fields[n - 1]; });
-            if (empty.length) return;
-        }
-        if (skip === 'col1' && !fields[0]) return;
-        results.push(LingTeXCore.applyRowTemplate(tmpl, fields));
-    });
-
-    return results.length ? results.join('\n') : null;
-}
 
 // ── Tauri integration ─────────────────────────────────────────────────────────
 
-var lastAutoClip = null;
 
 // Register (or unregister) a global OS shortcut for one profile.
 // shortcut = '' → unregisters any existing shortcut for that profile.
@@ -743,38 +698,9 @@ function initTauri() {
     syncConfigWithTauri();
     syncShortcutsWithTauri();
 
-    // Listen for clipboard changes from the Rust background monitor.
-    // When auto re-copy is ON, convert with active profile and write back.
-    tauri.event.listen('clipboard-changed', function (e) {
-        var text = e.payload;
-        if (!text || !text.trim() || text === lastAutoClip) return;
-        lastAutoClip = text;
-
-        var autoCb = document.getElementById('auto-convert-cb');
-        if (!autoCb || !autoCb.checked) return;
-
-        var out = convertForProfile(activePanel, text);
-        if (!out || !out.trim() || out === text) return;
-
-        // Write the converted LaTeX back to the clipboard
-        tauri.core.invoke('write_clipboard', { text: out })
-            .then(function () {
-                lastAutoClip = out; // prevent re-processing our own write
-                setStatus(activePanel, 'Auto re-copied ✓', 'ok');
-                setTimeout(function () {
-                    var el = document.getElementById(activePanel + '-status');
-                    if (el && el.textContent === 'Auto re-copied ✓') {
-                        el.textContent = '';
-                        el.className = 'status';
-                    }
-                }, 3000);
-            })
-            .catch(function () {});
-    });
-
     // Listen for profile shortcut completions from the Rust global shortcut handler.
-    // Rust has already converted the clipboard text and simulated a paste —
-    // we just need to switch tabs and show a status message.
+    // Rust has read the clipboard, converted, and typed the result at the cursor.
+    // We just switch tabs and show a status message.
     // Payload: { profileId: string }
     tauri.event.listen('profile-shortcut', function (e) {
         var profileId = e.payload.profileId;

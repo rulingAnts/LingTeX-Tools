@@ -1,5 +1,8 @@
 //! Rust port of docs/core.js — all conversion logic runs here so it can work
 //! from background threads without a live webview.
+//!
+//! Based on the original TeXstudio macro code by Moss Doerksen (SIL PNG),
+//! used by permission. JavaScript and Rust ports by Seth Johnston.
 
 // ── constants ─────────────────────────────────────────────────────────────────
 

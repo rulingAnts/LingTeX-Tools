@@ -1,14 +1,9 @@
 /**
  * content.js — LingTeX Tools browser extension
  *
- * Runs on every page. Provides two ways to convert clipboard/pasted data to LaTeX:
- *
- *   1. Smart-paste shortcut  Ctrl+Shift+V (Win/Linux) / Cmd+Shift+V (Mac)
- *      Reads the clipboard, converts using the active profile, inserts at cursor.
- *      Always available regardless of the auto-convert toggle.
- *
- *   2. Auto-convert paste  (only when the toggle is ON in the popup)
- *      Intercepts regular Ctrl+V / right-click Paste, converts before inserting.
+ * Runs on every page. Per-profile keyboard shortcuts convert the clipboard
+ * and insert the resulting LaTeX at the cursor — no clipboard modification,
+ * no paste interception.
  *
  * Settings are read from chrome.storage.local and kept in sync via onChanged.
  * The core conversion logic is provided by core.js (loaded first by the manifest).
@@ -21,16 +16,15 @@
 
     var DEFAULT_PROFILES = [
         { id: 'tsv-pa',  name: 'Phonology Assistant', isDefault: true,
-          tmpl: '\\exampleentry{}{$WORD}{$GLOSS}{\\phonrec{$ID}}', skip: 'referenced' },
+          tmpl: '\\exampleentry{}{$WORD}{$GLOSS}{\\phonrec{$ID}}', skip: 'referenced', trimLeading: true },
         { id: 'tsv-dek', name: 'Dekereke', isDefault: true,
-          tmpl: '\\exampleentry{}{$COL2}{$COL3}{\\phonrec{$COL1}}', skip: 'referenced' }
+          tmpl: '\\exampleentry{}{$COL2}{$COL3}{\\phonrec{$COL1}}', skip: 'referenced', trimLeading: false }
     ];
 
     // ── Cached settings ───────────────────────────────────────────────────────
     // Populated on load and kept current by the storage.onChanged listener.
 
     var cfg = {
-        autoConvert:     false,
         activeProfileId: 'tsv-pa',
         profiles:        DEFAULT_PROFILES,
         flexConfig: {
@@ -50,7 +44,6 @@
     });
 
     function applyCfg(data) {
-        if (data['lingtex-auto-convert']   !== undefined) cfg.autoConvert     = !!data['lingtex-auto-convert'];
         if (data['lingtex-active-profile'] !== undefined) cfg.activeProfileId = data['lingtex-active-profile'];
         if (data['lingtex-profiles']       !== undefined) cfg.profiles        = data['lingtex-profiles'];
         if (data['lingtex-flex-config']    !== undefined) cfg.flexConfig      = data['lingtex-flex-config'];
@@ -90,6 +83,9 @@
             .filter(function (l) { return l.trim(); })
             .reduce(function (acc, line) {
                 var fields = LingTeXCore.parseTSVRow(line);
+                if (profile.trimLeading) {
+                    if (fields.length >= 2 && fields[0] === '' && fields[1] === '') fields.shift();
+                }
                 if (profile.skip === 'referenced' && usedCols.length) {
                     if (usedCols.some(function (n) { return !fields[n - 1]; })) return acc;
                 }
@@ -163,11 +159,8 @@
     }
 
     // ── Smart-paste shortcut  Ctrl+Shift+V / Cmd+Shift+V ─────────────────────
-    // Rather than calling navigator.clipboard.readText() (unreliable in Firefox
-    // content scripts), we arm a flag in keydown and let the browser's own paste
-    // action fire — which produces a paste event with e.clipboardData available.
-    // The unified paste handler below converts when either the flag or
-    // autoConvert is set.
+    // Arms a keydown listener: reads the clipboard, converts, and inserts the
+    // resulting LaTeX directly at the cursor. The clipboard itself is never written.
 
     document.addEventListener('keydown', function (e) {
         // ── Per-profile shortcuts ─────────────────────────────────────────────
@@ -187,25 +180,6 @@
             var out = convert(text);
             if (out) insertAtCursor(out);
         }).catch(function () {});
-    }, true);
-
-    // ── Auto-convert paste intercept ──────────────────────────────────────────
-    // Only active when cfg.autoConvert is true (set via the popup toggle).
-    // If conversion produces no output (unrecognised format), falls through
-    // to normal paste behaviour.
-
-    document.addEventListener('paste', function (e) {
-        if (!cfg.autoConvert) return;
-
-        var text = e.clipboardData && e.clipboardData.getData('text/plain');
-        if (!text) return;
-
-        var out = convert(text);
-        if (!out || out === text) return;
-
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        insertAtCursor(out);
     }, true);
 
 }());

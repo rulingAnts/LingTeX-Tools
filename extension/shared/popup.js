@@ -5,8 +5,6 @@
  *   - chrome.storage.local replaces localStorage (async, shared with content script)
  *   - No inline event handlers (MV3 CSP); all binding done via event delegation
  *   - No service worker / offline logic
- *   - Includes the auto-convert toggle (controls content.js paste interception)
- *   - FLEx config changes are persisted to storage for the content script to use
  */
 
 'use strict';
@@ -15,9 +13,9 @@
 
 var DEFAULT_PROFILES = [
     { id: 'tsv-pa',  name: 'Phonology Assistant', isDefault: true,
-      tmpl: '\\exampleentry{}{$WORD}{$GLOSS}{\\phonrec{$ID}}', skip: 'referenced' },
+      tmpl: '\\exampleentry{}{$WORD}{$GLOSS}{\\phonrec{$ID}}', skip: 'referenced', trimLeading: true },
     { id: 'tsv-dek', name: 'Dekereke', isDefault: true,
-      tmpl: '\\exampleentry{}{$COL2}{$COL3}{\\phonrec{$COL1}}', skip: 'referenced' }
+      tmpl: '\\exampleentry{}{$COL2}{$COL3}{\\phonrec{$COL1}}', skip: 'referenced', trimLeading: false }
 ];
 
 var profiles    = DEFAULT_PROFILES.map(cloneProfile);
@@ -70,10 +68,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         storageSet({ 'lingtex-active-profile': activePanel });
 
-        // Auto-convert toggle
-        var autoCb = document.getElementById('auto-convert-cb');
-        if (autoCb) autoCb.checked = !!data['lingtex-auto-convert'];
-
         // FLEx config
         var fc = data['lingtex-flex-config'] || {};
         if (fc.glCmd        !== undefined) document.getElementById('flex-gl').value       = fc.glCmd;
@@ -98,11 +92,6 @@ document.addEventListener('DOMContentLoaded', function () {
 // ── Static event listeners (attached once after DOMContentLoaded) ─────────────
 
 function attachStaticListeners() {
-
-    // Auto-convert toggle → persist to storage (content.js reads this)
-    document.getElementById('auto-convert-cb').addEventListener('change', function (e) {
-        storageSet({ 'lingtex-auto-convert': e.target.checked });
-    });
 
     // Tab: FLEx
     document.getElementById('tab-flex').addEventListener('click', function () {
@@ -177,7 +166,7 @@ function attachStaticListeners() {
         var pid = pidOf(e.target);
         if (!pid) return;
         var action = e.target.dataset.action;
-        if (action === 'skip') updateAndConvert(pid);
+        if (action === 'skip' || action === 'trim-leading') updateAndConvert(pid);
     });
 
     main.addEventListener('click', function (e) {
@@ -235,7 +224,8 @@ function activatePanel(panelId) {
 // ── Profile helpers ───────────────────────────────────────────────────────────
 
 function cloneProfile(p) {
-    return { id: p.id, name: p.name, tmpl: p.tmpl, skip: p.skip, isDefault: !!p.isDefault };
+    return { id: p.id, name: p.name, tmpl: p.tmpl, skip: p.skip,
+             trimLeading: !!p.trimLeading, isDefault: !!p.isDefault };
 }
 
 function getProfile(id) {
@@ -335,6 +325,14 @@ function buildPanelHTML(p) {
         '      <select data-action="skip">' + skipHtml + '</select>' +
         '    </div>' +
 
+        // Auto-detect grouped view
+        '    <div class="cfg-row">' +
+        '      <label class="cb-label"><input type="checkbox" data-action="trim-leading"' +
+               (p.trimLeading ? ' checked' : '') + '> ' +
+        '        Auto-detect and trim extra column from grouped view</label>' +
+        '      <span class="cfg-hint-inline">When enabled, automatically strips the extra blank leading column that Phonology Assistant adds in grouped/minimal-pair view — has no effect on normal view rows</span>' +
+        '    </div>' +
+
         // Keyboard shortcut
         '    <div class="cfg-row">' +
         '      <label>Keyboard shortcut</label>' +
@@ -394,10 +392,11 @@ function buildPanelHTML(p) {
 
 function addProfile() {
     var newP = {
-        id:   'tsv-' + Date.now(),
-        name: 'New Tab',
-        tmpl: '$COL1',
-        skip: 'referenced'
+        id:          'tsv-' + Date.now(),
+        name:        'New Tab',
+        tmpl:        '$COL1',
+        skip:        'referenced',
+        trimLeading: false
     };
     profiles.push(newP);
     saveProfiles();
@@ -436,10 +435,12 @@ function updateAndConvert(id) {
     if (!p) return;
     var panel = document.getElementById('panel-' + id);
     if (!panel) return;
-    var tmplEl = panel.querySelector('[data-action="tmpl"]');
-    var skipEl = panel.querySelector('[data-action="skip"]');
-    if (tmplEl) p.tmpl = tmplEl.value;
-    if (skipEl) p.skip = skipEl.value;
+    var tmplEl        = panel.querySelector('[data-action="tmpl"]');
+    var skipEl        = panel.querySelector('[data-action="skip"]');
+    var trimLeadingEl = panel.querySelector('[data-action="trim-leading"]');
+    if (tmplEl)        p.tmpl        = tmplEl.value;
+    if (skipEl)        p.skip        = skipEl.value;
+    if (trimLeadingEl) p.trimLeading = trimLeadingEl.checked;
     saveProfiles();
     convertTSV(id);
 }
@@ -497,6 +498,8 @@ function convertTSV(id) {
     var raw  = inEl.value;
     var tmpl = tmplEl ? tmplEl.value : '';
     var skip = skipEl ? skipEl.value : 'referenced';
+    var p    = getProfile(id);
+    var trimLeading = p ? !!p.trimLeading : false;
 
     if (!raw.trim()) {
         outEl.value = '';
@@ -520,6 +523,9 @@ function convertTSV(id) {
 
     lines.forEach(function (line, i) {
         var fields = LingTeXCore.parseTSVRow(line);
+        if (trimLeading) {
+            if (fields.length >= 2 && fields[0] === '' && fields[1] === '') fields.shift();
+        }
         var rowNum = i + 1;
 
         if (skip === 'referenced' && usedCols.length) {

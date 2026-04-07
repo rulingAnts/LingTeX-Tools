@@ -26,6 +26,8 @@ struct TsvProfile {
     tmpl: String,
     #[serde(default = "default_skip")]
     skip: String,
+    #[serde(default)]
+    trim_leading: bool,
 }
 fn default_skip() -> String { "referenced".to_string() }
 
@@ -100,7 +102,12 @@ fn convert_for_profile(profile_id: &str, text: &str, cfg: &ActiveConfig) -> Opti
             .lines()
             .filter(|l| !l.trim().is_empty())
             .filter_map(|line| {
-                let fields = convert::parse_tsv_row(line);
+                let mut fields = convert::parse_tsv_row(line);
+                if profile.trim_leading {
+                    if fields.len() >= 2 && fields[0].is_empty() && fields[1].is_empty() {
+                        fields.remove(0);
+                    }
+                }
                 if profile.skip == "referenced" && !used_cols.is_empty() {
                     let any_empty = used_cols.iter().any(|&n| {
                         fields.get(n.saturating_sub(1)).map_or(true, |f| f.is_empty())
@@ -118,29 +125,19 @@ fn convert_for_profile(profile_id: &str, text: &str, cfg: &ActiveConfig) -> Opti
     }
 }
 
-/// Simulate a Cmd+V (macOS) or Ctrl+V (Windows/Linux) keystroke so the
-/// converted text is pasted into whatever app the user was working in.
+/// Type `text` directly at the current cursor position using enigo's virtual
+/// keyboard, without touching the clipboard at all.
 ///
-/// A 50 ms pause before the keystroke gives the clipboard time to settle.
+/// A 150 ms pause lets the triggering shortcut keys fully release before we
+/// start typing, preventing modifier bleed.
 /// On macOS this requires Accessibility permission:
 /// System Settings → Privacy & Security → Accessibility.
-fn simulate_paste() {
-    use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+fn type_text(text: &str) {
+    use enigo::{Enigo, Keyboard, Settings};
 
     thread::sleep(Duration::from_millis(150));
     if let Ok(mut en) = Enigo::new(&Settings::default()) {
-        #[cfg(target_os = "macos")]
-        {
-            let _ = en.key(Key::Meta,        Direction::Press);
-            let _ = en.key(Key::Unicode('v'), Direction::Click);
-            let _ = en.key(Key::Meta,        Direction::Release);
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            let _ = en.key(Key::Control,      Direction::Press);
-            let _ = en.key(Key::Unicode('v'),  Direction::Click);
-            let _ = en.key(Key::Control,       Direction::Release);
-        }
+        let _ = en.text(text);
     }
 }
 
@@ -216,44 +213,19 @@ fn register_profile_shortcut(
             let converted = convert_for_profile(&pid, &text, &cfg);
             drop(cfg);
 
+            drop(cb); // done reading clipboard
+
             if let Some(out) = converted {
-                if cb.set_text(&out).is_ok() {
-                    drop(cb); // release clipboard before keystroke
-                    simulate_paste();
-                    let _ = app.emit("profile-shortcut", serde_json::json!({
-                        "profileId": &pid
-                    }));
-                }
+                thread::spawn(move || type_text(&out));
+                let _ = app.emit("profile-shortcut", serde_json::json!({
+                    "profileId": &pid
+                }));
             }
         })
         .map_err(|e| e.to_string())?;
 
     map.insert(profile_id, shortcut_str);
     Ok(())
-}
-
-// ── Clipboard monitoring ──────────────────────────────────────────────────────
-
-/// Polls the clipboard every 400 ms in a background thread.
-/// Emits "clipboard-changed" to the frontend whenever the content changes.
-fn start_clipboard_monitor(app: AppHandle) {
-    thread::spawn(move || {
-        let mut cb = match arboard::Clipboard::new() {
-            Ok(c)  => c,
-            Err(e) => { eprintln!("[LingTeX] clipboard init failed: {e}"); return; }
-        };
-        let mut last = String::new();
-
-        loop {
-            if let Ok(text) = cb.get_text() {
-                if !text.is_empty() && text != last {
-                    last = text.clone();
-                    let _ = app.emit("clipboard-changed", text);
-                }
-            }
-            thread::sleep(Duration::from_millis(400));
-        }
-    });
 }
 
 // ── App entry point ───────────────────────────────────────────────────────────
@@ -313,9 +285,6 @@ pub fn run() {
                     let _ = win_for_close.hide();
                 }
             });
-
-            // ── Start background clipboard monitor ─────────────────────────────
-            start_clipboard_monitor(app.handle().clone());
 
             Ok(())
         })
