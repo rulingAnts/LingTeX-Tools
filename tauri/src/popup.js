@@ -17,7 +17,8 @@
 var ALL_KEYS = [
     'lingtex-profiles',
     'lingtex-active-profile',
-    'lingtex-flex-config'
+    'lingtex-flex-config',
+    'lingtex-flex-tsv-config'
 ];
 
 var chrome = {
@@ -112,10 +113,15 @@ document.addEventListener('DOMContentLoaded', function () {
         if (fc.txtrefPrefix !== undefined) document.getElementById('flex-txtpfx').value   = fc.txtrefPrefix;
         applyShortcutValue(document.getElementById('flex-shortcut'), fc.shortcut);
 
+        // FLEx TSV config
+        var ftc = data['lingtex-flex-tsv-config'] || {};
+        applyShortcutValue(document.getElementById('flex-tsv-shortcut'), ftc.shortcut);
+
         renderAll();
 
-        if (activePanel === 'flex' || !document.getElementById('panel-' + activePanel)) {
-            activePanel = 'flex';
+        if (activePanel === 'flex' || activePanel === 'flex-tsv' ||
+                !document.getElementById('panel-' + activePanel)) {
+            if (activePanel !== 'flex-tsv') activePanel = 'flex';
         } else {
             activatePanel(activePanel);
         }
@@ -131,6 +137,10 @@ function attachStaticListeners() {
 
     document.getElementById('tab-flex').addEventListener('click', function () {
         switchTab('flex');
+    });
+
+    document.getElementById('tab-flex-tsv').addEventListener('click', function () {
+        switchTab('flex-tsv');
     });
 
     document.getElementById('tab-add-btn').addEventListener('click', addProfile);
@@ -166,6 +176,37 @@ function attachStaticListeners() {
 
     document.getElementById('flex-copy-btn').addEventListener('click', function () {
         copyOutput('flex-out', this);
+    });
+
+    // FLEx TSV shortcut input
+    var flexTsvScInput = document.getElementById('flex-tsv-shortcut');
+    flexTsvScInput.addEventListener('keydown', function (e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        var sc = shortcutFromEvent(e);
+        if (!sc) return;
+        applyShortcutValue(flexTsvScInput, sc);
+        saveFlexTSVConfig();
+        tauriRegisterShortcut('flex-tsv', sc);
+        flexTsvScInput.blur();
+    });
+    document.getElementById('flex-tsv-shortcut-clear').addEventListener('click', function () {
+        applyShortcutValue(flexTsvScInput, '');
+        saveFlexTSVConfig();
+        tauriRegisterShortcut('flex-tsv', '');
+    });
+
+    // FLEx TSV test input
+    document.getElementById('flex-tsv-in').addEventListener('input', convertFlexTSV);
+
+    // FLEx TSV clear button
+    document.getElementById('flex-tsv-clear-btn').addEventListener('click', function () {
+        clearTool('flex-tsv');
+    });
+
+    // FLEx TSV copy button
+    document.getElementById('flex-tsv-copy-btn').addEventListener('click', function () {
+        copyOutput('flex-tsv-out', this);
     });
 
     var main = document.getElementById('main-content');
@@ -232,6 +273,14 @@ function saveFLExConfig() {
         }
     });
     syncConfigWithTauri();
+}
+
+function saveFlexTSVConfig() {
+    storageSet({
+        'lingtex-flex-tsv-config': {
+            shortcut: document.getElementById('flex-tsv-shortcut').value
+        }
+    });
 }
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
@@ -508,6 +557,35 @@ function convertFlex() {
     }
 }
 
+function convertFlexTSV() {
+    var raw    = document.getElementById('flex-tsv-in').value;
+    var outEl  = document.getElementById('flex-tsv-out');
+
+    if (!raw.trim()) {
+        outEl.value = '';
+        setStatus('flex-tsv', '', '');
+        return;
+    }
+
+    try {
+        var blocks = LingTeXCore.parseFLExBlocks(raw);
+        if (!blocks.length) {
+            outEl.value = '';
+            setStatus('flex-tsv', 'No recognisable interlinear tiers found.', 'err');
+            return;
+        }
+        var tsv = LingTeXCore.renderFLExTSVAuto(blocks);
+        outEl.value = tsv;
+        var msg = blocks.length > 1
+            ? 'Converted ' + blocks.length + ' blocks'
+            : 'Converted ' + ((blocks[0].lineArrays[0] || []).length - 1) + ' word(s)';
+        setStatus('flex-tsv', msg, 'ok');
+    } catch (e) {
+        outEl.value = '';
+        setStatus('flex-tsv', 'Error: ' + e.message, 'err');
+    }
+}
+
 function convertTSV(id) {
     var panel  = document.getElementById('panel-' + id);
     if (!panel) return;
@@ -593,17 +671,13 @@ function setStatus(id, msg, cls) {
 }
 
 function clearTool(id) {
-    var panel = id === 'flex'
-        ? document.getElementById('panel-flex')
-        : document.getElementById('panel-' + id);
+    var panel = document.getElementById('panel-' + id);
     if (!panel) return;
 
-    var inEl  = id === 'flex'
-        ? document.getElementById('flex-in')
+    var inEl  = (id === 'flex' || id === 'flex-tsv')
+        ? document.getElementById(id + '-in')
         : panel.querySelector('[data-action="test-in"]');
-    var outEl = id === 'flex'
-        ? document.getElementById('flex-out')
-        : document.getElementById(id + '-out');
+    var outEl = document.getElementById(id + '-out');
     var errEl = document.getElementById(id + '-errbox');
 
     if (inEl)  inEl.value  = '';
@@ -684,6 +758,8 @@ function syncConfigWithTauri() {
 function syncShortcutsWithTauri() {
     var flexSc = document.getElementById('flex-shortcut');
     if (flexSc && flexSc.value) tauriRegisterShortcut('flex', flexSc.value);
+    var flexTsvSc = document.getElementById('flex-tsv-shortcut');
+    if (flexTsvSc && flexTsvSc.value) tauriRegisterShortcut('flex-tsv', flexTsvSc.value);
     profiles.forEach(function (p) {
         if (p.shortcut) tauriRegisterShortcut(p.id, p.shortcut);
     });
