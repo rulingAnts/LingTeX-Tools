@@ -387,6 +387,133 @@
         return renderFLExXlist(blocks, opts);
     }
 
+    // ── FLEx → TSV renderer ──────────────────────────────────────────────────
+
+    /**
+     * Render a parsed FLEx block to morpheme-aligned TSV.
+     * Each morpheme and morpheme-boundary divider occupy a separate tab-separated
+     * column, so the output can be pasted into a spreadsheet for aligned display.
+     * No LaTeX escaping or command wrapping — output is plain text.
+     * @param  {object} ex  Result of parseFLExBlock()
+     * @returns {string}
+     */
+    function renderFLExTSV(ex) {
+        var lineTypes  = ex.lineTypes;
+        var lineArrays = ex.lineArrays;
+        var freeLines  = ex.freeLines;
+        var n          = lineTypes.length;
+
+        var morphIdx     = -1;
+        var lexGlossIdx  = -1;
+        var wordGlossIdx = -1;
+
+        for (var t = 0; t < n; t++) {
+            var lt = lineTypes[t];
+            if ((lt === 'Morphemes' || lt === 'LexEntries') && morphIdx    < 0) morphIdx    = t;
+            if (lt === 'LexGloss'                           && lexGlossIdx < 0) lexGlossIdx = t;
+            if (lt === 'WordGloss'                          && wordGlossIdx < 0) wordGlossIdx = t;
+        }
+        if (morphIdx < 0) {
+            for (var t2 = 0; t2 < n; t2++) {
+                if (lineTypes[t2] === 'Word') { morphIdx = t2; break; }
+            }
+        }
+        if (morphIdx < 0) return '(no recognisable tier lines — check labels)';
+
+        var primaryArr     = lineArrays[morphIdx];
+        var dataStart      = 1;
+        if (/^\d+$/.test(primaryArr[dataStart] || '')) dataStart++;
+
+        var formCols       = [];
+        var glossCols      = [];
+        var wglossCols     = [];
+        var lexGlossOffset = 0;
+        var FLOAT_PUNCT    = '-\u2012\u2013\u2014\u2015/|&\u2026...';
+
+        for (var w = dataStart; w < primaryArr.length; w++) {
+            var wt = primaryArr[w];
+
+            // Floating punctuation: one column, empty gloss cells
+            if (wt.length === 1 && FLOAT_PUNCT.indexOf(wt) !== -1) {
+                formCols.push(wt);
+                if (lexGlossIdx  >= 0) glossCols.push('');
+                if (wordGlossIdx >= 0) wglossCols.push('');
+                continue;
+            }
+
+            if (wt.indexOf(SENTINEL) !== -1) {
+                // Multi-morpheme token: expand into per-morpheme columns
+                var parts     = wt.split(SENTINEL);
+                var partCount = parts.length - 1;
+                var firstMorph = true;
+
+                for (var y = 0; y < parts.length; y++) {
+                    var part = parts[y];
+                    if (part === '') continue;
+
+                    if (MORPH_DIVS.indexOf(part) !== -1) {
+                        // Divider column: same character in both form and gloss rows
+                        formCols.push(part);
+                        if (lexGlossIdx  >= 0) glossCols.push(part);
+                        if (wordGlossIdx >= 0) wglossCols.push('');
+                        lexGlossOffset--;
+                    } else {
+                        // Morpheme form column
+                        formCols.push(part);
+                        if (lexGlossIdx >= 0) {
+                            var lArr = lineArrays[lexGlossIdx];
+                            var gi   = (w - dataStart) + lexGlossOffset + y;
+                            glossCols.push((lArr[gi + dataStart] || '').split(SENTINEL).join(''));
+                        }
+                        if (wordGlossIdx >= 0) {
+                            if (firstMorph) {
+                                var wgArr = lineArrays[wordGlossIdx];
+                                var wi    = w - dataStart;
+                                wglossCols.push((wgArr[wi + dataStart] || '').split(SENTINEL).join(''));
+                                firstMorph = false;
+                            } else {
+                                wglossCols.push('');
+                            }
+                        }
+                    }
+                }
+                lexGlossOffset += partCount;
+
+            } else {
+                // Unsegmented word: single column
+                formCols.push(wt.split(SENTINEL).join(''));
+                if (lexGlossIdx >= 0) {
+                    var lArr2 = lineArrays[lexGlossIdx];
+                    var gi2   = (w - dataStart) + lexGlossOffset;
+                    glossCols.push((lArr2[gi2 + dataStart] || '').split(SENTINEL).join(''));
+                }
+                if (wordGlossIdx >= 0) {
+                    var wgArr2 = lineArrays[wordGlossIdx];
+                    var wi2    = w - dataStart;
+                    wglossCols.push((wgArr2[wi2 + dataStart] || '').split(SENTINEL).join(''));
+                }
+            }
+        }
+
+        var rows = [];
+        rows.push(formCols.join('\t'));
+        if (lexGlossIdx  >= 0) rows.push(glossCols.join('\t'));
+        if (wordGlossIdx >= 0) rows.push(wglossCols.join('\t'));
+        if (freeLines.length > 0) rows.push(freeLines.join(' / '));
+
+        return rows.join('\n');
+    }
+
+    /**
+     * Render multiple parsed FLEx blocks to morpheme-aligned TSV.
+     * Multiple blocks are separated by a blank line.
+     * @param  {Array} blocks  Result of parseFLExBlocks()
+     * @returns {string}
+     */
+    function renderFLExTSVAuto(blocks) {
+        return blocks.map(renderFLExTSV).join('\n\n');
+    }
+
     // ── Phonology Assistant parser/renderer ──────────────────────────────────
 
     /**
@@ -513,6 +640,8 @@
         renderFLEx:                renderFLEx,
         renderFLExXlist:           renderFLExXlist,
         renderFLExAuto:            renderFLExAuto,
+        renderFLExTSV:             renderFLExTSV,
+        renderFLExTSVAuto:         renderFLExTSVAuto,
         parsePhonologyAssistant:   parsePhonologyAssistant,   // old fixed-column API
         renderPhonologyAssistant:  renderPhonologyAssistant,  // old fixed-column API
         parseTSVRow:               parseTSVRow,               // generic TSV API

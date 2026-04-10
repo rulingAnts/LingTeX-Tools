@@ -515,6 +515,140 @@ pub fn render_flex_auto(blocks: &[FlexParsed], opts: &FlexOpts) -> String {
     }
 }
 
+// ── FLEx → TSV renderer ───────────────────────────────────────────────────────
+
+/// Render a parsed FLEx block to morpheme-aligned TSV.
+/// Each morpheme and morpheme-boundary divider occupy a separate tab-separated
+/// column. No LaTeX escaping or command wrapping — output is plain text.
+pub fn render_flex_tsv(ex: &FlexParsed) -> String {
+    let n = ex.line_types.len();
+
+    let mut morph_idx:      Option<usize> = None;
+    let mut lex_gloss_idx:  Option<usize> = None;
+    let mut word_gloss_idx: Option<usize> = None;
+
+    for t in 0..n {
+        let lt = &ex.line_types[t];
+        if morph_idx.is_none() && (lt == "Morphemes" || lt == "LexEntries") { morph_idx = Some(t); }
+        if lex_gloss_idx.is_none()  && lt == "LexGloss"  { lex_gloss_idx  = Some(t); }
+        if word_gloss_idx.is_none() && lt == "WordGloss" { word_gloss_idx = Some(t); }
+    }
+    if morph_idx.is_none() {
+        for t in 0..n {
+            if ex.line_types[t] == "Word" { morph_idx = Some(t); break; }
+        }
+    }
+    let morph_idx = match morph_idx {
+        None    => return "(no recognisable tier lines — check labels)".to_string(),
+        Some(i) => i,
+    };
+
+    let primary_arr = &ex.line_arrays[morph_idx];
+    let mut data_start = 1usize;
+    if primary_arr.get(data_start).map_or(false, |s| s.parse::<u64>().is_ok()) {
+        data_start += 1;
+    }
+
+    let mut form_cols:   Vec<String> = Vec::new();
+    let mut gloss_cols:  Vec<String> = Vec::new();
+    let mut wgloss_cols: Vec<String> = Vec::new();
+    let mut lex_gloss_offset: isize  = 0;
+    let float_punct = "-\u{2012}\u{2013}\u{2014}\u{2015}/|&\u{2026}...";
+
+    for w in data_start..primary_arr.len() {
+        let wt = &primary_arr[w];
+
+        // Floating punctuation: one column, empty gloss cells
+        if wt.chars().count() == 1 {
+            let c = wt.chars().next().unwrap();
+            if float_punct.contains(c) {
+                form_cols.push(wt.clone());
+                if lex_gloss_idx.is_some()  { gloss_cols.push(String::new()); }
+                if word_gloss_idx.is_some() { wgloss_cols.push(String::new()); }
+                continue;
+            }
+        }
+
+        if wt.contains(SENTINEL) {
+            // Multi-morpheme token: expand into per-morpheme columns
+            let parts: Vec<&str> = wt.split(SENTINEL).collect();
+            let part_count = parts.len() as isize - 1;
+            let mut first_morph = true;
+
+            for (y, part) in parts.iter().enumerate() {
+                if part.is_empty() { continue; }
+
+                if part.len() == 1 && MORPH_DIVS.contains(part.chars().next().unwrap()) {
+                    // Divider column: same character in both form and gloss rows
+                    form_cols.push(part.to_string());
+                    if lex_gloss_idx.is_some()  { gloss_cols.push(part.to_string()); }
+                    if word_gloss_idx.is_some() { wgloss_cols.push(String::new()); }
+                    lex_gloss_offset -= 1;
+                } else {
+                    // Morpheme form column
+                    form_cols.push(part.to_string());
+                    if let Some(lgi) = lex_gloss_idx {
+                        let l_arr = &ex.line_arrays[lgi];
+                        let gi = (w as isize - data_start as isize)
+                                  + lex_gloss_offset + y as isize;
+                        let raw = l_arr.get((gi + data_start as isize) as usize)
+                            .map(|s| s.as_str()).unwrap_or("");
+                        gloss_cols.push(raw.replace(SENTINEL, ""));
+                    }
+                    if let Some(wgi) = word_gloss_idx {
+                        if first_morph {
+                            let wg_arr = &ex.line_arrays[wgi];
+                            let wi = w - data_start;
+                            let raw = wg_arr.get(wi + data_start)
+                                .map(|s| s.as_str()).unwrap_or("");
+                            wgloss_cols.push(raw.replace(SENTINEL, ""));
+                            first_morph = false;
+                        } else {
+                            wgloss_cols.push(String::new());
+                        }
+                    }
+                }
+            }
+            lex_gloss_offset += part_count;
+
+        } else {
+            // Unsegmented word: single column
+            form_cols.push(wt.replace(SENTINEL, ""));
+            if let Some(lgi) = lex_gloss_idx {
+                let l_arr = &ex.line_arrays[lgi];
+                let gi2 = (w as isize - data_start as isize) + lex_gloss_offset;
+                let raw = l_arr.get((gi2 + data_start as isize) as usize)
+                    .map(|s| s.as_str()).unwrap_or("");
+                gloss_cols.push(raw.replace(SENTINEL, ""));
+            }
+            if let Some(wgi) = word_gloss_idx {
+                let wg_arr = &ex.line_arrays[wgi];
+                let wi2 = w - data_start;
+                let raw = wg_arr.get(wi2 + data_start)
+                    .map(|s| s.as_str()).unwrap_or("");
+                wgloss_cols.push(raw.replace(SENTINEL, ""));
+            }
+        }
+    }
+
+    let mut rows: Vec<String> = Vec::new();
+    rows.push(form_cols.join("\t"));
+    if lex_gloss_idx.is_some()  { rows.push(gloss_cols.join("\t")); }
+    if word_gloss_idx.is_some() { rows.push(wgloss_cols.join("\t")); }
+    if !ex.free_lines.is_empty() { rows.push(ex.free_lines.join(" / ")); }
+
+    rows.join("\n")
+}
+
+/// Render multiple parsed FLEx blocks to morpheme-aligned TSV.
+/// Multiple blocks are separated by a blank line.
+pub fn render_flex_tsv_auto(blocks: &[FlexParsed]) -> String {
+    blocks.iter()
+        .map(|b| render_flex_tsv(b))
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
 // ── TSV row template ──────────────────────────────────────────────────────────
 
 /// Split a tab-separated line into trimmed fields. Index 0 = column 1.

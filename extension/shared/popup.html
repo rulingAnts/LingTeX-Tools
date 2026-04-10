@@ -358,6 +358,7 @@ textarea.out:focus { outline-color: #93c5fd; border-color: var(--slate-600); }
 
 <nav class="tabs" id="tab-nav" role="tablist">
   <button class="tab active" role="tab" data-panel="flex" id="tab-flex">FLEx Interlinear</button>
+  <button class="tab" role="tab" data-panel="flex-tsv" id="tab-flex-tsv">FLEx → Table</button>
   <!-- Dynamic TSV profile tabs inserted here by popup.js -->
   <button class="tab-add" id="tab-add-btn" title="Add a new TSV converter tab">+</button>
 </nav>
@@ -440,6 +441,54 @@ textarea.out:focus { outline-color: #93c5fd; border-color: var(--slate-600); }
       <textarea id="flex-out" class="out" readonly spellcheck="false"
         placeholder="LaTeX output will appear here…"></textarea>
       <div id="flex-status" class="status"></div>
+    </div>
+
+  </section>
+
+  <!-- ── FLEx TSV (static panel) ──────────────────────────────────────── -->
+  <section id="panel-flex-tsv" class="panel" role="tabpanel">
+
+    <details class="cfg" id="flex-tsv-cfg">
+      <summary>Configuration</summary>
+      <div class="cfg-body">
+
+        <div class="cfg-row">
+          <label>Keyboard shortcut</label>
+          <div class="shortcut-row">
+            <input type="text" id="flex-tsv-shortcut" class="shortcut-input"
+              placeholder="Click, then press keys…" readonly>
+            <button class="btn btn-ghost" id="flex-tsv-shortcut-clear" title="Clear shortcut">✕</button>
+          </div>
+        </div>
+        <div class="cfg-hint">
+          Press this shortcut anywhere to instantly read the clipboard, convert
+          using FLEx TSV settings, and insert at the cursor.
+        </div>
+
+      </div>
+    </details>
+
+    <!-- Test area -->
+    <div class="io-row">
+      <div class="io-label">
+        <span>Test input</span>
+        <div class="io-actions">
+          <button class="btn btn-ghost" id="flex-tsv-clear-btn">Clear</button>
+        </div>
+      </div>
+      <textarea id="flex-tsv-in" class="tall" spellcheck="false"
+        placeholder="Paste FLEx interlinear text here to test conversion…"></textarea>
+    </div>
+    <div class="io-row">
+      <div class="io-label">
+        <span>Output — TSV</span>
+        <div class="io-actions">
+          <button class="btn btn-secondary" id="flex-tsv-copy-btn">Copy Result</button>
+        </div>
+      </div>
+      <textarea id="flex-tsv-out" class="out" readonly spellcheck="false"
+        placeholder="TSV output will appear here…"></textarea>
+      <div id="flex-tsv-status" class="status"></div>
     </div>
 
   </section>

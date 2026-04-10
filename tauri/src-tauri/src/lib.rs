@@ -90,6 +90,12 @@ fn convert_for_profile(profile_id: &str, text: &str, cfg: &ActiveConfig) -> Opti
         let result = convert::render_flex_auto(&blocks, &cfg.flex_opts);
         if result.trim().is_empty() { return None; }
         Some(result)
+    } else if profile_id == "flex-tsv" {
+        let blocks = convert::parse_flex_blocks(text);
+        if blocks.is_empty() { return None; }
+        let result = convert::render_flex_tsv_auto(&blocks);
+        if result.trim().is_empty() { return None; }
+        Some(result)
     } else {
         let profile = cfg.tsv_profiles.iter().find(|p| p.id == profile_id)?;
         let used_cols = if profile.skip == "referenced" {

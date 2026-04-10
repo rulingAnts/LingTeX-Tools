@@ -749,6 +749,7 @@ footer a:hover { text-decoration: underline; }
 
 <nav class="tabs" id="tab-nav" role="tablist">
   <button class="tab active" role="tab" data-panel="flex" onclick="switchTab(this)">FLEx Interlinear</button>
+  <button class="tab" role="tab" data-panel="flex-tsv" onclick="switchTab(this)">FLEx → Table</button>
   <!-- TSV profile tabs rendered here by JS -->
   <button class="tab-add" id="tab-add-btn" title="Add a new TSV converter tab" onclick="addProfile()">+</button>
 </nav>
@@ -829,6 +830,42 @@ footer a:hover { text-decoration: underline; }
       <textarea id="flex-out" class="out" readonly spellcheck="false"
         placeholder="LaTeX output will appear here…"></textarea>
       <div id="flex-status" class="status"></div>
+    </div>
+
+  </section>
+
+  <!-- ── FLEx TSV ────────────────────────────────────────────────────── -->
+  <section id="panel-flex-tsv" class="panel" role="tabpanel">
+
+    <p class="tool-desc">
+      Paste interlinear text copied from <strong>FLEx</strong> and convert it to
+      morpheme-aligned TSV — each morpheme and boundary marker in its own
+      tab-separated column, ready to paste into a spreadsheet or corpus tool.
+      Uses the same processing as the FLEx Interlinear tab without LaTeX output.
+    </p>
+
+    <div class="io-row">
+      <div class="io-label">
+        <span>Input — paste FLEx interlinear text</span>
+        <div class="io-actions">
+          <button class="btn btn-ghost" onclick="clearTool('flex-tsv')">Clear</button>
+        </div>
+      </div>
+      <textarea id="flex-tsv-in" class="tall" spellcheck="false"
+        placeholder="Paste interlinear text copied from FLEx here.&#10;&#10;Example:&#10;Morphemes  na -a    ti -o&#10;Lex. Gloss 1SG COMPL 2SG INCOMPL&#10;Free Eng   I arrived and you left."
+        oninput="convertFlexTSV()"></textarea>
+    </div>
+
+    <div class="io-row">
+      <div class="io-label">
+        <span>Output — TSV</span>
+        <div class="io-actions">
+          <button class="btn btn-secondary" onclick="copyOutput('flex-tsv-out', this)">Copy Result</button>
+        </div>
+      </div>
+      <textarea id="flex-tsv-out" class="out" readonly spellcheck="false"
+        placeholder="TSV output will appear here…"></textarea>
+      <div id="flex-tsv-status" class="status"></div>
     </div>
 
   </section>
@@ -946,6 +983,35 @@ function convertFlex() {
     } catch (e) {
         outEl.value = '';
         setStatus('flex', 'Error: ' + e.message, 'err');
+    }
+}
+
+// ── FLEx TSV converter ────────────────────────────────────────────────────────
+function convertFlexTSV() {
+    var raw   = document.getElementById('flex-tsv-in').value;
+    var outEl = document.getElementById('flex-tsv-out');
+
+    if (!raw.trim()) { outEl.value = ''; setStatus('flex-tsv', '', ''); return; }
+
+    try {
+        var blocks = LingTeXCore.parseFLExBlocks(raw);
+        if (!blocks.length) {
+            outEl.value = '';
+            setStatus('flex-tsv', 'No recognisable interlinear tiers found. ' +
+                'Lines must start with: Word, Morphemes, Lex. Entries, Lex. Gloss, Word Gloss, Free', 'err');
+            return;
+        }
+        var tsv = LingTeXCore.renderFLExTSVAuto(blocks);
+        outEl.value = tsv;
+        var first = blocks[0];
+        var words = (first.lineArrays[0] || []).length - 1;
+        var msg = blocks.length > 1
+            ? 'Converted ' + blocks.length + ' blocks'
+            : 'Converted ' + words + ' word(s)';
+        setStatus('flex-tsv', msg, 'ok');
+    } catch (e) {
+        outEl.value = '';
+        setStatus('flex-tsv', 'Error: ' + e.message, 'err');
     }
 }
 
