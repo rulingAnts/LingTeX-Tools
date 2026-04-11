@@ -662,7 +662,7 @@ function convertFlex() {
             txtrefPrefix: document.getElementById('flex-txtpfx').value
         });
         outEl.value = latex;
-        var words = (blocks[0].lineArrays[0] || []).length - 1;
+        var words = (blocks[0].colArrays[0] || []).length - 1;
         var msg = blocks.length > 1
             ? 'Converted ' + blocks.length + ' blocks'
             : 'Converted ' + words + ' word(s)';
@@ -694,7 +694,7 @@ function convertFlexTSV() {
         outEl.value = tsv;
         var msg = blocks.length > 1
             ? 'Converted ' + blocks.length + ' blocks'
-            : 'Converted ' + ((blocks[0].lineArrays[0] || []).length - 1) + ' word(s)';
+            : 'Converted ' + ((blocks[0].colArrays[0] || []).length - 1) + ' word(s)';
         setStatus('flex-tsv', msg, 'ok');
     } catch (e) {
         outEl.value = '';
