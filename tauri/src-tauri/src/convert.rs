@@ -517,9 +517,10 @@ pub fn render_flex_auto(blocks: &[FlexParsed], opts: &FlexOpts) -> String {
 
 // ── FLEx → TSV renderer ───────────────────────────────────────────────────────
 
-/// Render a parsed FLEx block to morpheme-aligned TSV.
-/// Each morpheme and morpheme-boundary divider occupy a separate tab-separated
-/// column. No LaTeX escaping or command wrapping — output is plain text.
+/// Render a parsed FLEx block to word-collapsed TSV.
+/// Each word occupies a single tab-separated column; morpheme parts and
+/// dividers are joined inline (e.g. di=de, deda-a). Gloss assembly mirrors
+/// render_flex() exactly but without LaTeX escaping or command wrapping.
 pub fn render_flex_tsv(ex: &FlexParsed) -> String {
     let n = ex.line_types.len();
 
@@ -553,81 +554,49 @@ pub fn render_flex_tsv(ex: &FlexParsed) -> String {
     let mut gloss_cols:  Vec<String> = Vec::new();
     let mut wgloss_cols: Vec<String> = Vec::new();
     let mut lex_gloss_offset: isize  = 0;
-    let float_punct = "-\u{2012}\u{2013}\u{2014}\u{2015}/|&\u{2026}...";
 
     for w in data_start..primary_arr.len() {
         let wt = &primary_arr[w];
 
-        // Floating punctuation: one column, empty gloss cells
-        if wt.chars().count() == 1 {
-            let c = wt.chars().next().unwrap();
-            if float_punct.contains(c) {
-                form_cols.push(wt.clone());
-                if lex_gloss_idx.is_some()  { gloss_cols.push(String::new()); }
-                if word_gloss_idx.is_some() { wgloss_cols.push(String::new()); }
-                continue;
-            }
-        }
+        // Word-collapsed form: strip sentinels so dividers appear inline
+        form_cols.push(wt.replace(SENTINEL, ""));
 
-        if wt.contains(SENTINEL) {
-            // Multi-morpheme token: expand into per-morpheme columns
-            let parts: Vec<&str> = wt.split(SENTINEL).collect();
-            let part_count = parts.len() as isize - 1;
-            let mut first_morph = true;
-
-            for (y, part) in parts.iter().enumerate() {
-                if part.is_empty() { continue; }
-
-                if part.len() == 1 && MORPH_DIVS.contains(part.chars().next().unwrap()) {
-                    // Divider column: same character in both form and gloss rows
-                    form_cols.push(part.to_string());
-                    if lex_gloss_idx.is_some()  { gloss_cols.push(part.to_string()); }
-                    if word_gloss_idx.is_some() { wgloss_cols.push(String::new()); }
-                    lex_gloss_offset -= 1;
-                } else {
-                    // Morpheme form column
-                    form_cols.push(part.to_string());
-                    if let Some(lgi) = lex_gloss_idx {
-                        let l_arr = &ex.line_arrays[lgi];
+        if let Some(lgi) = lex_gloss_idx {
+            let l_arr = &ex.line_arrays[lgi];
+            if wt.contains(SENTINEL) {
+                // Segmented word: assemble gloss inline, same algorithm as render_flex
+                let parts: Vec<&str> = wt.split(SENTINEL).collect();
+                let part_count = parts.len() as isize - 1;
+                let mut g_parts: Vec<String> = Vec::new();
+                for (y, part) in parts.iter().enumerate() {
+                    if part.is_empty() { continue; }
+                    if part.len() == 1 && MORPH_DIVS.contains(part.chars().next().unwrap()) {
+                        g_parts.push(part.to_string());
+                        lex_gloss_offset -= 1;
+                    } else {
                         let gi = (w as isize - data_start as isize)
                                   + lex_gloss_offset + y as isize;
                         let raw = l_arr.get((gi + data_start as isize) as usize)
                             .map(|s| s.as_str()).unwrap_or("");
-                        gloss_cols.push(raw.replace(SENTINEL, ""));
-                    }
-                    if let Some(wgi) = word_gloss_idx {
-                        if first_morph {
-                            let wg_arr = &ex.line_arrays[wgi];
-                            let wi = w - data_start;
-                            let raw = wg_arr.get(wi + data_start)
-                                .map(|s| s.as_str()).unwrap_or("");
-                            wgloss_cols.push(raw.replace(SENTINEL, ""));
-                            first_morph = false;
-                        } else {
-                            wgloss_cols.push(String::new());
-                        }
+                        g_parts.push(raw.replace(SENTINEL, ""));
                     }
                 }
-            }
-            lex_gloss_offset += part_count;
-
-        } else {
-            // Unsegmented word: single column
-            form_cols.push(wt.replace(SENTINEL, ""));
-            if let Some(lgi) = lex_gloss_idx {
-                let l_arr = &ex.line_arrays[lgi];
+                gloss_cols.push(g_parts.join(""));
+                lex_gloss_offset += part_count;
+            } else {
                 let gi2 = (w as isize - data_start as isize) + lex_gloss_offset;
                 let raw = l_arr.get((gi2 + data_start as isize) as usize)
                     .map(|s| s.as_str()).unwrap_or("");
                 gloss_cols.push(raw.replace(SENTINEL, ""));
             }
-            if let Some(wgi) = word_gloss_idx {
-                let wg_arr = &ex.line_arrays[wgi];
-                let wi2 = w - data_start;
-                let raw = wg_arr.get(wi2 + data_start)
-                    .map(|s| s.as_str()).unwrap_or("");
-                wgloss_cols.push(raw.replace(SENTINEL, ""));
-            }
+        }
+
+        if let Some(wgi) = word_gloss_idx {
+            let wg_arr = &ex.line_arrays[wgi];
+            let wi = w - data_start;
+            let raw = wg_arr.get(wi + data_start)
+                .map(|s| s.as_str()).unwrap_or("");
+            wgloss_cols.push(raw.replace(SENTINEL, ""));
         }
     }
 

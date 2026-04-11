@@ -3,11 +3,11 @@
 ## ✅ Web app (`docs/index.html`)
 
 **Mode bar**
-- [ ] Three output modes visible: *LaTeX (langsci-gb4e)*, *Table/Spreadsheet (tab-separated)*, *XLingPaper*
-- [ ] LaTeX mode active by default — inner tab bar visible with FLEx Interlinear, PA, Dekereke, +
-- [ ] Switching to Table/Spreadsheet mode — inner tab bar hidden, FLEx → Table panel shown
-- [ ] Switching to XLingPaper mode — inner tab bar hidden, placeholder message shown
-- [ ] Active mode persists across page reload (localStorage)
+- [x] Three output modes visible: *LaTeX (langsci-gb4e)*, *Table/Spreadsheet (tab-separated)*, *XLingPaper*
+- [x] LaTeX mode active by default — inner tab bar visible with FLEx Interlinear, PA, Dekereke, +
+- [x] Switching to Table/Spreadsheet mode — inner tab bar hidden, FLEx → Table panel shown
+- [x] Switching to XLingPaper mode — inner tab bar hidden, placeholder message shown
+- [x] Active mode persists across page reload (localStorage)
 
 **LaTeX mode**
 - [x] Normal PA rows convert correctly (auto-detect off and on)
@@ -15,11 +15,13 @@
 - [x] Skip logic works correctly after trim fires
 - [x] FLEx tab converts correctly
 - [x] localStorage persists settings across reload
-- [ ] Add a custom tab — renders in the inner tab bar, not the mode bar
+- [x] Add a custom tab — renders in the inner tab bar, not the mode bar
+- [ ] FLEx conversion to LaTeX still works (both list and individual, this version intially broke that).
 
 **Table/Spreadsheet mode**
-- [ ] **FLEx → Table** — paste FLEx interlinear text → morpheme-aligned TSV output (one morpheme/divider per column)
-- [ ] **FLEx → Table** — segmented words (`na -a`) expand to separate columns per morpheme and divider
+- [ ] **FLEx → Table** — paste FLEx interlinear text → word-collapsed TSV output (one column per word)
+- [ ] **FLEx → Table** — segmented words (`di=de`, `deda-a`) collapse into a single cell with morphemes joined inline
+- [ ] **FLEx → Table** — glosses assembled inline per word (`pig=ERG`, `attack.CMP`) matching the morpheme structure
 - [ ] **FLEx → Table** — unsegmented words produce a single column
 - [ ] **FLEx → Table** — free translation appears as a final plain-text row
 - [ ] **FLEx → Table** — multiple blocks separated by blank line in output
@@ -51,6 +53,7 @@
 - [ ] Grouped PA rows — same shortcut → correct LaTeX typed at cursor (auto-detected, no manual toggle needed)
 - [ ] FLEx shortcut → correct `\gll` block typed at cursor
 - [ ] Add a custom tab — "Auto-detect grouped view" unchecked by default
+- [ ] Verify LaTeX output again (both individual example and xlist example). This version initially broke the LaTeX rendering. Let's make sure that's fixed.
 
 **Table/Spreadsheet mode**
 - [ ] **FLEx → Table** test area — paste FLEx interlinear → morpheme-aligned TSV output
