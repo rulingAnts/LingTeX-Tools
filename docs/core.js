@@ -203,7 +203,7 @@
      * @param  {string[]} morphemes   Column array for Morphemes tier
      * @param  {string[]} lexGlosses  Column array for LexGloss tier
      * @param  {number}  startIdx     Index of first data column (after label)
-     * @returns {Array<{ form: string, glossParts: string[], isPunct: boolean }>}
+     * @returns {Array<{ form: string, glossParts: string[] }>}
      */
     function groupWordsFromColumns(morphemes, lexGlosses, startIdx) {
         var words = [];
@@ -215,12 +215,12 @@
             var g = (lexGlosses[col] || '').trim();
 
             if (m !== '') {
-                // Non-empty morpheme
+                // Non-empty morpheme: check for boundary marker at start
                 var boundary = m.length > 0 && MORPH_DIVS.indexOf(m[0]) !== -1 ? m[0] : '';
                 var suffix   = boundary ? m.substring(1) : m;
 
                 if (boundary !== '') {
-                    // Attach to current word (enclitic/suffix boundary)
+                    // Attach to current word (suffix/enclitic or prefix boundary)
                     if (currentWord) {
                         currentWord.form += boundary + suffix;
                         if (g !== '') {
@@ -230,9 +230,9 @@
                         }
                     }
                 } else {
-                    // Start a new word
+                    // Start a new word (no boundary marker)
                     if (currentWord) words.push(currentWord);
-                    currentWord = { form: m, glossParts: g !== '' ? [g] : [], isPunct: false };
+                    currentWord = { form: m, glossParts: g !== '' ? [g] : [] };
 
                     // If direct gloss is empty, collect from following empty-morpheme columns
                     if (g === '') {
@@ -246,7 +246,7 @@
             } else {
                 // Empty morpheme: zero-morpheme standalone word slot
                 if (currentWord) words.push(currentWord);
-                if (g !== '') words.push({ form: '', glossParts: [g], isPunct: false });
+                if (g !== '') words.push({ form: '', glossParts: [g] });
                 currentWord = null;
             }
         }
@@ -339,14 +339,14 @@
             // Check for floating punctuation
             if (word.form.length === 1 && FLOAT_PUNCT.indexOf(word.form) !== -1) {
                 tier1.push(word.form);
-                if (lexGlossIdx  >= 0) tier2.push('~');
-                if (wordGlossIdx >= 0) tier3.push('~');
+                if (lexGlossIdx  >= 0) tier2.push('\\textasciitilde');
+                if (wordGlossIdx >= 0) tier3.push('\\textasciitilde');
                 continue;
             }
 
-            // Empty form: use ~ placeholder for gb4e
+            // Empty form: use escaped ~ placeholder for gb4e
             if (word.form === '') {
-                tier1.push('~');
+                tier1.push('\\textasciitilde');
             } else {
                 tier1.push(escapeLatex(word.form));
             }
@@ -359,7 +359,7 @@
             if (wordGlossIdx >= 0) {
                 // WordGloss doesn't have a good mapping from word-grouping result
                 // For now, emit empty placeholder
-                tier3.push('~');
+                tier3.push('\\textasciitilde');
             }
         }
 
