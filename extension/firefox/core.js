@@ -35,7 +35,7 @@
     // ── low-level helpers ────────────────────────────────────────────────────
 
     function stripInvisible(s) {
-        return s.replace(/[\u200E\u200F\u202A-\u202E]/g, '');
+        return s.replace(/[\u200B\u200E\u200F\u202A-\u202E]/g, '');
     }
 
     function escapeLatex(s) {
@@ -424,6 +424,14 @@
             + (lexGlossIdx  >= 0 ? 1 : 0)
             + (wordGlossIdx >= 0 ? 1 : 0);
         var gCmd   = 'g' + Array(tierCount + 1).join('l');
+        // NOTE: JS output intentionally uses indentation and \n newlines.
+        // Output goes into a <textarea> and is copied as a block, so indents
+        // are preserved correctly and do not trigger editor auto-indent.
+        // The Rust path (tauri/src-tauri/src/convert.rs) deliberately has NO
+        // indentation because it delivers output via enigo key events, where
+        // pressing Return would cause editors (Sublime, VS Code, etc.) to
+        // auto-indent subsequent lines. Do not "fix" this divergence: it is
+        // load-bearing.
         var indent = Array(gCmd.length + 2).join(' ');
 
         var tier1Content = formCmd
