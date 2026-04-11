@@ -15,7 +15,7 @@ const MORPH_DIVS: &str = "-=~<>";
 pub fn strip_invisible(s: &str) -> String {
     s.chars()
         .filter(|&c| !matches!(c,
-            '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}'
+            '\u{200B}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}'
         ))
         .collect()
 }
@@ -53,6 +53,55 @@ pub fn escape_latex(s: &str) -> String {
     result
 }
 
+/// Apply a case transform to a gloss abbreviation string.
+/// `case_opt`: "lowercase" | "uppercase" | "capitalize" | "none"
+fn apply_gloss_case(s: &str, case_opt: &str) -> String {
+    match case_opt {
+        "uppercase"  => s.to_uppercase(),
+        "capitalize" => {
+            let mut chars = s.chars();
+            match chars.next() {
+                None    => String::new(),
+                Some(c) => c.to_uppercase().to_string() + &chars.as_str().to_lowercase(),
+            }
+        }
+        "none"       => s.to_string(),
+        _            => s.to_lowercase(),  // "lowercase" (default)
+    }
+}
+
+/// Apply gloss case transform to grammatical segments in a plain token
+/// (no command wrapping — used for TSV output).
+fn transform_gloss_token(token: &str, gloss_case: &str) -> String {
+    if token.is_empty() { return String::new(); }
+    let mut parts: Vec<String> = Vec::new();
+    let mut cur = String::new();
+
+    for ch in token.chars() {
+        if MORPH_DIVS.contains(ch) || ch == '.' {
+            if !cur.is_empty() {
+                parts.push(if is_gram_gloss(&cur) {
+                    apply_gloss_case(&cur, gloss_case)
+                } else {
+                    cur.clone()
+                });
+                cur.clear();
+            }
+            parts.push(ch.to_string());
+        } else {
+            cur.push(ch);
+        }
+    }
+    if !cur.is_empty() {
+        parts.push(if is_gram_gloss(&cur) {
+            apply_gloss_case(&cur, gloss_case)
+        } else {
+            cur.clone()
+        });
+    }
+    parts.join("")
+}
+
 /// True if `s` looks like a grammatical gloss abbreviation (all-caps / digit-led).
 fn is_gram_gloss(s: &str) -> bool {
     let chars: Vec<char> = s.chars().collect();
@@ -77,8 +126,9 @@ fn is_gram_gloss(s: &str) -> bool {
         || first.is_ascii_digit()
 }
 
-/// Wrap gloss tokens in `gl_cmd`, escaping non-gloss tokens.
-pub fn wrap_glosses(token: &str, gl_cmd: &str) -> String {
+/// Wrap grammatical gloss segments in `gl_cmd`, applying `gloss_case` transform.
+/// Non-gloss segments are LaTeX-escaped. Splits on morpheme dividers and '.'.
+pub fn wrap_glosses(token: &str, gl_cmd: &str, gloss_case: &str) -> String {
     if token.is_empty() { return String::new(); }
     let mut parts: Vec<String> = Vec::new();
     let mut cur = String::new();
@@ -87,7 +137,7 @@ pub fn wrap_glosses(token: &str, gl_cmd: &str) -> String {
         if MORPH_DIVS.contains(ch) || ch == '.' {
             if !cur.is_empty() {
                 parts.push(if !gl_cmd.is_empty() && is_gram_gloss(&cur) {
-                    format!("{}{{{}}}", gl_cmd, cur.to_lowercase())
+                    format!("{}{{{}}}", gl_cmd, apply_gloss_case(&cur, gloss_case))
                 } else {
                     escape_latex(&cur)
                 });
@@ -100,7 +150,7 @@ pub fn wrap_glosses(token: &str, gl_cmd: &str) -> String {
     }
     if !cur.is_empty() {
         parts.push(if !gl_cmd.is_empty() && is_gram_gloss(&cur) {
-            format!("{}{{{}}}", gl_cmd, cur.to_lowercase())
+            format!("{}{{{}}}", gl_cmd, apply_gloss_case(&cur, gloss_case))
         } else {
             escape_latex(&cur)
         });
@@ -356,7 +406,7 @@ fn handle_standalone_punctuation(words: &mut Vec<Word>) {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FlexParsed {
     pub line_types:  Vec<String>,
-    pub line_arrays: Vec<Vec<String>>,
+    pub col_arrays:  Vec<Vec<String>>,
     pub free_lines:  Vec<String>,
     pub line_num:    Option<String>,
 }
@@ -527,7 +577,7 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
         col_arrays.push(cols);
     }
 
-    FlexParsed { line_types, line_arrays: col_arrays, free_lines, line_num }
+    FlexParsed { line_types, col_arrays, free_lines, line_num }
 }
 
 // ── FLEx renderer ─────────────────────────────────────────────────────────────
@@ -536,6 +586,8 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
 #[serde(rename_all = "camelCase")]
 pub struct FlexOpts {
     pub gl_cmd:        String,
+    pub gloss_case:    String,
+    pub form_cmd:      String,
     pub wrap_exe:      bool,
     pub txtref_cmd:    String,
     pub txtref_prefix: String,
@@ -544,9 +596,11 @@ pub struct FlexOpts {
 impl Default for FlexOpts {
     fn default() -> Self {
         FlexOpts {
-            gl_cmd:        "\\gl".to_string(),
+            gl_cmd:        "\\textsc".to_string(),
+            gloss_case:    "capitalize".to_string(),
+            form_cmd:      "\\textit".to_string(),
             wrap_exe:      true,
-            txtref_cmd:    "\\txtref".to_string(),
+            txtref_cmd:    "%\\txtref".to_string(),
             txtref_prefix: "TXT:".to_string(),
         }
     }
@@ -575,13 +629,13 @@ pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
         Some(i) => i,
     };
 
-    let morphemes_arr = &ex.line_arrays[morph_idx];
+    let morphemes_arr = &ex.col_arrays[morph_idx];
     let mut data_start = 1usize;
     if morphemes_arr.get(data_start).map_or(false, |s| s.parse::<u64>().is_ok()) {
         data_start += 1;
     }
 
-    let lex_glosses_arr = lex_gloss_idx.map(|i| &ex.line_arrays[i]);
+    let lex_glosses_arr = lex_gloss_idx.map(|i| &ex.col_arrays[i]);
 
     // Run word-grouping algorithm on tab-format columns
     let lex_glosses_empty = Vec::new();
@@ -613,7 +667,7 @@ pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
 
         if lex_gloss_idx.is_some() {
             let g_str = word.gloss_parts.join("");
-            tier2.push(wrap_glosses(&g_str, &opts.gl_cmd));
+            tier2.push(wrap_glosses(&g_str, &opts.gl_cmd, &opts.gloss_case));
         }
 
         if word_gloss_idx.is_some() {
@@ -628,10 +682,26 @@ pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
         + if lex_gloss_idx.is_some()  { 1 } else { 0 }
         + if word_gloss_idx.is_some() { 1 } else { 0 };
     let g_cmd  = format!("g{}", "l".repeat(tier_count));       // e.g. "gll"
-    let indent = " ".repeat(g_cmd.len() + 1);                  // e.g. "    "
+    // NOTE: No indentation here intentionally.
+    // The Rust path delivers output via enigo key events (Return between lines),
+    // not as a clipboard paste. Indented lines would trigger editor auto-indent
+    // (Sublime Text, VS Code, etc.) and produce doubled/wrong indentation.
+    // The JS/web path DOES use indentation because its output goes into a
+    // <textarea> and is copied as a block — see docs/core.js render functions.
+    // Do not "fix" this divergence: it is load-bearing.
+    let indent = "";
+
+    let tier1_content = if opts.form_cmd.is_empty() {
+        tier1.join(" ")
+    } else {
+        tier1.iter()
+            .map(|t| format!("{}{{{}}}", opts.form_cmd, t))
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
 
     let mut lines: Vec<String> = Vec::new();
-    lines.push(format!("\\{} {} \\\\", g_cmd, tier1.join(" ")));
+    lines.push(format!("\\{} {} \\\\", g_cmd, tier1_content));
     if lex_gloss_idx.is_some()  { lines.push(format!("{}{} \\\\", indent, tier2.join(" "))); }
     if word_gloss_idx.is_some() { lines.push(format!("{}{} \\\\", indent, tier3.join(" "))); }
 
@@ -664,13 +734,10 @@ pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
 /// Each block becomes one `\ex` sub-item inside `\begin{xlist}…\end{xlist}`.
 pub fn render_flex_xlist(blocks: &[FlexParsed], opts: &FlexOpts) -> String {
     let sub_opts = FlexOpts { wrap_exe: false, ..opts.clone() };
+    // NOTE: No indentation applied to xlist items — see comment in render_flex.
     let items: Vec<String> = blocks.iter().map(|block| {
         let body = render_flex(block, &sub_opts);
-        let indented = body.trim().lines()
-            .map(|l| format!("    {}", l))
-            .collect::<Vec<_>>()
-            .join("\n");
-        format!("\\ex % \\label{{ex:KEY}}\n{}", indented)
+        format!("\\ex % \\label{{ex:KEY}}\n{}", body.trim())
     }).collect();
 
     format!(
@@ -695,7 +762,8 @@ pub fn render_flex_auto(blocks: &[FlexParsed], opts: &FlexOpts) -> String {
 /// Render a parsed FLEx block to word-collapsed TSV.
 /// Each word occupies a single tab-separated column; morpheme parts and
 /// dividers are joined inline (e.g. di=de, deda-a).
-pub fn render_flex_tsv(ex: &FlexParsed) -> String {
+/// `opts.gloss_case` controls the case transform applied to grammatical gloss segments.
+pub fn render_flex_tsv(ex: &FlexParsed, opts: &FlexOpts) -> String {
     let n = ex.line_types.len();
 
     let mut morph_idx:      Option<usize> = None;
@@ -718,13 +786,13 @@ pub fn render_flex_tsv(ex: &FlexParsed) -> String {
         Some(i) => i,
     };
 
-    let morphemes_arr = &ex.line_arrays[morph_idx];
+    let morphemes_arr = &ex.col_arrays[morph_idx];
     let mut data_start = 1usize;
     if morphemes_arr.get(data_start).map_or(false, |s| s.parse::<u64>().is_ok()) {
         data_start += 1;
     }
 
-    let lex_glosses_arr = lex_gloss_idx.map(|i| &ex.line_arrays[i]);
+    let lex_glosses_arr = lex_gloss_idx.map(|i| &ex.col_arrays[i]);
 
     // Run word-grouping algorithm
     let lex_glosses_empty = Vec::new();
@@ -738,7 +806,7 @@ pub fn render_flex_tsv(ex: &FlexParsed) -> String {
     for word in &words {
         form_cols.push(word.form.clone());
         if lex_gloss_idx.is_some() {
-            gloss_cols.push(word.gloss_parts.join(""));
+            gloss_cols.push(transform_gloss_token(&word.gloss_parts.join(""), &opts.gloss_case));
         }
     }
 
@@ -752,9 +820,9 @@ pub fn render_flex_tsv(ex: &FlexParsed) -> String {
 
 /// Render multiple parsed FLEx blocks to morpheme-aligned TSV.
 /// Multiple blocks are separated by a blank line.
-pub fn render_flex_tsv_auto(blocks: &[FlexParsed]) -> String {
+pub fn render_flex_tsv_auto(blocks: &[FlexParsed], opts: &FlexOpts) -> String {
     blocks.iter()
-        .map(|b| render_flex_tsv(b))
+        .map(|b| render_flex_tsv(b, opts))
         .collect::<Vec<_>>()
         .join("\n\n")
 }
