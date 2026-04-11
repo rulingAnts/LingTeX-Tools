@@ -55,7 +55,31 @@
         return /^[^\w]*([0-9A-Z]+|[0-9]\w+)[^\w]*$/.test(s);
     }
 
-    function wrapGlosses(token, glCmd) {
+    /**
+     * Apply a case transform to a gloss abbreviation string.
+     * @param  {string} s
+     * @param  {string} caseOpt  'lowercase' | 'uppercase' | 'capitalize' | 'none'
+     * @returns {string}
+     */
+    function applyGlossCase(s, caseOpt) {
+        if (!s) return s;
+        switch (caseOpt) {
+            case 'uppercase':  return s.toUpperCase();
+            case 'capitalize': return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+            case 'none':       return s;
+            default:           return s.toLowerCase();  // 'lowercase'
+        }
+    }
+
+    /**
+     * Wrap grammatical gloss segments in a LaTeX command, applying case transform.
+     * Splits on morpheme dividers and '.'; non-grammatical segments are LaTeX-escaped.
+     * @param  {string} token
+     * @param  {string} glCmd      e.g. '\\textsc'
+     * @param  {string} glossCase  'lowercase' | 'uppercase' | 'capitalize' | 'none'
+     * @returns {string}
+     */
+    function wrapGlosses(token, glCmd, glossCase) {
         if (!token) return '';
         var parts = [];
         var cur   = '';
@@ -64,7 +88,7 @@
             if (MORPH_DIVS.indexOf(ch) !== -1 || ch === '.') {
                 if (cur) {
                     parts.push(glCmd && isGramGloss(cur)
-                        ? glCmd + '{' + cur.toLowerCase() + '}'
+                        ? glCmd + '{' + applyGlossCase(cur, glossCase) + '}'
                         : escapeLatex(cur));
                     cur = '';
                 }
@@ -75,8 +99,37 @@
         }
         if (cur) {
             parts.push(glCmd && isGramGloss(cur)
-                ? glCmd + '{' + cur.toLowerCase() + '}'
+                ? glCmd + '{' + applyGlossCase(cur, glossCase) + '}'
                 : escapeLatex(cur));
+        }
+        return parts.join('');
+    }
+
+    /**
+     * Apply glossCase transform to grammatical segments within a plain gloss token
+     * (no command wrapping — used for TSV output).
+     * @param  {string} token
+     * @param  {string} glossCase
+     * @returns {string}
+     */
+    function transformGlossToken(token, glossCase) {
+        if (!token) return '';
+        var parts = [];
+        var cur   = '';
+        for (var i = 0; i < token.length; i++) {
+            var ch = token[i];
+            if (MORPH_DIVS.indexOf(ch) !== -1 || ch === '.') {
+                if (cur) {
+                    parts.push(isGramGloss(cur) ? applyGlossCase(cur, glossCase) : cur);
+                    cur = '';
+                }
+                parts.push(ch);
+            } else {
+                cur += ch;
+            }
+        }
+        if (cur) {
+            parts.push(isGramGloss(cur) ? applyGlossCase(cur, glossCase) : cur);
         }
         return parts.join('');
     }
@@ -281,16 +334,20 @@
      * Render a parsed FLEx block to a langsci-gb4e \gll block.
      * @param  {object} ex       Result of parseFLExBlock()
      * @param  {object} [opts]
-     * @param  {string} [opts.glCmd='\\textsc']       Gloss abbreviation command
-     * @param  {string} [opts.txtrefCmd='\\txtref']  Source-reference command ('' to omit)
-     * @param  {string} [opts.txtrefPrefix='TXT:']   Prefix inside \txtref{}
-     * @param  {boolean} [opts.wrapExe=true]         Wrap in \begin{exe}\ex...\end{exe}
+     * @param  {string} [opts.glCmd='\\textsc']        Gloss abbreviation command
+     * @param  {string} [opts.glossCase='capitalize']  Case transform for grammatical glosses: 'lowercase'|'uppercase'|'capitalize'|'none'
+     * @param  {string} [opts.formCmd='\\textit']      Command to wrap the object-language tier ('' to omit)
+     * @param  {string} [opts.txtrefCmd='%\\txtref']   Source-reference command ('' to omit)
+     * @param  {string} [opts.txtrefPrefix='TXT:']    Prefix inside \txtref{}
+     * @param  {boolean} [opts.wrapExe=true]          Wrap in \begin{exe}\ex...\end{exe}
      * @returns {string}
      */
     function renderFLEx(ex, opts) {
         opts = opts || {};
         var glCmd        = opts.glCmd        !== undefined ? opts.glCmd        : '\\textsc';
-        var txtrefCmd    = opts.txtrefCmd    !== undefined ? opts.txtrefCmd    : '\\txtref';
+        var glossCase    = opts.glossCase    !== undefined ? opts.glossCase    : 'capitalize';
+        var formCmd      = opts.formCmd      !== undefined ? opts.formCmd      : '\\textit';
+        var txtrefCmd    = opts.txtrefCmd    !== undefined ? opts.txtrefCmd    : '%\\txtref';
         var txtrefPrefix = opts.txtrefPrefix !== undefined ? opts.txtrefPrefix : 'TXT:';
         var wrapExe      = opts.wrapExe      !== undefined ? opts.wrapExe      : true;
 
@@ -353,7 +410,7 @@
 
             if (lexGlossIdx >= 0) {
                 var gStr = word.glossParts.join('');
-                tier2.push(wrapGlosses(gStr, glCmd));
+                tier2.push(wrapGlosses(gStr, glCmd, glossCase));
             }
 
             if (wordGlossIdx >= 0) {
@@ -369,8 +426,12 @@
         var gCmd   = 'g' + Array(tierCount + 1).join('l');
         var indent = Array(gCmd.length + 2).join(' ');
 
+        var tier1Content = formCmd
+            ? tier1.map(function (t) { return formCmd + '{' + t + '}'; }).join(' ')
+            : tier1.join(' ');
+
         var lines = [];
-        lines.push('\\' + gCmd + ' ' + tier1.join(' ') + ' \\\\');
+        lines.push('\\' + gCmd + ' ' + tier1Content + ' \\\\');
         if (lexGlossIdx  >= 0) lines.push(indent + tier2.join(' ') + ' \\\\');
         if (wordGlossIdx >= 0) lines.push(indent + tier3.join(' ') + ' \\\\');
 
@@ -448,6 +509,8 @@
         opts = opts || {};
         var subOpts = {
             glCmd:        opts.glCmd,
+            glossCase:    opts.glossCase,
+            formCmd:      opts.formCmd,
             txtrefCmd:    opts.txtrefCmd,
             txtrefPrefix: opts.txtrefPrefix,
             wrapExe:      false
@@ -485,10 +548,15 @@
      * Render a parsed FLEx block to word-collapsed TSV.
      * Each word occupies a single tab-separated column; morpheme parts and
      * dividers are joined inline (e.g. di=de, deda-a).
-     * @param  {object} ex  Result of parseFLExBlock()
+     * @param  {object} ex    Result of parseFLExBlock()
+     * @param  {object} [opts]
+     * @param  {string} [opts.glossCase='capitalize']  Case transform for grammatical glosses
      * @returns {string}
      */
-    function renderFLExTSV(ex) {
+    function renderFLExTSV(ex, opts) {
+        opts = opts || {};
+        var glossCase  = opts.glossCase !== undefined ? opts.glossCase : 'capitalize';
+
         var lineTypes  = ex.lineTypes;
         var colArrays  = ex.colArrays;
         var freeLines  = ex.freeLines;
@@ -529,7 +597,7 @@
             var word = words[w];
             formCols.push(word.form);
             if (lexGlossIdx >= 0) {
-                glossCols.push(word.glossParts.join(''));
+                glossCols.push(transformGlossToken(word.glossParts.join(''), glossCase));
             }
         }
 
@@ -544,11 +612,12 @@
     /**
      * Render multiple parsed FLEx blocks to morpheme-aligned TSV.
      * Multiple blocks are separated by a blank line.
-     * @param  {Array} blocks  Result of parseFLExBlocks()
+     * @param  {Array}  blocks  Result of parseFLExBlocks()
+     * @param  {object} [opts]  Same options as renderFLExTSV()
      * @returns {string}
      */
-    function renderFLExTSVAuto(blocks) {
-        return blocks.map(renderFLExTSV).join('\n\n');
+    function renderFLExTSVAuto(blocks, opts) {
+        return blocks.map(function (b) { return renderFLExTSV(b, opts); }).join('\n\n');
     }
 
     // ── Phonology Assistant parser/renderer ──────────────────────────────────

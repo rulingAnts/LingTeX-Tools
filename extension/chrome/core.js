@@ -55,7 +55,31 @@
         return /^[^\w]*([0-9A-Z]+|[0-9]\w+)[^\w]*$/.test(s);
     }
 
-    function wrapGlosses(token, glCmd) {
+    /**
+     * Apply a case transform to a gloss abbreviation string.
+     * @param  {string} s
+     * @param  {string} caseOpt  'lowercase' | 'uppercase' | 'capitalize' | 'none'
+     * @returns {string}
+     */
+    function applyGlossCase(s, caseOpt) {
+        if (!s) return s;
+        switch (caseOpt) {
+            case 'uppercase':  return s.toUpperCase();
+            case 'capitalize': return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+            case 'none':       return s;
+            default:           return s.toLowerCase();  // 'lowercase'
+        }
+    }
+
+    /**
+     * Wrap grammatical gloss segments in a LaTeX command, applying case transform.
+     * Splits on morpheme dividers and '.'; non-grammatical segments are LaTeX-escaped.
+     * @param  {string} token
+     * @param  {string} glCmd      e.g. '\\textsc'
+     * @param  {string} glossCase  'lowercase' | 'uppercase' | 'capitalize' | 'none'
+     * @returns {string}
+     */
+    function wrapGlosses(token, glCmd, glossCase) {
         if (!token) return '';
         var parts = [];
         var cur   = '';
@@ -64,7 +88,7 @@
             if (MORPH_DIVS.indexOf(ch) !== -1 || ch === '.') {
                 if (cur) {
                     parts.push(glCmd && isGramGloss(cur)
-                        ? glCmd + '{' + cur.toLowerCase() + '}'
+                        ? glCmd + '{' + applyGlossCase(cur, glossCase) + '}'
                         : escapeLatex(cur));
                     cur = '';
                 }
@@ -75,8 +99,37 @@
         }
         if (cur) {
             parts.push(glCmd && isGramGloss(cur)
-                ? glCmd + '{' + cur.toLowerCase() + '}'
+                ? glCmd + '{' + applyGlossCase(cur, glossCase) + '}'
                 : escapeLatex(cur));
+        }
+        return parts.join('');
+    }
+
+    /**
+     * Apply glossCase transform to grammatical segments within a plain gloss token
+     * (no command wrapping — used for TSV output).
+     * @param  {string} token
+     * @param  {string} glossCase
+     * @returns {string}
+     */
+    function transformGlossToken(token, glossCase) {
+        if (!token) return '';
+        var parts = [];
+        var cur   = '';
+        for (var i = 0; i < token.length; i++) {
+            var ch = token[i];
+            if (MORPH_DIVS.indexOf(ch) !== -1 || ch === '.') {
+                if (cur) {
+                    parts.push(isGramGloss(cur) ? applyGlossCase(cur, glossCase) : cur);
+                    cur = '';
+                }
+                parts.push(ch);
+            } else {
+                cur += ch;
+            }
+        }
+        if (cur) {
+            parts.push(isGramGloss(cur) ? applyGlossCase(cur, glossCase) : cur);
         }
         return parts.join('');
     }
@@ -113,24 +166,27 @@
 
     // ── FLEx parser ──────────────────────────────────────────────────────────
 
+
     /**
      * Parse the first interlinear block from raw FLEx clipboard text.
+     * For tab-separated FLEx data: returns raw column arrays.
+     * For space-separated fallback: returns token arrays (legacy path).
      * @param  {string} raw
-     * @returns {{ lineTypes: string[], lineArrays: string[][], freeLines: string[], lineNum: string|null }}
+     * @returns {{ lineTypes: string[], colArrays: string[][], freeLines: string[], lineNum: string|null }}
      */
     function parseFLExBlock(raw) {
-        var text = raw.replace(/\r\n?/g, '\n').replace(/\t/g, ' ');
+        var text     = raw.replace(/\r\n?/g, '\n');
         var blockEnd = text.indexOf('\n\n');
         if (blockEnd >= 0) text = text.substring(0, blockEnd);
 
         var lineTypes  = [];
-        var lineArrays = [];
+        var colArrays  = [];
         var freeLines  = [];
         var lineNum    = null;
         var seenFree   = false;
 
         var rawLines = text.split('\n')
-            .map(function (l) { return String(l).replace(/\s+$/, ''); })
+            .map(function (l) { return String(l).replace(/[ \t]+$/, ''); })
             .filter(function (l) { return l.replace(/^\s+/, '') !== ''; });
 
         for (var i = 0; i < rawLines.length; i++) {
@@ -161,16 +217,115 @@
                 continue;
             }
 
-            l = massageLine(stripInvisible(l));
-            var toks = l.trim().split(/\s+/).filter(function (t) { return t !== ''; });
-            if (toks.length === 0) continue;
+            var cols;
+            if (l.indexOf('\t') !== -1) {
+                // Tab-column FLEx format: parse as raw column array
+                var normalized = stripInvisible(l)
+                    .replace(/Lex\. Entries/g, 'LexEntries')
+                    .replace(/Lex\. Gloss/g,   'LexGloss')
+                    .replace(/Word Gloss/g,    'WordGloss')
+                    .replace(/Word Cat\./g,    'WordCat');
+                cols = normalized.split('\t').map(function (c) { return c.trim(); });
 
-            lineTypes.push(toks[0]);
-            lineArrays.push(toks);
+                // If first column is empty, shift left (skip the leading empty column
+                // that occurs when the tier label is in column 1)
+                if (cols.length > 0 && cols[0] === '') {
+                    cols.shift();
+                }
+            } else {
+                // Space-separated fallback (legacy / non-FLEx sources)
+                var massaged = massageLine(stripInvisible(l));
+                cols = massaged.trim().split(/\s+/).filter(function (t) { return t !== ''; });
+            }
+
+            if (!cols || cols.length === 0) continue;
+            lineTypes.push(cols[0]);
+            colArrays.push(cols);
         }
 
-        return { lineTypes: lineTypes, lineArrays: lineArrays,
+        return { lineTypes: lineTypes, colArrays: colArrays,
                  freeLines: freeLines, lineNum: lineNum };
+    }
+
+    // ── Word-grouping algorithm (tab-format columns) ──────────────────────────
+
+    /**
+     * Run the word-grouping algorithm on raw column arrays.
+     * Returns an array of word objects: { form, glossParts[] }.
+     * Each glossParts element is a string (may include boundary markers).
+     * @param  {string[]} morphemes   Column array for Morphemes tier
+     * @param  {string[]} lexGlosses  Column array for LexGloss tier
+     * @param  {number}  startIdx     Index of first data column (after label)
+     * @returns {Array<{ form: string, glossParts: string[] }>}
+     */
+    function groupWordsFromColumns(morphemes, lexGlosses, startIdx) {
+        var words = [];
+        var currentWord = null;
+        var N = morphemes.length;
+
+        for (var col = startIdx; col < N; col++) {
+            var m = (morphemes[col] || '').trim();
+            var g = (lexGlosses[col] || '').trim();
+
+            if (m !== '') {
+                // Non-empty morpheme: check for boundary marker at start
+                var boundary = m.length > 0 && MORPH_DIVS.indexOf(m[0]) !== -1 ? m[0] : '';
+                var suffix   = boundary ? m.substring(1) : m;
+
+                if (boundary !== '') {
+                    // Attach to current word (suffix/enclitic or prefix boundary)
+                    if (currentWord) {
+                        currentWord.form += boundary + suffix;
+                        if (g !== '') {
+                            currentWord.glossParts.push(boundary + g);
+                        } else {
+                            currentWord.glossParts.push(boundary);
+                        }
+                    }
+                } else {
+                    // Start a new word (no boundary marker)
+                    if (currentWord) words.push(currentWord);
+                    currentWord = { form: m, glossParts: g !== '' ? [g] : [] };
+
+                    // If direct gloss is empty, collect from following empty-morpheme columns
+                    if (g === '') {
+                        while (col + 1 < N && (morphemes[col + 1] || '').trim() === '') {
+                            col++;
+                            var nextG = (lexGlosses[col] || '').trim();
+                            if (nextG !== '') currentWord.glossParts.push(nextG);
+                        }
+                    }
+                }
+            } else {
+                // Empty morpheme: zero-morpheme standalone word slot
+                if (currentWord) words.push(currentWord);
+                if (g !== '') words.push({ form: '', glossParts: [g] });
+                currentWord = null;
+            }
+        }
+
+        if (currentWord) words.push(currentWord);
+        return words;
+    }
+
+    /**
+     * Special case: standalone punctuation (single char, empty gloss) appends
+     * to preceding word's form only, no gloss contribution.
+     * @param {Array} words  Mutated in place
+     */
+    function handleStandalonePunctuation(words) {
+        var M = '\u2026,:;.!?-\u2012\u2013\u2014\u2015/|&';
+        for (var i = 1; i < words.length; i++) {
+            var w = words[i];
+            if (w.form.length === 1 && M.indexOf(w.form) !== -1 && w.glossParts.length === 0) {
+                // Append to preceding word's form, remove from list
+                if (words[i - 1]) {
+                    words[i - 1].form += w.form;
+                }
+                words.splice(i, 1);
+                i--;
+            }
+        }
     }
 
     // ── FLEx renderer ────────────────────────────────────────────────────────
@@ -179,21 +334,25 @@
      * Render a parsed FLEx block to a langsci-gb4e \gll block.
      * @param  {object} ex       Result of parseFLExBlock()
      * @param  {object} [opts]
-     * @param  {string} [opts.glCmd='\\gl']          Gloss abbreviation command
-     * @param  {string} [opts.txtrefCmd='\\txtref']  Source-reference command ('' to omit)
-     * @param  {string} [opts.txtrefPrefix='TXT:']   Prefix inside \txtref{}
-     * @param  {boolean} [opts.wrapExe=true]         Wrap in \begin{exe}\ex...\end{exe}
+     * @param  {string} [opts.glCmd='\\textsc']        Gloss abbreviation command
+     * @param  {string} [opts.glossCase='capitalize']  Case transform for grammatical glosses: 'lowercase'|'uppercase'|'capitalize'|'none'
+     * @param  {string} [opts.formCmd='\\textit']      Command to wrap the object-language tier ('' to omit)
+     * @param  {string} [opts.txtrefCmd='%\\txtref']   Source-reference command ('' to omit)
+     * @param  {string} [opts.txtrefPrefix='TXT:']    Prefix inside \txtref{}
+     * @param  {boolean} [opts.wrapExe=true]          Wrap in \begin{exe}\ex...\end{exe}
      * @returns {string}
      */
     function renderFLEx(ex, opts) {
         opts = opts || {};
-        var glCmd        = opts.glCmd        !== undefined ? opts.glCmd        : '\\gl';
-        var txtrefCmd    = opts.txtrefCmd    !== undefined ? opts.txtrefCmd    : '\\txtref';
+        var glCmd        = opts.glCmd        !== undefined ? opts.glCmd        : '\\textsc';
+        var glossCase    = opts.glossCase    !== undefined ? opts.glossCase    : 'capitalize';
+        var formCmd      = opts.formCmd      !== undefined ? opts.formCmd      : '\\textit';
+        var txtrefCmd    = opts.txtrefCmd    !== undefined ? opts.txtrefCmd    : '%\\txtref';
         var txtrefPrefix = opts.txtrefPrefix !== undefined ? opts.txtrefPrefix : 'TXT:';
         var wrapExe      = opts.wrapExe      !== undefined ? opts.wrapExe      : true;
 
         var lineTypes  = ex.lineTypes;
-        var lineArrays = ex.lineArrays;
+        var colArrays  = ex.colArrays;
         var freeLines  = ex.freeLines;
         var lineNum    = ex.lineNum;
         var n          = lineTypes.length;
@@ -215,59 +374,49 @@
         }
         if (morphIdx < 0) return '% (no recognisable tier lines — check labels)';
 
-        var primaryArr = lineArrays[morphIdx];
-        var dataStart  = 1;
-        if (/^\d+$/.test(primaryArr[dataStart] || '')) dataStart++;
+        var morphemesArr = colArrays[morphIdx];
+        var dataStart    = 1;
+        if (/^\d+$/.test(morphemesArr[dataStart] || '')) dataStart++;
 
-        var tier1          = [];
-        var tier2          = [];
-        var tier3          = [];
-        var lexGlossOffset = 0;
-        var FLOAT_PUNCT    = '-\u2012\u2013\u2014\u2015/|&\u2026...';
+        var lexGlossesArr = lexGlossIdx >= 0 ? colArrays[lexGlossIdx] : [];
+        var wordGlossesArr = wordGlossIdx >= 0 ? colArrays[wordGlossIdx] : [];
 
-        for (var w = dataStart; w < primaryArr.length; w++) {
-            var wt = primaryArr[w];
+        // Run word-grouping algorithm on tab-format columns
+        var words = groupWordsFromColumns(morphemesArr, lexGlossesArr, dataStart);
+        handleStandalonePunctuation(words);
 
-            if (wt.length === 1 && FLOAT_PUNCT.indexOf(wt) !== -1) {
-                tier1.push(wt);
-                if (lexGlossIdx  >= 0) tier2.push('{}');
-                if (wordGlossIdx >= 0) tier3.push('{}');
+        var tier1 = [];
+        var tier2 = [];
+        var tier3 = [];
+        var FLOAT_PUNCT = '-\u2012\u2013\u2014\u2015/|&\u2026...';
+
+        for (var w = 0; w < words.length; w++) {
+            var word = words[w];
+
+            // Check for floating punctuation
+            if (word.form.length === 1 && FLOAT_PUNCT.indexOf(word.form) !== -1) {
+                tier1.push(word.form);
+                if (lexGlossIdx  >= 0) tier2.push('\\textasciitilde');
+                if (wordGlossIdx >= 0) tier3.push('\\textasciitilde');
                 continue;
             }
 
-            tier1.push(escapeLatex(wt.split(SENTINEL).join('')));
+            // Empty form: use escaped ~ placeholder for gb4e
+            if (word.form === '') {
+                tier1.push('\\textasciitilde');
+            } else {
+                tier1.push(escapeLatex(word.form));
+            }
 
             if (lexGlossIdx >= 0) {
-                var lArr = lineArrays[lexGlossIdx];
-                if (wt.indexOf(SENTINEL) !== -1) {
-                    var parts     = wt.split(SENTINEL);
-                    var partCount = parts.length - 1;
-                    var gParts    = [];
-                    for (var y = 0; y < parts.length; y++) {
-                        var part = parts[y];
-                        if (part === '') continue;
-                        if (MORPH_DIVS.indexOf(part) !== -1) {
-                            gParts.push(part);
-                            lexGlossOffset--;
-                        } else {
-                            var gi  = (w - dataStart) + lexGlossOffset + y;
-                            var raw = lArr[gi + dataStart] || '';
-                            gParts.push(wrapGlosses(raw, glCmd));
-                        }
-                    }
-                    tier2.push(gParts.join(''));
-                    lexGlossOffset += partCount;
-                } else {
-                    var gi2  = (w - dataStart) + lexGlossOffset;
-                    var raw2 = lArr[gi2 + dataStart] || '';
-                    tier2.push(wrapGlosses(raw2, glCmd));
-                }
+                var gStr = word.glossParts.join('');
+                tier2.push(wrapGlosses(gStr, glCmd, glossCase));
             }
 
             if (wordGlossIdx >= 0) {
-                var wgArr = lineArrays[wordGlossIdx];
-                var wi    = w - dataStart;
-                tier3.push(wrapGlosses(wgArr[wi + dataStart] || '', glCmd));
+                // WordGloss doesn't have a good mapping from word-grouping result
+                // For now, emit empty placeholder
+                tier3.push('\\textasciitilde');
             }
         }
 
@@ -277,8 +426,12 @@
         var gCmd   = 'g' + Array(tierCount + 1).join('l');
         var indent = Array(gCmd.length + 2).join(' ');
 
+        var tier1Content = formCmd
+            ? tier1.map(function (t) { return formCmd + '{' + t + '}'; }).join(' ')
+            : tier1.join(' ');
+
         var lines = [];
-        lines.push('\\' + gCmd + ' ' + tier1.join(' ') + ' \\\\');
+        lines.push('\\' + gCmd + ' ' + tier1Content + ' \\\\');
         if (lexGlossIdx  >= 0) lines.push(indent + tier2.join(' ') + ' \\\\');
         if (wordGlossIdx >= 0) lines.push(indent + tier3.join(' ') + ' \\\\');
 
@@ -310,7 +463,7 @@
      * Returns an array of parsed block objects (result of parseFLExBlock).
      * Blocks with no recognisable tier lines are silently dropped.
      * @param  {string} raw
-     * @returns {Array<{ lineTypes: string[], lineArrays: string[][], freeLines: string[], lineNum: string|null }>}
+     * @returns {Array<{ lineTypes: string[], colArrays: string[][], freeLines: string[], lineNum: string|null }>}
      */
     function parseFLExBlocks(raw) {
         var text = raw.replace(/\r\n?/g, '\n');
@@ -356,6 +509,8 @@
         opts = opts || {};
         var subOpts = {
             glCmd:        opts.glCmd,
+            glossCase:    opts.glossCase,
+            formCmd:      opts.formCmd,
             txtrefCmd:    opts.txtrefCmd,
             txtrefPrefix: opts.txtrefPrefix,
             wrapExe:      false
@@ -385,6 +540,84 @@
     function renderFLExAuto(blocks, opts) {
         if (blocks.length === 1) return renderFLEx(blocks[0], opts);
         return renderFLExXlist(blocks, opts);
+    }
+
+    // ── FLEx → TSV renderer ──────────────────────────────────────────────────
+
+    /**
+     * Render a parsed FLEx block to word-collapsed TSV.
+     * Each word occupies a single tab-separated column; morpheme parts and
+     * dividers are joined inline (e.g. di=de, deda-a).
+     * @param  {object} ex    Result of parseFLExBlock()
+     * @param  {object} [opts]
+     * @param  {string} [opts.glossCase='capitalize']  Case transform for grammatical glosses
+     * @returns {string}
+     */
+    function renderFLExTSV(ex, opts) {
+        opts = opts || {};
+        var glossCase  = opts.glossCase !== undefined ? opts.glossCase : 'capitalize';
+
+        var lineTypes  = ex.lineTypes;
+        var colArrays  = ex.colArrays;
+        var freeLines  = ex.freeLines;
+        var n          = lineTypes.length;
+
+        var morphIdx     = -1;
+        var lexGlossIdx  = -1;
+        var wordGlossIdx = -1;
+
+        for (var t = 0; t < n; t++) {
+            var lt = lineTypes[t];
+            if ((lt === 'Morphemes' || lt === 'LexEntries') && morphIdx    < 0) morphIdx    = t;
+            if (lt === 'LexGloss'                           && lexGlossIdx < 0) lexGlossIdx = t;
+            if (lt === 'WordGloss'                          && wordGlossIdx < 0) wordGlossIdx = t;
+        }
+        if (morphIdx < 0) {
+            for (var t2 = 0; t2 < n; t2++) {
+                if (lineTypes[t2] === 'Word') { morphIdx = t2; break; }
+            }
+        }
+        if (morphIdx < 0) return '(no recognisable tier lines — check labels)';
+
+        var morphemesArr = colArrays[morphIdx];
+        var dataStart    = 1;
+        if (/^\d+$/.test(morphemesArr[dataStart] || '')) dataStart++;
+
+        var lexGlossesArr = lexGlossIdx >= 0 ? colArrays[lexGlossIdx] : [];
+        var wordGlossesArr = wordGlossIdx >= 0 ? colArrays[wordGlossIdx] : [];
+
+        // Run word-grouping algorithm
+        var words = groupWordsFromColumns(morphemesArr, lexGlossesArr, dataStart);
+        handleStandalonePunctuation(words);
+
+        var formCols  = [];
+        var glossCols = [];
+
+        for (var w = 0; w < words.length; w++) {
+            var word = words[w];
+            formCols.push(word.form);
+            if (lexGlossIdx >= 0) {
+                glossCols.push(transformGlossToken(word.glossParts.join(''), glossCase));
+            }
+        }
+
+        var rows = [];
+        rows.push(formCols.join('\t'));
+        if (lexGlossIdx  >= 0) rows.push(glossCols.join('\t'));
+        if (freeLines.length > 0) rows.push(freeLines.join(' / '));
+
+        return rows.join('\n');
+    }
+
+    /**
+     * Render multiple parsed FLEx blocks to morpheme-aligned TSV.
+     * Multiple blocks are separated by a blank line.
+     * @param  {Array}  blocks  Result of parseFLExBlocks()
+     * @param  {object} [opts]  Same options as renderFLExTSV()
+     * @returns {string}
+     */
+    function renderFLExTSVAuto(blocks, opts) {
+        return blocks.map(function (b) { return renderFLExTSV(b, opts); }).join('\n\n');
     }
 
     // ── Phonology Assistant parser/renderer ──────────────────────────────────
@@ -513,15 +746,17 @@
         renderFLEx:                renderFLEx,
         renderFLExXlist:           renderFLExXlist,
         renderFLExAuto:            renderFLExAuto,
+        renderFLExTSV:             renderFLExTSV,
+        renderFLExTSVAuto:         renderFLExTSVAuto,
         parsePhonologyAssistant:   parsePhonologyAssistant,   // old fixed-column API
         renderPhonologyAssistant:  renderPhonologyAssistant,  // old fixed-column API
         parseTSVRow:               parseTSVRow,               // generic TSV API
         applyRowTemplate:          applyRowTemplate,          // generic TSV API
         wrapCommand:               wrapCommand,
         // expose internals for testing
-        _escapeLatex:  escapeLatex,
-        _isGramGloss:  isGramGloss,
-        _wrapGlosses:  wrapGlosses,
-        _massageLine:  massageLine
+        _escapeLatex:     escapeLatex,
+        _isGramGloss:     isGramGloss,
+        _wrapGlosses:     wrapGlosses,
+        _massageLine:     massageLine
     };
 }));
