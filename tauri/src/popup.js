@@ -99,6 +99,14 @@ function showShortcutMsg(msgEl, text) {
     setTimeout(function () { if (msgEl.textContent === text) msgEl.textContent = ''; }, 4000);
 }
 
+function updateShortcutWarning() {
+    var hasAny = !!(document.getElementById('flex-shortcut').value ||
+                    document.getElementById('flex-tsv-shortcut').value ||
+                    profiles.some(function (p) { return p.shortcut; }));
+    var warn = document.getElementById('shortcut-warning');
+    if (warn) warn.style.display = hasAny ? 'none' : '';
+}
+
 function clearShortcutForId(id) {
     if (id === 'flex') {
         applyShortcutValue(document.getElementById('flex-shortcut'), '');
@@ -163,11 +171,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // FLEx config
         var fc = data['lingtex-flex-config'] || {};
-        if (fc.glCmd        !== undefined) document.getElementById('flex-gl').value       = fc.glCmd;
-        if (fc.wrapExe      !== undefined) document.getElementById('flex-wrap-exe').value = fc.wrapExe ? 'yes' : 'no';
-        if (fc.txtrefCmd    !== undefined) document.getElementById('flex-txtref').value   = fc.txtrefCmd;
-        if (fc.txtrefPrefix !== undefined) document.getElementById('flex-txtpfx').value   = fc.txtrefPrefix;
-        applyShortcutValue(document.getElementById('flex-shortcut'), fc.shortcut);
+        if (fc.glCmd        !== undefined) document.getElementById('flex-gl').value          = fc.glCmd;
+        if (fc.glossCase    !== undefined) document.getElementById('flex-gloss-case').value = fc.glossCase;
+        if (fc.formCmd      !== undefined) document.getElementById('flex-form-cmd').value   = fc.formCmd;
+        if (fc.wrapExe      !== undefined) document.getElementById('flex-wrap-exe').value   = fc.wrapExe ? 'yes' : 'no';
+        if (fc.txtrefCmd    !== undefined) document.getElementById('flex-txtref').value     = fc.txtrefCmd;
+        if (fc.txtrefPrefix !== undefined) document.getElementById('flex-txtpfx').value     = fc.txtrefPrefix;
+        // Default FLEx shortcut on first install; respect explicit blank if user cleared it
+        var flexShortcut = fc.shortcut !== undefined ? fc.shortcut : 'Ctrl+Shift+V';
+        applyShortcutValue(document.getElementById('flex-shortcut'), flexShortcut);
+        if (fc.shortcut === undefined) {
+            saveFLExConfig();
+            tauriRegisterShortcut('flex', flexShortcut);
+        }
 
         // FLEx TSV config
         var ftc = data['lingtex-flex-tsv-config'] || {};
@@ -178,6 +194,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         attachStaticListeners();
         initTauri();
+        updateShortcutWarning();
     });
 });
 
@@ -201,10 +218,10 @@ function attachStaticListeners() {
 
     document.getElementById('tab-add-btn').addEventListener('click', addProfile);
 
-    ['flex-gl', 'flex-wrap-exe', 'flex-txtref', 'flex-txtpfx'].forEach(function (id) {
+    ['flex-gl', 'flex-gloss-case', 'flex-form-cmd', 'flex-wrap-exe', 'flex-txtref', 'flex-txtpfx'].forEach(function (id) {
         var el = document.getElementById(id);
-        if (el) el.addEventListener('input',  function () { saveFLExConfig(); convertFlex(); });
-        if (el) el.addEventListener('change', function () { saveFLExConfig(); convertFlex(); });
+        if (el) el.addEventListener('input',  function () { saveFLExConfig(); convertFlex(); if (id === 'flex-gloss-case') convertFlexTSV(); });
+        if (el) el.addEventListener('change', function () { saveFLExConfig(); convertFlex(); if (id === 'flex-gloss-case') convertFlexTSV(); });
     });
 
     var flexScInput = document.getElementById('flex-shortcut');
@@ -217,10 +234,12 @@ function attachStaticListeners() {
         checkAndHandleDuplicateShortcut(sc, 'flex', flexScMsg);
         applyShortcutValue(flexScInput, sc);
         saveFLExConfig();
+        updateShortcutWarning();
         tauriRegisterShortcut('flex', sc, function () {
             showShortcutMsg(flexScMsg, '\u26a0 OS rejected this shortcut — try another combo');
             applyShortcutValue(flexScInput, '');
             saveFLExConfig();
+            updateShortcutWarning();
         });
         flexScInput.blur();
     });
@@ -228,6 +247,7 @@ function attachStaticListeners() {
         applyShortcutValue(flexScInput, '');
         saveFLExConfig();
         tauriRegisterShortcut('flex', '');
+        updateShortcutWarning();
     });
 
     document.getElementById('flex-in').addEventListener('input', convertFlex);
@@ -251,10 +271,12 @@ function attachStaticListeners() {
         checkAndHandleDuplicateShortcut(sc, 'flex-tsv', flexTsvScMsg);
         applyShortcutValue(flexTsvScInput, sc);
         saveFlexTSVConfig();
+        updateShortcutWarning();
         tauriRegisterShortcut('flex-tsv', sc, function () {
             showShortcutMsg(flexTsvScMsg, '\u26a0 OS rejected this shortcut — try another combo');
             applyShortcutValue(flexTsvScInput, '');
             saveFlexTSVConfig();
+            updateShortcutWarning();
         });
         flexTsvScInput.blur();
     });
@@ -262,6 +284,7 @@ function attachStaticListeners() {
         applyShortcutValue(flexTsvScInput, '');
         saveFlexTSVConfig();
         tauriRegisterShortcut('flex-tsv', '');
+        updateShortcutWarning();
     });
 
     // FLEx TSV test input
@@ -299,7 +322,9 @@ function attachStaticListeners() {
                     applyShortcutValue(e.target, '');
                     p.shortcut = '';
                     saveProfiles();
+                    updateShortcutWarning();
                 });
+                updateShortcutWarning();
             }
         }
         e.target.blur();
@@ -333,6 +358,7 @@ function attachStaticListeners() {
             var scInput = btn.closest('.shortcut-row').querySelector('.shortcut-input');
             if (scInput) applyShortcutValue(scInput, '');
             var p = getProfile(pid); if (p) { p.shortcut = ''; saveProfiles(); tauriRegisterShortcut(pid, ''); }
+            updateShortcutWarning();
         }
     });
 }
@@ -348,6 +374,8 @@ function saveFLExConfig() {
     storageSet({
         'lingtex-flex-config': {
             glCmd:        document.getElementById('flex-gl').value.trim(),
+            glossCase:    document.getElementById('flex-gloss-case').value,
+            formCmd:      document.getElementById('flex-form-cmd').value.trim(),
             wrapExe:      document.getElementById('flex-wrap-exe').value === 'yes',
             txtrefCmd:    document.getElementById('flex-txtref').value.trim(),
             txtrefPrefix: document.getElementById('flex-txtpfx').value,
@@ -657,6 +685,8 @@ function convertFlex() {
         }
         var latex = LingTeXCore.renderFLExAuto(blocks, {
             glCmd:        document.getElementById('flex-gl').value.trim(),
+            glossCase:    document.getElementById('flex-gloss-case').value,
+            formCmd:      document.getElementById('flex-form-cmd').value.trim(),
             wrapExe:      document.getElementById('flex-wrap-exe').value === 'yes',
             txtrefCmd:    document.getElementById('flex-txtref').value.trim(),
             txtrefPrefix: document.getElementById('flex-txtpfx').value
@@ -690,7 +720,9 @@ function convertFlexTSV() {
             setStatus('flex-tsv', 'No recognisable interlinear tiers found.', 'err');
             return;
         }
-        var tsv = LingTeXCore.renderFLExTSVAuto(blocks);
+        var tsv = LingTeXCore.renderFLExTSVAuto(blocks, {
+            glossCase: document.getElementById('flex-gloss-case').value
+        });
         outEl.value = tsv;
         var msg = blocks.length > 1
             ? 'Converted ' + blocks.length + ' blocks'
@@ -855,6 +887,8 @@ function syncConfigWithTauri() {
     if (!window.__TAURI__) return;
     var flexOpts = {
         glCmd:        document.getElementById('flex-gl').value.trim(),
+        glossCase:    document.getElementById('flex-gloss-case').value,
+        formCmd:      document.getElementById('flex-form-cmd').value.trim(),
         wrapExe:      document.getElementById('flex-wrap-exe').value === 'yes',
         txtrefCmd:    document.getElementById('flex-txtref').value.trim(),
         txtrefPrefix: document.getElementById('flex-txtpfx').value

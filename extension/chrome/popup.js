@@ -19,9 +19,10 @@ var DEFAULT_PROFILES = [
 ];
 
 var profiles    = DEFAULT_PROFILES.map(cloneProfile);
+var activeMode  = 'latex';
 var activePanel = 'flex';
 
-// ── Shortcut helper (shared with content.js logic) ────────────────────────────
+// ── Shortcut helpers ──────────────────────────────────────────────────────────
 
 function shortcutFromEvent(e) {
     var key = e.key;
@@ -38,6 +39,60 @@ function shortcutFromEvent(e) {
 function applyShortcutValue(input, value) {
     input.value = value || '';
     input.classList.toggle('has-value', !!value);
+}
+
+function getAllShortcutBindings() {
+    var out = [];
+    var fs = document.getElementById('flex-shortcut');
+    if (fs && fs.value) out.push({ id: 'flex',     label: 'FLEx Interlinear', sc: fs.value });
+    var fts = document.getElementById('flex-tsv-shortcut');
+    if (fts && fts.value) out.push({ id: 'flex-tsv', label: 'FLEx → Table',  sc: fts.value });
+    profiles.forEach(function (p) {
+        if (p.shortcut) out.push({ id: p.id, label: p.name, sc: p.shortcut });
+    });
+    return out;
+}
+
+function showShortcutMsg(msgEl, text) {
+    if (!msgEl) return;
+    msgEl.textContent = text;
+    setTimeout(function () { if (msgEl.textContent === text) msgEl.textContent = ''; }, 4000);
+}
+
+function updateShortcutWarning() {
+    var hasAny = !!(document.getElementById('flex-shortcut').value ||
+                    document.getElementById('flex-tsv-shortcut').value ||
+                    profiles.some(function (p) { return p.shortcut; }));
+    var warn = document.getElementById('shortcut-warning');
+    if (warn) warn.style.display = hasAny ? 'none' : '';
+}
+
+function clearShortcutForId(id) {
+    if (id === 'flex') {
+        applyShortcutValue(document.getElementById('flex-shortcut'), '');
+        saveFLExConfig();
+    } else if (id === 'flex-tsv') {
+        applyShortcutValue(document.getElementById('flex-tsv-shortcut'), '');
+        saveFlexTSVConfig();
+    } else {
+        var p = getProfile(id);
+        if (p) { p.shortcut = ''; saveProfiles(); }
+        var panel = document.getElementById('panel-' + id);
+        if (panel) {
+            var scIn = panel.querySelector('[data-action="shortcut"]');
+            if (scIn) applyShortcutValue(scIn, '');
+        }
+    }
+}
+
+function checkAndHandleDuplicateShortcut(newSc, currentId, msgEl) {
+    var conflict = null;
+    getAllShortcutBindings().forEach(function (b) {
+        if (b.sc === newSc && b.id !== currentId) conflict = b;
+    });
+    if (!conflict) return;
+    clearShortcutForId(conflict.id);
+    showShortcutMsg(msgEl, '\u26a0 Removed from ' + conflict.label);
 }
 
 // ── Storage helpers ───────────────────────────────────────────────────────────
@@ -61,37 +116,58 @@ document.addEventListener('DOMContentLoaded', function () {
             profiles = data['lingtex-profiles'];
         }
 
-        // Active panel — read stored value, then write it back so the
-        // content script is always in sync with the popup's current state.
+        // Active mode and panel
         if (data['lingtex-active-profile']) {
             activePanel = data['lingtex-active-profile'];
+        }
+        if (data['lingtex-active-mode']) {
+            activeMode = data['lingtex-active-mode'];
+        } else if (activePanel === 'flex-tsv') {
+            // Migrate: old stored panel was the TSV tab — move it to TSV mode
+            activeMode  = 'tsv';
+            activePanel = 'flex';
         }
         storageSet({ 'lingtex-active-profile': activePanel });
 
         // FLEx config
         var fc = data['lingtex-flex-config'] || {};
-        if (fc.glCmd        !== undefined) document.getElementById('flex-gl').value       = fc.glCmd;
-        if (fc.wrapExe      !== undefined) document.getElementById('flex-wrap-exe').value = fc.wrapExe ? 'yes' : 'no';
-        if (fc.txtrefCmd    !== undefined) document.getElementById('flex-txtref').value   = fc.txtrefCmd;
-        if (fc.txtrefPrefix !== undefined) document.getElementById('flex-txtpfx').value   = fc.txtrefPrefix;
-        applyShortcutValue(document.getElementById('flex-shortcut'), fc.shortcut);
+        if (fc.glCmd        !== undefined) document.getElementById('flex-gl').value          = fc.glCmd;
+        if (fc.glossCase    !== undefined) document.getElementById('flex-gloss-case').value = fc.glossCase;
+        if (fc.formCmd      !== undefined) document.getElementById('flex-form-cmd').value   = fc.formCmd;
+        if (fc.wrapExe      !== undefined) document.getElementById('flex-wrap-exe').value   = fc.wrapExe ? 'yes' : 'no';
+        if (fc.txtrefCmd    !== undefined) document.getElementById('flex-txtref').value     = fc.txtrefCmd;
+        if (fc.txtrefPrefix !== undefined) document.getElementById('flex-txtpfx').value     = fc.txtrefPrefix;
+        // Default FLEx shortcut on first install; respect explicit blank if user cleared it
+        var flexShortcut = fc.shortcut !== undefined ? fc.shortcut : 'Ctrl+Shift+V';
+        applyShortcutValue(document.getElementById('flex-shortcut'), flexShortcut);
+        if (fc.shortcut === undefined) saveFLExConfig();
+
+        // FLEx TSV config
+        var ftc = data['lingtex-flex-tsv-config'] || {};
+        applyShortcutValue(document.getElementById('flex-tsv-shortcut'), ftc.shortcut);
 
         renderAll();
-
-        // Activate stored panel (or default to flex)
-        if (activePanel === 'flex' || !document.getElementById('panel-' + activePanel)) {
-            activePanel = 'flex';
-        } else {
-            activatePanel(activePanel);
-        }
+        switchMode(activeMode);
 
         attachStaticListeners();
+        updateShortcutWarning();
     });
 });
 
 // ── Static event listeners (attached once after DOMContentLoaded) ─────────────
 
 function attachStaticListeners() {
+
+    // Mode buttons
+    document.getElementById('mode-latex').addEventListener('click', function () {
+        switchMode('latex');
+    });
+    document.getElementById('mode-tsv').addEventListener('click', function () {
+        switchMode('tsv');
+    });
+    document.getElementById('mode-xlingpaper').addEventListener('click', function () {
+        switchMode('xlingpaper');
+    });
 
     // Tab: FLEx
     document.getElementById('tab-flex').addEventListener('click', function () {
@@ -102,27 +178,31 @@ function attachStaticListeners() {
     document.getElementById('tab-add-btn').addEventListener('click', addProfile);
 
     // FLEx config inputs → persist + re-convert test area
-    ['flex-gl', 'flex-wrap-exe', 'flex-txtref', 'flex-txtpfx'].forEach(function (id) {
+    ['flex-gl', 'flex-gloss-case', 'flex-form-cmd', 'flex-wrap-exe', 'flex-txtref', 'flex-txtpfx'].forEach(function (id) {
         var el = document.getElementById(id);
-        if (el) el.addEventListener('input',  function () { saveFLExConfig(); convertFlex(); });
-        if (el) el.addEventListener('change', function () { saveFLExConfig(); convertFlex(); });
+        if (el) el.addEventListener('input',  function () { saveFLExConfig(); convertFlex(); if (id === 'flex-gloss-case') convertFlexTSV(); });
+        if (el) el.addEventListener('change', function () { saveFLExConfig(); convertFlex(); if (id === 'flex-gloss-case') convertFlexTSV(); });
     });
 
     // FLEx shortcut input — capture keydown so the pressed keys are recorded,
     // not typed into the field
     var flexScInput = document.getElementById('flex-shortcut');
+    var flexScMsg   = document.getElementById('flex-shortcut-msg');
     flexScInput.addEventListener('keydown', function (e) {
         e.preventDefault();
         e.stopImmediatePropagation();
         var sc = shortcutFromEvent(e);
         if (!sc) return;
+        checkAndHandleDuplicateShortcut(sc, 'flex', flexScMsg);
         applyShortcutValue(flexScInput, sc);
         saveFLExConfig();
+        updateShortcutWarning();
         flexScInput.blur();
     });
     document.getElementById('flex-shortcut-clear').addEventListener('click', function () {
         applyShortcutValue(flexScInput, '');
         saveFLExConfig();
+        updateShortcutWarning();
     });
 
     // FLEx test input
@@ -138,6 +218,39 @@ function attachStaticListeners() {
         copyOutput('flex-out', this);
     });
 
+    // FLEx TSV shortcut input
+    var flexTsvScInput = document.getElementById('flex-tsv-shortcut');
+    var flexTsvScMsg   = document.getElementById('flex-tsv-shortcut-msg');
+    flexTsvScInput.addEventListener('keydown', function (e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        var sc = shortcutFromEvent(e);
+        if (!sc) return;
+        checkAndHandleDuplicateShortcut(sc, 'flex-tsv', flexTsvScMsg);
+        applyShortcutValue(flexTsvScInput, sc);
+        saveFlexTSVConfig();
+        updateShortcutWarning();
+        flexTsvScInput.blur();
+    });
+    document.getElementById('flex-tsv-shortcut-clear').addEventListener('click', function () {
+        applyShortcutValue(flexTsvScInput, '');
+        saveFlexTSVConfig();
+        updateShortcutWarning();
+    });
+
+    // FLEx TSV test input
+    document.getElementById('flex-tsv-in').addEventListener('input', convertFlexTSV);
+
+    // FLEx TSV clear button
+    document.getElementById('flex-tsv-clear-btn').addEventListener('click', function () {
+        clearTool('flex-tsv');
+    });
+
+    // FLEx TSV copy button
+    document.getElementById('flex-tsv-copy-btn').addEventListener('click', function () {
+        copyOutput('flex-tsv-out', this);
+    });
+
     // Event delegation for dynamically generated TSV panels
     var main = document.getElementById('main-content');
 
@@ -147,9 +260,12 @@ function attachStaticListeners() {
         e.stopImmediatePropagation();
         var sc = shortcutFromEvent(e);
         if (!sc) return;
+        var pid   = pidOf(e.target);
+        var msgEl = e.target.parentElement.querySelector('.shortcut-msg');
+        checkAndHandleDuplicateShortcut(sc, pid, msgEl);
         applyShortcutValue(e.target, sc);
-        var pid = pidOf(e.target);
         if (pid) { var p = getProfile(pid); if (p) { p.shortcut = sc; saveProfiles(); } }
+        updateShortcutWarning();
         e.target.blur();
     });
 
@@ -181,6 +297,7 @@ function attachStaticListeners() {
             var scInput = btn.closest('.shortcut-row').querySelector('.shortcut-input');
             if (scInput) applyShortcutValue(scInput, '');
             var p = getProfile(pid); if (p) { p.shortcut = ''; saveProfiles(); }
+            updateShortcutWarning();
         }
     });
 }
@@ -196,12 +313,55 @@ function saveFLExConfig() {
     storageSet({
         'lingtex-flex-config': {
             glCmd:        document.getElementById('flex-gl').value.trim(),
+            glossCase:    document.getElementById('flex-gloss-case').value,
+            formCmd:      document.getElementById('flex-form-cmd').value.trim(),
             wrapExe:      document.getElementById('flex-wrap-exe').value === 'yes',
             txtrefCmd:    document.getElementById('flex-txtref').value.trim(),
             txtrefPrefix: document.getElementById('flex-txtpfx').value,
             shortcut:     document.getElementById('flex-shortcut').value
         }
     });
+}
+
+function saveFlexTSVConfig() {
+    storageSet({
+        'lingtex-flex-tsv-config': {
+            shortcut: document.getElementById('flex-tsv-shortcut').value
+        }
+    });
+}
+
+// ── Mode switching ────────────────────────────────────────────────────────────
+
+function switchMode(mode) {
+    activeMode = mode;
+    storageSet({ 'lingtex-active-mode': mode });
+
+    document.querySelectorAll('.mode-btn').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.mode === mode);
+    });
+
+    var tabNav = document.getElementById('tab-nav');
+    tabNav.style.display = (mode === 'latex') ? '' : 'none';
+
+    if (mode === 'latex') {
+        // Ensure the stored latex panel is valid
+        if (!activePanel || activePanel === 'flex-tsv' ||
+                !document.getElementById('panel-' + activePanel)) {
+            activePanel = 'flex';
+        }
+        switchTab(activePanel);
+    } else {
+        // Deactivate all inner tabs
+        document.querySelectorAll('.tab').forEach(function (b) {
+            b.classList.remove('active');
+        });
+        // Show the mode's panel
+        var targetId = (mode === 'tsv') ? 'panel-flex-tsv' : 'panel-' + mode;
+        document.querySelectorAll('.panel').forEach(function (p) {
+            p.classList.toggle('active', p.id === targetId);
+        });
+    }
 }
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
@@ -341,6 +501,7 @@ function buildPanelHTML(p) {
         '          data-action="shortcut" placeholder="Click, then press keys…" readonly' +
         '          value="' + escHtml(p.shortcut || '') + '">' +
         '        <button class="btn btn-ghost" data-action="clear-shortcut" title="Clear shortcut">✕</button>' +
+        '        <span class="shortcut-msg"></span>' +
         '      </div>' +
         '    </div>' +
         '    <div class="cfg-hint">' +
@@ -468,12 +629,14 @@ function convertFlex() {
         }
         var latex = LingTeXCore.renderFLExAuto(blocks, {
             glCmd:        document.getElementById('flex-gl').value.trim(),
+            glossCase:    document.getElementById('flex-gloss-case').value,
+            formCmd:      document.getElementById('flex-form-cmd').value.trim(),
             wrapExe:      document.getElementById('flex-wrap-exe').value === 'yes',
             txtrefCmd:    document.getElementById('flex-txtref').value.trim(),
             txtrefPrefix: document.getElementById('flex-txtpfx').value
         });
         outEl.value = latex;
-        var words = (blocks[0].lineArrays[0] || []).length - 1;
+        var words = (blocks[0].colArrays[0] || []).length - 1;
         var msg = blocks.length > 1
             ? 'Converted ' + blocks.length + ' blocks'
             : 'Converted ' + words + ' word(s)';
@@ -481,6 +644,37 @@ function convertFlex() {
     } catch (e) {
         outEl.value = '';
         setStatus('flex', 'Error: ' + e.message, 'err');
+    }
+}
+
+function convertFlexTSV() {
+    var raw    = document.getElementById('flex-tsv-in').value;
+    var outEl  = document.getElementById('flex-tsv-out');
+
+    if (!raw.trim()) {
+        outEl.value = '';
+        setStatus('flex-tsv', '', '');
+        return;
+    }
+
+    try {
+        var blocks = LingTeXCore.parseFLExBlocks(raw);
+        if (!blocks.length) {
+            outEl.value = '';
+            setStatus('flex-tsv', 'No recognisable interlinear tiers found.', 'err');
+            return;
+        }
+        var tsv = LingTeXCore.renderFLExTSVAuto(blocks, {
+            glossCase: document.getElementById('flex-gloss-case').value
+        });
+        outEl.value = tsv;
+        var msg = blocks.length > 1
+            ? 'Converted ' + blocks.length + ' blocks'
+            : 'Converted ' + ((blocks[0].colArrays[0] || []).length - 1) + ' word(s)';
+        setStatus('flex-tsv', msg, 'ok');
+    } catch (e) {
+        outEl.value = '';
+        setStatus('flex-tsv', 'Error: ' + e.message, 'err');
     }
 }
 
@@ -570,15 +764,15 @@ function setStatus(id, msg, cls) {
 }
 
 function clearTool(id) {
-    var panel = id === 'flex'
-        ? document.getElementById('panel-flex')
+    var panel = (id === 'flex' || id === 'flex-tsv')
+        ? document.getElementById('panel-' + id)
         : document.getElementById('panel-' + id);
     if (!panel) return;
 
-    var inEl  = id === 'flex'
-        ? document.getElementById('flex-in')
+    var inEl  = (id === 'flex' || id === 'flex-tsv')
+        ? document.getElementById(id + '-in')
         : panel.querySelector('[data-action="test-in"]');
-    var outEl = document.getElementById(id + '-out') || document.getElementById('flex-out');
+    var outEl = document.getElementById(id + '-out');
     var errEl = document.getElementById(id + '-errbox');
 
     if (inEl)  inEl.value  = '';
