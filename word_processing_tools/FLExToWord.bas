@@ -2,25 +2,43 @@ Attribute VB_Name = "FLExToWord"
 Option Explicit
 
 '=============================================================================
-' FLExToWord.bas  —  Word VBA port of the LibreOffice FLExTextToFrames macro
-' Original LibreOffice macro by Moss Doerksen
+' FLExToWord.bas  —  Word VBA macro for interlinear glossed text (IGT)
+' Original LibreOffice macro by Moss Doerksen; Word port by Seth J
 '
-' Converts FLEx interlinear clipboard text into OMML nested-matrix frames,
-' one per WORD.  The logic is identical to the LO macro; the only difference
-' is the output: OMML matrices instead of LibreOffice inline text frames.
+' Converts FLEx interlinear clipboard text into Word equation (OMath) frames,
+' one per word.  Uses the Word OMath object model directly — no XML generation.
 '
-' Word-level architecture (same as LO macro):
+' Architecture:
 '   • Morphemes are COLLAPSED into words  (kata░=░te  →  kata=te)
 '   • Gloss dividers are assembled inline  (carry.CMP + = + SEQ  →  carry.CMP=SEQ)
-'   • Each word → one <m:oMath>  containing a 1-column inner matrix
-'   • Rows of the inner matrix = tiers (vernacular, gloss, wordcat, …)
+'   • Each word → one OMath zone containing a T-row × 1-col matrix
+'   • Rows = tiers (vernacular, gloss, wordcat, …)
 '
-' Per-cell formatting (identical to LO macro output):
-'   Row 0  object language  italic, surrounding font
-'   Row 1+ gloss / other    small caps on grammatical tokens, surrounding font
+' Per-cell formatting:
+'   Row 0  object language  italic, document font
+'   Row 1+ gloss / other    upright; grammatical tokens (ALLCAPS/digit-initial)
+'                           stored lowercase and displayed via small caps
 '
-' Install:  Alt+F11 → Insert → Module → paste this file
-' Run:      Select FLEx-copied interlinear text → run FLExTextToWord
+' ── INSTALLATION ─────────────────────────────────────────────────────────────
+'
+' OPTION A — Import the .bas file directly (recommended):
+'   1. In Word, open the VBA IDE:  Alt+F11
+'   2. File → Import File…  and select FLExToWord.bas
+'   The module will be created and named automatically.
+'   The "Attribute VB_Name" line at the top of this file is read by the
+'   importer and must NOT be pasted into the code editor manually.
+'
+' OPTION B — Copy and paste:
+'   1. In Word, open the VBA IDE:  Alt+F11
+'   2. Insert → Module  to create a new module
+'   3. In the Properties pane (F4), set the module Name to:  FLExToWord
+'   4. Paste the contents of this file into the module, but OMIT the first
+'      line ("Attribute VB_Name = ...") — it causes a compile error when
+'      entered directly in the code editor.
+'
+' ── RUNNING ──────────────────────────────────────────────────────────────────
+'   Select FLEx-copied interlinear text in your document, then run
+'   FLExTextToWord via the Macros dialog (Alt+F8) or a toolbar button.
 '=============================================================================
 
 ' ── Paragraph style for free translation (must exist in your Word template) ─
@@ -34,23 +52,22 @@ Private Const STYLE_FREE_TRANS  As String = "Ex. Trans."
 Private Const FALLBACK_FONT     As String = "Charis SIL"
 
 ' ── Internal parsing constants (identical to LO macro) ──────────────────────
-' ░ U+2591: sentinel inserted around morpheme dividers by MassageFLExLine
-Private Const MORPH_SEP         As String = Chr(9601)
+' ▁ U+2581 — MORPH_SEP: sentinel inserted around morpheme dividers by MassageFLExLine
+'   Defined as Property Get below (VBA Const cannot use ChrW(), a runtime function)
 ' Characters that serve as morpheme dividers in the source data
 Private Const MORPH_DIVIDERS    As String = "-<>=~"
 ' Valid FLEx line-type labels (same set as LO macro)
 Private Const VALID_TYPES       As String = "/Word/WordGloss/Morphemes/LexEntries/LexGloss/WordCat/"
 
-' ── OMML matrix properties (matches FLEx Word export document format) ────────
-Private Const M_PROPS_1COL      As String = _
-    "<m:mPr><m:baseJc m:val=""top""/><m:rSpRule m:val=""4""/><m:rSp m:val=""3""/>" & _
-    "<m:mcs><m:mc><m:mcPr><m:count m:val=""1""/><m:mcJc m:val=""left""/>" & _
-    "</m:mcPr></m:mc></m:mcs></m:mPr>"
-
 ' ── Grammatical gloss detection (mirrors LO grammaticalGlossRegex) ───────────
 ' Tokens are grammatical if they are ALL-CAPS (with optional digits/punctuation)
 ' or digit-initial (3sg, 1pl).  Single capital letter is excluded.
 
+
+' ── MORPH_SEP property (replaces Const — ChrW() is not allowed in Const) ────
+Private Property Get MORPH_SEP() As String
+    MORPH_SEP = ChrW(9601)   ' ▁ U+2581 LOWER ONE EIGHTH BLOCK
+End Property
 
 '=============================================================================
 ' ── PUBLIC ENTRY POINTS ──────────────────────────────────────────────────────
@@ -106,11 +123,22 @@ Public Sub FLExTextToWord()
         wordArrays(0) = fl
     End If
 
-    ' Build the OMML paragraph XML and replace the selection
-    Dim paraXML As String
-    paraXML = BuildParagraphXML(wordArrays, lineTypes, morphWordArr, glossWordArr, _
-                                hasLexGloss, targetFont)
-    Selection.Range.InsertXML paraXML
+    ' Delete the selected FLEx text, preserving one empty paragraph.
+    ' Exclude the last paragraph mark so the paragraph shell remains.
+    Dim replaceRng As Range
+    Set replaceRng = Selection.Range
+    replaceRng.Start = replaceRng.Paragraphs(1).Range.Start
+    replaceRng.End   = replaceRng.Paragraphs(replaceRng.Paragraphs.Count).Range.End - 1
+    Dim insertStart As Long
+    insertStart = replaceRng.Start
+    replaceRng.Delete
+
+    ' Insert one OMath equation zone per word at the now-empty paragraph
+    Dim insertPt As Range
+    Set insertPt = ActiveDocument.Range(insertStart, insertStart)
+
+    Call InsertIGTEquations(wordArrays, lineTypes, morphWordArr, glossWordArr, _
+                            hasLexGloss, targetFont, insertPt)
 
     ' Insert free translation line(s) after the IGT paragraph
     If UBound(freeLines) >= 0 Then
@@ -184,8 +212,8 @@ Private Function NormalizeText(s As String) As String
     s = Replace(s, Chr(13) & Chr(10), Chr(13))
     s = Replace(s, Chr(10), Chr(13))
     s = Replace(s, Chr(9), " ")
-    s = Replace(s, Chr(8206), "")   ' U+200E LEFT-TO-RIGHT MARK
-    s = Replace(s, Chr(8207), "")   ' U+200F RIGHT-TO-LEFT MARK
+    s = Replace(s, ChrW(8206), "")   ' U+200E LEFT-TO-RIGHT MARK
+    s = Replace(s, ChrW(8207), "")   ' U+200F RIGHT-TO-LEFT MARK
 
     Dim i As Integer
     For i = 1 To 6
@@ -241,7 +269,7 @@ Private Sub SeparateFreeLines(allLines() As String, _
         If Left(allLines(i), 4) = "Free" Then
             Dim freeText As String
             freeText = Trim(Mid(allLines(i), 5))
-            freeLines(freeN) = Chr(8216) & freeText & Chr(8217)   ' ' … '
+            freeLines(freeN) = ChrW(8216) & freeText & ChrW(8217)   ' ' … '
             freeN = freeN + 1
         Else
             igtLines(igtN) = MassageFLExLine(allLines(i))
@@ -286,9 +314,9 @@ Private Function MassageFLExLine(s As String) As String
     body = Replace(body, " !", "!")  : body = Replace(body, " :", ":")
     body = Replace(body, " ;", ";")  : body = Replace(body, "( ", "(")
     body = Replace(body, " )", ")")  : body = Replace(body, "[ ", "[")
-    body = Replace(body, " ]", "]")  : body = Replace(body, Chr(34) & " ", Chr(8220))
-    body = Replace(body, Chr(8220) & " ", Chr(8220))
-    body = Replace(body, "' ", Chr(8216)) : body = Replace(body, Chr(8216) & " ", Chr(8216))
+    body = Replace(body, " ]", "]")  : body = Replace(body, Chr(34) & " ", ChrW(8220))
+    body = Replace(body, ChrW(8220) & " ", ChrW(8220))
+    body = Replace(body, "' ", ChrW(8216)) : body = Replace(body, ChrW(8216) & " ", ChrW(8216))
 
     MassageFLExLine = lbl & body
 End Function
@@ -372,22 +400,19 @@ End Function
 
 Private Function BuildParagraphXML(wordArrays(), lineTypes() As String, _
         morphWordArr() As String, glossWordArr() As String, _
-        hasLexGloss As Boolean, fontName As String) As String
+        hasLexGloss As Boolean, fontName As String) As String()
     '
-    ' Builds a <w:body><w:p>…</w:p></w:body> string ready for Range.InsertXML.
-    ' One <m:oMath> per word, separated by ordinary Word spaces.
-    ' Mirrors LO FLExTextToFrames: one frame per word, all tiers stacked.
+    ' Returns a 1-based String() array — one <m:oMath>…</m:oMath> per word.
+    ' FLExTextToWord inserts each into an OMath zone via OMaths.Add + InsertXML.
+    ' FLExTextToWord_DebugXML assembles them into a paragraph via AssembleParaXML.
     '
-    Const NS As String = _
-        "xmlns:w=""http://schemas.openxmlformats.org/wordprocessingml/2006/main"" " & _
-        "xmlns:m=""http://schemas.openxmlformats.org/officeDocument/2006/math"""
-
     Dim firstLine() As String
     firstLine = wordArrays(0)
     Dim numWords As Integer
     numWords = UBound(firstLine)   ' index 0 = line-type label; words start at 1
 
-    Dim body           As String
+    Dim words()        As String
+    ReDim words(1 To numWords)
     Dim lexGlossOffset As Integer
     Dim missingText    As Boolean
     Dim missingGlosses As Boolean
@@ -395,11 +420,6 @@ Private Function BuildParagraphXML(wordArrays(), lineTypes() As String, _
 
     Dim w As Integer
     For w = 1 To numWords
-
-        ' Space between equation frames (plain Word run, not inside oMath)
-        If w > 1 Then
-            body = body & WRun(" ", fontName)
-        End If
 
         ' Check for floating punctuation on first line (LO handles this too)
         Dim firstLineWord As String
@@ -491,13 +511,13 @@ Private Function BuildParagraphXML(wordArrays(), lineTypes() As String, _
         Next t
 
         ' ── Build the OMML matrix frame for this word ─────────────────────────
-        body = body & BuildWordOMath(tierValues, lineTypes, fontName)
+        words(w) = BuildWordOMath(tierValues, lineTypes, fontName)
     Next w
 
     If missingText    Then MsgBox "Some lines appear to be missing text.",   vbInformation
     If missingGlosses Then MsgBox "Some gloss lines appear to be incomplete.", vbInformation
 
-    BuildParagraphXML = "<w:body " & NS & "><w:p>" & body & "</w:p></w:body>"
+    BuildParagraphXML = words
 End Function
 
 
@@ -728,6 +748,36 @@ Private Function XmlEsc(s As String) As String
     s = Replace(s, "<", "&lt;")
     s = Replace(s, ">", "&gt;")
     XmlEsc = s
+End Function
+
+Private Function OMathToMatXML(oMathXML As String) As String
+    ' Strips the <m:oMath> wrapper from a BuildWordOMath result and adds
+    ' standalone namespace declarations to the root <m:m> element, making
+    ' it suitable for Range.InsertXML into an existing OMath zone's Range.
+    ' Input:  <m:oMath><m:m>...</m:m></m:oMath>
+    ' Output: <m:m xmlns:m="..." xmlns:w="...">...</m:m>
+    Const NS As String = _
+        " xmlns:m=""http://schemas.openxmlformats.org/officeDocument/2006/math""" & _
+        " xmlns:w=""http://schemas.openxmlformats.org/wordprocessingml/2006/main"""
+    ' <m:oMath> = 8 chars;  </m:oMath> = 9 chars  →  strip 17 chars total
+    Dim inner As String
+    inner = Mid(oMathXML, 9, Len(oMathXML) - 17)
+    OMathToMatXML = Replace(inner, "<m:m>", "<m:m" & NS & ">", 1, 1)
+End Function
+
+Private Function AssembleParaXML(wordXMLs() As String, fontName As String) As String
+    ' Assembles per-word <m:oMath> strings into a full <w:body> paragraph XML.
+    ' Used by FLExTextToWord_DebugXML to produce a string for inspection.
+    Const NS As String = _
+        "xmlns:w=""http://schemas.openxmlformats.org/wordprocessingml/2006/main"" " & _
+        "xmlns:m=""http://schemas.openxmlformats.org/officeDocument/2006/math"""
+    Dim body As String
+    Dim w As Integer
+    For w = LBound(wordXMLs) To UBound(wordXMLs)
+        If w > LBound(wordXMLs) Then body = body & WRun(" ", fontName)
+        body = body & wordXMLs(w)
+    Next w
+    AssembleParaXML = "<w:body " & NS & "><w:p>" & body & "</w:p></w:body>"
 End Function
 
 
