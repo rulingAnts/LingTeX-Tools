@@ -19,9 +19,10 @@ var DEFAULT_PROFILES = [
 ];
 
 var profiles    = DEFAULT_PROFILES.map(cloneProfile);
+var activeMode  = 'latex';
 var activePanel = 'flex';
 
-// ── Shortcut helper (shared with content.js logic) ────────────────────────────
+// ── Shortcut helpers ──────────────────────────────────────────────────────────
 
 function shortcutFromEvent(e) {
     var key = e.key;
@@ -38,6 +39,52 @@ function shortcutFromEvent(e) {
 function applyShortcutValue(input, value) {
     input.value = value || '';
     input.classList.toggle('has-value', !!value);
+}
+
+function getAllShortcutBindings() {
+    var out = [];
+    var fs = document.getElementById('flex-shortcut');
+    if (fs && fs.value) out.push({ id: 'flex',     label: 'FLEx Interlinear', sc: fs.value });
+    var fts = document.getElementById('flex-tsv-shortcut');
+    if (fts && fts.value) out.push({ id: 'flex-tsv', label: 'FLEx → Table',  sc: fts.value });
+    profiles.forEach(function (p) {
+        if (p.shortcut) out.push({ id: p.id, label: p.name, sc: p.shortcut });
+    });
+    return out;
+}
+
+function showShortcutMsg(msgEl, text) {
+    if (!msgEl) return;
+    msgEl.textContent = text;
+    setTimeout(function () { if (msgEl.textContent === text) msgEl.textContent = ''; }, 4000);
+}
+
+function clearShortcutForId(id) {
+    if (id === 'flex') {
+        applyShortcutValue(document.getElementById('flex-shortcut'), '');
+        saveFLExConfig();
+    } else if (id === 'flex-tsv') {
+        applyShortcutValue(document.getElementById('flex-tsv-shortcut'), '');
+        saveFlexTSVConfig();
+    } else {
+        var p = getProfile(id);
+        if (p) { p.shortcut = ''; saveProfiles(); }
+        var panel = document.getElementById('panel-' + id);
+        if (panel) {
+            var scIn = panel.querySelector('[data-action="shortcut"]');
+            if (scIn) applyShortcutValue(scIn, '');
+        }
+    }
+}
+
+function checkAndHandleDuplicateShortcut(newSc, currentId, msgEl) {
+    var conflict = null;
+    getAllShortcutBindings().forEach(function (b) {
+        if (b.sc === newSc && b.id !== currentId) conflict = b;
+    });
+    if (!conflict) return;
+    clearShortcutForId(conflict.id);
+    showShortcutMsg(msgEl, '\u26a0 Removed from ' + conflict.label);
 }
 
 // ── Storage helpers ───────────────────────────────────────────────────────────
@@ -61,10 +108,16 @@ document.addEventListener('DOMContentLoaded', function () {
             profiles = data['lingtex-profiles'];
         }
 
-        // Active panel — read stored value, then write it back so the
-        // content script is always in sync with the popup's current state.
+        // Active mode and panel
         if (data['lingtex-active-profile']) {
             activePanel = data['lingtex-active-profile'];
+        }
+        if (data['lingtex-active-mode']) {
+            activeMode = data['lingtex-active-mode'];
+        } else if (activePanel === 'flex-tsv') {
+            // Migrate: old stored panel was the TSV tab — move it to TSV mode
+            activeMode  = 'tsv';
+            activePanel = 'flex';
         }
         storageSet({ 'lingtex-active-profile': activePanel });
 
@@ -81,14 +134,7 @@ document.addEventListener('DOMContentLoaded', function () {
         applyShortcutValue(document.getElementById('flex-tsv-shortcut'), ftc.shortcut);
 
         renderAll();
-
-        // Activate stored panel (or default to flex)
-        if (activePanel === 'flex' || activePanel === 'flex-tsv' ||
-                !document.getElementById('panel-' + activePanel)) {
-            if (activePanel !== 'flex-tsv') activePanel = 'flex';
-        } else {
-            activatePanel(activePanel);
-        }
+        switchMode(activeMode);
 
         attachStaticListeners();
     });
@@ -98,14 +144,20 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function attachStaticListeners() {
 
+    // Mode buttons
+    document.getElementById('mode-latex').addEventListener('click', function () {
+        switchMode('latex');
+    });
+    document.getElementById('mode-tsv').addEventListener('click', function () {
+        switchMode('tsv');
+    });
+    document.getElementById('mode-xlingpaper').addEventListener('click', function () {
+        switchMode('xlingpaper');
+    });
+
     // Tab: FLEx
     document.getElementById('tab-flex').addEventListener('click', function () {
         switchTab('flex');
-    });
-
-    // Tab: FLEx TSV
-    document.getElementById('tab-flex-tsv').addEventListener('click', function () {
-        switchTab('flex-tsv');
     });
 
     // Add profile button
@@ -121,11 +173,13 @@ function attachStaticListeners() {
     // FLEx shortcut input — capture keydown so the pressed keys are recorded,
     // not typed into the field
     var flexScInput = document.getElementById('flex-shortcut');
+    var flexScMsg   = document.getElementById('flex-shortcut-msg');
     flexScInput.addEventListener('keydown', function (e) {
         e.preventDefault();
         e.stopImmediatePropagation();
         var sc = shortcutFromEvent(e);
         if (!sc) return;
+        checkAndHandleDuplicateShortcut(sc, 'flex', flexScMsg);
         applyShortcutValue(flexScInput, sc);
         saveFLExConfig();
         flexScInput.blur();
@@ -150,11 +204,13 @@ function attachStaticListeners() {
 
     // FLEx TSV shortcut input
     var flexTsvScInput = document.getElementById('flex-tsv-shortcut');
+    var flexTsvScMsg   = document.getElementById('flex-tsv-shortcut-msg');
     flexTsvScInput.addEventListener('keydown', function (e) {
         e.preventDefault();
         e.stopImmediatePropagation();
         var sc = shortcutFromEvent(e);
         if (!sc) return;
+        checkAndHandleDuplicateShortcut(sc, 'flex-tsv', flexTsvScMsg);
         applyShortcutValue(flexTsvScInput, sc);
         saveFlexTSVConfig();
         flexTsvScInput.blur();
@@ -186,8 +242,10 @@ function attachStaticListeners() {
         e.stopImmediatePropagation();
         var sc = shortcutFromEvent(e);
         if (!sc) return;
+        var pid   = pidOf(e.target);
+        var msgEl = e.target.parentElement.querySelector('.shortcut-msg');
+        checkAndHandleDuplicateShortcut(sc, pid, msgEl);
         applyShortcutValue(e.target, sc);
-        var pid = pidOf(e.target);
         if (pid) { var p = getProfile(pid); if (p) { p.shortcut = sc; saveProfiles(); } }
         e.target.blur();
     });
@@ -249,6 +307,39 @@ function saveFlexTSVConfig() {
             shortcut: document.getElementById('flex-tsv-shortcut').value
         }
     });
+}
+
+// ── Mode switching ────────────────────────────────────────────────────────────
+
+function switchMode(mode) {
+    activeMode = mode;
+    storageSet({ 'lingtex-active-mode': mode });
+
+    document.querySelectorAll('.mode-btn').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.mode === mode);
+    });
+
+    var tabNav = document.getElementById('tab-nav');
+    tabNav.style.display = (mode === 'latex') ? '' : 'none';
+
+    if (mode === 'latex') {
+        // Ensure the stored latex panel is valid
+        if (!activePanel || activePanel === 'flex-tsv' ||
+                !document.getElementById('panel-' + activePanel)) {
+            activePanel = 'flex';
+        }
+        switchTab(activePanel);
+    } else {
+        // Deactivate all inner tabs
+        document.querySelectorAll('.tab').forEach(function (b) {
+            b.classList.remove('active');
+        });
+        // Show the mode's panel
+        var targetId = (mode === 'tsv') ? 'panel-flex-tsv' : 'panel-' + mode;
+        document.querySelectorAll('.panel').forEach(function (p) {
+            p.classList.toggle('active', p.id === targetId);
+        });
+    }
 }
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
@@ -388,6 +479,7 @@ function buildPanelHTML(p) {
         '          data-action="shortcut" placeholder="Click, then press keys…" readonly' +
         '          value="' + escHtml(p.shortcut || '') + '">' +
         '        <button class="btn btn-ghost" data-action="clear-shortcut" title="Clear shortcut">✕</button>' +
+        '        <span class="shortcut-msg"></span>' +
         '      </div>' +
         '    </div>' +
         '    <div class="cfg-hint">' +
