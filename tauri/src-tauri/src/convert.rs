@@ -227,6 +227,130 @@ pub fn parse_flex_blocks(raw: &str) -> Vec<FlexParsed> {
         .collect()
 }
 
+// ── Word-grouping algorithm (tab-format columns) ──────────────────────────────
+
+#[derive(Debug, Clone)]
+struct Word {
+    form: String,
+    gloss_parts: Vec<String>,
+}
+
+/// Run the word-grouping algorithm on raw column arrays.
+/// Returns a vector of word objects with forms and gloss parts.
+fn group_words_from_columns(
+    morphemes: &[String],
+    lex_glosses: &[String],
+    start_idx: usize,
+) -> Vec<Word> {
+    let mut words: Vec<Word> = Vec::new();
+    let mut current_word: Option<Word> = None;
+    let n = morphemes.len();
+
+    for col in start_idx..n {
+        let m = morphemes.get(col).map(|s| s.trim()).unwrap_or("");
+        let g = lex_glosses.get(col).map(|s| s.trim()).unwrap_or("");
+
+        if !m.is_empty() {
+            // Non-empty morpheme
+            let first_char = m.chars().next().unwrap_or('\0');
+            let boundary = if MORPH_DIVS.contains(first_char) {
+                first_char.to_string()
+            } else {
+                String::new()
+            };
+            let suffix = if !boundary.is_empty() {
+                m[1..].to_string()
+            } else {
+                m.to_string()
+            };
+
+            if !boundary.is_empty() {
+                // Attach to current word (enclitic/suffix boundary)
+                if let Some(ref mut cw) = current_word {
+                    cw.form.push_str(&boundary);
+                    cw.form.push_str(&suffix);
+                    if !g.is_empty() {
+                        cw.gloss_parts.push(format!("{}{}", boundary, g));
+                    } else {
+                        cw.gloss_parts.push(boundary);
+                    }
+                }
+            } else {
+                // Start a new word
+                if let Some(cw) = current_word.take() {
+                    words.push(cw);
+                }
+                let mut word = Word {
+                    form: m.to_string(),
+                    gloss_parts: if !g.is_empty() {
+                        vec![g.to_string()]
+                    } else {
+                        Vec::new()
+                    },
+                };
+
+                // If direct gloss is empty, collect from following empty-morpheme columns
+                if g.is_empty() {
+                    let mut col_idx = col + 1;
+                    while col_idx < n
+                        && morphemes
+                            .get(col_idx)
+                            .map(|s| s.trim().is_empty())
+                            .unwrap_or(false)
+                    {
+                        let next_g = lex_glosses.get(col_idx).map(|s| s.trim()).unwrap_or("");
+                        if !next_g.is_empty() {
+                            word.gloss_parts.push(next_g.to_string());
+                        }
+                        col_idx += 1;
+                    }
+                }
+
+                current_word = Some(word);
+            }
+        } else {
+            // Empty morpheme: zero-morpheme standalone word slot
+            if let Some(cw) = current_word.take() {
+                words.push(cw);
+            }
+            if !g.is_empty() {
+                words.push(Word {
+                    form: String::new(),
+                    gloss_parts: vec![g.to_string()],
+                });
+            }
+        }
+    }
+
+    if let Some(cw) = current_word {
+        words.push(cw);
+    }
+    words
+}
+
+/// Special case: standalone punctuation (single char, empty gloss) appends
+/// to preceding word's form only, no gloss contribution.
+fn handle_standalone_punctuation(words: &mut Vec<Word>) {
+    let punct_chars = "\u{2026},:;.!?-\u{2012}\u{2013}\u{2014}\u{2015}/|&";
+    let mut i = 1;
+    while i < words.len() {
+        let w = &words[i];
+        if w.form.len() == 1
+            && punct_chars.contains(&w.form)
+            && w.gloss_parts.is_empty()
+        {
+            // Append to preceding word's form, remove from list
+            if i > 0 {
+                let punct_form = words[i].form.clone();
+                words[i - 1].form.push_str(&punct_form);
+            }
+            words.remove(i);
+        } else {
+            i += 1;
+        }
+    }
+}
+
 // ── FLEx parser ───────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -239,12 +363,8 @@ pub struct FlexParsed {
 
 /// Parse one tab-column FLEx line into [label, tok1, tok2, …].
 ///
-/// Each tab-separated column is one morpheme or boundary marker.  An empty
-/// column marks a word boundary.  Adjacent non-empty columns where a MORPH_DIVS
-/// character is flanked on both sides by morphemes are collapsed into a single
-/// sentinel-marked token (e.g. deda + = + di → "deda░=░di").  A boundary
-/// marker with no following morpheme in the same run is emitted standalone.
-fn flex_tab_line_toks(l: &str) -> Vec<String> {
+/// (This function is no longer used; replaced by column-aware parsing in parse_flex_block.)
+fn _unused_flex_tab_line_toks(l: &str) -> Vec<String> {
     let cols: Vec<&str> = l.split('\t').collect();
     let label = cols[0].trim();
     if label.is_empty() { return Vec::new(); }
@@ -311,7 +431,7 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
     };
 
     let mut line_types:  Vec<String> = Vec::new();
-    let mut line_arrays: Vec<Vec<String>> = Vec::new();
+    let mut col_arrays:  Vec<Vec<String>> = Vec::new();
     let mut free_lines:  Vec<String> = Vec::new();
     let mut line_num:    Option<String> = None;
     let mut seen_free = false;
@@ -377,14 +497,16 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
             }
         }
 
-        let toks: Vec<String> = if l.contains('\t') {
-            // Tab-column FLEx format: column-aware parsing
+        let mut cols: Vec<String> = if l.contains('\t') {
+            // Tab-column FLEx format: return raw column array
             let normalized = strip_invisible(&l)
                 .replace("Lex. Entries", "LexEntries")
                 .replace("Lex. Gloss",   "LexGloss")
                 .replace("Word Gloss",   "WordGloss")
                 .replace("Word Cat.",    "WordCat");
-            flex_tab_line_toks(&normalized)
+            normalized.split('\t')
+                .map(|c| c.trim().to_string())
+                .collect()
         } else {
             // Space-separated fallback (legacy / non-FLEx sources)
             let massaged = massage_line(&strip_invisible(&l));
@@ -394,12 +516,18 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
                 .collect()
         };
 
-        if toks.is_empty() { continue; }
-        line_types.push(toks[0].clone());
-        line_arrays.push(toks);
+        // If first column is empty, shift left (skip the leading empty column
+        // that occurs when the tier label is in column 1)
+        if !cols.is_empty() && cols[0].is_empty() {
+            cols.remove(0);
+        }
+
+        if cols.is_empty() { continue; }
+        line_types.push(cols[0].clone());
+        col_arrays.push(cols);
     }
 
-    FlexParsed { line_types, line_arrays, free_lines, line_num }
+    FlexParsed { line_types, line_arrays: col_arrays, free_lines, line_num }
 }
 
 // ── FLEx renderer ─────────────────────────────────────────────────────────────
@@ -447,84 +575,59 @@ pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
         Some(i) => i,
     };
 
-    let primary_arr = &ex.line_arrays[morph_idx];
+    let morphemes_arr = &ex.line_arrays[morph_idx];
     let mut data_start = 1usize;
-    if primary_arr.get(data_start).map_or(false, |s| s.parse::<u64>().is_ok()) {
+    if morphemes_arr.get(data_start).map_or(false, |s| s.parse::<u64>().is_ok()) {
         data_start += 1;
     }
 
-    let mut tier1:             Vec<String> = Vec::new();
-    let mut tier2:             Vec<String> = Vec::new();
-    let mut tier3:             Vec<String> = Vec::new();
-    let mut lex_gloss_offset:  isize = 0;
+    let lex_glosses_arr = lex_gloss_idx.map(|i| &ex.line_arrays[i]);
+
+    // Run word-grouping algorithm on tab-format columns
+    let lex_glosses_empty = Vec::new();
+    let lex_glosses = lex_glosses_arr.unwrap_or(&lex_glosses_empty);
+    let mut words = group_words_from_columns(morphemes_arr, lex_glosses, data_start);
+    handle_standalone_punctuation(&mut words);
+
+    let mut tier1: Vec<String> = Vec::new();
+    let mut tier2: Vec<String> = Vec::new();
+    let mut tier3: Vec<String> = Vec::new();
 
     let float_punct = "-\u{2012}\u{2013}\u{2014}\u{2015}/|&\u{2026}...";
 
-    for w in data_start..primary_arr.len() {
-        let wt = &primary_arr[w];
-
-        // Floating punctuation token
-        if wt.chars().count() == 1 {
-            let c = wt.chars().next().unwrap();
-            if float_punct.contains(c) {
-                tier1.push(wt.clone());
-                if lex_gloss_idx.is_some()  { tier2.push("{}".to_string()); }
-                if word_gloss_idx.is_some() { tier3.push("{}".to_string()); }
-                continue;
-            }
+    for word in &words {
+        // Check for floating punctuation
+        if word.form.len() == 1 && float_punct.contains(&word.form) {
+            tier1.push(word.form.clone());
+            if lex_gloss_idx.is_some()  { tier2.push("~".to_string()); }
+            if word_gloss_idx.is_some() { tier3.push("~".to_string()); }
+            continue;
         }
 
-        // tier1 — word/morpheme token without sentinels
-        tier1.push(escape_latex(&wt.replace(SENTINEL, "")));
-
-        // tier2 — lex gloss
-        if let Some(lgi) = lex_gloss_idx {
-            let l_arr = &ex.line_arrays[lgi];
-            if wt.contains(SENTINEL) {
-                let parts: Vec<&str> = wt.split(SENTINEL).collect();
-                let part_count = parts.len() as isize - 1;
-                let mut g_parts: Vec<String> = Vec::new();
-                for (y, part) in parts.iter().enumerate() {
-                    if part.is_empty() { continue; }
-                    if part.len() == 1 && MORPH_DIVS.contains(part.chars().next().unwrap()) {
-                        g_parts.push(part.to_string());
-                        lex_gloss_offset -= 1;
-                    } else {
-                        let gi = (w as isize - data_start as isize)
-                                  + lex_gloss_offset + y as isize;
-                        let raw = l_arr.get((gi + data_start as isize) as usize)
-                            .map(|s| s.as_str()).unwrap_or("");
-                        g_parts.push(wrap_glosses(raw, &opts.gl_cmd));
-                    }
-                }
-                tier2.push(g_parts.join(""));
-                lex_gloss_offset += part_count;
-            } else {
-                let gi2  = (w as isize - data_start as isize) + lex_gloss_offset;
-                let raw2 = l_arr.get((gi2 + data_start as isize) as usize)
-                    .map(|s| s.as_str()).unwrap_or("");
-                tier2.push(wrap_glosses(raw2, &opts.gl_cmd));
-            }
+        // Empty form: use ~ placeholder for gb4e
+        if word.form.is_empty() {
+            tier1.push("~".to_string());
+        } else {
+            tier1.push(escape_latex(&word.form));
         }
 
-        // tier3 — word gloss
-        if let Some(wgi) = word_gloss_idx {
-            let wg_arr = &ex.line_arrays[wgi];
-            let wi = w - data_start;
-            tier3.push(wrap_glosses(
-                wg_arr.get(wi + data_start).map(|s| s.as_str()).unwrap_or(""),
-                &opts.gl_cmd,
-            ));
+        if lex_gloss_idx.is_some() {
+            let g_str = word.gloss_parts.join("");
+            tier2.push(wrap_glosses(&g_str, &opts.gl_cmd));
+        }
+
+        if word_gloss_idx.is_some() {
+            // WordGloss doesn't have a good mapping from word-grouping result
+            // For now, emit empty placeholder
+            tier3.push("~".to_string());
         }
     }
 
     // Build LaTeX lines
-    // JS: gCmd = 'g' + Array(tierCount+1).join('l')  →  "g" + "l"*tierCount
     let tier_count = 1
         + if lex_gloss_idx.is_some()  { 1 } else { 0 }
         + if word_gloss_idx.is_some() { 1 } else { 0 };
     let g_cmd  = format!("g{}", "l".repeat(tier_count));       // e.g. "gll"
-    // JS: indent = Array(gCmd.length + 2).join(' ')  →  ' ' * (gCmd.len + 1)
     let indent = " ".repeat(g_cmd.len() + 1);                  // e.g. "    "
 
     let mut lines: Vec<String> = Vec::new();
@@ -591,8 +694,7 @@ pub fn render_flex_auto(blocks: &[FlexParsed], opts: &FlexOpts) -> String {
 
 /// Render a parsed FLEx block to word-collapsed TSV.
 /// Each word occupies a single tab-separated column; morpheme parts and
-/// dividers are joined inline (e.g. di=de, deda-a). Gloss assembly mirrors
-/// render_flex() exactly but without LaTeX escaping or command wrapping.
+/// dividers are joined inline (e.g. di=de, deda-a).
 pub fn render_flex_tsv(ex: &FlexParsed) -> String {
     let n = ex.line_types.len();
 
@@ -616,66 +718,33 @@ pub fn render_flex_tsv(ex: &FlexParsed) -> String {
         Some(i) => i,
     };
 
-    let primary_arr = &ex.line_arrays[morph_idx];
+    let morphemes_arr = &ex.line_arrays[morph_idx];
     let mut data_start = 1usize;
-    if primary_arr.get(data_start).map_or(false, |s| s.parse::<u64>().is_ok()) {
+    if morphemes_arr.get(data_start).map_or(false, |s| s.parse::<u64>().is_ok()) {
         data_start += 1;
     }
 
-    let mut form_cols:   Vec<String> = Vec::new();
-    let mut gloss_cols:  Vec<String> = Vec::new();
-    let mut wgloss_cols: Vec<String> = Vec::new();
-    let mut lex_gloss_offset: isize  = 0;
+    let lex_glosses_arr = lex_gloss_idx.map(|i| &ex.line_arrays[i]);
 
-    for w in data_start..primary_arr.len() {
-        let wt = &primary_arr[w];
+    // Run word-grouping algorithm
+    let lex_glosses_empty = Vec::new();
+    let lex_glosses = lex_glosses_arr.unwrap_or(&lex_glosses_empty);
+    let mut words = group_words_from_columns(morphemes_arr, lex_glosses, data_start);
+    handle_standalone_punctuation(&mut words);
 
-        // Word-collapsed form: strip sentinels so dividers appear inline
-        form_cols.push(wt.replace(SENTINEL, ""));
+    let mut form_cols:  Vec<String> = Vec::new();
+    let mut gloss_cols: Vec<String> = Vec::new();
 
-        if let Some(lgi) = lex_gloss_idx {
-            let l_arr = &ex.line_arrays[lgi];
-            if wt.contains(SENTINEL) {
-                // Segmented word: assemble gloss inline, same algorithm as render_flex
-                let parts: Vec<&str> = wt.split(SENTINEL).collect();
-                let part_count = parts.len() as isize - 1;
-                let mut g_parts: Vec<String> = Vec::new();
-                for (y, part) in parts.iter().enumerate() {
-                    if part.is_empty() { continue; }
-                    if part.len() == 1 && MORPH_DIVS.contains(part.chars().next().unwrap()) {
-                        g_parts.push(part.to_string());
-                        lex_gloss_offset -= 1;
-                    } else {
-                        let gi = (w as isize - data_start as isize)
-                                  + lex_gloss_offset + y as isize;
-                        let raw = l_arr.get((gi + data_start as isize) as usize)
-                            .map(|s| s.as_str()).unwrap_or("");
-                        g_parts.push(raw.replace(SENTINEL, ""));
-                    }
-                }
-                gloss_cols.push(g_parts.join(""));
-                lex_gloss_offset += part_count;
-            } else {
-                let gi2 = (w as isize - data_start as isize) + lex_gloss_offset;
-                let raw = l_arr.get((gi2 + data_start as isize) as usize)
-                    .map(|s| s.as_str()).unwrap_or("");
-                gloss_cols.push(raw.replace(SENTINEL, ""));
-            }
-        }
-
-        if let Some(wgi) = word_gloss_idx {
-            let wg_arr = &ex.line_arrays[wgi];
-            let wi = w - data_start;
-            let raw = wg_arr.get(wi + data_start)
-                .map(|s| s.as_str()).unwrap_or("");
-            wgloss_cols.push(raw.replace(SENTINEL, ""));
+    for word in &words {
+        form_cols.push(word.form.clone());
+        if lex_gloss_idx.is_some() {
+            gloss_cols.push(word.gloss_parts.join(""));
         }
     }
 
     let mut rows: Vec<String> = Vec::new();
     rows.push(form_cols.join("\t"));
     if lex_gloss_idx.is_some()  { rows.push(gloss_cols.join("\t")); }
-    if word_gloss_idx.is_some() { rows.push(wgloss_cols.join("\t")); }
     if !ex.free_lines.is_empty() { rows.push(ex.free_lines.join(" / ")); }
 
     rows.join("\n")
