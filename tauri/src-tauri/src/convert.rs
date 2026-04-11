@@ -237,9 +237,73 @@ pub struct FlexParsed {
     pub line_num:    Option<String>,
 }
 
+/// Parse one tab-column FLEx line into [label, tok1, tok2, …].
+///
+/// Each tab-separated column is one morpheme or boundary marker.  An empty
+/// column marks a word boundary.  Adjacent non-empty columns where a MORPH_DIVS
+/// character is flanked on both sides by morphemes are collapsed into a single
+/// sentinel-marked token (e.g. deda + = + di → "deda░=░di").  A boundary
+/// marker with no following morpheme in the same run is emitted standalone.
+fn flex_tab_line_toks(l: &str) -> Vec<String> {
+    let cols: Vec<&str> = l.split('\t').collect();
+    let label = cols[0].trim();
+    if label.is_empty() { return Vec::new(); }
+
+    let mut toks: Vec<String> = vec![label.to_string()];
+    let mut i = 1usize;
+
+    while i < cols.len() {
+        if cols[i].trim().is_empty() { i += 1; continue; }
+
+        // Collect a non-empty run (word group)
+        let mut run: Vec<String> = Vec::new();
+        while i < cols.len() && !cols[i].trim().is_empty() {
+            run.push(cols[i].trim().to_string());
+            i += 1;
+        }
+
+        // Collapse run into word tokens
+        let mut j = 0usize;
+        while j < run.len() {
+            let col = &run[j];
+            let is_div = col.len() == 1 && MORPH_DIVS.contains(col.chars().next().unwrap());
+            if is_div {
+                // Standalone boundary (no preceding morpheme absorbed this pass)
+                toks.push(col.clone());
+                j += 1;
+            } else {
+                // Regular morpheme — greedily absorb following boundary+morpheme pairs
+                let mut word = col.clone();
+                j += 1;
+                while j < run.len() {
+                    let next = &run[j];
+                    let next_is_div = next.len() == 1
+                        && MORPH_DIVS.contains(next.chars().next().unwrap());
+                    if !next_is_div { break; }
+                    // Boundary present — check that a morpheme follows it
+                    if j + 1 >= run.len() { break; }
+                    let after = &run[j + 1];
+                    let after_is_div = after.len() == 1
+                        && MORPH_DIVS.contains(after.chars().next().unwrap());
+                    if after_is_div { break; }
+                    // Absorb: word + SENTINEL + boundary + SENTINEL + morpheme
+                    word.push(SENTINEL);
+                    word.push_str(next);
+                    word.push(SENTINEL);
+                    word.push_str(after);
+                    j += 2;
+                }
+                toks.push(word);
+            }
+        }
+    }
+
+    toks
+}
+
 pub fn parse_flex_block(raw: &str) -> FlexParsed {
-    // Normalise line endings and tabs
-    let text = raw.replace("\r\n", "\n").replace('\r', "\n").replace('\t', " ");
+    // Normalise line endings only — preserve tabs for column-aware parsing
+    let text = raw.replace("\r\n", "\n").replace('\r', "\n");
     // Take only the first block (up to the first blank line)
     let text = match text.find("\n\n") {
         Some(i) => text[..i].to_string(),
@@ -253,7 +317,7 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
     let mut seen_free = false;
 
     let raw_lines: Vec<&str> = text.lines()
-        .map(|l| l.trim_end())
+        .map(|l| l.trim_end_matches(|c: char| c == ' ' || c == '\t'))
         .filter(|l| !l.trim().is_empty())
         .collect();
 
@@ -280,7 +344,6 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
         let l_clean = strip_invisible(l.trim());
 
         // Free translation line
-        // /^Free\b/i  — starts with "Free" and next char is non-alpha or end
         let free_match = {
             let lc = l_clean.to_lowercase();
             lc.starts_with("free")
@@ -288,7 +351,6 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
         };
         if free_match {
             seen_free = true;
-            // Strip "Free [lang-tag] " prefix
             let after_free = l_clean[4..].trim_start();
             let ft = if after_free.split_whitespace().next()
                          .map_or(false, |w| w.len() >= 2 && w.len() <= 8
@@ -301,7 +363,6 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
             continue;
         }
 
-        // Continuation free-translation line (another language tag after "Free …")
         if seen_free {
             let parts: Vec<&str> = l_clean.splitn(2, char::is_whitespace).collect();
             if !parts.is_empty() {
@@ -316,13 +377,24 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
             }
         }
 
-        let l = massage_line(&strip_invisible(&l));
-        let toks: Vec<String> = l.split_whitespace()
-            .filter(|t| !t.is_empty())
-            .map(|t| t.to_string())
-            .collect();
-        if toks.is_empty() { continue; }
+        let toks: Vec<String> = if l.contains('\t') {
+            // Tab-column FLEx format: column-aware parsing
+            let normalized = strip_invisible(&l)
+                .replace("Lex. Entries", "LexEntries")
+                .replace("Lex. Gloss",   "LexGloss")
+                .replace("Word Gloss",   "WordGloss")
+                .replace("Word Cat.",    "WordCat");
+            flex_tab_line_toks(&normalized)
+        } else {
+            // Space-separated fallback (legacy / non-FLEx sources)
+            let massaged = massage_line(&strip_invisible(&l));
+            massaged.split_whitespace()
+                .filter(|t| !t.is_empty())
+                .map(|t| t.to_string())
+                .collect()
+        };
 
+        if toks.is_empty() { continue; }
         line_types.push(toks[0].clone());
         line_arrays.push(toks);
     }

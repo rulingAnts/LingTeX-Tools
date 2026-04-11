@@ -114,12 +114,70 @@
     // ── FLEx parser ──────────────────────────────────────────────────────────
 
     /**
+     * Parse one tab-column FLEx line into an array of word tokens.
+     * Each tab-separated column is one morpheme or boundary marker.
+     * An empty column marks a word boundary.  Adjacent non-empty columns that
+     * contain a MORPH_DIVS boundary flanked by morphemes are collapsed into a
+     * single sentinel-marked token (e.g. deda + = + di → deda░=░di).
+     * A boundary marker with no following morpheme in the same run is emitted
+     * as its own standalone token (e.g. trailing ~ → separate token).
+     *
+     * @param  {string} l  A single line with tab-separated columns (already
+     *                     label-normalised and stripped of invisible chars).
+     * @returns {string[]} [label, tok1, tok2, …]
+     */
+    function flexTabLineToks(l) {
+        var cols  = l.split('\t');
+        var label = cols[0].trim();
+        if (!label) return [];
+
+        var toks = [label];
+        var i    = 1;
+
+        while (i < cols.length) {
+            if (cols[i].trim() === '') { i++; continue; }
+
+            // Collect a non-empty run (word group)
+            var run = [];
+            while (i < cols.length && cols[i].trim() !== '') {
+                run.push(cols[i].trim());
+                i++;
+            }
+
+            // Collapse run into word tokens
+            var j = 0;
+            while (j < run.length) {
+                var col = run[j];
+                if (MORPH_DIVS.indexOf(col) !== -1) {
+                    // Standalone boundary (no preceding morpheme in this pass)
+                    toks.push(col);
+                    j++;
+                } else {
+                    // Regular morpheme — greedily absorb following boundary+morpheme pairs
+                    var word = col;
+                    j++;
+                    while (j < run.length
+                           && MORPH_DIVS.indexOf(run[j]) !== -1
+                           && j + 1 < run.length
+                           && MORPH_DIVS.indexOf(run[j + 1]) === -1) {
+                        word = word + SENTINEL + run[j] + SENTINEL + run[j + 1];
+                        j += 2;
+                    }
+                    toks.push(word);
+                }
+            }
+        }
+
+        return toks;
+    }
+
+    /**
      * Parse the first interlinear block from raw FLEx clipboard text.
      * @param  {string} raw
      * @returns {{ lineTypes: string[], lineArrays: string[][], freeLines: string[], lineNum: string|null }}
      */
     function parseFLExBlock(raw) {
-        var text = raw.replace(/\r\n?/g, '\n').replace(/\t/g, ' ');
+        var text     = raw.replace(/\r\n?/g, '\n');
         var blockEnd = text.indexOf('\n\n');
         if (blockEnd >= 0) text = text.substring(0, blockEnd);
 
@@ -130,7 +188,7 @@
         var seenFree   = false;
 
         var rawLines = text.split('\n')
-            .map(function (l) { return String(l).replace(/\s+$/, ''); })
+            .map(function (l) { return String(l).replace(/[ \t]+$/, ''); })
             .filter(function (l) { return l.replace(/^\s+/, '') !== ''; });
 
         for (var i = 0; i < rawLines.length; i++) {
@@ -161,10 +219,22 @@
                 continue;
             }
 
-            l = massageLine(stripInvisible(l));
-            var toks = l.trim().split(/\s+/).filter(function (t) { return t !== ''; });
-            if (toks.length === 0) continue;
+            var toks;
+            if (l.indexOf('\t') !== -1) {
+                // Tab-column FLEx format: use column-aware parser
+                var normalized = stripInvisible(l)
+                    .replace(/Lex\. Entries/g, 'LexEntries')
+                    .replace(/Lex\. Gloss/g,   'LexGloss')
+                    .replace(/Word Gloss/g,    'WordGloss')
+                    .replace(/Word Cat\./g,    'WordCat');
+                toks = flexTabLineToks(normalized);
+            } else {
+                // Space-separated fallback (legacy / non-FLEx sources)
+                var massaged = massageLine(stripInvisible(l));
+                toks = massaged.trim().split(/\s+/).filter(function (t) { return t !== ''; });
+            }
 
+            if (!toks || toks.length === 0) continue;
             lineTypes.push(toks[0]);
             lineArrays.push(toks);
         }
@@ -623,9 +693,10 @@
         applyRowTemplate:          applyRowTemplate,          // generic TSV API
         wrapCommand:               wrapCommand,
         // expose internals for testing
-        _escapeLatex:  escapeLatex,
-        _isGramGloss:  isGramGloss,
-        _wrapGlosses:  wrapGlosses,
-        _massageLine:  massageLine
+        _escapeLatex:     escapeLatex,
+        _isGramGloss:     isGramGloss,
+        _wrapGlosses:     wrapGlosses,
+        _massageLine:     massageLine,
+        _flexTabLineToks: flexTabLineToks
     };
 }));
