@@ -51,6 +51,11 @@ committing to the change. If confirmed working, remove the line-splitting logic
 from `type_text` and update the load-bearing divergence comments in `convert.rs`
 and `docs/core.js`.
 
+This also fixes a secondary UX problem with the current approach: because the
+desktop app types output one line at a time via `Key::Return`, the editor's undo
+history records each line as a separate action. The user must press Undo once per
+line to reverse a paste, instead of once for the whole block.
+
 ### Text abbreviation prompt
 **Scope:** All platforms
 
@@ -94,7 +99,12 @@ interprets these as blank lines, resulting in extra empty lines in the pasted
 output. Other editors (Sublime Text, VS Code without TeX Workshop, Notepad++,
 plain text editors) are not affected.
 
+A secondary issue with the current approach: because output is typed one line at
+a time, the editor's undo history records each line separately — undoing a paste
+requires pressing Undo once per line rather than once for the whole block.
+
 **Workaround:** Use the in-app copy button and paste manually (`Cmd+V`) instead
-of the global keyboard shortcut.
+of the global keyboard shortcut. This delivers output as a single clipboard paste,
+which both avoids the TeX Workshop blank-line issue and creates a single undo step.
 
 **Fix planned:** See "OS-native line endings" above.
