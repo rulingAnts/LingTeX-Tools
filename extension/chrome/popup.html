@@ -97,9 +97,36 @@ header {
 }
 .auto-toggle input { cursor: pointer; accent-color: var(--blue-700); }
 
+/* ── Mode bar ─────────────────────────────────────────────────────────────── */
+.mode-bar {
+  background: #fff;
+  border-bottom: 1px solid var(--slate-200);
+  padding: 0 14px;
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.mode-bar::-webkit-scrollbar { display: none; }
+.mode-btn {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--slate-500);
+  cursor: pointer;
+  font: 600 0.85rem var(--font);
+  padding: 9px 12px;
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+  letter-spacing: 0.01em;
+}
+.mode-btn:hover { color: var(--slate-800); }
+.mode-btn.active { color: var(--blue-800); border-color: var(--blue-700); }
+.mode-btn.disabled { color: var(--slate-400); cursor: default; }
+
 /* ── Tabs ─────────────────────────────────────────────────────────────────── */
 .tabs {
-  background: #fff;
+  background: var(--slate-50);
   border-bottom: 1px solid var(--slate-200);
   padding: 0 14px;
   display: flex;
@@ -133,6 +160,15 @@ header {
   transition: color .15s;
 }
 .tab-add:hover { color: var(--blue-700); }
+
+/* ── Placeholder panel ────────────────────────────────────────────────────── */
+.placeholder-coming-soon {
+  padding: 32px 20px;
+  text-align: center;
+  color: var(--slate-400);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
 
 /* ── Main content ─────────────────────────────────────────────────────────── */
 main {
@@ -261,6 +297,12 @@ main {
   background: var(--blue-50);
 }
 .shortcut-input.has-value { color: var(--blue-700); font-weight: 600; }
+.shortcut-msg {
+  font-size: 0.72rem;
+  color: #92400e;
+  margin-left: 6px;
+  white-space: nowrap;
+}
 
 /* ── Profile name input ───────────────────────────────────────────────────── */
 .profile-name-input {
@@ -356,11 +398,23 @@ textarea.out:focus { outline-color: #93c5fd; border-color: var(--slate-600); }
   <div class="hdr-controls"></div>
 </header>
 
-<nav class="tabs" id="tab-nav" role="tablist">
-  <button class="tab active" role="tab" data-panel="flex" id="tab-flex">FLEx Interlinear</button>
-  <!-- Dynamic TSV profile tabs inserted here by popup.js -->
-  <button class="tab-add" id="tab-add-btn" title="Add a new TSV converter tab">+</button>
+<nav class="mode-bar" id="mode-nav" role="tablist" aria-label="Output mode">
+  <button class="mode-btn active" role="tab" data-mode="latex" id="mode-latex">LaTeX (langsci-gb4e)</button>
+  <button class="mode-btn" role="tab" data-mode="tsv" id="mode-tsv">Table/Spreadsheet (tab-separated)</button>
+  <button class="mode-btn" role="tab" data-mode="xlingpaper" id="mode-xlingpaper">XLingPaper</button>
 </nav>
+
+<nav class="tabs" id="tab-nav" role="tablist" aria-label="LaTeX converter">
+  <button class="tab active" role="tab" data-panel="flex" id="tab-flex">FLEx Interlinear</button>
+  <!-- Dynamic LaTeX profile tabs inserted here by popup.js -->
+  <button class="tab-add" id="tab-add-btn" title="Add a new LaTeX converter tab">+</button>
+</nav>
+
+<div id="shortcut-warning" style="display:none; margin:8px 10px 0; padding:8px 10px; background:#fefce8; border:1px solid #fde047; border-radius:6px; font-size:0.75rem; color:#713f12; line-height:1.5;">
+  <strong>No keyboard shortcut configured.</strong>
+  Open the Configuration section on any tab and click the shortcut field, then press your desired key combination.
+  Without a shortcut, the extension can only be used from this popup's test area.
+</div>
 
 <main id="main-content">
 
@@ -372,13 +426,37 @@ textarea.out:focus { outline-color: #93c5fd; border-color: var(--slate-600); }
       <div class="cfg-body">
 
         <div class="cfg-row">
-          <label for="flex-gl">Gloss command</label>
-          <input type="text" id="flex-gl" value="\gl"
-            placeholder="\gl  or  \textsc  or empty to disable">
+          <label for="flex-gl">Grammatical gloss command</label>
+          <input type="text" id="flex-gl" value="\textsc"
+            placeholder="\textsc  or  \gl  or empty to disable">
         </div>
         <div class="cfg-hint">
-          Wraps all-caps abbreviations: <code>PST</code> → <code>\gl{pst}</code>.
-          Leave empty to disable.
+          Wraps all-caps abbreviations: e.g. <code>\textsc{Pst}</code>.
+          Use <code>\gl</code> or <code>\acrshort</code> to link to an abbreviations list via
+          <a href="https://ctan.org/pkg/glossaries-extra" target="_blank" rel="noopener">glossaries-extra</a>.
+          Leave empty to disable wrapping.
+        </div>
+
+        <div class="cfg-row">
+          <label for="flex-gloss-case">Gloss case</label>
+          <select id="flex-gloss-case">
+            <option value="capitalize" selected>Capitalize first (Pst)</option>
+            <option value="lowercase">All lowercase (pst)</option>
+            <option value="uppercase">All uppercase (PST)</option>
+            <option value="none">Unmodified</option>
+          </select>
+        </div>
+        <div class="cfg-hint">
+          Applies to grammatical glosses in both LaTeX and Table output.
+        </div>
+
+        <div class="cfg-row">
+          <label for="flex-form-cmd">Object language formatting</label>
+          <input type="text" id="flex-form-cmd" value="\textit"
+            placeholder="\textit  or empty to omit">
+        </div>
+        <div class="cfg-hint">
+          Wraps the object-language tier — e.g. <code>\textit{word1 word2}</code>. (LaTeX only.)
         </div>
 
         <!-- TODO (future release): wire up \begin{exe} wrapping toggle;
@@ -390,8 +468,8 @@ textarea.out:focus { outline-color: #93c5fd; border-color: var(--slate-600); }
 
         <div class="cfg-row">
           <label for="flex-txtref">Source ref. command</label>
-          <input type="text" id="flex-txtref" value="\txtref"
-            placeholder="\txtref  or empty to omit">
+          <input type="text" id="flex-txtref" value="%\txtref"
+            placeholder="e.g. \txtref  or %\txtref to comment out">
         </div>
 
         <div class="cfg-row">
@@ -400,7 +478,10 @@ textarea.out:focus { outline-color: #93c5fd; border-color: var(--slate-600); }
             placeholder="TXT:  or empty">
         </div>
         <div class="cfg-hint">
-          Produces e.g. <code>\txtref{TXT:8}</code> on the <code>\glt</code> line.
+          When set, appends a source citation to the <code>\glt</code> line —
+          e.g. <code>\txtref</code> + <code>TXT:</code> + example number → <code>\txtref{TXT:8}</code>.
+          Default <code>%\txtref</code> leaves it commented out — remove the <code>%</code> to activate.
+          Leave empty to omit entirely.
         </div>
 
         <div class="cfg-row">
@@ -409,6 +490,7 @@ textarea.out:focus { outline-color: #93c5fd; border-color: var(--slate-600); }
             <input type="text" id="flex-shortcut" class="shortcut-input"
               placeholder="Click, then press keys…" readonly>
             <button class="btn btn-ghost" id="flex-shortcut-clear" title="Clear shortcut">✕</button>
+            <span class="shortcut-msg" id="flex-shortcut-msg"></span>
           </div>
         </div>
         <div class="cfg-hint">
@@ -444,7 +526,63 @@ textarea.out:focus { outline-color: #93c5fd; border-color: var(--slate-600); }
 
   </section>
 
-  <!-- Dynamic TSV profile panels rendered by popup.js -->
+  <!-- ── FLEx TSV (static panel) ──────────────────────────────────────── -->
+  <section id="panel-flex-tsv" class="panel" role="tabpanel">
+
+    <details class="cfg" id="flex-tsv-cfg">
+      <summary>Configuration</summary>
+      <div class="cfg-body">
+
+        <div class="cfg-row">
+          <label>Keyboard shortcut</label>
+          <div class="shortcut-row">
+            <input type="text" id="flex-tsv-shortcut" class="shortcut-input"
+              placeholder="Click, then press keys…" readonly>
+            <button class="btn btn-ghost" id="flex-tsv-shortcut-clear" title="Clear shortcut">✕</button>
+            <span class="shortcut-msg" id="flex-tsv-shortcut-msg"></span>
+          </div>
+        </div>
+        <div class="cfg-hint">
+          Press this shortcut anywhere to instantly read the clipboard, convert
+          using FLEx TSV settings, and insert at the cursor.
+        </div>
+
+      </div>
+    </details>
+
+    <!-- Test area -->
+    <div class="io-row">
+      <div class="io-label">
+        <span>Test input</span>
+        <div class="io-actions">
+          <button class="btn btn-ghost" id="flex-tsv-clear-btn">Clear</button>
+        </div>
+      </div>
+      <textarea id="flex-tsv-in" class="tall" spellcheck="false"
+        placeholder="Paste FLEx interlinear text here to test conversion…"></textarea>
+    </div>
+    <div class="io-row">
+      <div class="io-label">
+        <span>Output — TSV</span>
+        <div class="io-actions">
+          <button class="btn btn-secondary" id="flex-tsv-copy-btn">Copy Result</button>
+        </div>
+      </div>
+      <textarea id="flex-tsv-out" class="out" readonly spellcheck="false"
+        placeholder="TSV output will appear here…"></textarea>
+      <div id="flex-tsv-status" class="status"></div>
+    </div>
+
+  </section>
+
+  <!-- Dynamic LaTeX profile panels rendered by popup.js -->
+
+  <!-- ── XLingPaper placeholder ──────────────────────────────────────────── -->
+  <section id="panel-xlingpaper" class="panel" role="tabpanel">
+    <div class="placeholder-coming-soon">
+      <p>XLingPaper output support is coming in a future release.</p>
+    </div>
+  </section>
 
 </main>
 

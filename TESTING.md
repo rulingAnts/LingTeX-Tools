@@ -10,28 +10,28 @@
 - [x] Active mode persists across page reload (localStorage)
 
 **LaTeX mode**
-- [ ] Normal PA rows convert correctly (auto-detect off and on)
-- [ ] Grouped PA rows (double leading tab) auto-correct with "Auto-detect grouped view" checked
-- [ ] Skip logic works correctly after trim fires
-- [ ] FLEx tab converts correctly
-- [ ] localStorage persists settings across reload
-- [ ] Add a custom tab — renders in the inner tab bar, not the mode bar
-- [ ] FLEx conversion to LaTeX still works (both list and individual, this version intially broke that).
+- [x] Normal PA rows convert correctly (auto-detect off and on)
+- [x] Grouped PA rows (double leading tab) auto-correct with "Auto-detect grouped view" checked
+- [x] Skip logic works correctly after trim fires
+- [x] FLEx tab converts correctly
+- [x] localStorage persists settings across reload
+- [x] Add a custom tab — renders in the inner tab bar, not the mode bar
+- [x] FLEx conversion to LaTeX still works (both list and individual, this version intially broke that).
 
 **Table/Spreadsheet mode**
-- [ ] **FLEx → Table** — paste FLEx interlinear text → word-collapsed TSV output (one column per word)
-- [ ] **FLEx → Table** — segmented words (`di=de`, `deda-a`) collapse into a single cell with morphemes joined inline
-- [ ] **FLEx → Table** — glosses assembled inline per word (`pig=ERG`, `attack.CMP`) matching the morpheme structure
-- [ ] **FLEx → Table** — unsegmented words produce a single column
-- [ ] **FLEx → Table** — free translation appears as a final plain-text row
-- [ ] **FLEx → Table** — multiple blocks separated by blank line in output
-- [ ] **FLEx → Table** — no LaTeX commands in output (no `\gl{}`, `\gll`, `\begin{exe}`, etc.)
-- [ ] **FLEx → Table — clipboard paste test** — copy output, paste into OneNote (and any other target apps): does tab-separated plain text auto-convert to a table? If not, consider writing `text/html` table markup alongside `text/plain` via `ClipboardItem` (see note in code comments / issue tracker)
+- [x] **FLEx → Table** — paste FLEx interlinear text → word-collapsed TSV output (one column per word)
+- [ x **FLEx → Table** — segmented words (`di=de`, `deda-a`) collapse into a single cell with morphemes joined inline
+- [x] **FLEx → Table** — glosses assembled inline per word (`pig=ERG`, `attack.CMP`) matching the morpheme structure
+- [x] **FLEx → Table** — unsegmented words produce a single column
+- [x] **FLEx → Table** — free translation appears as a final plain-text row
+- [x] **FLEx → Table** — multiple blocks separated by blank line in output
+- [x] **FLEx → Table** — no LaTeX commands in output (no `\gl{}`, `\gll`, `\begin{exe}`, etc.)
+- [x] **FLEx → Table — clipboard paste test** — copy output, paste into OneNote (and any other target apps): does tab-separated plain text auto-convert to a table? If not, consider writing `text/html` table markup alongside `text/plain` via `ClipboardItem` (see note in code comments / issue tracker)
 
 **Site page**
-- [ ] Nav "Shortcuts" link scrolls to the keyboard shortcuts documentation section
-- [ ] Keyboard shortcuts section renders with all three cards (shortcuts fire regardless of mode; duplicates; OS conflicts)
-- [ ] Product card descriptions mention output modes and the mode-independent shortcut behavior
+- [x Nav "Shortcuts" link scrolls to the keyboard shortcuts documentation section
+- [x] Keyboard shortcuts section renders with all three cards (shortcuts fire regardless of mode; duplicates; OS conflicts)
+- [x] Product card descriptions mention output modes and the mode-independent shortcut behavior
 
 ---
 
