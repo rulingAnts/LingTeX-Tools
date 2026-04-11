@@ -251,7 +251,7 @@ fn group_words_from_columns(
         let g = lex_glosses.get(col).map(|s| s.trim()).unwrap_or("");
 
         if !m.is_empty() {
-            // Non-empty morpheme
+            // Non-empty morpheme: check for boundary marker at start
             let first_char = m.chars().next().unwrap_or('\0');
             let boundary = if MORPH_DIVS.contains(first_char) {
                 first_char.to_string()
@@ -265,7 +265,7 @@ fn group_words_from_columns(
             };
 
             if !boundary.is_empty() {
-                // Attach to current word (enclitic/suffix boundary)
+                // Attach to current word (suffix/enclitic or prefix boundary)
                 if let Some(ref mut cw) = current_word {
                     cw.form.push_str(&boundary);
                     cw.form.push_str(&suffix);
@@ -276,7 +276,7 @@ fn group_words_from_columns(
                     }
                 }
             } else {
-                // Start a new word
+                // Start a new word (no boundary marker)
                 if let Some(cw) = current_word.take() {
                     words.push(cw);
                 }
@@ -599,14 +599,14 @@ pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
         // Check for floating punctuation
         if word.form.len() == 1 && float_punct.contains(&word.form) {
             tier1.push(word.form.clone());
-            if lex_gloss_idx.is_some()  { tier2.push("~".to_string()); }
-            if word_gloss_idx.is_some() { tier3.push("~".to_string()); }
+            if lex_gloss_idx.is_some()  { tier2.push("\\textasciitilde".to_string()); }
+            if word_gloss_idx.is_some() { tier3.push("\\textasciitilde".to_string()); }
             continue;
         }
 
-        // Empty form: use ~ placeholder for gb4e
+        // Empty form: use escaped ~ placeholder for gb4e
         if word.form.is_empty() {
-            tier1.push("~".to_string());
+            tier1.push("\\textasciitilde".to_string());
         } else {
             tier1.push(escape_latex(&word.form));
         }
@@ -619,7 +619,7 @@ pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
         if word_gloss_idx.is_some() {
             // WordGloss doesn't have a good mapping from word-grouping result
             // For now, emit empty placeholder
-            tier3.push("~".to_string());
+            tier3.push("\\textasciitilde".to_string());
         }
     }
 
