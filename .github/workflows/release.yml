@@ -209,7 +209,7 @@ jobs:
       - name: Cache Cargo registry + build
         uses: Swatinem/rust-cache@v2
         with:
-          workingDirectory: tauri/src-tauri
+          workspaces: tauri/src-tauri
 
       - name: Build macOS desktop app
         uses: tauri-apps/tauri-action@v0
@@ -249,7 +249,7 @@ jobs:
       - name: Cache Cargo registry + build
         uses: Swatinem/rust-cache@v2
         with:
-          workingDirectory: tauri/src-tauri
+          workspaces: tauri/src-tauri
 
       - name: Build Windows desktop app
         uses: tauri-apps/tauri-action@v0
@@ -304,7 +304,7 @@ jobs:
       - name: Cache Cargo registry + build
         uses: Swatinem/rust-cache@v2
         with:
-          workingDirectory: tauri/src-tauri
+          workspaces: tauri/src-tauri
 
       - name: Build Linux desktop app
         uses: tauri-apps/tauri-action@v0
