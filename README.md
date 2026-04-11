@@ -286,6 +286,7 @@ Pages serves.
 
 | Feature | Scope |
 |---|---|
+| **Rich-text copy for FLEx → Table** — copy button will write both `text/plain` (TSV) and `text/html` (HTML table) to the clipboard via `ClipboardItem`, so pasting into OneNote, Word, or Google Docs produces a table directly without routing through a spreadsheet | Web app &amp; extension |
 | **Text abbreviation prompt** — optional setting to show a prompt on each conversion (keyboard shortcut and UI copy) asking for the text/example abbreviation, so the `\txtref{}` value is filled in correctly without manually editing each pasted block | All platforms |
 | **FLEx corpus → LaTeX export** — export an entire FLEx corpus as a structured LaTeX document (full example appendix or corpus reference) | Extension |
 | **Figure insertion** — insert `\includegraphics` blocks from a file picker or clipboard image | Desktop &amp; extension |

@@ -28,10 +28,13 @@
         activeProfileId: 'tsv-pa',
         profiles:        DEFAULT_PROFILES,
         flexConfig: {
-            glCmd:        '\\gl',
+            glCmd:        '\\textsc',
+            glossCase:    'capitalize',
+            formCmd:      '\\textit',
             wrapExe:      true,
-            txtrefCmd:    '\\txtref',
-            txtrefPrefix: 'TXT:'
+            txtrefCmd:    '%\\txtref',
+            txtrefPrefix: 'TXT:',
+            shortcut:     'Ctrl+Shift+V'
         }
     };
 

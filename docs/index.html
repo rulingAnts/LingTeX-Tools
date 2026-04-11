@@ -774,9 +774,17 @@ footer a:hover { text-decoration: underline; }
 <section id="shortcuts" style="background:#fff; border-top:1px solid var(--slate-200); padding:36px 20px 40px;">
   <div style="max-width:var(--max-w); margin:0 auto;">
     <h2 style="font-size:1.0625rem; font-weight:700; color:var(--slate-900); margin-bottom:6px;">⌨ Keyboard Shortcuts</h2>
-    <p style="font-size:0.875rem; color:var(--slate-500); margin-bottom:22px; line-height:1.6;">
+    <p style="font-size:0.875rem; color:var(--slate-500); margin-bottom:12px; line-height:1.6;">
       Applies to the Desktop App and Browser Extension. The web version below does not support shortcuts.
     </p>
+    <div style="background:#fefce8; border:1px solid #fde047; border-radius:var(--r); padding:12px 16px; margin-bottom:18px; font-size:0.875rem; color:#713f12; line-height:1.6;">
+      <strong>First-time setup required.</strong>
+      Shortcuts must be configured inside the app before they will work.
+      Open the app or extension popup, expand <em>Configuration</em> on the FLEx Interlinear tab,
+      click the shortcut field, and press your desired key combination.
+      The default shortcut for FLEx Interlinear is <strong>Ctrl+Shift+V</strong> (set automatically on first launch).
+      The app will warn you if no shortcuts are configured.
+    </div>
     <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">
 
       <div style="background:var(--slate-50); border:1px solid var(--slate-200); border-radius:var(--r); padding:18px 20px;">
@@ -866,12 +874,36 @@ footer a:hover { text-decoration: underline; }
             oninput="convertFlex()">
         </div>
         <div class="cfg-hint">
-          Wraps all-caps abbreviations like <code>PST</code>, <code>3SG</code> — e.g. <code>\textsc{pst}</code>.
+          Wraps all-caps abbreviations like <code>PST</code>, <code>3SG</code> — e.g. <code>\textsc{Pst}</code>.
           Use <code>\textsc</code> for standard small-caps (no extra packages).
           Use <code>\gl</code> or <code>\acrshort</code> to link glosses to an abbreviations list via
           <a href="https://ctan.org/pkg/glossaries-extra" target="_blank" rel="noopener">glossaries-extra</a>
           (with <code>\setabbreviationstyle{short-sc}</code> for small-caps output).
           Leave <strong>empty</strong> to disable wrapping entirely.
+        </div>
+
+        <div class="cfg-row">
+          <label for="flex-gloss-case">Gloss case</label>
+          <select id="flex-gloss-case" onchange="convertFlex(); convertFlexTSV();">
+            <option value="capitalize" selected>Capitalize first letter (Pst)</option>
+            <option value="lowercase">All lowercase (pst)</option>
+            <option value="uppercase">All uppercase (PST)</option>
+            <option value="none">Unmodified (from source)</option>
+          </select>
+        </div>
+        <div class="cfg-hint">
+          Applies to grammatical gloss abbreviations in both LaTeX and Table output.
+        </div>
+
+        <div class="cfg-row">
+          <label for="flex-form-cmd">Object language formatting</label>
+          <input type="text" id="flex-form-cmd" value="\textit"
+            placeholder="\textit  or leave empty for no wrapping"
+            oninput="convertFlex()">
+        </div>
+        <div class="cfg-hint">
+          Wraps the entire object-language tier — e.g. <code>\textit{word1 word2 word3}</code>.
+          Leave <strong>empty</strong> to omit. (LaTeX output only.)
         </div>
 
         <!-- TODO (future release): wire up \begin{exe} wrapping toggle;
@@ -882,8 +914,8 @@ footer a:hover { text-decoration: underline; }
 
         <div class="cfg-row">
           <label for="flex-txtref">Source ref. command</label>
-          <input type="text" id="flex-txtref" value="\txtref"
-            placeholder="\txtref  or leave empty to omit"
+          <input type="text" id="flex-txtref" value="%\txtref"
+            placeholder="e.g. \txtref  or %\txtref to comment out"
             oninput="convertFlex()">
         </div>
         <div class="cfg-row">
@@ -893,8 +925,10 @@ footer a:hover { text-decoration: underline; }
             oninput="convertFlex()">
         </div>
         <div class="cfg-hint">
-          Together produce e.g. <code>\txtref{TXT:8}</code> at the end of the <code>\glt</code> line.
-          Leave <em>Source ref. command</em> empty to omit entirely.
+          When set, appends a source citation to the end of the <code>\glt</code> free-translation line —
+          e.g. command <code>\txtref</code> + prefix <code>TXT:</code> + FLEx example number <code>8</code>
+          produces <code>\txtref{TXT:8}</code>. Default <code>%\txtref</code> leaves it commented out —
+          remove the <code>%</code> to activate. Leave empty to omit entirely.
         </div>
 
       </div>
@@ -1099,6 +1133,8 @@ function convertFlex() {
         }
         var latex = LingTeXCore.renderFLExAuto(blocks, {
             glCmd:        document.getElementById('flex-gl').value.trim(),
+            glossCase:    document.getElementById('flex-gloss-case').value,
+            formCmd:      document.getElementById('flex-form-cmd').value.trim(),
             wrapExe:      document.getElementById('flex-wrap-exe').value === 'yes',
             txtrefCmd:    document.getElementById('flex-txtref').value.trim(),
             txtrefPrefix: document.getElementById('flex-txtpfx').value
@@ -1132,7 +1168,9 @@ function convertFlexTSV() {
                 'Lines must start with: Word, Morphemes, Lex. Entries, Lex. Gloss, Word Gloss, Free', 'err');
             return;
         }
-        var tsv = LingTeXCore.renderFLExTSVAuto(blocks);
+        var tsv = LingTeXCore.renderFLExTSVAuto(blocks, {
+            glossCase: document.getElementById('flex-gloss-case').value
+        });
         outEl.value = tsv;
         var first = blocks[0];
         var words = (first.colArrays[0] || []).length - 1;
