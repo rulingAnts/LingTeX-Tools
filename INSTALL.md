@@ -107,5 +107,46 @@ Once installed in any browser:
 | **Test / configure** | Click the extension icon to open the popup. Paste sample data into the test area to verify your template before using it in a document. |
 
 The popup lets you configure LaTeX command names, row templates, and create
-custom TSV converter tabs. Settings persist across sessions.
+custom converter tabs. Settings persist across sessions.
+
+---
+
+## Keyboard Shortcuts — important notes
+
+### Shortcuts fire regardless of active mode or tab
+
+Shortcuts are registered globally — they fire based on the key combo alone, not on
+which output mode or tab you have open in the popup. If you set Ctrl+Shift+1 on the
+Phonology Assistant profile, pressing that combo runs the PA conversion whether you
+are currently looking at the FLEx Interlinear tab, the Table/Spreadsheet mode, or
+anywhere else.
+
+### Duplicate shortcuts are detected automatically
+
+If you assign a key combo that is already used by another tab or profile, the app will
+automatically remove the old binding and show a brief warning next to the shortcut field.
+Each combo can only be active for one converter at a time.
+
+### Conflicts with OS and other app shortcuts
+
+**Desktop app (Tauri):** Shortcuts are registered as OS-wide global shortcuts via the
+operating system's accessibility APIs. This means:
+
+- **System shortcuts take priority** — combos reserved by the OS (e.g. Cmd+Space for
+  Spotlight, Cmd+Tab for the app switcher on macOS; Win key combos on Windows) typically
+  cannot be captured. The app will warn you in the shortcut field if the OS rejects a
+  registration.
+- **Conflicts with other apps** — if another app has also registered the same global
+  shortcut, one of them will win depending on registration order. To avoid this, prefer
+  less common combos: three-modifier combos (e.g. Cmd+Opt+Shift+L on macOS,
+  Ctrl+Alt+Shift+L on Windows) rarely conflict with anything else.
+- **macOS Accessibility permission** — global shortcuts require the Accessibility
+  permission granted during first launch. If shortcuts stop working after a system
+  update, check **System Settings → Privacy & Security → Accessibility**.
+
+**Browser extension:** Shortcuts are handled entirely within web pages by the content
+script. They have no effect on OS-level shortcuts and do not conflict with other apps.
+They only fire when a web page is focused (not in browser chrome, not in desktop apps).
+On pages that intercept keyboard events before the extension can (rare), the shortcut
+may not fire — in that case use the popup's test area and copy the output manually.
 

@@ -296,9 +296,34 @@ a:hover { text-decoration: underline; }
 .dot.offline { background: var(--slate-400); }
 .hdr-status-sep { color: var(--slate-300); }
 
+/* ── Mode bar ────────────────────────────────────────────────────────────── */
+.mode-bar {
+  background: #fff;
+  border-bottom: 1px solid var(--slate-200);
+  padding: 0 20px;
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mode-bar::-webkit-scrollbar { display: none; }
+.mode-btn {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--slate-500);
+  cursor: pointer;
+  font: 600 0.875rem var(--font);
+  padding: 11px 14px;
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+  letter-spacing: 0.01em;
+}
+.mode-btn:hover { color: var(--slate-800); }
+.mode-btn.active { color: var(--blue-800); border-color: var(--blue-700); }
+
 /* ── Tabs ────────────────────────────────────────────────────────────────── */
 .tabs {
-  background: #fff;
+  background: var(--slate-50);
   border-bottom: 1px solid var(--slate-200);
   padding: 0 20px;
   display: flex;
@@ -319,6 +344,15 @@ a:hover { text-decoration: underline; }
 }
 .tab:hover { color: var(--slate-700); }
 .tab.active { color: var(--blue-700); border-color: var(--blue-700); font-weight: 600; }
+
+/* ── Placeholder panel ───────────────────────────────────────────────────── */
+.placeholder-coming-soon {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--slate-400);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
 
 /* ── Main layout ─────────────────────────────────────────────────────────── */
 main {
@@ -568,8 +602,8 @@ footer a:hover { text-decoration: underline; }
   <div class="nav-links">
     <a href="#download">Desktop App</a>
     <a href="#extensions">Extensions</a>
+    <a href="#shortcuts">Shortcuts</a>
     <a href="#try-online">Try Online</a>
-    <a href="#troubleshooting">Troubleshoot</a>
     <a href="https://github.com/rulingAnts/LingTeX-Tools" class="nav-gh" target="_blank">GitHub</a>
   </div>
 </nav>
@@ -620,14 +654,16 @@ footer a:hover { text-decoration: underline; }
     <h2>🖥 Desktop App</h2>
     <p class="card-desc">
       Runs silently in the system tray (Windows) or menu bar (macOS).
-      Keyboard shortcuts work <em>system-wide</em> — in any desktop
-      TeX editor, web-based editor (Overleaf, Authorea), or anywhere else you type.
+      Choose your output mode — <em>LaTeX</em>, <em>Table/Spreadsheet</em>, or (coming soon) <em>XLingPaper</em> —
+      and configure keyboard shortcuts that work <em>system-wide</em> in any editor, web-based or desktop.
       When you press a shortcut, the app reads your clipboard, converts it, and
-      types the resulting LaTeX directly at the cursor — no clipboard modification.
+      types the result directly at the cursor — no clipboard modification.
+      Shortcuts fire regardless of which mode or tab is currently open.
     </p>
     <ul class="card-features">
       <li>Global keyboard shortcuts — fire from any app, browser or desktop</li>
-      <li>FLEx interlinear + custom TSV profiles</li>
+      <li>Multiple output modes: LaTeX, Table/Spreadsheet, XLingPaper (planned)</li>
+      <li>FLEx interlinear + Phonology Assistant + custom TSV profiles</li>
       <li>No browser needed — works fully offline</li>
     </ul>
     <div class="dl-btns">
@@ -671,15 +707,18 @@ footer a:hover { text-decoration: underline; }
   <div class="product-card" id="extensions">
     <h2>⬡ Browser Extension</h2>
     <p class="card-desc">
-      Adds a toolbar button to your browser. Converts clipboard content and inserts
-      the resulting LaTeX directly at the cursor in web-based editors like Overleaf or
-      Authorea — <em>within the browser only</em>.
+      Adds a toolbar button to your browser. Choose your output mode — <em>LaTeX</em>,
+      <em>Table/Spreadsheet</em>, or (coming soon) <em>XLingPaper</em> — and assign
+      per-profile keyboard shortcuts that insert converted text directly at the cursor
+      in Overleaf, Authorea, or any web-based editor — <em>within the browser only</em>.
+      Shortcuts fire regardless of which mode or tab is currently open.
       Choose this <em>or</em> the Desktop App, not both.
     </p>
     <ul class="card-features">
       <li>Works in Overleaf, Authorea, and more</li>
+      <li>Multiple output modes: LaTeX, Table/Spreadsheet, XLingPaper (planned)</li>
       <li>Per-profile keyboard shortcuts, insert at cursor</li>
-      <li>FLEx interlinear + custom TSV profiles</li>
+      <li>FLEx interlinear + Phonology Assistant + custom TSV profiles</li>
       <li>Settings sync across browser sessions</li>
     </ul>
     <div class="dl-btns">
@@ -730,6 +769,50 @@ footer a:hover { text-decoration: underline; }
   </div>
 </div>
 
+<!-- ── Keyboard shortcuts ────────────────────────────────────────────────── -->
+<section id="shortcuts" style="background:#fff; border-top:1px solid var(--slate-200); padding:36px 20px 40px;">
+  <div style="max-width:var(--max-w); margin:0 auto;">
+    <h2 style="font-size:1.0625rem; font-weight:700; color:var(--slate-900); margin-bottom:6px;">⌨ Keyboard Shortcuts</h2>
+    <p style="font-size:0.875rem; color:var(--slate-500); margin-bottom:22px; line-height:1.6;">
+      Applies to the Desktop App and Browser Extension. The web version below does not support shortcuts.
+    </p>
+    <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">
+
+      <div style="background:var(--slate-50); border:1px solid var(--slate-200); border-radius:var(--r); padding:18px 20px;">
+        <h3 style="font-size:0.9375rem; font-weight:600; color:var(--slate-900); margin-bottom:8px;">Shortcuts fire regardless of active mode</h3>
+        <p style="font-size:0.875rem; color:var(--slate-600); line-height:1.6;">
+          Shortcuts are registered globally — they fire based on the key combo alone, not on which output mode
+          or tab is currently open in the app. A shortcut set on the Phonology Assistant profile works
+          whether you are looking at the LaTeX mode, Table/Spreadsheet mode, or anything else.
+        </p>
+      </div>
+
+      <div style="background:var(--slate-50); border:1px solid var(--slate-200); border-radius:var(--r); padding:18px 20px;">
+        <h3 style="font-size:0.9375rem; font-weight:600; color:var(--slate-900); margin-bottom:8px;">Duplicates are resolved automatically</h3>
+        <p style="font-size:0.875rem; color:var(--slate-600); line-height:1.6;">
+          If you assign a key combo that is already used by another tab or profile, the app automatically
+          removes the old binding and shows a brief warning next to the shortcut field. Each combo can only
+          be active for one converter at a time.
+        </p>
+      </div>
+
+      <div style="background:var(--slate-50); border:1px solid var(--slate-200); border-radius:var(--r); padding:18px 20px;">
+        <h3 style="font-size:0.9375rem; font-weight:600; color:var(--slate-900); margin-bottom:8px;">OS and app conflicts (Desktop App)</h3>
+        <p style="font-size:0.875rem; color:var(--slate-600); line-height:1.6;">
+          System-reserved shortcuts (e.g. <code>Cmd+Space</code> for Spotlight, <code>Cmd+Tab</code> for the
+          app switcher on macOS) cannot be captured — the app will warn you if the OS rejects a registration.
+          To avoid silently stealing shortcuts from other apps, prefer three-modifier combos such as
+          <code>Cmd+Opt+Shift+L</code> on macOS or <code>Ctrl+Alt+Shift+L</code> on Windows, which rarely
+          conflict with anything else.
+          <br><br>
+          <em>Browser extension shortcuts only fire within web pages and cannot conflict with OS or desktop-app shortcuts.</em>
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
 <!-- ── Try it online ─────────────────────────────────────────────────────── -->
 <div class="try-online-bar" id="try-online">
   <div class="try-online-hdr">
@@ -747,11 +830,16 @@ footer a:hover { text-decoration: underline; }
   </div>
 </div>
 
-<nav class="tabs" id="tab-nav" role="tablist">
+<nav class="mode-bar" id="mode-nav" role="tablist" aria-label="Output mode">
+  <button class="mode-btn active" role="tab" data-mode="latex" onclick="switchMode('latex')">LaTeX (langsci-gb4e)</button>
+  <button class="mode-btn" role="tab" data-mode="tsv" onclick="switchMode('tsv')">Table/Spreadsheet (tab-separated)</button>
+  <button class="mode-btn" role="tab" data-mode="xlingpaper" onclick="switchMode('xlingpaper')">XLingPaper</button>
+</nav>
+
+<nav class="tabs" id="tab-nav" role="tablist" aria-label="LaTeX converter">
   <button class="tab active" role="tab" data-panel="flex" onclick="switchTab(this)">FLEx Interlinear</button>
-  <button class="tab" role="tab" data-panel="flex-tsv" onclick="switchTab(this)">FLEx → Table</button>
-  <!-- TSV profile tabs rendered here by JS -->
-  <button class="tab-add" id="tab-add-btn" title="Add a new TSV converter tab" onclick="addProfile()">+</button>
+  <!-- LaTeX profile tabs rendered here by JS -->
+  <button class="tab-add" id="tab-add-btn" title="Add a new LaTeX converter tab" onclick="addProfile()">+</button>
 </nav>
 
 <main>
@@ -870,6 +958,13 @@ footer a:hover { text-decoration: underline; }
 
   </section>
 
+  <!-- ── XLingPaper placeholder ──────────────────────────────────────────── -->
+  <section id="panel-xlingpaper" class="panel" role="tabpanel">
+    <div class="placeholder-coming-soon">
+      <p>XLingPaper output support is coming in a future release.</p>
+    </div>
+  </section>
+
 </main>
 
 <!-- ── Coming Soon ─────────────────────────────────────────────────────── -->
@@ -909,8 +1004,41 @@ footer a:hover { text-decoration: underline; }
 // APP
 // ══════════════════════════════════════════════════════════════════════════════
 
+// ── Mode switching ────────────────────────────────────────────────────────────
+var activeMode = 'latex';
+
+function switchMode(mode) {
+    activeMode = mode;
+    try { localStorage.setItem('lingtex-active-mode', mode); } catch(e) {}
+
+    document.querySelectorAll('.mode-btn').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.mode === mode);
+    });
+
+    var tabNav = document.getElementById('tab-nav');
+    tabNav.style.display = (mode === 'latex') ? '' : 'none';
+
+    if (mode === 'latex') {
+        if (!activePanel || activePanel === 'flex-tsv') activePanel = 'flex';
+        document.querySelectorAll('.tab').forEach(function(b) {
+            b.classList.toggle('active',
+                b.dataset.panel === activePanel || b.dataset.profile === activePanel);
+        });
+        document.querySelectorAll('.panel').forEach(function(p) {
+            p.classList.toggle('active', p.id === 'panel-' + activePanel);
+        });
+    } else {
+        document.querySelectorAll('.tab').forEach(function(b) { b.classList.remove('active'); });
+        var targetId = (mode === 'tsv') ? 'panel-flex-tsv' : 'panel-' + mode;
+        document.querySelectorAll('.panel').forEach(function(p) {
+            p.classList.toggle('active', p.id === targetId);
+        });
+    }
+}
+
 // ── Tab switching ─────────────────────────────────────────────────────────────
 function switchTab(btn) {
+    activePanel = btn.dataset.panel;
     document.querySelectorAll('.tab').forEach(function(b) {
         b.classList.remove('active');
         b.setAttribute('aria-selected', 'false');
@@ -921,7 +1049,6 @@ function switchTab(btn) {
     btn.classList.add('active');
     btn.setAttribute('aria-selected', 'true');
     document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
-    activePanel = btn.dataset.panel;
 }
 
 // ── Clipboard helpers ─────────────────────────────────────────────────────────
@@ -1039,6 +1166,10 @@ function loadProfiles() {
         profiles = DEFAULT_PROFILES.map(cloneProfile);
     }
     if (!profiles.length) profiles = DEFAULT_PROFILES.map(cloneProfile);
+    try {
+        var storedMode = localStorage.getItem('lingtex-active-mode');
+        if (storedMode) activeMode = storedMode;
+    } catch(e) {}
 }
 
 function saveProfiles() {
@@ -1185,13 +1316,9 @@ function renderAll() {
 
 function switchToProfile(id) {
     activePanel = id;
-    // Update flex tab button
-    document.querySelectorAll('.tab').forEach(function(b) {
-        b.classList.remove('active');
-    });
-    document.querySelectorAll('.panel').forEach(function(p) {
-        p.classList.remove('active');
-    });
+    if (activeMode !== 'latex') switchMode('latex');
+    document.querySelectorAll('.tab').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
     var panel = document.getElementById('panel-' + id);
     if (panel) panel.classList.add('active');
     var btn = document.querySelector('[data-profile="' + id + '"]');
@@ -1321,8 +1448,7 @@ function convertTSV(id) {
 // Initialise profiles, settings, and render
 loadProfiles();
 renderAll();
-// Activate first TSV profile tab by default (flex starts active)
-// (user stays on flex tab on page load; TSV tabs render in background)
+switchMode(activeMode);
 
 function setStatus(tool, msg, cls) {
     var el = document.getElementById(tool + '-status');
