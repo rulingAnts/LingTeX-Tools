@@ -59,6 +59,12 @@ Private Const MORPH_DIVIDERS    As String = "-<>=~"
 ' Valid FLEx line-type labels (same set as LO macro)
 Private Const VALID_TYPES       As String = "/Word/WordGloss/Morphemes/LexEntries/LexGloss/WordCat/"
 
+' ── OMML matrix properties — top-aligned, tight spacing (mirrors FLEx Word export) ─
+Private Const M_PROPS_1COL As String = _
+    "<m:mPr><m:baseJc m:val=""top""/><m:rSpRule m:val=""4""/><m:rSp m:val=""3""/>" & _
+    "<m:mcs><m:mc><m:mcPr><m:count m:val=""1""/><m:mcJc m:val=""left""/>" & _
+    "</m:mcPr></m:mc></m:mcs></m:mPr>"
+
 ' ── Grammatical gloss detection (mirrors LO grammaticalGlossRegex) ───────────
 ' Tokens are grammatical if they are ALL-CAPS (with optional digits/punctuation)
 ' or digit-initial (3sg, 1pl).  Single capital letter is excluded.
@@ -123,8 +129,12 @@ Public Sub FLExTextToWord()
         wordArrays(0) = fl
     End If
 
-    ' Delete the selected FLEx text, preserving one empty paragraph.
-    ' Exclude the last paragraph mark so the paragraph shell remains.
+    ' ── Build OOXML for all words ────────────────────────────────────────────
+    Dim wordXMLs() As String
+    wordXMLs = BuildParagraphXML(wordArrays, lineTypes, morphWordArr, glossWordArr, _
+                                 hasLexGloss, targetFont)
+
+    ' ── Delete the selected FLEx text, keeping one empty paragraph ──────────
     Dim replaceRng As Range
     Set replaceRng = Selection.Range
     replaceRng.Start = replaceRng.Paragraphs(1).Range.Start
@@ -133,14 +143,43 @@ Public Sub FLExTextToWord()
     insertStart = replaceRng.Start
     replaceRng.Delete
 
-    ' Insert one OMath equation zone per word at the now-empty paragraph
+    ' ── FlatOPC file-based insertion ─────────────────────────────────────────
+    ' Range.InsertXML rejects <m:oMath> everywhere (Error 6145).
+    ' Solution: write the OOXML as a FlatOPC XML file — the single-file
+    ' variant of the OOXML package format that Word opens natively, exactly
+    ' like opening a FLEx export .docx.  Word's native file reader has no
+    ' restriction on math content.  We open the file, copy the equations,
+    ' paste inline, then delete the temp file.
+    Dim mainDoc As Document
+    Set mainDoc = ActiveDocument
+
+    Dim tmpPath As String
+    tmpPath = GetTempFilePath()
+    WriteXMLFile tmpPath, CreateFlatOpcXML(wordXMLs, targetFont)
+
+    ' Open the FlatOPC file — format 21 = wdOpenFormatXMLDocumentSerialized
+    Dim tmpDoc As Document
+    Set tmpDoc = Documents.Open(Filename:=tmpPath, Format:=21)
+
+    ' Copy first paragraph's content (exclude trailing paragraph mark)
+    Dim copyRng As Range
+    Set copyRng = tmpDoc.Paragraphs(1).Range
+    copyRng.End = copyRng.End - 1
+    copyRng.Copy
+
+    tmpDoc.Close SaveChanges:=False
+    On Error Resume Next
+    Kill tmpPath           ' delete temp file (best effort)
+    On Error GoTo ErrHandler
+
+    ' Paste inline at the insertion point
+    mainDoc.Activate
     Dim insertPt As Range
-    Set insertPt = ActiveDocument.Range(insertStart, insertStart)
+    Set insertPt = mainDoc.Range(insertStart, insertStart)
+    insertPt.Select
+    Selection.Paste
 
-    Call InsertIGTEquations(wordArrays, lineTypes, morphWordArr, glossWordArr, _
-                            hasLexGloss, targetFont, insertPt)
-
-    ' Insert free translation line(s) after the IGT paragraph
+    ' ── Insert free translation line(s) after the IGT paragraph ─────────────
     If UBound(freeLines) >= 0 Then
         Call InsertFreeLines(freeLines, targetFont)
     End If
@@ -395,23 +434,23 @@ End Function
 
 
 '=============================================================================
-' ── PARAGRAPH XML CONSTRUCTION ───────────────────────────────────────────────
+' ── IGT PARAGRAPH CONSTRUCTION ───────────────────────────────────────────────
 '=============================================================================
 
 Private Function BuildParagraphXML(wordArrays(), lineTypes() As String, _
         morphWordArr() As String, glossWordArr() As String, _
         hasLexGloss As Boolean, fontName As String) As String()
     '
-    ' Returns a 1-based String() array — one <m:oMath>…</m:oMath> per word.
-    ' FLExTextToWord inserts each into an OMath zone via OMaths.Add + InsertXML.
-    ' FLExTextToWord_DebugXML assembles them into a paragraph via AssembleParaXML.
+    ' Returns a 1-based String() — one <m:oMath>…</m:oMath> per word.
+    ' Collects per-tier values for each word position and delegates the
+    ' OOXML generation to BuildWordOMath.
     '
     Dim firstLine() As String
     firstLine = wordArrays(0)
     Dim numWords As Integer
     numWords = UBound(firstLine)   ' index 0 = line-type label; words start at 1
 
-    Dim words()        As String
+    Dim words() As String
     ReDim words(1 To numWords)
     Dim lexGlossOffset As Integer
     Dim missingText    As Boolean
@@ -421,16 +460,6 @@ Private Function BuildParagraphXML(wordArrays(), lineTypes() As String, _
     Dim w As Integer
     For w = 1 To numWords
 
-        ' Check for floating punctuation on first line (LO handles this too)
-        Dim firstLineWord As String
-        firstLineWord = firstLine(w)
-        Dim wOffset As Integer
-        wOffset = 0
-        ' (Punctuation-only tokens on line 0 are passed through as-is;
-        '  the LO code adjusts wO for such tokens — we keep it simpler here
-        '  since FLEx rarely produces floating punctuation in the clipboard text.)
-
-        ' ── Collect per-tier values for word position w ──────────────────────
         Dim tierValues() As String
         ReDim tierValues(0 To UBound(lineTypes))
 
@@ -442,7 +471,6 @@ Private Function BuildParagraphXML(wordArrays(), lineTypes() As String, _
             Select Case lineTypes(t)
 
                 Case "Word", "WordGloss", "WordCat"
-                    ' Word-level tier: one token per word, used directly
                     If w <= UBound(wa) Then
                         tierValues(t) = wa(w)
                     Else
@@ -450,34 +478,26 @@ Private Function BuildParagraphXML(wordArrays(), lineTypes() As String, _
                     End If
 
                 Case "Morphemes", "LexEntries"
-                    ' Morpheme-level tier: COLLAPSE morphemes into one word.
-                    ' Split on MORPH_SEP, keep divider chars, join back.
-                    ' Mirrors LO: words(t) = Join(Split(lineArrays(t)(wwO),"░"),"")
                     If w <= UBound(wa) Then
                         Dim morphParts() As String
                         morphParts = Split(wa(w), MORPH_SEP)
-                        tierValues(t) = Join(morphParts, "")  ' e.g. kata=te
+                        tierValues(t) = Join(morphParts, "")
                     Else
                         missingText = True
                     End If
 
                 Case "LexGloss"
-                    ' Gloss-level tier: assemble morpheme glosses + dividers
-                    ' into one string.  Mirrors LO LexGloss case in
-                    ' FLExTextToFrames, including lexGlossOffset tracking.
                     Dim gi As Integer
                     gi = w + lexGlossOffset
                     Dim ga() As String
                     ga = glossWordArr
 
                     If gi <= UBound(ga) Then
-                        tierValues(t) = ga(gi)   ' initial assignment
+                        tierValues(t) = ga(gi)
                     Else
                         missingGlosses = True
                     End If
 
-                    ' If this word has morpheme splits, gather the corresponding
-                    ' gloss tokens and assemble them with divider chars inline.
                     If UBound(morphWordArr) >= w And _
                        InStr(morphWordArr(w), MORPH_SEP) > 0 Then
 
@@ -489,12 +509,9 @@ Private Function BuildParagraphXML(wordArrays(), lineTypes() As String, _
                         Dim y As Integer
                         For y = 0 To UBound(mparts)
                             If InStr(MORPH_DIVIDERS, mparts(y)) > 0 Then
-                                ' It's a divider character (-, =, ~, etc.)
-                                ' Use the divider itself; it doesn't consume a gloss slot
                                 glossArray(y)  = mparts(y)
                                 lexGlossOffset = lexGlossOffset - 1
                             Else
-                                ' Actual morpheme — fetch the corresponding gloss token
                                 If gi + y <= UBound(ga) Then
                                     glossArray(y) = ga(gi + y)
                                 Else
@@ -503,110 +520,229 @@ Private Function BuildParagraphXML(wordArrays(), lineTypes() As String, _
                             End If
                         Next y
 
-                        ' Assemble: "carry.CMP" + "=" + "SEQ" → "carry.CMP=SEQ"
                         tierValues(t)  = Join(glossArray, "")
                         lexGlossOffset = lexGlossOffset + UBound(mparts)
                     End If
+
             End Select
         Next t
 
-        ' ── Build the OMML matrix frame for this word ─────────────────────────
-        words(w) = BuildWordOMath(tierValues, lineTypes, fontName)
+        words(w) = BuildWordOMath(tierValues, fontName)
     Next w
 
-    If missingText    Then MsgBox "Some lines appear to be missing text.",   vbInformation
+    If missingText    Then MsgBox "Some lines appear to be missing text.",    vbInformation
     If missingGlosses Then MsgBox "Some gloss lines appear to be incomplete.", vbInformation
 
     BuildParagraphXML = words
 End Function
 
+' ─────────────────────────────────────────────────────────────────────────────
 
-'=============================================================================
-' ── OMML MATRIX BUILDER ───────────────────────────────────────────────────────
-'=============================================================================
+Private Function GetTempFilePath() As String
+    ' Returns a unique temp file path with an .xml extension.
+    ' Uses the platform-appropriate temp directory.
+    Dim tmpDir As String
+    Dim sep    As String
+    #If Mac Then
+        tmpDir = Environ("TMPDIR")
+        sep    = "/"
+        If tmpDir = "" Then tmpDir = "/tmp/"
+    #Else
+        tmpDir = Environ("TEMP")
+        If tmpDir = "" Then tmpDir = Environ("TMP")
+        If tmpDir = "" Then tmpDir = "C:\Temp"
+        sep = "\"
+    #End If
+    If Right(tmpDir, 1) <> sep Then tmpDir = tmpDir & sep
+    GetTempFilePath = tmpDir & "flex_igt_" & Format(Now, "yyyymmddhhmmss") & ".xml"
+End Function
 
-Private Function BuildWordOMath(tierValues() As String, lineTypes() As String, _
-        fontName As String) As String
+' ─────────────────────────────────────────────────────────────────────────────
+
+Private Sub WriteXMLFile(filePath As String, content As String)
+    ' Writes an XML string to disk as a plain-text file.
+    ' Because XmlEsc encodes all non-ASCII characters as &#xNNNN; entities,
+    ' the content is pure ASCII and VBA's Open/Print/Close is safe on all
+    ' platforms (no ADODB or FSO dependency needed).
+    Dim fileNum As Integer
+    fileNum = FreeFile
+    Open filePath For Output As #fileNum
+    Print #fileNum, content
+    Close #fileNum
+End Sub
+
+' ─────────────────────────────────────────────────────────────────────────────
+
+Private Function CreateFlatOpcXML(wordXMLs() As String, fontName As String) As String
     '
-    ' Builds the OMML for one word:
+    ' Builds a FlatOPC XML package string from per-word <m:oMath> fragments.
+    ' FlatOPC (single-file OOXML) is opened by Word with
+    '   Documents.Open(Filename:=path, Format:=21)   ' wdOpenFormatXMLDocumentSerialized
+    ' Word's native file reader handles <m:oMath> freely — unlike InsertXML
+    ' which rejects math content at inline positions (Error 6145).
     '
-    '   <m:oMath>
-    '     outer 1×1 matrix
-    '       └─ inner 1×T matrix  (T = number of tiers)
-    '            row 0  vernacular  [italic]
-    '            row 1+ gloss/other [small caps on grammatical tokens]
-    '   </m:oMath>
+    ' Package structure (mirrors FLEx Word export):
+    '   /_rels/.rels          → points to word/document.xml
+    '   /word/document.xml    → one <w:p> with all oMath + space-run elements
     '
-    ' The 1-column design mirrors the LO macro (one frame per word, not per
-    ' morpheme).  Morpheme dividers appear inline in the cell text.
-    '
-    Dim innerRows As String
-    Dim t         As Integer
+    Const NS_PKG  As String = "http://schemas.microsoft.com/office/2006/xmlPackage"
+    Const NS_REL  As String = "http://schemas.openxmlformats.org/package/2006/relationships"
+    Const NS_W    As String = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    Const NS_M    As String = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+    Const TYPE_DOC As String = _
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+    Const CT_RELS As String = _
+        "application/vnd.openxmlformats-package.relationships+xml"
+    Const CT_DOC  As String = _
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
 
-    For t = 0 To UBound(tierValues)
-        Dim cellText As String
-        cellText = tierValues(t)
-        If cellText = "" Then cellText = " "   ' keep matrix shape
+    ' Build paragraph body: oMath elements interleaved with space runs
+    Dim paraBody As String
+    Dim w As Integer
+    For w = LBound(wordXMLs) To UBound(wordXMLs)
+        If w > LBound(wordXMLs) Then paraBody = paraBody & WRun(" ", fontName)
+        paraBody = paraBody & wordXMLs(w)
+    Next w
 
-        ' Trailing space matches FLEx Word export convention
-        If Right(cellText, 1) <> " " Then cellText = cellText & " "
+    ' Assemble the FlatOPC package
+    Dim x As String
+    x = "<?xml version=""1.0"" encoding=""utf-8""?>" & vbLf
+    x = x & "<?mso-application progid=""Word.Document""?>" & vbLf
+    x = x & "<pkg:package xmlns:pkg=""" & NS_PKG & """>" & vbLf
 
-        Dim cellXML As String
-        If t = 0 Then
-            ' Row 0: object language — italic, same as LO firstLineFrameStyle
-            cellXML = MathRun(cellText, fontName, True, False)
-        Else
-            ' Row 1+: gloss/other — small caps on grammatical tokens,
-            ' same as LO insertGlosses() applied to otherLineFrameStyle rows
-            cellXML = BuildGlossRunXML(cellText, fontName)
-        End If
+    '── /_rels/.rels ─────────────────────────────────────────────────────────
+    x = x & "<pkg:part pkg:name=""/_rels/.rels"""
+    x = x & " pkg:contentType=""" & CT_RELS & """"
+    x = x & " pkg:padding=""512"">" & vbLf
+    x = x & "<pkg:xmlData>"
+    x = x & "<Relationships xmlns=""" & NS_REL & """>"
+    x = x & "<Relationship Id=""rId1"" Type=""" & TYPE_DOC & """"
+    x = x & " Target=""word/document.xml""/>"
+    x = x & "</Relationships>"
+    x = x & "</pkg:xmlData></pkg:part>" & vbLf
 
-        innerRows = innerRows & "<m:mr><m:e>" & cellXML & "</m:e></m:mr>"
-    Next t
+    '── /word/document.xml ───────────────────────────────────────────────────
+    x = x & "<pkg:part pkg:name=""/word/document.xml"""
+    x = x & " pkg:contentType=""" & CT_DOC & """>" & vbLf
+    x = x & "<pkg:xmlData>"
+    x = x & "<w:document xmlns:w=""" & NS_W & """ xmlns:m=""" & NS_M & """>"
+    x = x & "<w:body>"
+    x = x & "<w:p>" & paraBody & "</w:p>"
+    x = x & "<w:sectPr/>"
+    x = x & "</w:body>"
+    x = x & "</w:document>"
+    x = x & "</pkg:xmlData></pkg:part>" & vbLf
 
-    ' Inner matrix: 1 column, T rows
-    Dim innerMat As String
-    innerMat = "<m:m>" & M_PROPS_1COL & innerRows & "</m:m>"
-
-    ' Outer matrix: 1 column, 1 row (wraps the inner matrix as a single unit)
-    Dim outerMat As String
-    outerMat = "<m:m>" & M_PROPS_1COL & "<m:mr><m:e>" & innerMat & "</m:e></m:mr></m:m>"
-
-    BuildWordOMath = "<m:oMath>" & outerMat & "</m:oMath>"
+    x = x & "</pkg:package>"
+    CreateFlatOpcXML = x
 End Function
 
 
 '=============================================================================
-' ── GLOSS FORMATTING ─────────────────────────────────────────────────────────
+' ── OMML GENERATION ──────────────────────────────────────────────────────────
 '=============================================================================
+
+Private Function BuildWordOMath(tierValues() As String, fontName As String) As String
+    '
+    ' Returns <m:oMath>…</m:oMath> for one IGT word: a T×1 matrix.
+    '   Row 0  — object language: italic, <m:nor/> overrides Cambria Math
+    '   Row 1+ — gloss/other:     upright; grammatical tokens in small caps
+    '
+    Dim innerRows As String
+    Dim t As Integer
+    For t = 0 To UBound(tierValues)
+        Dim cellText As String
+        cellText = tierValues(t)
+        If cellText = "" Then cellText = " "
+        If Right(cellText, 1) <> " " Then cellText = cellText & " "
+
+        Dim cellXML As String
+        If t = 0 Then
+            cellXML = MathRun(cellText, fontName, True, False)
+        Else
+            cellXML = BuildGlossRunXML(cellText, fontName)
+        End If
+        innerRows = innerRows & "<m:mr><m:e>" & cellXML & "</m:e></m:mr>"
+    Next t
+
+    Dim mat As String
+    mat = "<m:m>" & M_PROPS_1COL & innerRows & "</m:m>"
+    BuildWordOMath = "<m:oMath>" & mat & "</m:oMath>"
+End Function
+
+' ─────────────────────────────────────────────────────────────────────────────
 
 Private Function BuildGlossRunXML(text As String, fontName As String) As String
     '
-    ' Splits gloss text at morpheme punctuation and applies small caps to
-    ' grammatical tokens.  Mirrors LO insertGlosses() + splitPunctuation().
-    '
-    ' Example:  "carry.CMP=SEQ "
-    '   → segments: "carry", ".", "CMP", "=", "SEQ", " "
-    '   → output:   carry  .  CMP  =  SEQ  (CMP and SEQ in small caps)
+    ' Splits gloss text at morpheme punctuation; applies small caps to
+    ' grammatical tokens (stored as lowercase + <w:smallCaps/>).
     '
     Dim segs() As String
     segs = SplitPunctuation(text)
+    Dim result As String
+    Dim i As Integer
+    For i = 0 To UBound(segs)
+        If IsGrammatical(segs(i), text) Then
+            result = result & MathRun(LCase(segs(i)), fontName, False, True)
+        Else
+            result = result & MathRun(segs(i), fontName, False, False)
+        End If
+    Next i
+    BuildGlossRunXML = result
+End Function
+
+' ─────────────────────────────────────────────────────────────────────────────
+
+Private Function MathRun(text As String, fontName As String, _
+        isItalic As Boolean, isSmallCaps As Boolean) As String
+    '
+    ' One <m:r> element with:
+    '   <m:rPr><m:nor/></m:rPr>  — disables Cambria Math / math auto-italic
+    '   <w:rPr>…</w:rPr>         — explicit font, italic, small caps
+    '   <m:t>…</m:t>
+    '
+    Dim rPr As String
+    rPr = "<w:rPr><w:rFonts w:ascii=""" & fontName & """ w:hAnsi=""" & fontName & _
+          """ w:cs=""" & fontName & """ w:eastAsia=""" & fontName & """/>"
+    If isItalic    Then rPr = rPr & "<w:i/><w:iCs/>"
+    If isSmallCaps Then rPr = rPr & "<w:smallCaps/>"
+    rPr = rPr & "</w:rPr>"
+    MathRun = "<m:r><m:rPr><m:nor/></m:rPr>" & rPr & _
+              "<m:t xml:space=""preserve"">" & XmlEsc(text) & "</m:t></m:r>"
+End Function
+
+Private Function WRun(text As String, fontName As String) As String
+    ' Plain Word run — space between <m:oMath> elements in the paragraph
+    WRun = "<w:r><w:rPr><w:rFonts w:ascii=""" & fontName & _
+           """ w:hAnsi=""" & fontName & """/></w:rPr>" & _
+           "<w:t xml:space=""preserve"">" & XmlEsc(text) & "</w:t></w:r>"
+End Function
+
+Private Function XmlEsc(s As String) As String
+    ' Escapes XML special characters AND encodes all non-ASCII code points as
+    ' &#xNNNN; numeric character references.  This keeps the serialised file
+    ' pure ASCII so VBA's Open/Print/Close is safe on Windows (ANSI) and Mac
+    ' (UTF-8) alike — no ADODB.Stream or FSO needed.
+    s = Replace(s, "&", "&amp;")    ' must come first
+    s = Replace(s, "<", "&lt;")
+    s = Replace(s, ">", "&gt;")
 
     Dim result As String
     Dim i      As Integer
-    For i = 0 To UBound(segs)
-        Dim seg As String
-        seg = segs(i)
-        If IsGrammatical(seg, text) Then
-            ' Small caps: store as lowercase (display as small caps via w:smallCaps)
-            ' Mirrors LO: charCaseMap=4 + insertString(lcase(segment))
-            result = result & MathRun(LCase(seg), fontName, False, True)
+    Dim cp     As Long
+    Dim ch     As String
+    result = ""
+    For i = 1 To Len(s)
+        ch = Mid(s, i, 1)
+        cp = AscW(ch)
+        If cp < 0 Then cp = cp + 65536    ' AscW returns -ve for code points > 32767
+        If cp > 127 Then
+            result = result & "&#x" & Hex(cp) & ";"
         Else
-            result = result & MathRun(seg, fontName, False, False)
+            result = result & ch
         End If
     Next i
-
-    BuildGlossRunXML = result
+    XmlEsc = result
 End Function
 
 Private Function SplitPunctuation(text As String) As String()
@@ -709,75 +845,6 @@ End Function
 
 Private Function IsAlNum(c As String) As Boolean
     IsAlNum = (c >= "A" And c <= "Z") Or (c >= "a" And c <= "z") Or (c >= "0" And c <= "9")
-End Function
-
-
-'=============================================================================
-' ── LOW-LEVEL XML HELPERS ────────────────────────────────────────────────────
-'=============================================================================
-
-Private Function MathRun(text As String, fontName As String, _
-        isItalic As Boolean, isSmallCaps As Boolean) As String
-    '
-    ' Builds an <m:r> element:
-    '   <m:rPr><m:nor/></m:rPr>   ← disables Cambria Math / math-italic
-    '   <w:rPr>…</w:rPr>          ← explicit font + style (italic / small caps)
-    '   <m:t>…</m:t>
-    '
-    Dim rPr As String
-    rPr = "<w:rPr>" & _
-          "<w:rFonts w:ascii=""" & fontName & """ w:hAnsi=""" & fontName & _
-          """ w:cs=""" & fontName & """ w:eastAsia=""" & fontName & """/>"
-    If isItalic    Then rPr = rPr & "<w:i/><w:iCs/>"
-    If isSmallCaps Then rPr = rPr & "<w:smallCaps/>"
-    rPr = rPr & "</w:rPr>"
-
-    MathRun = "<m:r><m:rPr><m:nor/></m:rPr>" & rPr & _
-              "<m:t xml:space=""preserve"">" & XmlEsc(text) & "</m:t></m:r>"
-End Function
-
-Private Function WRun(text As String, fontName As String) As String
-    ' Plain Word run — used for spaces between <m:oMath> elements
-    WRun = "<w:r><w:rPr><w:rFonts w:ascii=""" & fontName & _
-           """ w:hAnsi=""" & fontName & """/></w:rPr>" & _
-           "<w:t xml:space=""preserve"">" & XmlEsc(text) & "</w:t></w:r>"
-End Function
-
-Private Function XmlEsc(s As String) As String
-    s = Replace(s, "&", "&amp;")
-    s = Replace(s, "<", "&lt;")
-    s = Replace(s, ">", "&gt;")
-    XmlEsc = s
-End Function
-
-Private Function OMathToMatXML(oMathXML As String) As String
-    ' Strips the <m:oMath> wrapper from a BuildWordOMath result and adds
-    ' standalone namespace declarations to the root <m:m> element, making
-    ' it suitable for Range.InsertXML into an existing OMath zone's Range.
-    ' Input:  <m:oMath><m:m>...</m:m></m:oMath>
-    ' Output: <m:m xmlns:m="..." xmlns:w="...">...</m:m>
-    Const NS As String = _
-        " xmlns:m=""http://schemas.openxmlformats.org/officeDocument/2006/math""" & _
-        " xmlns:w=""http://schemas.openxmlformats.org/wordprocessingml/2006/main"""
-    ' <m:oMath> = 8 chars;  </m:oMath> = 9 chars  →  strip 17 chars total
-    Dim inner As String
-    inner = Mid(oMathXML, 9, Len(oMathXML) - 17)
-    OMathToMatXML = Replace(inner, "<m:m>", "<m:m" & NS & ">", 1, 1)
-End Function
-
-Private Function AssembleParaXML(wordXMLs() As String, fontName As String) As String
-    ' Assembles per-word <m:oMath> strings into a full <w:body> paragraph XML.
-    ' Used by FLExTextToWord_DebugXML to produce a string for inspection.
-    Const NS As String = _
-        "xmlns:w=""http://schemas.openxmlformats.org/wordprocessingml/2006/main"" " & _
-        "xmlns:m=""http://schemas.openxmlformats.org/officeDocument/2006/math"""
-    Dim body As String
-    Dim w As Integer
-    For w = LBound(wordXMLs) To UBound(wordXMLs)
-        If w > LBound(wordXMLs) Then body = body & WRun(" ", fontName)
-        body = body & wordXMLs(w)
-    Next w
-    AssembleParaXML = "<w:body " & NS & "><w:p>" & body & "</w:p></w:body>"
 End Function
 
 
