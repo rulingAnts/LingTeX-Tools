@@ -257,6 +257,7 @@ jobs:
           projectPath: tauri
 
       - name: Upload Windows artifacts
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
