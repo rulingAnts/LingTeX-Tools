@@ -93,7 +93,7 @@ fn convert_for_profile(profile_id: &str, text: &str, cfg: &ActiveConfig) -> Opti
     } else if profile_id == "flex-tsv" {
         let blocks = convert::parse_flex_blocks(text);
         if blocks.is_empty() { return None; }
-        let result = convert::render_flex_tsv_auto(&blocks);
+        let result = convert::render_flex_tsv_auto(&blocks, &cfg.flex_opts);
         if result.trim().is_empty() { return None; }
         Some(result)
     } else {
@@ -139,11 +139,18 @@ fn convert_for_profile(profile_id: &str, text: &str, cfg: &ActiveConfig) -> Opti
 /// On macOS this requires Accessibility permission:
 /// System Settings → Privacy & Security → Accessibility.
 fn type_text(text: &str) {
-    use enigo::{Enigo, Keyboard, Settings};
+    use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 
     thread::sleep(Duration::from_millis(150));
     if let Ok(mut en) = Enigo::new(&Settings::default()) {
-        let _ = en.text(text);
+        for (i, segment) in text.split('\n').enumerate() {
+            if i > 0 {
+                let _ = en.key(Key::Return, Direction::Click);
+            }
+            if !segment.is_empty() {
+                let _ = en.text(segment);
+            }
+        }
     }
 }
 

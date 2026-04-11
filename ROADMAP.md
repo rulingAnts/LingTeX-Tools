@@ -31,6 +31,26 @@ receiving application's table styles apply cleanly.
 
 ## Future releases
 
+### OS-native line endings in Rust output (desktop global shortcut)
+**Scope:** Desktop (Rust backend)
+
+Currently the Rust render functions output `\n` line separators, and `type_text`
+in `lib.rs` splits on `\n` and presses `Key::Return` between segments to work
+around enigo's inability to type newline characters via `text()` on macOS.
+
+This approach works in most editors (Sublime Text, VS Code, Notepad++, plain
+text) but **produces blank lines in TeX Workshop** (VS Code's LaTeX extension),
+which is a known issue with the current release — see Known Issues below.
+
+A cleaner approach: have the render functions emit OS-native line endings
+(`\r` on macOS, `\r\n` on Windows, `\n` on Linux) using `cfg!` macros, then
+call `enigo::text()` directly without the split-and-Return workaround. On macOS
+`\r` (U+000D) is the Return character and should map correctly through
+`CGEventCreateKeyboardEvent`. Needs testing on all three platforms before
+committing to the change. If confirmed working, remove the line-splitting logic
+from `type_text` and update the load-bearing divergence comments in `convert.rs`
+and `docs/core.js`.
+
 ### Text abbreviation prompt
 **Scope:** All platforms
 
@@ -60,3 +80,21 @@ Paste a table from Excel or Word as a LaTeX `tabular` environment; copy a LaTeX
 
 Currently failing in CI due to Xcode signing issues. Target: bring parity with
 Chrome/Firefox for local install and App Store distribution.
+
+---
+
+## Known issues
+
+### Blank lines inserted when pasting into TeX Workshop (macOS desktop)
+**Affects:** Desktop app, macOS, global keyboard shortcut only
+
+The desktop app delivers converted output by simulating `Key::Return` keypresses
+between lines (via enigo). TeX Workshop (the LaTeX extension for VS Code)
+interprets these as blank lines, resulting in extra empty lines in the pasted
+output. Other editors (Sublime Text, VS Code without TeX Workshop, Notepad++,
+plain text editors) are not affected.
+
+**Workaround:** Use the in-app copy button and paste manually (`Cmd+V`) instead
+of the global keyboard shortcut.
+
+**Fix planned:** See "OS-native line endings" above.
