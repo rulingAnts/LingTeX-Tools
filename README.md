@@ -279,7 +279,7 @@ Pages serves.
 | Issue | Affected platforms |
 |---|---|
 | **Header row included in copy** — when selecting rows from the top of a Phonology Assistant or Dekereke table, the column-header row may be included in the clipboard selection. The converter will attempt to process it as data, producing a garbled first entry. Delete that entry from the output manually. | Phonology Assistant, Dekereke (all platforms) |
-| **Extra blank lines in TeX Workshop** — the desktop app delivers output by simulating keypresses; TeX Workshop (the LaTeX extension for VS Code) interprets the Return keypresses as blank lines. Works correctly in Sublime Text, VS Code without TeX Workshop, Notepad++, and plain text editors. **Workaround:** use the in-app Copy button and paste manually (`Cmd/Ctrl+V`). | Desktop app, macOS, global shortcut only |
+| **Extra blank lines in TeX Workshop / single-line undo** — the desktop app delivers output by simulating keypresses; TeX Workshop (the LaTeX extension for VS Code) interprets the Return keypresses as blank lines, and all editors record each line as a separate undo step. Works correctly in Sublime Text, VS Code without TeX Workshop, Notepad++, and plain text editors. **Workaround:** use the in-app Copy button and paste manually (`Cmd/Ctrl+V`) — this avoids both issues. | Desktop app, global shortcut only |
 
 ---
 
