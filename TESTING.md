@@ -10,12 +10,12 @@
 - [x] Active mode persists across page reload (localStorage)
 
 **LaTeX mode**
-- [x] Normal PA rows convert correctly (auto-detect off and on)
-- [x] Grouped PA rows (double leading tab) auto-correct with "Auto-detect grouped view" checked
-- [x] Skip logic works correctly after trim fires
-- [x] FLEx tab converts correctly
-- [x] localStorage persists settings across reload
-- [x] Add a custom tab — renders in the inner tab bar, not the mode bar
+- [ ] Normal PA rows convert correctly (auto-detect off and on)
+- [ ] Grouped PA rows (double leading tab) auto-correct with "Auto-detect grouped view" checked
+- [ ] Skip logic works correctly after trim fires
+- [ ] FLEx tab converts correctly
+- [ ] localStorage persists settings across reload
+- [ ] Add a custom tab — renders in the inner tab bar, not the mode bar
 - [ ] FLEx conversion to LaTeX still works (both list and individual, this version intially broke that).
 
 **Table/Spreadsheet mode**
