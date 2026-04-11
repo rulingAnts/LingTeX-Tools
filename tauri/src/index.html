@@ -426,13 +426,15 @@ textarea.out:focus { outline-color: #93c5fd; border-color: var(--slate-600); }
         <div class="cfg-body">
 
           <div class="cfg-row">
-            <label for="flex-gl">Gloss command</label>
-            <input type="text" id="flex-gl" value="\gl"
-              placeholder="\gl  or  \textsc  or empty to disable">
+            <label for="flex-gl">Grammatical gloss command</label>
+            <input type="text" id="flex-gl" value="\textsc"
+              placeholder="\textsc  or  \gl  or empty to disable">
           </div>
           <div class="cfg-hint">
-            Wraps all-caps abbreviations: <code>PST</code> → <code>\gl{pst}</code>.
-            Leave empty to disable.
+            Wraps all-caps abbreviations: e.g. <code>\textsc{pst}</code>.
+            Use <code>\gl</code> or <code>\acrshort</code> to link to an abbreviations list via
+            <a href="https://ctan.org/pkg/glossaries-extra" target="_blank" rel="noopener">glossaries-extra</a>.
+            Leave empty to disable wrapping.
           </div>
 
           <!-- TODO (future release): wire up \begin{exe} wrapping toggle;

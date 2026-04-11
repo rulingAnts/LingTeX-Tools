@@ -281,7 +281,7 @@
      * Render a parsed FLEx block to a langsci-gb4e \gll block.
      * @param  {object} ex       Result of parseFLExBlock()
      * @param  {object} [opts]
-     * @param  {string} [opts.glCmd='\\gl']          Gloss abbreviation command
+     * @param  {string} [opts.glCmd='\\textsc']       Gloss abbreviation command
      * @param  {string} [opts.txtrefCmd='\\txtref']  Source-reference command ('' to omit)
      * @param  {string} [opts.txtrefPrefix='TXT:']   Prefix inside \txtref{}
      * @param  {boolean} [opts.wrapExe=true]         Wrap in \begin{exe}\ex...\end{exe}
@@ -289,7 +289,7 @@
      */
     function renderFLEx(ex, opts) {
         opts = opts || {};
-        var glCmd        = opts.glCmd        !== undefined ? opts.glCmd        : '\\gl';
+        var glCmd        = opts.glCmd        !== undefined ? opts.glCmd        : '\\textsc';
         var txtrefCmd    = opts.txtrefCmd    !== undefined ? opts.txtrefCmd    : '\\txtref';
         var txtrefPrefix = opts.txtrefPrefix !== undefined ? opts.txtrefPrefix : 'TXT:';
         var wrapExe      = opts.wrapExe      !== undefined ? opts.wrapExe      : true;
@@ -402,7 +402,7 @@
      * Returns an array of parsed block objects (result of parseFLExBlock).
      * Blocks with no recognisable tier lines are silently dropped.
      * @param  {string} raw
-     * @returns {Array<{ lineTypes: string[], lineArrays: string[][], freeLines: string[], lineNum: string|null }>}
+     * @returns {Array<{ lineTypes: string[], colArrays: string[][], freeLines: string[], lineNum: string|null }>}
      */
     function parseFLExBlocks(raw) {
         var text = raw.replace(/\r\n?/g, '\n');

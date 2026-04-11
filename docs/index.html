@@ -861,14 +861,17 @@ footer a:hover { text-decoration: underline; }
 
         <div class="cfg-row">
           <label for="flex-gl">Grammatical gloss command</label>
-          <input type="text" id="flex-gl" value="\gl"
-            placeholder="\gl  or  \textsc  or leave empty for no wrapping"
+          <input type="text" id="flex-gl" value="\textsc"
+            placeholder="\textsc  or  \gl  or leave empty for no wrapping"
             oninput="convertFlex()">
         </div>
         <div class="cfg-hint">
-          Wraps all-caps abbreviations like <code>PST</code>, <code>3SG</code>.
-          Default: <code>\gl{pst}</code>.
-          Set to <code>\textsc</code> for standard small-caps, or leave <strong>empty</strong> to disable wrapping entirely.
+          Wraps all-caps abbreviations like <code>PST</code>, <code>3SG</code> — e.g. <code>\textsc{pst}</code>.
+          Use <code>\textsc</code> for standard small-caps (no extra packages).
+          Use <code>\gl</code> or <code>\acrshort</code> to link glosses to an abbreviations list via
+          <a href="https://ctan.org/pkg/glossaries-extra" target="_blank" rel="noopener">glossaries-extra</a>
+          (with <code>\setabbreviationstyle{short-sc}</code> for small-caps output).
+          Leave <strong>empty</strong> to disable wrapping entirely.
         </div>
 
         <!-- TODO (future release): wire up \begin{exe} wrapping toggle;
@@ -1102,7 +1105,7 @@ function convertFlex() {
         });
         outEl.value = latex;
         var first = blocks[0];
-        var words = (first.lineArrays[0] || []).length - 1;
+        var words = (first.colArrays[0] || []).length - 1;
         var msg = blocks.length > 1
             ? 'Converted ' + blocks.length + ' blocks'
             : 'Converted ' + words + ' word(s)' +
@@ -1132,7 +1135,7 @@ function convertFlexTSV() {
         var tsv = LingTeXCore.renderFLExTSVAuto(blocks);
         outEl.value = tsv;
         var first = blocks[0];
-        var words = (first.lineArrays[0] || []).length - 1;
+        var words = (first.colArrays[0] || []).length - 1;
         var msg = blocks.length > 1
             ? 'Converted ' + blocks.length + ' blocks'
             : 'Converted ' + words + ' word(s)';
