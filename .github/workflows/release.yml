@@ -211,13 +211,18 @@ jobs:
         with:
           workingDirectory: tauri/src-tauri
 
-      - name: Build and upload macOS desktop app
+      - name: Build macOS desktop app
         uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: tauri
-          releaseId: ${{ needs.create-release.outputs.release_id }}
+
+      - name: Upload macOS artifact
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DMG=$(find tauri/src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
+          cp "$DMG" lingtex-tools-macos.dmg
+          gh release upload ${{ github.ref_name }} lingtex-tools-macos.dmg
 
   # ── 4. Desktop app — Windows ───────────────────────────────────────────────
   desktop-windows:
@@ -246,13 +251,20 @@ jobs:
         with:
           workingDirectory: tauri/src-tauri
 
-      - name: Build and upload Windows desktop app
+      - name: Build Windows desktop app
         uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: tauri
-          releaseId: ${{ needs.create-release.outputs.release_id }}
+
+      - name: Upload Windows artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXE=$(find tauri/src-tauri/target/release/bundle/nsis -name "*-setup.exe" | head -1)
+          MSI=$(find tauri/src-tauri/target/release/bundle/msi -name "*.msi" | head -1)
+          cp "$EXE" lingtex-tools-windows-setup.exe
+          cp "$MSI" lingtex-tools-windows.msi
+          gh release upload ${{ github.ref_name }} lingtex-tools-windows-setup.exe lingtex-tools-windows.msi
 
   # ── 5. Desktop app — Linux ─────────────────────────────────────────────────
   # Linux is community-maintained and has not been tested by the developer.
@@ -294,15 +306,22 @@ jobs:
         with:
           workingDirectory: tauri/src-tauri
 
-      - name: Build and upload Linux desktop app
+      - name: Build Linux desktop app
         uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: tauri
-          releaseId: ${{ needs.create-release.outputs.release_id }}
 
-  # ── 6. Publish (un-draft) and update download links on the website ──────────
+      - name: Upload Linux artifacts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DEB=$(find tauri/src-tauri/target/release/bundle/deb -name "*.deb" | head -1)
+          APPIMAGE=$(find tauri/src-tauri/target/release/bundle/appimage -name "*.AppImage" | head -1)
+          cp "$DEB" lingtex-tools-linux.deb
+          cp "$APPIMAGE" lingtex-tools-linux.AppImage
+          gh release upload ${{ github.ref_name }} lingtex-tools-linux.deb lingtex-tools-linux.AppImage
+
+  # ── 6. Publish (un-draft) the release ─────────────────────────────────────
   publish-release:
     needs: [extensions, desktop-macos, desktop-windows, desktop-linux]
     runs-on: ubuntu-latest
@@ -311,30 +330,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release edit ${{ github.ref_name }} --draft=false --repo ${{ github.repository }}
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # Upload version-agnostic aliases so the website's releases/latest/download/ links
-      # always resolve to the correct file regardless of version number in the filename.
-      - name: Upload version-agnostic download aliases
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p /tmp/aliases
-          gh release download ${{ github.ref_name }} --repo ${{ github.repository }} \
-            --pattern "*.dmg" --pattern "*-setup.exe" --pattern "*.msi" \
-            --pattern "*.deb" --pattern "*.AppImage" \
-            --dir /tmp/aliases
-          cd /tmp/aliases
-          for f in *.dmg;        do cp "$f" lingtex-tools-macos.dmg;            done
-          for f in *-setup.exe;  do cp "$f" lingtex-tools-windows-setup.exe;    done
-          for f in *_en-US.msi;  do cp "$f" lingtex-tools-windows.msi;          done
-          for f in *.deb;        do cp "$f" lingtex-tools-linux.deb;             done
-          for f in *.AppImage;   do cp "$f" lingtex-tools-linux.AppImage;        done
-          gh release upload ${{ github.ref_name }} --repo ${{ github.repository }} --clobber \
-            lingtex-tools-macos.dmg \
-            lingtex-tools-windows-setup.exe \
-            lingtex-tools-windows.msi \
-            lingtex-tools-linux.deb \
-            lingtex-tools-linux.AppImage
