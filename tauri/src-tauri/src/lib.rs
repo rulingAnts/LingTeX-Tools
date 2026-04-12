@@ -139,8 +139,8 @@ fn convert_for_profile(profile_id: &str, text: &str, cfg: &ActiveConfig) -> Opti
 /// On macOS this requires Accessibility permission:
 /// System Settings → Privacy & Security → Accessibility.
 ///
-/// On Windows, enigo accepts \r\n in a single text() call, so we inject the
-/// whole block at once. On macOS/Linux, we split on \n and press Key::Return
+/// On Windows, we attempt to inject the whole block at once via text() with
+/// bare \n characters. On macOS/Linux, we split on \n and press Key::Return
 /// between segments, which is required for newlines to register correctly.
 fn type_text(text: &str) {
     use enigo::{Direction, Enigo, Key, Keyboard, Settings};
@@ -149,8 +149,7 @@ fn type_text(text: &str) {
     if let Ok(mut en) = Enigo::new(&Settings::default()) {
         #[cfg(target_os = "windows")]
         {
-            let windows_text = text.replace('\n', "\r\n");
-            let _ = en.text(&windows_text);
+            let _ = en.text(text);
         }
 
         #[cfg(not(target_os = "windows"))]
