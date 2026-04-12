@@ -39,6 +39,16 @@ When you first launch the app, macOS will prompt you to grant
 This permission is required for global keyboard shortcuts and Auto re-copy to work.
 If you accidentally dismiss the prompt, you can grant it manually in System Settings.
 
+**Step 3 — After every update: re-grant Accessibility access**
+
+macOS ties the Accessibility permission to the specific app binary. Installing a new version
+replaces the binary, so macOS silently revokes the permission and global shortcuts stop working.
+
+After each update, go to **System Settings → Privacy & Security → Accessibility**,
+find LingTeX Tools, **remove it** (click the − button), then **add it again** (click +
+and navigate to `/Applications/LingTeX Tools.app`). Global shortcuts will not work
+until you do this.
+
 ### Linux — community-maintained
 
 The Linux build has **not been tested by the developer** — there is no Linux test machine.
