@@ -700,6 +700,14 @@ footer a:hover { text-decoration: underline; }
           LingTeX Tools in <em>System Settings → Privacy &amp; Security → Accessibility</em>.
           This is required for global keyboard shortcuts to work.
         </li>
+        <li>
+          <strong>After every update: re-grant Accessibility access</strong> — macOS ties
+          the permission to the specific app binary. Installing a new version replaces the
+          binary and silently revokes the permission, so global shortcuts stop working.
+          After each update, open <em>System Settings → Privacy &amp; Security → Accessibility</em>,
+          remove LingTeX Tools (− button), then add it again (+ button →
+          <code>/Applications/LingTeX Tools.app</code>).
+        </li>
       </ol>
     </div>
   </div>

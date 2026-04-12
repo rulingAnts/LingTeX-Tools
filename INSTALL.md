@@ -49,6 +49,12 @@ find LingTeX Tools, **remove it** (click the − button), then **add it again** 
 and navigate to `/Applications/LingTeX Tools.app`). Global shortcuts will not work
 until you do this.
 
+### Windows — upgrading
+
+If the app misbehaves after installing a new version, fully uninstall the old version first
+via **Settings → Add or remove programs → LingTeX Tools → Uninstall**, then install the new version.
+The upgrade path is not yet fully reliable and is under investigation for a future release.
+
 ### Linux — community-maintained
 
 The Linux build has **not been tested by the developer** — there is no Linux test machine.
