@@ -138,11 +138,22 @@ fn convert_for_profile(profile_id: &str, text: &str, cfg: &ActiveConfig) -> Opti
 /// start typing, preventing modifier bleed.
 /// On macOS this requires Accessibility permission:
 /// System Settings → Privacy & Security → Accessibility.
+///
+/// On Windows, enigo accepts \r\n in a single text() call, so we inject the
+/// whole block at once. On macOS/Linux, we split on \n and press Key::Return
+/// between segments, which is required for newlines to register correctly.
 fn type_text(text: &str) {
     use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 
     thread::sleep(Duration::from_millis(150));
     if let Ok(mut en) = Enigo::new(&Settings::default()) {
+        #[cfg(target_os = "windows")]
+        {
+            let windows_text = text.replace('\n', "\r\n");
+            let _ = en.text(&windows_text);
+        }
+
+        #[cfg(not(target_os = "windows"))]
         for (i, segment) in text.split('\n').enumerate() {
             if i > 0 {
                 let _ = en.key(Key::Return, Direction::Click);
