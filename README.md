@@ -280,6 +280,8 @@ Pages serves.
 |---|---|
 | **Header row included in copy** — when selecting rows from the top of a Phonology Assistant or Dekereke table, the column-header row may be included in the clipboard selection. The converter will attempt to process it as data, producing a garbled first entry. Delete that entry from the output manually. | Phonology Assistant, Dekereke (all platforms) |
 | **Extra blank lines in TeX Workshop / single-line undo** — the desktop app delivers output by simulating keypresses; TeX Workshop (the LaTeX extension for VS Code) interprets the Return keypresses as blank lines, and all editors record each line as a separate undo step. Works correctly in Sublime Text, VS Code without TeX Workshop, Notepad++, and plain text editors. **Workaround:** use the in-app Copy button and paste manually (`Cmd/Ctrl+V`) — this avoids both issues. | Desktop app, global shortcut only |
+| **macOS: global shortcuts stop working after an update** — macOS ties the Accessibility permission to the specific app binary. Installing a new version silently revokes it. After each update, open **System Settings → Privacy & Security → Accessibility**, remove LingTeX Tools (− button), and add it again (+ → `/Applications/LingTeX Tools.app`). | Desktop app, macOS only |
+| **Windows: upgrading over an existing install may not work correctly** — if the app misbehaves after updating, fully uninstall LingTeX Tools via Settings → Add or remove programs, then install the new version fresh. Under investigation for a future release. | Desktop app, Windows only |
 
 ---
 

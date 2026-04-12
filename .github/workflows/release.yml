@@ -41,7 +41,7 @@ jobs:
 
             Download the installer for your platform from the assets below.
 
-            **macOS — required first-launch steps (app is unsigned):**
+            **macOS — required steps (app is unsigned):**
 
             1. After installing, right-click `LingTeX Tools.app` → **Open**, then click **Open** again in the security dialog.
                Or run once in Terminal:
@@ -51,6 +51,15 @@ jobs:
             2. When prompted, grant **Accessibility** access in
                **System Settings → Privacy & Security → Accessibility**.
                This is required for global keyboard shortcuts and Auto re-copy to work.
+            3. **Every update:** macOS ties the Accessibility permission to the specific app binary.
+               After installing a new version, open **System Settings → Privacy & Security → Accessibility**,
+               remove LingTeX Tools (− button), then add it again (+ → `/Applications/LingTeX Tools.app`).
+               Global shortcuts will not work until you do this.
+
+            **Windows — upgrading:**
+            If the app misbehaves after updating, fully uninstall the old version first
+            (**Settings → Add or remove programs → LingTeX Tools → Uninstall**), then install the new version.
+            The upgrade path is not yet fully reliable.
 
             ---
 
