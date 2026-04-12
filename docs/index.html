@@ -843,6 +843,45 @@ footer a:hover { text-decoration: underline; }
   </div>
 </section>
 
+<!-- ── Known issues ──────────────────────────────────────────────────────── -->
+<section style="background:#fff8f0; border-top:1px solid var(--slate-200); padding:36px 20px 40px;">
+  <div style="max-width:760px; margin:0 auto;">
+    <h2 style="font-size:1.0625rem; font-weight:700; color:var(--slate-900); margin-bottom:14px;">⚠ Known Issues</h2>
+    <div style="display:flex; flex-direction:column; gap:12px; font-size:0.9rem; color:var(--slate-700);">
+
+      <div style="padding:10px 14px; background:#fff; border:1px solid var(--slate-200); border-radius:6px;">
+        <strong>FLEx: blank morpheme cells cause column misalignment</strong> —
+        If a morpheme is missing data in the selected writing system, FLEx exports a blank cell for that column,
+        shifting the gloss row out of alignment and producing garbled or phantom tokens in the output.
+        <strong>Workaround:</strong> in FLEx, use a writing system in which all morphemes have forms,
+        or add the missing forms before copying.
+      </div>
+
+      <div style="padding:10px 14px; background:#fff; border:1px solid var(--slate-200); border-radius:6px;">
+        <strong>Header row included in copy</strong> —
+        When selecting from the top of a Phonology Assistant or Dekereke table, the column-header row may be
+        included in the clipboard selection and processed as data, producing a garbled first entry.
+        Delete it from the output manually.
+      </div>
+
+      <div style="padding:10px 14px; background:#fff; border:1px solid var(--slate-200); border-radius:6px;">
+        <strong>Windows: global shortcut can't fire twice in a row</strong> —
+        On Windows the shortcut writes output to the clipboard and simulates Ctrl+V, so the converted result
+        replaces the original source. Firing the shortcut again without copying new source text will produce nothing.
+        You only need to fire it once — the result stays in the clipboard and you can paste again with plain Ctrl+V.
+      </div>
+
+      <div style="padding:10px 14px; background:#fff; border:1px solid var(--slate-200); border-radius:6px;">
+        <strong>macOS: global shortcuts stop working after an update</strong> —
+        macOS ties the Accessibility permission to the specific app binary. After each update, open
+        <em>System Settings → Privacy &amp; Security → Accessibility</em>, remove LingTeX Tools (− button),
+        then add it again (+ → <code>/Applications/LingTeX Tools.app</code>).
+      </div>
+
+    </div>
+  </div>
+</section>
+
 <!-- ── Try it online ─────────────────────────────────────────────────────── -->
 <div class="try-online-bar" id="try-online">
   <div class="try-online-hdr">
