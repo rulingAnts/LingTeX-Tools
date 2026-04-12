@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "LingTeX Tools",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Convert FLEx, Phonology Assistant, and TSV data to LaTeX as you paste. Press Ctrl+Shift+V / ⌘⇧V to smart-paste anywhere.",
 
   "permissions": [
