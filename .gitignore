@@ -29,6 +29,12 @@ dist/
 # Rust build cache — can be several GB; fully reproducible via `cargo build`
 tauri/src-tauri/target/
 
+# Machine-local Cargo config — contains platform-specific linker/compiler
+# overrides (e.g. lld-link + clang-cl on ARM64 Windows) that are not portable.
+# Each developer maintains their own copy; see tauri/src-tauri/README-windows-dev.md
+# for the Windows setup.
+tauri/src-tauri/.cargo/
+
 # Tauri-generated capability schemas — recreated on every `cargo tauri build/dev`
 tauri/src-tauri/gen/
 
