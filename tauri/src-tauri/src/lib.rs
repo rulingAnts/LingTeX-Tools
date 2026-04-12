@@ -131,28 +131,35 @@ fn convert_for_profile(profile_id: &str, text: &str, cfg: &ActiveConfig) -> Opti
     }
 }
 
-/// Type `text` directly at the current cursor position using enigo's virtual
-/// keyboard, without touching the clipboard at all.
+/// Deliver `text` to the application that was focused when the shortcut fired.
 ///
-/// A 150 ms pause lets the triggering shortcut keys fully release before we
-/// start typing, preventing modifier bleed.
-/// On macOS this requires Accessibility permission:
-/// System Settings → Privacy & Security → Accessibility.
+/// ╔══════════════════════════════════════════════════════════════════════════╗
+/// ║  PERMANENT PLATFORM SPLIT — DO NOT UNIFY WITHOUT THOROUGH RE-TESTING   ║
+/// ║                                                                          ║
+/// ║  macOS  → enigo virtual-keyboard injection                               ║
+/// ║           Works reliably in native apps AND browser extensions           ║
+/// ║           (extensions receive key events, not clipboard changes).        ║
+/// ║           Requires Accessibility permission (Privacy & Security).        ║
+/// ║                                                                          ║
+/// ║  Windows / Linux → clipboard-swap + simulated Ctrl+V                    ║
+/// ║           enigo text injection was unreliable on Windows for multi-byte  ║
+/// ║           Unicode (IPA, combining diacritics, etc.).  Writing to the     ║
+/// ║           clipboard and pasting is the only approach that works across   ║
+/// ║           all Windows target apps.  A 400 ms settle delay is required    ║
+/// ║           before the paste keystroke so Windows has time to propagate    ║
+/// ║           the clipboard update.                                           ║
+/// ╚══════════════════════════════════════════════════════════════════════════╝
 ///
-/// On Windows, we attempt to inject the whole block at once via text() with
-/// bare \n characters. On macOS/Linux, we split on \n and press Key::Return
-/// between segments, which is required for newlines to register correctly.
+/// A 150 ms initial pause lets the triggering shortcut keys fully release
+/// before we act, preventing modifier bleed on all platforms.
 fn type_text(text: &str) {
     use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 
     thread::sleep(Duration::from_millis(150));
-    if let Ok(mut en) = Enigo::new(&Settings::default()) {
-        #[cfg(target_os = "windows")]
-        {
-            let _ = en.text(text);
-        }
 
-        #[cfg(not(target_os = "windows"))]
+    // ── macOS: enigo virtual-keyboard injection (see platform note above) ──
+    #[cfg(target_os = "macos")]
+    if let Ok(mut en) = Enigo::new(&Settings::default()) {
         for (i, segment) in text.split('\n').enumerate() {
             if i > 0 {
                 let _ = en.key(Key::Return, Direction::Click);
@@ -160,6 +167,26 @@ fn type_text(text: &str) {
             if !segment.is_empty() {
                 let _ = en.text(segment);
             }
+        }
+    }
+
+    // ── Windows / Linux: clipboard-swap + Ctrl+V (see platform note above) ─
+    #[cfg(not(target_os = "macos"))]
+    {
+        let mut cb = match arboard::Clipboard::new() {
+            Ok(c)  => c,
+            Err(_) => return,
+        };
+        if cb.set_text(text).is_err() { return; }
+        drop(cb); // release before pasting
+
+        // Give Windows time to propagate the clipboard update.
+        thread::sleep(Duration::from_millis(400));
+
+        if let Ok(mut en) = Enigo::new(&Settings::default()) {
+            let _ = en.key(Key::Control,      Direction::Press);
+            let _ = en.key(Key::Unicode('v'), Direction::Click);
+            let _ = en.key(Key::Control,      Direction::Release);
         }
     }
 }
