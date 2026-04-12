@@ -658,7 +658,11 @@ footer a:hover { text-decoration: underline; }
       Choose your output mode — <em>LaTeX</em>, <em>Table/Spreadsheet</em>, or (coming soon) <em>XLingPaper</em> —
       and configure keyboard shortcuts that work <em>system-wide</em> in any editor, web-based or desktop.
       When you press a shortcut, the app reads your clipboard, converts it, and
-      types the result directly at the cursor — no clipboard modification.
+      delivers the result at your cursor.
+      On macOS this uses keyboard injection (your clipboard is untouched).
+      On Windows the result is written to the clipboard and pasted — so after
+      a shortcut fires, the converted text stays in your clipboard and you can
+      paste it again with a plain Ctrl+V.
       Shortcuts fire regardless of which mode or tab is currently open.
     </p>
     <ul class="card-features">
@@ -709,6 +713,15 @@ footer a:hover { text-decoration: underline; }
           <code>/Applications/LingTeX Tools.app</code>).
         </li>
       </ol>
+    </div>
+    <div class="windows-note" style="margin-top:1em; padding:0.75em 1em; background:#fff8e1; border-left:4px solid #f59e0b; border-radius:4px; font-size:0.92em;">
+      <strong>🪟 Windows — known limitation:</strong>
+      On Windows, the global shortcut delivers output by writing to the clipboard and
+      simulating Ctrl+V. This means firing the shortcut twice in a row without copying
+      new source text first will attempt to re-convert the already-converted output and
+      produce nothing. <strong>You only need to fire it once</strong> — the converted
+      result stays in your clipboard afterwards, so you can paste again with a plain
+      Ctrl+V as many times as you like.
     </div>
   </div>
 
