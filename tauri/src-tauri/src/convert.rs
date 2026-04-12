@@ -296,7 +296,14 @@ fn group_words_from_columns(
     let mut current_word: Option<Word> = None;
     let n = morphemes.len();
 
-    for col in start_idx..n {
+    // NOTE: this must be a while loop, not a for loop.  When a morpheme has an
+    // empty gloss and the following columns have empty morphemes with glosses
+    // (e.g. "bida □ □ =hi" / "□ throw .CMP ABIL"), the lookahead below
+    // pre-consumes those empty-morpheme columns into the current word's
+    // gloss_parts.  We then advance `col` past them so they are not visited
+    // again — a for loop cannot skip iterations mid-range.
+    let mut col = start_idx;
+    while col < n {
         let m = morphemes.get(col).map(|s| s.trim()).unwrap_or("");
         let g = lex_glosses.get(col).map(|s| s.trim()).unwrap_or("");
 
@@ -339,7 +346,11 @@ fn group_words_from_columns(
                     },
                 };
 
-                // If direct gloss is empty, collect from following empty-morpheme columns
+                // If direct gloss is empty, look ahead through consecutive
+                // empty-morpheme columns and collect their glosses into this
+                // word.  Advance `col` past those consumed columns so the
+                // outer while loop does not re-visit them and create spurious
+                // standalone words.
                 if g.is_empty() {
                     let mut col_idx = col + 1;
                     while col_idx < n
@@ -354,6 +365,10 @@ fn group_words_from_columns(
                         }
                         col_idx += 1;
                     }
+                    // Jump outer loop to the first non-consumed column.
+                    col = col_idx;
+                    current_word = Some(word);
+                    continue; // skip the col += 1 below
                 }
 
                 current_word = Some(word);
@@ -370,6 +385,7 @@ fn group_words_from_columns(
                 });
             }
         }
+        col += 1;
     }
 
     if let Some(cw) = current_word {
