@@ -32,6 +32,14 @@
     var SENTINEL   = '\u2591';    // ░  internal morpheme-boundary sentinel
     var MORPH_DIVS = '-=~<>';
 
+    // Unicode directional marks FLEx sprinkles through clipboard text. On Free/Lit
+    // lines they bracket an optional writing-system code (e.g. <LRM>Eng<LRM>).
+    var DIR_CLASS = '‎‏‪-‮';
+    // Leading writing-system code: optional marks/spaces, a short alphabetic
+    // token, then a directional mark. A genuine first word of a translation is
+    // followed by a space (not a mark), so it never matches.
+    var CODE_RE   = new RegExp('^[\\s' + DIR_CLASS + ']*[A-Za-z]{1,5}[' + DIR_CLASS + ']');
+
     // ── low-level helpers ────────────────────────────────────────────────────
 
     function stripInvisible(s) {
@@ -44,7 +52,18 @@
         s = s.replace(/\\[a-zA-Z]+\{[^}]*\}/g, function (m) {
             ph.push(m); return M + (ph.length - 1) + '\x00';
         });
-        s = s.replace(/([%$#&_{}])/g, '\\$1');
+        // Single pass so replacement text (which itself contains braces) is not
+        // re-escaped. Covers _ % $ # & { } plus backslash, tilde, caret.
+        s = s.replace(/[\\{}%$#&_~^]/g, function (ch) {
+            switch (ch) {
+                case '\\': return '\\textbackslash{}';
+                case '~':  return '\\textasciitilde{}';
+                case '^':  return '\\textasciicircum{}';
+                case '{':  return '\\{';
+                case '}':  return '\\}';
+                default:   return '\\' + ch;     // % $ # & _
+            }
+        });
         s = s.replace(new RegExp(M + '(\\d+)\x00', 'g'),
             function (_, i) { return ph[Number(i)]; });
         return s;
@@ -174,6 +193,12 @@
      * @param  {string} raw
      * @returns {{ lineTypes: string[], colArrays: string[][], freeLines: string[], lineNum: string|null }}
      */
+    // Strip a leading writing-system code (mark-delimited) from a Free/Lit remainder.
+    function stripWsCode(rest) {
+        var m = CODE_RE.exec(rest);
+        return m ? rest.slice(m[0].length) : rest;
+    }
+
     function parseFLExBlock(raw) {
         var text     = raw.replace(/\r\n?/g, '\n');
         var blockEnd = text.indexOf('\n\n');
@@ -182,12 +207,16 @@
         var lineTypes  = [];
         var colArrays  = [];
         var freeLines  = [];
+        var litLines   = [];
         var lineNum    = null;
         var seenFree   = false;
+        var lastLabel  = 'free';
 
         var rawLines = text.split('\n')
-            .map(function (l) { return String(l).replace(/[ \t]+$/, ''); })
-            .filter(function (l) { return l.replace(/^\s+/, '') !== ''; });
+            // Strip trailing SPACES only — trailing tabs are significant columns
+            // (FLEx pads short tiers with empty cells; trimming them drops glosses).
+            .map(function (l) { return String(l).replace(/[ ]+$/, ''); })
+            .filter(function (l) { return stripInvisible(l).trim() !== ''; });
 
         for (var i = 0; i < rawLines.length; i++) {
             var l = rawLines[i];
@@ -202,21 +231,26 @@
                 }
             }
 
+            // Free / Lit translation line (marks preserved so a ws code can be
+            // detected — FLEx brackets the code with directional marks).
+            var head = l.replace(new RegExp('^[\\s' + DIR_CLASS + ']+'), '');
+            var labelMatch = head.match(/^(Free\b|Lit\.)/i);
+            if (labelMatch) {
+                seenFree  = true;
+                lastLabel = /^Lit/i.test(labelMatch[1]) ? 'lit' : 'free';
+                var ft = stripInvisible(stripWsCode(head.slice(labelMatch[1].length))).trim();
+                if (ft) (lastLabel === 'lit' ? litLines : freeLines).push(ft);
+                continue;
+            }
+
+            // Continuation line carrying an additional writing system (e.g. " Ind …")
+            if (seenFree && CODE_RE.test(l)) {
+                var cont = stripInvisible(stripWsCode(l)).trim();
+                if (cont) (lastLabel === 'lit' ? litLines : freeLines).push(cont);
+                continue;
+            }
+
             var lClean = stripInvisible(l).trim();
-
-            if (/^Free\b/i.test(lClean)) {
-                seenFree = true;
-                var ft = lClean.replace(/^Free\b(\s+[A-Za-z]{2,8})?\s*/i, '').trim();
-                if (ft) freeLines.push(ft);
-                continue;
-            }
-
-            if (seenFree && /^[A-Za-z]{2,8}(\s|$)/.test(lClean)) {
-                var ft2 = lClean.replace(/^[A-Za-z]{2,8}\s*/, '').trim();
-                if (ft2) freeLines.push(ft2);
-                continue;
-            }
-
             var cols;
             if (l.indexOf('\t') !== -1) {
                 // Tab-column FLEx format: parse as raw column array
@@ -244,7 +278,7 @@
         }
 
         return { lineTypes: lineTypes, colArrays: colArrays,
-                 freeLines: freeLines, lineNum: lineNum };
+                 freeLines: freeLines, litLines: litLines, lineNum: lineNum };
     }
 
     // ── Word-grouping algorithm (tab-format columns) ──────────────────────────
@@ -258,53 +292,107 @@
      * @param  {number}  startIdx     Index of first data column (after label)
      * @returns {Array<{ form: string, glossParts: string[] }>}
      */
-    function groupWordsFromColumns(morphemes, lexGlosses, startIdx) {
-        var words = [];
-        var currentWord = null;
-        var N = morphemes.length;
+    // Join a gathered gloss piece onto a morpheme's running gloss.
+    // When the source has a morpheme tier, gathered pieces are within-morpheme
+    // continuations (e.g. "go" + ".CMP") and are concatenated verbatim. When the
+    // source has only a whole-word tier (no Morphemes/LexEntries), gathered pieces
+    // can span DIFFERENT morphemes whose boundary marker is unknown; `wholeWord`
+    // inserts a neutral "-" so glosses stay segmented (e.g. "go.CMP-lnk").
+    function appendGloss(g, ng, wholeWord) {
+        if (g === '') return ng;
+        var c0 = ng.charAt(0);
+        if (c0 === '.' || MORPH_DIVS.indexOf(c0) !== -1) return g + ng;
+        if (MORPH_DIVS.indexOf(g.charAt(g.length - 1)) !== -1) return g + ng;
+        return wholeWord ? g + '-' + ng : g + ng;
+    }
 
-        for (var col = startIdx; col < N; col++) {
-            var m = (morphemes[col] || '').trim();
-            var g = (lexGlosses[col] || '').trim();
-
+    // Collapse padded columns into a list of { m, g } morphemes, gathering each
+    // morpheme's multi-column gloss from the empty-morpheme columns that follow it.
+    function collapseMorphemes(morphemes, lexGlosses, startIdx, wholeWord) {
+        var N = Math.max(morphemes.length, lexGlosses.length);
+        var list = [];
+        var i = startIdx;
+        while (i < N) {
+            var m = (morphemes[i] || '').trim();
+            var g = (lexGlosses[i] || '').trim();
             if (m !== '') {
-                // Non-empty morpheme: check for boundary marker at start
-                var boundary = m.length > 0 && MORPH_DIVS.indexOf(m[0]) !== -1 ? m[0] : '';
-                var suffix   = boundary ? m.substring(1) : m;
-
-                if (boundary !== '') {
-                    // Attach to current word (suffix/enclitic or prefix boundary)
-                    if (currentWord) {
-                        currentWord.form += boundary + suffix;
-                        if (g !== '') {
-                            currentWord.glossParts.push(boundary + g);
-                        } else {
-                            currentWord.glossParts.push(boundary);
-                        }
-                    }
-                } else {
-                    // Start a new word (no boundary marker)
-                    if (currentWord) words.push(currentWord);
-                    currentWord = { form: m, glossParts: g !== '' ? [g] : [] };
-
-                    // If direct gloss is empty, collect from following empty-morpheme columns
-                    if (g === '') {
-                        while (col + 1 < N && (morphemes[col + 1] || '').trim() === '') {
-                            col++;
-                            var nextG = (lexGlosses[col] || '').trim();
-                            if (nextG !== '') currentWord.glossParts.push(nextG);
-                        }
-                    }
+                var j = i + 1;
+                while (j < N && (morphemes[j] || '').trim() === '') {
+                    var ng = (lexGlosses[j] || '').trim();
+                    if (ng !== '') g = appendGloss(g, ng, wholeWord);
+                    j++;
                 }
+                list.push({ m: m, g: g });
+                i = j;
             } else {
-                // Empty morpheme: zero-morpheme standalone word slot
-                if (currentWord) words.push(currentWord);
-                if (g !== '') words.push({ form: '', glossParts: [g] });
-                currentWord = null;
+                if (g !== '') list.push({ m: '', g: g });
+                i++;
             }
         }
+        return list;
+    }
 
-        if (currentWord) words.push(currentWord);
+    // Group collapsed morphemes into words by divider DIRECTION:
+    //   leading  - = ~ < >  → suffix/enclitic, attaches to the PREVIOUS word
+    //   trailing - = ~ < >  → prefix/proclitic, attaches to the NEXT word
+    //   no divider           → root, starts a new word
+    function groupWordsFromColumns(morphemes, lexGlosses, startIdx, wholeWord) {
+        var morphList = collapseMorphemes(morphemes, lexGlosses, startIdx, wholeWord);
+        var words = [];
+        var cur = null;
+        var awaitHost = '';   // trailing divider of a prefix/proclitic awaiting its host
+        function flush() { if (cur) { words.push(cur); cur = null; } awaitHost = ''; }
+
+        for (var k = 0; k < morphList.length; k++) {
+            var m = morphList[k].m, g = morphList[k].g;
+
+            if (m === '') {
+                // Orphan gloss with no morpheme form — standalone slot.
+                flush();
+                words.push({ form: '', glossParts: g !== '' ? [g] : [] });
+                continue;
+            }
+
+            var lead  = MORPH_DIVS.indexOf(m.charAt(0)) !== -1 ? m.charAt(0) : '';
+            var last  = m.charAt(m.length - 1);
+            var trail = MORPH_DIVS.indexOf(last) !== -1 ? last : '';
+
+            if (lead) {
+                // Suffix / enclitic → attach to current word (left).
+                if (cur) {
+                    cur.form += m;
+                    cur.glossParts.push(g !== '' ? lead + g : lead);
+                } else {
+                    cur = { form: m, glossParts: g !== '' ? [g] : [] };
+                }
+                continue;
+            }
+
+            if (trail) {
+                // Prefix / proclitic → attaches to the NEXT word (right).
+                if (cur && awaitHost) {
+                    cur.form += m;
+                    if (g !== '') cur.glossParts.push(awaitHost + g);
+                    awaitHost = trail;
+                } else {
+                    flush();
+                    cur = { form: m, glossParts: g !== '' ? [g] : [] };
+                    awaitHost = trail;
+                }
+                continue;
+            }
+
+            // Pure root.
+            if (cur && awaitHost) {
+                cur.form += m;
+                if (g !== '') cur.glossParts.push(awaitHost + g);
+                awaitHost = '';
+            } else {
+                flush();
+                cur = { form: m, glossParts: g !== '' ? [g] : [] };
+            }
+        }
+        flush();
         return words;
     }
 
@@ -326,6 +414,46 @@
                 i--;
             }
         }
+    }
+
+    // ── Tier selection + word building (shared by all renderers) ─────────────
+
+    /**
+     * Choose the object-language (form) tier and the gloss tier.
+     * Forms:  Morphemes / LexEntries  (else Word).
+     * Gloss:  LexGloss preferred (morpheme glosses — what IGT examples need);
+     *         else WordGloss (whole-word gloss, e.g. a Word + Word Gloss export).
+     * @returns {{ morphIdx:number, glossIdx:number, wholeWord:boolean }}
+     */
+    function pickTiers(ex) {
+        var lt = ex.lineTypes, morphIdx = -1, glossIdx = -1;
+        for (var t = 0; t < lt.length; t++) {
+            if (morphIdx < 0 && (lt[t] === 'Morphemes' || lt[t] === 'LexEntries')) morphIdx = t;
+            if (glossIdx < 0 && lt[t] === 'LexGloss') glossIdx = t;
+        }
+        if (morphIdx < 0) for (var a = 0; a < lt.length; a++) if (lt[a] === 'Word')      { morphIdx = a; break; }
+        if (glossIdx < 0) for (var b = 0; b < lt.length; b++) if (lt[b] === 'WordGloss') { glossIdx = b; break; }
+        // Whole-word source: forms come from a Word tier but glosses are
+        // morpheme-level (no Morphemes/LexEntries tier to supply boundaries).
+        var wholeWord = morphIdx >= 0 && lt[morphIdx] === 'Word'
+                        && glossIdx >= 0 && lt[glossIdx] === 'LexGloss';
+        return { morphIdx: morphIdx, glossIdx: glossIdx, wholeWord: wholeWord };
+    }
+
+    /**
+     * Run tier selection + word grouping for a parsed block.
+     * @returns {{ words: Array, hasGloss: boolean }|null}  null if no form tier.
+     */
+    function buildWords(ex) {
+        var sel = pickTiers(ex);
+        if (sel.morphIdx < 0) return null;
+        var morphArr  = ex.colArrays[sel.morphIdx];
+        var dataStart = 1;
+        if (/^\d+$/.test(morphArr[dataStart] || '')) dataStart++;
+        var glossArr  = sel.glossIdx >= 0 ? ex.colArrays[sel.glossIdx] : [];
+        var words = groupWordsFromColumns(morphArr, glossArr, dataStart, sel.wholeWord);
+        handleStandalonePunctuation(words);
+        return { words: words, hasGloss: sel.glossIdx >= 0 };
     }
 
     // ── FLEx renderer ────────────────────────────────────────────────────────
@@ -351,53 +479,25 @@
         var txtrefPrefix = opts.txtrefPrefix !== undefined ? opts.txtrefPrefix : 'TXT:';
         var wrapExe      = opts.wrapExe      !== undefined ? opts.wrapExe      : true;
 
-        var lineTypes  = ex.lineTypes;
-        var colArrays  = ex.colArrays;
         var freeLines  = ex.freeLines;
         var lineNum    = ex.lineNum;
-        var n          = lineTypes.length;
 
-        var morphIdx     = -1;
-        var lexGlossIdx  = -1;
-        var wordGlossIdx = -1;
-
-        for (var t = 0; t < n; t++) {
-            var lt = lineTypes[t];
-            if ((lt === 'Morphemes' || lt === 'LexEntries') && morphIdx    < 0) morphIdx    = t;
-            if (lt === 'LexGloss'                           && lexGlossIdx < 0) lexGlossIdx = t;
-            if (lt === 'WordGloss'                          && wordGlossIdx < 0) wordGlossIdx = t;
-        }
-        if (morphIdx < 0) {
-            for (var t2 = 0; t2 < n; t2++) {
-                if (lineTypes[t2] === 'Word') { morphIdx = t2; break; }
-            }
-        }
-        if (morphIdx < 0) return '% (no recognisable tier lines — check labels)';
-
-        var morphemesArr = colArrays[morphIdx];
-        var dataStart    = 1;
-        if (/^\d+$/.test(morphemesArr[dataStart] || '')) dataStart++;
-
-        var lexGlossesArr = lexGlossIdx >= 0 ? colArrays[lexGlossIdx] : [];
-        var wordGlossesArr = wordGlossIdx >= 0 ? colArrays[wordGlossIdx] : [];
-
-        // Run word-grouping algorithm on tab-format columns
-        var words = groupWordsFromColumns(morphemesArr, lexGlossesArr, dataStart);
-        handleStandalonePunctuation(words);
+        var built = buildWords(ex);
+        if (!built) return '% (no recognisable tier lines — check labels)';
+        var words    = built.words;
+        var hasGloss = built.hasGloss;
 
         var tier1 = [];
         var tier2 = [];
-        var tier3 = [];
         var FLOAT_PUNCT = '-\u2012\u2013\u2014\u2015/|&\u2026...';
 
         for (var w = 0; w < words.length; w++) {
             var word = words[w];
 
             // Check for floating punctuation
-            if (word.form.length === 1 && FLOAT_PUNCT.indexOf(word.form) !== -1) {
+            if (Array.from(word.form).length === 1 && FLOAT_PUNCT.indexOf(word.form) !== -1) {
                 tier1.push(word.form);
-                if (lexGlossIdx  >= 0) tier2.push('\\textasciitilde');
-                if (wordGlossIdx >= 0) tier3.push('\\textasciitilde');
+                if (hasGloss) tier2.push('\\textasciitilde');
                 continue;
             }
 
@@ -408,21 +508,12 @@
                 tier1.push(escapeLatex(word.form));
             }
 
-            if (lexGlossIdx >= 0) {
-                var gStr = word.glossParts.join('');
-                tier2.push(wrapGlosses(gStr, glCmd, glossCase));
-            }
-
-            if (wordGlossIdx >= 0) {
-                // WordGloss doesn't have a good mapping from word-grouping result
-                // For now, emit empty placeholder
-                tier3.push('\\textasciitilde');
+            if (hasGloss) {
+                tier2.push(wrapGlosses(word.glossParts.join(''), glCmd, glossCase));
             }
         }
 
-        var tierCount = 1
-            + (lexGlossIdx  >= 0 ? 1 : 0)
-            + (wordGlossIdx >= 0 ? 1 : 0);
+        var tierCount = 1 + (hasGloss ? 1 : 0);
         var gCmd   = 'g' + Array(tierCount + 1).join('l');
         // NOTE: JS output intentionally uses indentation and \n newlines.
         // Output goes into a <textarea> and is copied as a block, so indents
@@ -440,8 +531,7 @@
 
         var lines = [];
         lines.push('\\' + gCmd + ' ' + tier1Content + ' \\\\');
-        if (lexGlossIdx  >= 0) lines.push(indent + tier2.join(' ') + ' \\\\');
-        if (wordGlossIdx >= 0) lines.push(indent + tier3.join(' ') + ' \\\\');
+        if (hasGloss) lines.push(indent + tier2.join(' ') + ' \\\\');
 
         var txtref = '';
         if (txtrefCmd && lineNum) {
@@ -565,38 +655,12 @@
         opts = opts || {};
         var glossCase  = opts.glossCase !== undefined ? opts.glossCase : 'capitalize';
 
-        var lineTypes  = ex.lineTypes;
-        var colArrays  = ex.colArrays;
         var freeLines  = ex.freeLines;
-        var n          = lineTypes.length;
 
-        var morphIdx     = -1;
-        var lexGlossIdx  = -1;
-        var wordGlossIdx = -1;
-
-        for (var t = 0; t < n; t++) {
-            var lt = lineTypes[t];
-            if ((lt === 'Morphemes' || lt === 'LexEntries') && morphIdx    < 0) morphIdx    = t;
-            if (lt === 'LexGloss'                           && lexGlossIdx < 0) lexGlossIdx = t;
-            if (lt === 'WordGloss'                          && wordGlossIdx < 0) wordGlossIdx = t;
-        }
-        if (morphIdx < 0) {
-            for (var t2 = 0; t2 < n; t2++) {
-                if (lineTypes[t2] === 'Word') { morphIdx = t2; break; }
-            }
-        }
-        if (morphIdx < 0) return '(no recognisable tier lines — check labels)';
-
-        var morphemesArr = colArrays[morphIdx];
-        var dataStart    = 1;
-        if (/^\d+$/.test(morphemesArr[dataStart] || '')) dataStart++;
-
-        var lexGlossesArr = lexGlossIdx >= 0 ? colArrays[lexGlossIdx] : [];
-        var wordGlossesArr = wordGlossIdx >= 0 ? colArrays[wordGlossIdx] : [];
-
-        // Run word-grouping algorithm
-        var words = groupWordsFromColumns(morphemesArr, lexGlossesArr, dataStart);
-        handleStandalonePunctuation(words);
+        var built = buildWords(ex);
+        if (!built) return '(no recognisable tier lines — check labels)';
+        var words    = built.words;
+        var hasGloss = built.hasGloss;
 
         var formCols  = [];
         var glossCols = [];
@@ -604,14 +668,14 @@
         for (var w = 0; w < words.length; w++) {
             var word = words[w];
             formCols.push(word.form);
-            if (lexGlossIdx >= 0) {
+            if (hasGloss) {
                 glossCols.push(transformGlossToken(word.glossParts.join(''), glossCase));
             }
         }
 
         var rows = [];
         rows.push(formCols.join('\t'));
-        if (lexGlossIdx  >= 0) rows.push(glossCols.join('\t'));
+        if (hasGloss) rows.push(glossCols.join('\t'));
         if (freeLines.length > 0) rows.push(freeLines.join(' / '));
 
         return rows.join('\n');

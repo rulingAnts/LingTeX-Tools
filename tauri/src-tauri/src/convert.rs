@@ -20,6 +20,76 @@ pub fn strip_invisible(s: &str) -> String {
         .collect()
 }
 
+/// True for a Unicode directional mark (the marks FLEx uses to bracket a
+/// writing-system code on Free/Lit lines). Excludes ZWSP, matching DIR_CLASS in
+/// docs/core.js.
+fn is_dir(c: char) -> bool {
+    matches!(c, '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}')
+}
+
+/// Strip leading whitespace and directional marks; return the remaining slice.
+fn trim_leading_ws_dir(s: &str) -> &str {
+    let mut idx = 0;
+    for c in s.chars() {
+        if c.is_whitespace() || is_dir(c) { idx += c.len_utf8(); } else { break; }
+    }
+    &s[idx..]
+}
+
+/// Byte length of a leading writing-system code (incl. its trailing mark), or 0.
+/// Pattern: optional ws/dir marks, 1–5 ASCII letters, then a directional mark.
+/// A genuine first word of a translation is followed by a space, not a mark, so
+/// it never matches. Mirrors CODE_RE in docs/core.js.
+fn ws_code_len(s: &str) -> usize {
+    let mut chars = s.char_indices().peekable();
+    let mut consumed = 0usize; // byte length skipped so far
+    // leading ws / dir marks
+    while let Some(&(i, c)) = chars.peek() {
+        if c.is_whitespace() || is_dir(c) { consumed = i + c.len_utf8(); chars.next(); } else { break; }
+    }
+    // 1–5 ASCII letters
+    let mut n = 0;
+    let mut end = consumed;
+    while let Some(&(i, c)) = chars.peek() {
+        if c.is_ascii_alphabetic() && n < 5 { n += 1; end = i + c.len_utf8(); chars.next(); } else { break; }
+    }
+    if n == 0 { return 0; }
+    // immediately followed by a directional mark
+    if let Some(&(i, c)) = chars.peek() {
+        if is_dir(c) { return i + c.len_utf8(); }
+    }
+    let _ = end;
+    0
+}
+
+/// If `head` (already ws/dir-trimmed) starts with a Free/Lit label, return its
+/// byte length and whether it is a literal-translation line. Mirrors the
+/// /^(Free\b|Lit\.)/i test in docs/core.js.
+fn match_free_label(head: &str) -> Option<(usize, bool)> {
+    let lower = head.to_lowercase();
+    if lower.starts_with("lit.") { return Some((4, true)); }
+    if lower.starts_with("free") {
+        let next = head[4..].chars().next();
+        let boundary = match next { None => true, Some(c) => !(c.is_alphanumeric() || c == '_') };
+        if boundary { return Some((4, false)); }
+    }
+    None
+}
+
+/// Byte length of a leading example number matching \d+(\.\d+)? else 0.
+fn lead_num_len(s: &str) -> usize {
+    let b = s.as_bytes();
+    let mut i = 0;
+    while i < b.len() && b[i].is_ascii_digit() { i += 1; }
+    if i == 0 { return 0; }
+    if i < b.len() && b[i] == b'.' {
+        let mut j = i + 1;
+        while j < b.len() && b[j].is_ascii_digit() { j += 1; }
+        if j > i + 1 { i = j; }
+    }
+    i
+}
+
 /// Escape LaTeX special characters, preserving existing \cmd{...} sequences.
 pub fn escape_latex(s: &str) -> String {
     let chars: Vec<char> = s.chars().collect();
@@ -42,6 +112,9 @@ pub fn escape_latex(s: &str) -> String {
             }
         }
         match chars[i] {
+            '\\' => result.push_str("\\textbackslash{}"),
+            '~'  => result.push_str("\\textasciitilde{}"),
+            '^'  => result.push_str("\\textasciicircum{}"),
             '%' | '$' | '#' | '&' | '_' | '{' | '}' => {
                 result.push('\\');
                 result.push(chars[i]);
@@ -285,112 +358,126 @@ struct Word {
     gloss_parts: Vec<String>,
 }
 
-/// Run the word-grouping algorithm on raw column arrays.
-/// Returns a vector of word objects with forms and gloss parts.
+struct Morph { m: String, g: String }
+
+/// Join a gathered gloss piece onto a morpheme's running gloss. See docs/core.js
+/// appendGloss: gathered pieces are within-morpheme continuations unless the
+/// source has only a whole-word tier (`whole_word`), where a neutral "-" is
+/// inserted between distinct morpheme glosses.
+fn append_gloss(g: &str, ng: &str, whole_word: bool) -> String {
+    if g.is_empty() { return ng.to_string(); }
+    let c0 = ng.chars().next().unwrap_or('\0');
+    if c0 == '.' || MORPH_DIVS.contains(c0) { return format!("{}{}", g, ng); }
+    if MORPH_DIVS.contains(g.chars().last().unwrap_or('\0')) { return format!("{}{}", g, ng); }
+    if whole_word { format!("{}-{}", g, ng) } else { format!("{}{}", g, ng) }
+}
+
+/// Collapse padded columns into morphemes, gathering each morpheme's multi-column
+/// gloss from the empty-morpheme columns that follow it. Iterates to the longer
+/// of the two arrays so trailing gloss columns are never dropped.
+fn collapse_morphemes(
+    morphemes: &[String],
+    lex_glosses: &[String],
+    start_idx: usize,
+    whole_word: bool,
+) -> Vec<Morph> {
+    let n = morphemes.len().max(lex_glosses.len());
+    let mut list: Vec<Morph> = Vec::new();
+    let mut i = start_idx;
+    while i < n {
+        let m = morphemes.get(i).map(|s| s.trim()).unwrap_or("");
+        let mut g = lex_glosses.get(i).map(|s| s.trim()).unwrap_or("").to_string();
+        if !m.is_empty() {
+            let mut j = i + 1;
+            while j < n && morphemes.get(j).map(|s| s.trim().is_empty()).unwrap_or(true) {
+                let ng = lex_glosses.get(j).map(|s| s.trim()).unwrap_or("");
+                if !ng.is_empty() { g = append_gloss(&g, ng, whole_word); }
+                j += 1;
+            }
+            list.push(Morph { m: m.to_string(), g });
+            i = j;
+        } else {
+            if !g.is_empty() { list.push(Morph { m: String::new(), g }); }
+            i += 1;
+        }
+    }
+    list
+}
+
+fn new_word(m: &str, g: &str) -> Word {
+    Word { form: m.to_string(), gloss_parts: if g.is_empty() { Vec::new() } else { vec![g.to_string()] } }
+}
+
+/// Group collapsed morphemes into words by divider DIRECTION:
+///   leading  - = ~ < >  → suffix/enclitic, attaches to the PREVIOUS word
+///   trailing - = ~ < >  → prefix/proclitic, attaches to the NEXT word
+///   no divider           → root, starts a new word
 fn group_words_from_columns(
     morphemes: &[String],
     lex_glosses: &[String],
     start_idx: usize,
+    whole_word: bool,
 ) -> Vec<Word> {
+    let morph_list = collapse_morphemes(morphemes, lex_glosses, start_idx, whole_word);
     let mut words: Vec<Word> = Vec::new();
-    let mut current_word: Option<Word> = None;
-    let n = morphemes.len();
+    let mut cur: Option<Word> = None;
+    let mut await_host: char = '\0'; // trailing divider of a prefix/proclitic awaiting its host
 
-    // NOTE: this must be a while loop, not a for loop.  When a morpheme has an
-    // empty gloss and the following columns have empty morphemes with glosses
-    // (e.g. "zeva □ □ =xe" / "□ throw .CMP ABIL"), the lookahead below
-    // pre-consumes those empty-morpheme columns into the current word's
-    // gloss_parts.  We then advance `col` past them so they are not visited
-    // again — a for loop cannot skip iterations mid-range.
-    let mut col = start_idx;
-    while col < n {
-        let m = morphemes.get(col).map(|s| s.trim()).unwrap_or("");
-        let g = lex_glosses.get(col).map(|s| s.trim()).unwrap_or("");
+    for mo in &morph_list {
+        let (m, g) = (mo.m.as_str(), mo.g.as_str());
 
-        if !m.is_empty() {
-            // Non-empty morpheme: check for boundary marker at start
-            let first_char = m.chars().next().unwrap_or('\0');
-            let boundary = if MORPH_DIVS.contains(first_char) {
-                first_char.to_string()
-            } else {
-                String::new()
-            };
-            let suffix = if !boundary.is_empty() {
-                m[1..].to_string()
-            } else {
-                m.to_string()
-            };
-
-            if !boundary.is_empty() {
-                // Attach to current word (suffix/enclitic or prefix boundary)
-                if let Some(ref mut cw) = current_word {
-                    cw.form.push_str(&boundary);
-                    cw.form.push_str(&suffix);
-                    if !g.is_empty() {
-                        cw.gloss_parts.push(format!("{}{}", boundary, g));
-                    } else {
-                        cw.gloss_parts.push(boundary);
-                    }
-                }
-            } else {
-                // Start a new word (no boundary marker)
-                if let Some(cw) = current_word.take() {
-                    words.push(cw);
-                }
-                let mut word = Word {
-                    form: m.to_string(),
-                    gloss_parts: if !g.is_empty() {
-                        vec![g.to_string()]
-                    } else {
-                        Vec::new()
-                    },
-                };
-
-                // If direct gloss is empty, look ahead through consecutive
-                // empty-morpheme columns and collect their glosses into this
-                // word.  Advance `col` past those consumed columns so the
-                // outer while loop does not re-visit them and create spurious
-                // standalone words.
-                if g.is_empty() {
-                    let mut col_idx = col + 1;
-                    while col_idx < n
-                        && morphemes
-                            .get(col_idx)
-                            .map(|s| s.trim().is_empty())
-                            .unwrap_or(false)
-                    {
-                        let next_g = lex_glosses.get(col_idx).map(|s| s.trim()).unwrap_or("");
-                        if !next_g.is_empty() {
-                            word.gloss_parts.push(next_g.to_string());
-                        }
-                        col_idx += 1;
-                    }
-                    // Jump outer loop to the first non-consumed column.
-                    col = col_idx;
-                    current_word = Some(word);
-                    continue; // skip the col += 1 below
-                }
-
-                current_word = Some(word);
-            }
-        } else {
-            // Empty morpheme: zero-morpheme standalone word slot
-            if let Some(cw) = current_word.take() {
-                words.push(cw);
-            }
-            if !g.is_empty() {
-                words.push(Word {
-                    form: String::new(),
-                    gloss_parts: vec![g.to_string()],
-                });
-            }
+        if m.is_empty() {
+            if let Some(cw) = cur.take() { words.push(cw); }
+            await_host = '\0';
+            words.push(new_word("", g));
+            continue;
         }
-        col += 1;
+
+        let first = m.chars().next().unwrap();
+        let last  = m.chars().last().unwrap();
+        let lead  = MORPH_DIVS.contains(first);
+        let trail = MORPH_DIVS.contains(last);
+
+        if lead {
+            // suffix / enclitic → attach to current word (left)
+            if let Some(ref mut cw) = cur {
+                cw.form.push_str(m);
+                cw.gloss_parts.push(if g.is_empty() { first.to_string() } else { format!("{}{}", first, g) });
+            } else {
+                cur = Some(new_word(m, g));
+            }
+            continue;
+        }
+
+        if trail {
+            // prefix / proclitic → attaches to the NEXT word (right)
+            if cur.is_some() && await_host != '\0' {
+                if let Some(ref mut cw) = cur {
+                    cw.form.push_str(m);
+                    if !g.is_empty() { cw.gloss_parts.push(format!("{}{}", await_host, g)); }
+                }
+            } else {
+                if let Some(cw) = cur.take() { words.push(cw); }
+                cur = Some(new_word(m, g));
+            }
+            await_host = last;
+            continue;
+        }
+
+        // pure root
+        if cur.is_some() && await_host != '\0' {
+            if let Some(ref mut cw) = cur {
+                cw.form.push_str(m);
+                if !g.is_empty() { cw.gloss_parts.push(format!("{}{}", await_host, g)); }
+            }
+            await_host = '\0';
+        } else {
+            if let Some(cw) = cur.take() { words.push(cw); }
+            cur = Some(new_word(m, g));
+        }
     }
 
-    if let Some(cw) = current_word {
-        words.push(cw);
-    }
+    if let Some(cw) = cur { words.push(cw); }
     words
 }
 
@@ -400,16 +487,13 @@ fn handle_standalone_punctuation(words: &mut Vec<Word>) {
     let punct_chars = "\u{2026},:;.!?-\u{2012}\u{2013}\u{2014}\u{2015}/|&";
     let mut i = 1;
     while i < words.len() {
-        let w = &words[i];
-        if w.form.len() == 1
-            && punct_chars.contains(&w.form)
-            && w.gloss_parts.is_empty()
-        {
-            // Append to preceding word's form, remove from list
-            if i > 0 {
-                let punct_form = words[i].form.clone();
-                words[i - 1].form.push_str(&punct_form);
-            }
+        let single = words[i].form.chars().next();
+        let is_punct = words[i].form.chars().count() == 1
+            && single.map_or(false, |c| punct_chars.contains(c))
+            && words[i].gloss_parts.is_empty();
+        if is_punct {
+            let punct_form = words[i].form.clone();
+            words[i - 1].form.push_str(&punct_form);
             words.remove(i);
         } else {
             i += 1;
@@ -424,6 +508,7 @@ pub struct FlexParsed {
     pub line_types:  Vec<String>,
     pub col_arrays:  Vec<Vec<String>>,
     pub free_lines:  Vec<String>,
+    pub lit_lines:   Vec<String>,
     pub line_num:    Option<String>,
 }
 
@@ -499,12 +584,16 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
     let mut line_types:  Vec<String> = Vec::new();
     let mut col_arrays:  Vec<Vec<String>> = Vec::new();
     let mut free_lines:  Vec<String> = Vec::new();
+    let mut lit_lines:   Vec<String> = Vec::new();
     let mut line_num:    Option<String> = None;
     let mut seen_free = false;
+    let mut last_lit  = false;
 
+    // Strip trailing SPACES only — trailing tabs are significant columns (FLEx
+    // pads short tiers with empty cells; trimming them drops trailing glosses).
     let raw_lines: Vec<&str> = text.lines()
-        .map(|l| l.trim_end_matches(|c: char| c == ' ' || c == '\t'))
-        .filter(|l| !l.trim().is_empty())
+        .map(|l| l.trim_end_matches(' '))
+        .filter(|l| !strip_invisible(l).trim().is_empty())
         .collect();
 
     for raw_line in raw_lines {
@@ -513,9 +602,7 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
         // Extract leading example number (e.g. "1" or "1.2") if not yet found
         if line_num.is_none() {
             let trimmed = l.trim();
-            let num_end = trimmed.chars()
-                .take_while(|c| c.is_ascii_digit() || *c == '.')
-                .count();
+            let num_end = lead_num_len(trimmed);
             if num_end > 0 {
                 let after = &trimmed[num_end..];
                 if after.is_empty() || after.starts_with(char::is_whitespace) {
@@ -527,39 +614,30 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
             }
         }
 
-        let l_clean = strip_invisible(l.trim());
-
-        // Free translation line
-        let free_match = {
-            let lc = l_clean.to_lowercase();
-            lc.starts_with("free")
-                && l_clean.as_bytes().get(4).map_or(true, |b| !b.is_ascii_alphabetic())
-        };
-        if free_match {
+        // Free / Lit translation line. Marks are preserved so a writing-system
+        // code can be detected — FLEx brackets the code with directional marks,
+        // while a genuine first word of the translation is followed by a space.
+        let head = trim_leading_ws_dir(&l);
+        if let Some((label_len, is_lit)) = match_free_label(head) {
             seen_free = true;
-            let after_free = l_clean[4..].trim_start();
-            let ft = if after_free.split_whitespace().next()
-                         .map_or(false, |w| w.len() >= 2 && w.len() <= 8
-                                          && w.chars().all(|c| c.is_ascii_alphabetic())) {
-                after_free.splitn(2, char::is_whitespace).nth(1).unwrap_or("").trim().to_string()
-            } else {
-                after_free.to_string()
-            };
-            if !ft.is_empty() { free_lines.push(ft); }
+            last_lit  = is_lit;
+            let rest = &head[label_len..];
+            let ft = strip_invisible(&rest[ws_code_len(rest)..]).trim().to_string();
+            if !ft.is_empty() {
+                if is_lit { lit_lines.push(ft); } else { free_lines.push(ft); }
+            }
             continue;
         }
 
+        // Continuation line carrying an additional writing system (e.g. " Ind …").
         if seen_free {
-            let parts: Vec<&str> = l_clean.splitn(2, char::is_whitespace).collect();
-            if !parts.is_empty() {
-                let tag = parts[0];
-                if tag.len() >= 2 && tag.len() <= 8
-                    && tag.chars().all(|c| c.is_ascii_alphabetic())
-                {
-                    let ft = parts.get(1).unwrap_or(&"").trim();
-                    if !ft.is_empty() { free_lines.push(ft.to_string()); }
-                    continue;
+            let code = ws_code_len(&l);
+            if code > 0 {
+                let cont = strip_invisible(&l[code..]).trim().to_string();
+                if !cont.is_empty() {
+                    if last_lit { lit_lines.push(cont); } else { free_lines.push(cont); }
                 }
+                continue;
             }
         }
 
@@ -593,7 +671,7 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
         col_arrays.push(cols);
     }
 
-    FlexParsed { line_types, col_arrays, free_lines, line_num }
+    FlexParsed { line_types, col_arrays, free_lines, lit_lines, line_num }
 }
 
 // ── FLEx renderer ─────────────────────────────────────────────────────────────
@@ -622,55 +700,59 @@ impl Default for FlexOpts {
     }
 }
 
-pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
-    let n = ex.line_types.len();
-
-    let mut morph_idx:     Option<usize> = None;
-    let mut lex_gloss_idx: Option<usize> = None;
-    let mut word_gloss_idx:Option<usize> = None;
-
-    for t in 0..n {
-        let lt = &ex.line_types[t];
-        if morph_idx.is_none() && (lt == "Morphemes" || lt == "LexEntries") { morph_idx = Some(t); }
-        if lex_gloss_idx.is_none()  && lt == "LexGloss"  { lex_gloss_idx  = Some(t); }
-        if word_gloss_idx.is_none() && lt == "WordGloss" { word_gloss_idx = Some(t); }
+/// Choose the form tier (Morphemes/LexEntries, else Word) and the gloss tier
+/// (LexGloss preferred — morpheme glosses; else WordGloss). Returns the form
+/// index, optional gloss index, and whether the source is whole-word only.
+fn pick_tiers(ex: &FlexParsed) -> Option<(usize, Option<usize>, bool)> {
+    let lt = &ex.line_types;
+    let mut morph_idx: Option<usize> = None;
+    let mut gloss_idx: Option<usize> = None;
+    for t in 0..lt.len() {
+        if morph_idx.is_none() && (lt[t] == "Morphemes" || lt[t] == "LexEntries") { morph_idx = Some(t); }
+        if gloss_idx.is_none() && lt[t] == "LexGloss" { gloss_idx = Some(t); }
     }
     if morph_idx.is_none() {
-        for t in 0..n {
-            if ex.line_types[t] == "Word" { morph_idx = Some(t); break; }
-        }
+        for t in 0..lt.len() { if lt[t] == "Word" { morph_idx = Some(t); break; } }
     }
-    let morph_idx = match morph_idx {
-        None    => return "% (no recognisable tier lines — check labels)".to_string(),
-        Some(i) => i,
-    };
+    if gloss_idx.is_none() {
+        for t in 0..lt.len() { if lt[t] == "WordGloss" { gloss_idx = Some(t); break; } }
+    }
+    let mi = morph_idx?;
+    let whole_word = lt[mi] == "Word" && gloss_idx.map_or(false, |gi| lt[gi] == "LexGloss");
+    Some((mi, gloss_idx, whole_word))
+}
 
+/// Run tier selection + word grouping. Returns (words, has_gloss).
+fn build_words(ex: &FlexParsed) -> Option<(Vec<Word>, bool)> {
+    let (morph_idx, gloss_idx, whole_word) = pick_tiers(ex)?;
     let morphemes_arr = &ex.col_arrays[morph_idx];
     let mut data_start = 1usize;
     if morphemes_arr.get(data_start).map_or(false, |s| s.parse::<u64>().is_ok()) {
         data_start += 1;
     }
-
-    let lex_glosses_arr = lex_gloss_idx.map(|i| &ex.col_arrays[i]);
-
-    // Run word-grouping algorithm on tab-format columns
-    let lex_glosses_empty = Vec::new();
-    let lex_glosses = lex_glosses_arr.unwrap_or(&lex_glosses_empty);
-    let mut words = group_words_from_columns(morphemes_arr, lex_glosses, data_start);
+    let empty = Vec::new();
+    let gloss_arr = gloss_idx.map(|i| &ex.col_arrays[i]).unwrap_or(&empty);
+    let mut words = group_words_from_columns(morphemes_arr, gloss_arr, data_start, whole_word);
     handle_standalone_punctuation(&mut words);
+    Some((words, gloss_idx.is_some()))
+}
+
+pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
+    let (words, has_gloss) = match build_words(ex) {
+        None      => return "% (no recognisable tier lines — check labels)".to_string(),
+        Some(v)   => v,
+    };
 
     let mut tier1: Vec<String> = Vec::new();
     let mut tier2: Vec<String> = Vec::new();
-    let mut tier3: Vec<String> = Vec::new();
 
     let float_punct = "-\u{2012}\u{2013}\u{2014}\u{2015}/|&\u{2026}...";
 
     for word in &words {
         // Check for floating punctuation
-        if word.form.len() == 1 && float_punct.contains(&word.form) {
+        if word.form.chars().count() == 1 && float_punct.contains(&word.form) {
             tier1.push(word.form.clone());
-            if lex_gloss_idx.is_some()  { tier2.push("\\textasciitilde".to_string()); }
-            if word_gloss_idx.is_some() { tier3.push("\\textasciitilde".to_string()); }
+            if has_gloss { tier2.push("\\textasciitilde".to_string()); }
             continue;
         }
 
@@ -681,22 +763,13 @@ pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
             tier1.push(escape_latex(&word.form));
         }
 
-        if lex_gloss_idx.is_some() {
-            let g_str = word.gloss_parts.join("");
-            tier2.push(wrap_glosses(&g_str, &opts.gl_cmd, &opts.gloss_case));
-        }
-
-        if word_gloss_idx.is_some() {
-            // WordGloss doesn't have a good mapping from word-grouping result
-            // For now, emit empty placeholder
-            tier3.push("\\textasciitilde".to_string());
+        if has_gloss {
+            tier2.push(wrap_glosses(&word.gloss_parts.join(""), &opts.gl_cmd, &opts.gloss_case));
         }
     }
 
     // Build LaTeX lines
-    let tier_count = 1
-        + if lex_gloss_idx.is_some()  { 1 } else { 0 }
-        + if word_gloss_idx.is_some() { 1 } else { 0 };
+    let tier_count = 1 + if has_gloss { 1 } else { 0 };
     let g_cmd  = format!("g{}", "l".repeat(tier_count));       // e.g. "gll"
     // NOTE: No indentation here intentionally.
     // The Rust path delivers output via enigo key events (Return between lines),
@@ -718,8 +791,7 @@ pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
 
     let mut lines: Vec<String> = Vec::new();
     lines.push(format!("\\{} {} \\\\", g_cmd, tier1_content));
-    if lex_gloss_idx.is_some()  { lines.push(format!("{}{} \\\\", indent, tier2.join(" "))); }
-    if word_gloss_idx.is_some() { lines.push(format!("{}{} \\\\", indent, tier3.join(" "))); }
+    if has_gloss { lines.push(format!("{}{} \\\\", indent, tier2.join(" "))); }
 
     let txtref = if !opts.txtref_cmd.is_empty() {
         match &ex.line_num {
@@ -780,55 +852,24 @@ pub fn render_flex_auto(blocks: &[FlexParsed], opts: &FlexOpts) -> String {
 /// dividers are joined inline (e.g. vu=ve, levo-z).
 /// `opts.gloss_case` controls the case transform applied to grammatical gloss segments.
 pub fn render_flex_tsv(ex: &FlexParsed, opts: &FlexOpts) -> String {
-    let n = ex.line_types.len();
-
-    let mut morph_idx:      Option<usize> = None;
-    let mut lex_gloss_idx:  Option<usize> = None;
-    let mut word_gloss_idx: Option<usize> = None;
-
-    for t in 0..n {
-        let lt = &ex.line_types[t];
-        if morph_idx.is_none() && (lt == "Morphemes" || lt == "LexEntries") { morph_idx = Some(t); }
-        if lex_gloss_idx.is_none()  && lt == "LexGloss"  { lex_gloss_idx  = Some(t); }
-        if word_gloss_idx.is_none() && lt == "WordGloss" { word_gloss_idx = Some(t); }
-    }
-    if morph_idx.is_none() {
-        for t in 0..n {
-            if ex.line_types[t] == "Word" { morph_idx = Some(t); break; }
-        }
-    }
-    let morph_idx = match morph_idx {
+    let (words, has_gloss) = match build_words(ex) {
         None    => return "(no recognisable tier lines — check labels)".to_string(),
-        Some(i) => i,
+        Some(v) => v,
     };
-
-    let morphemes_arr = &ex.col_arrays[morph_idx];
-    let mut data_start = 1usize;
-    if morphemes_arr.get(data_start).map_or(false, |s| s.parse::<u64>().is_ok()) {
-        data_start += 1;
-    }
-
-    let lex_glosses_arr = lex_gloss_idx.map(|i| &ex.col_arrays[i]);
-
-    // Run word-grouping algorithm
-    let lex_glosses_empty = Vec::new();
-    let lex_glosses = lex_glosses_arr.unwrap_or(&lex_glosses_empty);
-    let mut words = group_words_from_columns(morphemes_arr, lex_glosses, data_start);
-    handle_standalone_punctuation(&mut words);
 
     let mut form_cols:  Vec<String> = Vec::new();
     let mut gloss_cols: Vec<String> = Vec::new();
 
     for word in &words {
         form_cols.push(word.form.clone());
-        if lex_gloss_idx.is_some() {
+        if has_gloss {
             gloss_cols.push(transform_gloss_token(&word.gloss_parts.join(""), &opts.gloss_case));
         }
     }
 
     let mut rows: Vec<String> = Vec::new();
     rows.push(form_cols.join("\t"));
-    if lex_gloss_idx.is_some()  { rows.push(gloss_cols.join("\t")); }
+    if has_gloss { rows.push(gloss_cols.join("\t")); }
     if !ex.free_lines.is_empty() { rows.push(ex.free_lines.join(" / ")); }
 
     rows.join("\n")
