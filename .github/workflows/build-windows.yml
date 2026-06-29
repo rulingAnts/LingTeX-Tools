@@ -26,6 +26,7 @@ jobs:
         run: |
           VERSION="${{ inputs.tag }}"
           VERSION="${VERSION#v}"
+          VERSION="${VERSION%%-*}"   # strip -pre.N → numeric version (MSI requires numeric)
           jq --arg v "$VERSION" '.version = $v' tauri/src-tauri/tauri.conf.json > tmp.json
           mv tmp.json tauri/src-tauri/tauri.conf.json
 

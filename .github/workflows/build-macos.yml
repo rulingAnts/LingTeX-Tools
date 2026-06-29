@@ -21,6 +21,15 @@ jobs:
       - name: Sync core.js into tauri/src/
         run: cp docs/core.js tauri/src/core.js
 
+      - name: Set bundle version
+        shell: bash
+        run: |
+          VERSION="${{ inputs.label }}"
+          VERSION="${VERSION#v}"
+          VERSION="${VERSION%%-*}"   # strip -pre.N → numeric version for the bundle
+          jq --arg v "$VERSION" '.version = $v' tauri/src-tauri/tauri.conf.json > tmp.json
+          mv tmp.json tauri/src-tauri/tauri.conf.json
+
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
 
@@ -35,17 +44,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: tauri
-          tagName:      pre-mac-${{ github.run_number }}-${{ inputs.label }}
-          releaseName:  'LingTeX Tools — macOS pre-release #${{ github.run_number }}'
+          tagName:      v${{ inputs.label }}
+          releaseName:  'LingTeX Tools v${{ inputs.label }} — pre-release'
           releaseBody:  |
-            macOS pre-release build — **not for production use**.
+            > ⚠️ **Pre-release — not yet extensively tested.** This build contains the new FLEx interlinear parsing/formatting fixes. Please try it in real work and send feedback ([issues / PRs welcome](https://github.com/rulingAnts/LingTeX-Tools/issues)) so any rough edges can be fixed before a stable release.
 
-            > **Note:** this build is unsigned. macOS Gatekeeper will block it on first launch.
-            > Right-click the `.app` → **Open** to bypass, or run:
-            > ```
-            > xattr -cr /Applications/LingTeX\ Tools.app
-            > ```
+            ### 🖥 Desktop app (macOS / Windows)
 
-            Triggered manually from branch `${{ github.ref_name }}`.
+            Download the installer for your platform from the assets below.
+
+            **macOS — required first-launch steps (the app is unsigned):**
+
+            1. After installing, right-click `LingTeX Tools.app` → **Open**, then **Open** again in the security dialog. Or run once in Terminal:
+               ```
+               xattr -cr "/Applications/LingTeX Tools.app"
+               ```
+            2. Grant **Accessibility** access in **System Settings → Privacy & Security → Accessibility** (required for the global keyboard shortcuts / auto-type).
+
+            **Windows:** download `lingtex-tools-windows-setup.exe` (or the `.msi`). If the app misbehaves after an update, uninstall the old version first, then install fresh.
           releaseDraft: false
           prerelease:   true
