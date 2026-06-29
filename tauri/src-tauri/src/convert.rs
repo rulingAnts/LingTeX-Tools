@@ -27,11 +27,29 @@ fn is_dir(c: char) -> bool {
     matches!(c, '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}')
 }
 
+/// Whitespace exactly as matched by JavaScript's regex `\s` (and `String.trim`).
+/// Rust's `char::is_whitespace` differs (it omits U+FEFF and includes U+0085), so
+/// the ports would diverge on those; this keeps convert.rs byte-identical to
+/// docs/core.js, which is the source of truth.
+fn is_js_space(c: char) -> bool {
+    matches!(c,
+        ' ' | '\t' | '\n' | '\u{000B}' | '\u{000C}' | '\r' |
+        '\u{00A0}' | '\u{1680}' | '\u{2000}'..='\u{200A}' |
+        '\u{2028}' | '\u{2029}' | '\u{202F}' | '\u{205F}' | '\u{3000}' | '\u{FEFF}'
+    )
+}
+
+/// Wrap a rendered tier token in braces if it contains a literal space, so gb4e
+/// `\gll` counts it as one alignment column. Mirrors braceIfSpace in core.js.
+fn brace_if_space(t: &str) -> String {
+    if t.contains(' ') { format!("{{{}}}", t) } else { t.to_string() }
+}
+
 /// Strip leading whitespace and directional marks; return the remaining slice.
 fn trim_leading_ws_dir(s: &str) -> &str {
     let mut idx = 0;
     for c in s.chars() {
-        if c.is_whitespace() || is_dir(c) { idx += c.len_utf8(); } else { break; }
+        if is_js_space(c) || is_dir(c) { idx += c.len_utf8(); } else { break; }
     }
     &s[idx..]
 }
@@ -42,35 +60,32 @@ fn trim_leading_ws_dir(s: &str) -> &str {
 /// it never matches. Mirrors CODE_RE in docs/core.js.
 fn ws_code_len(s: &str) -> usize {
     let mut chars = s.char_indices().peekable();
-    let mut consumed = 0usize; // byte length skipped so far
     // leading ws / dir marks
-    while let Some(&(i, c)) = chars.peek() {
-        if c.is_whitespace() || is_dir(c) { consumed = i + c.len_utf8(); chars.next(); } else { break; }
+    while let Some(&(_, c)) = chars.peek() {
+        if is_js_space(c) || is_dir(c) { chars.next(); } else { break; }
     }
     // 1–5 ASCII letters
     let mut n = 0;
-    let mut end = consumed;
-    while let Some(&(i, c)) = chars.peek() {
-        if c.is_ascii_alphabetic() && n < 5 { n += 1; end = i + c.len_utf8(); chars.next(); } else { break; }
+    while let Some(&(_, c)) = chars.peek() {
+        if c.is_ascii_alphabetic() && n < 5 { n += 1; chars.next(); } else { break; }
     }
     if n == 0 { return 0; }
     // immediately followed by a directional mark
     if let Some(&(i, c)) = chars.peek() {
         if is_dir(c) { return i + c.len_utf8(); }
     }
-    let _ = end;
     0
 }
 
 /// If `head` (already ws/dir-trimmed) starts with a Free/Lit label, return its
 /// byte length and whether it is a literal-translation line. Mirrors the
-/// /^(Free\b|Lit\.)/i test in docs/core.js.
+/// /^(Free\b|Lit\.)/i test in docs/core.js (whose `\b` uses an ASCII word class).
 fn match_free_label(head: &str) -> Option<(usize, bool)> {
     let lower = head.to_lowercase();
     if lower.starts_with("lit.") { return Some((4, true)); }
     if lower.starts_with("free") {
         let next = head[4..].chars().next();
-        let boundary = match next { None => true, Some(c) => !(c.is_alphanumeric() || c == '_') };
+        let boundary = match next { None => true, Some(c) => !(c.is_ascii_alphanumeric() || c == '_') };
         if boundary { return Some((4, false)); }
     }
     None
@@ -216,7 +231,9 @@ pub fn wrap_glosses(token: &str, gl_cmd: &str, gloss_case: &str) -> String {
                 });
                 cur.clear();
             }
-            parts.push(ch.to_string());
+            // '~' is LaTeX-active; render a visible tilde to match escape_latex
+            // on the object-language tier (other dividers pass through literally).
+            parts.push(if ch == '~' { "\\textasciitilde{}".to_string() } else { ch.to_string() });
         } else {
             cur.push(ch);
         }
@@ -280,21 +297,22 @@ fn massage_line(line: &str) -> String {
 /// Returns true if `stripped` (already stripped of invisibles and whitespace-trimmed)
 /// looks like the start of a new numbered example block (e.g. "1 …", "2\t…", "3").
 fn is_block_start(stripped: &str) -> bool {
-    if stripped.is_empty() { return false; }
-    let num_end = stripped.chars()
-        .take_while(|c| c.is_ascii_digit() || *c == '.')
-        .count();
+    // Mirror JS /^\d+(?:\.\d+)?(\s|$)/ exactly: a single optional ".digits"
+    // group only — "1.2.3", "12.", ".5" must NOT match.
+    let num_end = lead_num_len(stripped);
     if num_end == 0 { return false; }
     let after = &stripped[num_end..];
-    after.is_empty() || after.starts_with(char::is_whitespace)
+    after.is_empty() || after.starts_with(is_js_space)
 }
 
-/// Split `text` into chunks separated by blank (whitespace-only) lines.
+/// Split `text` into chunks separated by blank lines. JS phase-1 splits on
+/// /\n[ \t]*\n+/, so a separator line is empty or only ASCII spaces/tabs (NOT
+/// other Unicode whitespace like NBSP/form-feed, which `str::trim` would catch).
 fn split_on_blank_lines(text: &str) -> Vec<String> {
     let mut chunks: Vec<String> = Vec::new();
     let mut current: Vec<&str> = Vec::new();
     for line in text.lines() {
-        if line.trim().is_empty() {
+        if line.chars().all(|c| c == ' ' || c == '\t') {
             if !current.is_empty() {
                 chunks.push(current.join("\n"));
                 current.clear();
@@ -334,9 +352,11 @@ pub fn parse_flex_blocks(raw: &str) -> Vec<FlexParsed> {
     // Phase 2 — split on numbered-line boundaries ─────────────────────────────
     let mut groups: Vec<Vec<String>> = vec![Vec::new()];
     for line in text.lines() {
-        let stripped = strip_invisible(line.trim());
+        // JS: stripInvisible(line).trim() — strip marks first, then trim.
+        let stripped_owned = strip_invisible(line);
+        let stripped = stripped_owned.trim_matches(is_js_space);
         let last_len = groups.last().map(|g| g.len()).unwrap_or(0);
-        if last_len > 0 && is_block_start(&stripped) {
+        if last_len > 0 && is_block_start(stripped) {
             groups.push(Vec::new());
         }
         groups.last_mut().unwrap().push(line.to_string());
@@ -605,9 +625,9 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
             let num_end = lead_num_len(trimmed);
             if num_end > 0 {
                 let after = &trimmed[num_end..];
-                if after.is_empty() || after.starts_with(char::is_whitespace) {
+                if after.is_empty() || after.starts_with(is_js_space) {
                     line_num = Some(trimmed[..num_end].to_string());
-                    let remainder = after.trim();
+                    let remainder = after.trim_matches(is_js_space);
                     if remainder.is_empty() { continue; }
                     l = remainder.to_string();
                 }
@@ -622,7 +642,7 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
             seen_free = true;
             last_lit  = is_lit;
             let rest = &head[label_len..];
-            let ft = strip_invisible(&rest[ws_code_len(rest)..]).trim().to_string();
+            let ft = strip_invisible(&rest[ws_code_len(rest)..]).trim_matches(is_js_space).to_string();
             if !ft.is_empty() {
                 if is_lit { lit_lines.push(ft); } else { free_lines.push(ft); }
             }
@@ -633,7 +653,7 @@ pub fn parse_flex_block(raw: &str) -> FlexParsed {
         if seen_free {
             let code = ws_code_len(&l);
             if code > 0 {
-                let cont = strip_invisible(&l[code..]).trim().to_string();
+                let cont = strip_invisible(&l[code..]).trim_matches(is_js_space).to_string();
                 if !cont.is_empty() {
                     if last_lit { lit_lines.push(cont); } else { free_lines.push(cont); }
                 }
@@ -727,7 +747,10 @@ fn build_words(ex: &FlexParsed) -> Option<(Vec<Word>, bool)> {
     let (morph_idx, gloss_idx, whole_word) = pick_tiers(ex)?;
     let morphemes_arr = &ex.col_arrays[morph_idx];
     let mut data_start = 1usize;
-    if morphemes_arr.get(data_start).map_or(false, |s| s.parse::<u64>().is_ok()) {
+    // Mirror JS /^\d+$/ (ASCII digits, any length) — NOT parse::<u64> which would
+    // reject 20+ digit cells and accept a leading '+'.
+    if morphemes_arr.get(data_start)
+        .map_or(false, |s| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit())) {
         data_start += 1;
     }
     let empty = Vec::new();
@@ -764,7 +787,11 @@ pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
         }
 
         if has_gloss {
-            tier2.push(wrap_glosses(&word.gloss_parts.join(""), &opts.gl_cmd, &opts.gloss_case));
+            // Empty gloss for a non-empty form → placeholder, so tier1 and tier2
+            // keep equal token counts and \gll stays aligned.
+            let gstr = word.gloss_parts.join("");
+            tier2.push(if gstr.is_empty() { "\\textasciitilde".to_string() }
+                       else { wrap_glosses(&gstr, &opts.gl_cmd, &opts.gloss_case) });
         }
     }
 
@@ -781,7 +808,7 @@ pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
     let indent = "";
 
     let tier1_content = if opts.form_cmd.is_empty() {
-        tier1.join(" ")
+        tier1.iter().map(|t| brace_if_space(t)).collect::<Vec<_>>().join(" ")
     } else {
         tier1.iter()
             .map(|t| format!("{}{{{}}}", opts.form_cmd, t))
@@ -791,7 +818,10 @@ pub fn render_flex(ex: &FlexParsed, opts: &FlexOpts) -> String {
 
     let mut lines: Vec<String> = Vec::new();
     lines.push(format!("\\{} {} \\\\", g_cmd, tier1_content));
-    if has_gloss { lines.push(format!("{}{} \\\\", indent, tier2.join(" "))); }
+    if has_gloss {
+        let g = tier2.iter().map(|t| brace_if_space(t)).collect::<Vec<_>>().join(" ");
+        lines.push(format!("{}{} \\\\", indent, g));
+    }
 
     let txtref = if !opts.txtref_cmd.is_empty() {
         match &ex.line_num {

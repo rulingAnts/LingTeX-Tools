@@ -111,7 +111,9 @@
                         : escapeLatex(cur));
                     cur = '';
                 }
-                parts.push(ch);
+                // '~' is LaTeX-active; render a visible tilde to match escapeLatex
+                // on the object-language tier (other dividers pass through literally).
+                parts.push(ch === '~' ? '\\textasciitilde{}' : ch);
             } else {
                 cur += ch;
             }
@@ -416,6 +418,11 @@
         }
     }
 
+    // Wrap a rendered tier token in braces if it contains a literal space, so
+    // gb4e \gll counts it as one alignment column (gb4e splits tiers on source
+    // whitespace, so an unbraced multi-word form/gloss would add phantom columns).
+    function braceIfSpace(t) { return t.indexOf(' ') !== -1 ? '{' + t + '}' : t; }
+
     // ── Tier selection + word building (shared by all renderers) ─────────────
 
     /**
@@ -509,7 +516,10 @@
             }
 
             if (hasGloss) {
-                tier2.push(wrapGlosses(word.glossParts.join(''), glCmd, glossCase));
+                // Empty gloss for a non-empty form → placeholder, so tier1 and
+                // tier2 keep equal token counts and \gll stays aligned.
+                var gstr = word.glossParts.join('');
+                tier2.push(gstr === '' ? '\\textasciitilde' : wrapGlosses(gstr, glCmd, glossCase));
             }
         }
 
@@ -527,11 +537,11 @@
 
         var tier1Content = formCmd
             ? tier1.map(function (t) { return formCmd + '{' + t + '}'; }).join(' ')
-            : tier1.join(' ');
+            : tier1.map(braceIfSpace).join(' ');
 
         var lines = [];
         lines.push('\\' + gCmd + ' ' + tier1Content + ' \\\\');
-        if (hasGloss) lines.push(indent + tier2.join(' ') + ' \\\\');
+        if (hasGloss) lines.push(indent + tier2.map(braceIfSpace).join(' ') + ' \\\\');
 
         var txtref = '';
         if (txtrefCmd && lineNum) {
