@@ -287,6 +287,23 @@ for Mac**. Two of them were wrong.
 | `VBProject.VBComponents.Import` | **Blocked**, error 6068. No automated module import: the `.dotm` is built by manual File → Import File |
 | `Application.FileDialog` | **Absent** on Mac, error 5948. No folder picker for the add-in or any bootstrap — relevant to the Phase 2 form |
 
+A second probe, `tools/probe/Probe AppleScript Bridge.applescript`, asked what
+Word exposes to AppleScript on the same build:
+
+| Term | Result |
+|---|---|
+| Word is scriptable | **Yes**, version 16.112.4 |
+| `do Visual Basic` | **Absent.** No arbitrary-VBA bridge, so a script cannot inject code |
+| `run VB macro` | **Present.** A script can invoke a macro that already exists |
+
+Together with `VBProject.Import` being blocked, that settles the build: nothing can
+*inject* modules, so the `.dotm` is assembled by hand in the VBA editor. But
+`run VB macro` is enough for the Mac installer to **verify its own work** — after
+copying the template it can relaunch Word and call `LingTeXPing`, which
+distinguishes "installed and loaded" from "installed and silently ignored". That
+matters because the known silent failure is macOS quarantining a `.dotm` that
+arrived inside a downloaded zip.
+
 Still unverified because Mac cannot cover them, for one pass on Windows: the NSIS
 installer, and whether custom ribbon XML in a STARTUP `.dotm` loads.
 
