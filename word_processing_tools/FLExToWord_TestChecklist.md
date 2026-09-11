@@ -1,5 +1,21 @@
 # FLExToWord VBA Macro — Test Checklist
 
+> ## ⚠ Superseded
+>
+> This checklist tests `FLExToWord.bas`, the OMML/equation-frame macro, which has
+> been **superseded by the [LingTeX-Word](../LingTeX-Word/) add-in**. Equation
+> frames turned out to be a dead end: once a word is inside `<m:oMath>` neither the
+> clipboard nor a later macro can transform it, so an example can never be
+> re-wrapped or read back; and insertion required writing a temp file, which fights
+> Mac Word's sandbox. LingTeX-Word renders borderless tables that auto-wrap to the
+> page instead, and writes nothing to disk.
+>
+> Current test plans: [`../LingTeX-Word/TESTING.md`](../LingTeX-Word/TESTING.md).
+>
+> Kept because the dead end is worth documenting, and because section 11 below is
+> the source of the grammatical-gloss cases now in
+> `LingTeX-Word/src/modTests.bas` — **with one correction, noted there.**
+
 Each test gives sample FLEx clipboard text to paste into Word, the macro to run, and what to verify in the output.  
 **Paste each sample as plain text** (Ctrl+Shift+V or Paste Special → Unformatted Text), select it, then run `FLExTextToWord`.
 
@@ -185,7 +201,7 @@ Test these gloss tokens individually (put them as the WordGloss line):
 |---|---|
 | `FOC` | small caps (`foc`) |
 | `3SG` | small caps (`3sg`) — digit-initial |
-| `3sg` | **NOT** small caps (has lowercase) — normal |
+| `3sg` | small caps — digit-initial. **Corrected:** this row previously read "NOT small caps", which contradicted the `1s.POSS` row below asserting that digit-initial tokens *are* small-capped. `docs/core.js` settles it: the second branch of its `isGramGloss` pattern is `[0-9]\w+`, documented as "digit-initial (3sg, 1pl)". Someone writing `3sg` means the same category as `3SG`. |
 | `bark` | NOT small caps |
 | `P.N.` | NOT small caps — matches "A." exclusion pattern (single cap + period) |
 | `N.` | NOT small caps |

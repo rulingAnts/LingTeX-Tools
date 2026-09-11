@@ -1,6 +1,38 @@
 Attribute VB_Name = "FLExToWord"
 Option Explicit
 
+'#############################################################################
+'#                                                                           #
+'#  SUPERSEDED -- kept as a reference, not for use.                           #
+'#                                                                           #
+'#  Replaced by the LingTeX-Word add-in in ..\LingTeX-Word\, which renders    #
+'#  interlinear examples as BORDERLESS TABLES that auto-wrap to the page.     #
+'#                                                                           #
+'#  Why this approach was abandoned:                                         #
+'#                                                                           #
+'#  * OMML equation frames are an opaque black box.  Once a word is inside    #
+'#    <m:oMath> neither the clipboard nor a later macro can transform it,     #
+'#    so an example cannot be re-wrapped, re-aligned, or read back out.       #
+'#    Interlinear text has to stay editable; equations do not allow that.     #
+'#                                                                           #
+'#  * The alignment is poor, and it cannot be made to wrap to the margin.     #
+'#                                                                           #
+'#  * Insertion needs a FlatOPC temp FILE on disk (Range.InsertXML rejects    #
+'#    <m:oMath> with error 6145, so the XML has to be written out and         #
+'#    reopened).  Mac Word is sandboxed, so writing outside the container     #
+'#    needs a user grant -- hostile to a macro that should just work.  The    #
+'#    replacement performs no file I/O at all.                               #
+'#                                                                           #
+'#  * It parses only the SPACE-SEPARATED, label-prefixed FLEx form.           #
+'#    NormalizeText below converts Chr(9) to a space, which destroys the      #
+'#    column structure that real FLEx clipboard output carries.  See          #
+'#    ..\PROMPT.md for what FLEx actually puts on the clipboard.              #
+'#                                                                           #
+'#  Still useful: IsGrammatical and SplitPunctuation below are what           #
+'#  LingTeX-Word\src\modFlexParse.bas was ported from.                        #
+'#                                                                           #
+'#############################################################################
+
 '=============================================================================
 ' FLExToWord.bas  —  Word VBA macro for interlinear glossed text (IGT)
 ' Original LibreOffice macro by Moss Doerksen; Word port by Seth J
