@@ -188,6 +188,33 @@ path included. If the Window menu shows a stray blank document, type
 
 ---
 
+## Shortcut if you are on Windows: import them automatically
+
+On Windows, VBA is allowed to rewrite its own project once one setting is on, and
+then a single pasted macro can import all thirteen modules and save the template.
+
+1. **File → Options → Trust Center → Trust Center Settings… → Macro Settings**,
+   tick **"Trust access to the VBA project object model"**, restart Word.
+2. Paste `tools/ImportModules.bas` into a new module named `modImport`, and set
+   `SRC_FOLDER` at the top to your clone's `LingTeX-Word/src` path.
+3. Run `ImportLingTeXModules`. Re-running is safe — it replaces modules rather
+   than duplicating them, so it is also how to pick up later edits to `src/`.
+4. Optionally run `SaveAsTemplate` to write `LingTeX-Word.dotm`.
+
+**This does not work on Mac.** There is no equivalent setting in Word's interface,
+and the probe found the access blocked on Word 16.112 with no way to grant it
+(error 6068). On Mac, import by hand.
+
+The template it produces is cross-platform, so building on Windows and testing on
+Mac is a perfectly good split — nothing about the `.dotm` is Windows-specific.
+
+A note on that setting: it exists because it lets code rewrite code, and it is
+worth respecting. This add-in never asks an *end user* to enable it, and its
+installer does not touch it. It is for whoever builds the template, on their own
+machine, and turning it back off afterwards costs nothing.
+
+---
+
 ## If you have to paste
 
 Only needed if your VBA editor has no **File → Import File…**. Generate the

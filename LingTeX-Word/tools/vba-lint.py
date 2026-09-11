@@ -25,8 +25,8 @@ import sys
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-# The engine, plus the standalone probe module that ships for pasting into Word.
-SRC_DIRS = [ROOT / "src", ROOT / "tools" / "probe"]
+# The engine, plus the standalone modules that ship for pasting into Word.
+SRC_DIRS = [ROOT / "src", ROOT / "tools", ROOT / "tools" / "probe"]
 
 # Platform traps. Each of these exists on Windows Word and not on Mac Word.
 WINDOWS_ONLY = {
@@ -229,8 +229,9 @@ STAGE1 = {
     "modFlexParse.bas", "modIgtModel.bas", "modLeipzig.bas",
     "modWrap.bas", "modTests.bas", "clsIgtWarning.cls",
 }
-# Not part of the engine; shipped to be pasted on its own.
-STANDALONE = {"modProbe.bas"}
+# Not part of the engine; each is pasted on its own and depends on nothing else.
+# Excluded from the stage-1 dependency check, which only concerns engine modules.
+STANDALONE = {"modProbe.bas", "ImportModules.bas"}
 
 
 def proc_names(text):
