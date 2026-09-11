@@ -77,7 +77,14 @@ src/modIgtModel.bas       src/clsIgtWarning.cls
 src/modLeipzig.bas        src/modTests.bas
 ```
 
-Import all six, then in the Immediate window:
+Import the five `.bas` files with **File → Import File…**.
+
+**Do not import `clsIgtWarning.cls`** — paste it instead. See
+*Class modules are pasted, never imported* below. The same applies to
+`clsAppEvents.cls` in step 2. This is not a preference; importing a `.cls`
+silently produces a standard module often enough that it is not worth trying.
+
+Then, in the Immediate window:
 
 ```
 RunAllTests
@@ -170,10 +177,14 @@ everything has to be present.
 You pasted a file that still has its `Attribute VB_Name` line. Use the
 `build/paste/` copies, which have it stripped, or import the `src/` files instead.
 
-**`clsAppEvents` will not compile**
-It has to be a **Class Module**, not a standard module — it declares
+**`clsAppEvents` or `clsIgtWarning` will not compile**
+**This is the most likely thing to go wrong, and it is always the same cause.**
+It has to be a **Class Module**, not a standard module — `clsAppEvents` declares
 `Private WithEvents mApp As Word.Application`, which is only legal in a class.
-Delete it and re-insert via Insert → Class Module.
+If you see `VERSION 1.0 CLASS` / `BEGIN` / `END` sitting in the code, or
+complaints about `WithEvents` or `New`, it came in as a standard module: delete it
+and redo it with Insert → Class Module and the paste file. See *Class modules are
+pasted, never imported*.
 
 **Nothing happens, no error**
 Check `Application.ScreenUpdating` got turned back on: type
@@ -215,10 +226,66 @@ machine, and turning it back off afterwards costs nothing.
 
 ---
 
+## Class modules are pasted, never imported
+
+`clsIgtWarning.cls` and `clsAppEvents.cls` are the two class modules, and they are
+the one part of this that does **not** go through File → Import File…
+
+The VBA editor decides what kind of component an imported file becomes by parsing
+its header. When it misreads the `.cls` preamble it creates a **standard module**
+instead, leaving
+
+```
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+```
+
+in the code as syntax errors. The module then cannot compile at all — `clsAppEvents`
+declares `Private WithEvents mApp As Word.Application`, which is legal only in a
+class — and it reads as a bug in the module rather than as a bad import.
+
+Bare-LF line endings are one way to trigger it, which is why `.gitattributes` now
+pins `*.bas` and `*.cls` to CRLF in the working tree. But rather than depend on
+that holding on every clone, do it the way that cannot go wrong:
+
+```bash
+sh LingTeX-Word/tools/make-paste-bundle.sh
+```
+
+Then for each of `build/paste/05-clsIgtWarning.txt` and
+`build/paste/13-clsAppEvents.txt`:
+
+1. **Insert → Class Module**
+2. Paste the whole file
+3. Properties pane → `(Name)` → the name the file's header gives
+4. Properties pane → `Instancing` → `1 - Private`
+
+Step 4 is the default for a new class module, so there is normally nothing to
+change — check it rather than set it. The header of each generated file repeats all
+four steps, and derives the Instancing value from the source file's own attributes
+so it cannot drift.
+
+Confirm it worked, in the Immediate window:
+
+```
+?TypeName(New clsIgtWarning)
+```
+
+That prints `clsIgtWarning`. If it errors, the module is still a standard module.
+
+`tools/ImportModules.bas` handles this correctly on its own — it creates class
+components explicitly with `VBComponents.Add` and never calls `Import` on a
+`.cls`. So if the Windows shortcut below is available to you, it is the path with
+the fewest steps *and* the fewest ways to go wrong.
+
+---
+
 ## If you have to paste
 
-Only needed if your VBA editor has no **File → Import File…**. Generate the
-stripped, paste-ready copies:
+Needed for the two class modules always, and for everything else only if your VBA
+editor has no **File → Import File…**. Generate the stripped, paste-ready copies:
 
 ```bash
 sh LingTeX-Word/tools/make-paste-bundle.sh

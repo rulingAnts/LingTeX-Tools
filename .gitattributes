@@ -1,0 +1,33 @@
+# Normalise text files in the repository, and check them out with the line
+# endings each toolchain actually requires.
+
+*               text=auto
+
+# VBA sources MUST be CRLF in the working tree, on every platform.
+#
+# The VBA editor's File > Import File... (and VBProject.VBComponents.Import)
+# parses the header of a .cls file to decide what kind of component to create.
+# With bare LF endings it does not recognise the
+#
+#     VERSION 1.0 CLASS
+#     BEGIN
+#       MultiUse = -1  'True
+#     END
+#
+# preamble, so it silently imports the class as a STANDARD module -- and then
+# those four lines sit in the code as syntax errors, and the WithEvents
+# declaration in clsAppEvents cannot compile. The failure looks like a bug in the
+# code rather than a line-ending problem, which is why this is pinned here rather
+# than left to each clone's core.autocrlf.
+*.bas           text eol=crlf
+*.cls           text eol=crlf
+*.frm           text eol=crlf
+*.frx           binary
+
+# Word templates are zip archives.
+*.dotm          binary
+*.docx          binary
+
+# Shell scripts and AppleScript must stay LF even on Windows clones.
+*.sh            text eol=lf
+*.applescript   text eol=lf
