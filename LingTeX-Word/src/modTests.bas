@@ -208,6 +208,95 @@ End Sub
 
 
 '=============================================================================
+' -- WRAP DIAGNOSTIC --------------------------------------------------------
+'=============================================================================
+
+'-----------------------------------------------------------------------------
+' Run this when the wrap section crashes: DiagnoseWrap
+'
+' Performs the same work as the first wrap assertion, one step at a time, and
+' prints a marker before each. Whatever the last marker is, the step after it is
+' what failed -- so the output names the exact statement rather than the section.
+'
+' It builds the arrays by hand as well as by parsing, so it separates "the test
+' harness cannot parse its own input" from "ComputeWrapLines itself fails".
+'-----------------------------------------------------------------------------
+Public Sub DiagnoseWrap()
+    Dim wParts() As String, fParts() As String
+    Dim parsedW() As Single, parsedF() As Boolean
+    Dim fixedW(0 To 2) As Single
+    Dim fixedF(0 To 2) As Boolean
+    Dim lineStarts() As Long
+    Dim i As Long
+    Dim stepNo As Long
+    Dim s As String
+
+    mRpt = ""
+    Emit "DiagnoseWrap"
+    Emit "============"
+
+    On Error GoTo Crashed
+
+    stepNo = 1: Emit "step 1  build fixed-size arrays by hand"
+    fixedW(0) = 10: fixedW(1) = 10: fixedW(2) = 10
+    fixedF(0) = False: fixedF(1) = False: fixedF(2) = False
+
+    stepNo = 2: Emit "step 2  call ComputeWrapLines with the hand-built arrays"
+    lineStarts = ComputeWrapLines(fixedW, fixedF, 30, 0, 0)
+
+    stepNo = 3: Emit "step 3  read its bounds"
+    Emit "        LBound=" & CStr(LBound(lineStarts)) & _
+         "  UBound=" & CStr(UBound(lineStarts))
+
+    stepNo = 4: Emit "step 4  render the line starts"
+    s = ""
+    For i = LBound(lineStarts) To UBound(lineStarts)
+        If s <> "" Then s = s & ","
+        s = s & CStr(lineStarts(i))
+    Next i
+    Emit "        result = " & s & "   (expected 0)"
+
+    stepNo = 5: Emit "step 5  Split the width string"
+    wParts = Split("10,10,10", ",")
+    fParts = Split("0,0,0", ",")
+    Emit "        UBound(wParts)=" & CStr(UBound(wParts)) & _
+         "  UBound(fParts)=" & CStr(UBound(fParts))
+
+    stepNo = 6: Emit "step 6  ReDim the parsed arrays"
+    ReDim parsedW(0 To UBound(wParts))
+    ReDim parsedF(0 To UBound(wParts))
+
+    stepNo = 7: Emit "step 7  parse each width with Val then CSng"
+    For i = 0 To UBound(wParts)
+        Emit "        i=" & CStr(i) & " raw=[" & wParts(i) & "]"
+        parsedW(i) = CSng(Val(Trim$(wParts(i))))
+        parsedF(i) = False
+        If i <= UBound(fParts) Then parsedF(i) = (Trim$(fParts(i)) = "1")
+    Next i
+
+    stepNo = 8: Emit "step 8  call ComputeWrapLines with the parsed arrays"
+    lineStarts = ComputeWrapLines(parsedW, parsedF, 30, 0, 0)
+    Emit "        ok, UBound=" & CStr(UBound(lineStarts))
+
+    stepNo = 9: Emit "step 9  call PlanStarts end to end"
+    Emit "        result = " & PlanStarts("10,10,10", "0,0,0", 30)
+
+    Emit ""
+    Emit "COMPLETED with no error. The crash is somewhere else."
+    GoTo Done
+
+Crashed:
+    Emit ""
+    Emit "CRASHED at the step AFTER marker " & CStr(stepNo) & _
+         " -- run-time error " & CStr(Err.Number) & ": " & Err.Description
+    Err.Clear
+
+Done:
+    Debug.Print mRpt
+    MsgBox mRpt, vbInformation, "LingTeX-Word wrap diagnostic"
+End Sub
+
+'=============================================================================
 ' -- GOLDEN VECTORS ---------------------------------------------------------
 '=============================================================================
 ' From PROMPT.md.  Tabs are written as ChrW here rather than as literal tab
