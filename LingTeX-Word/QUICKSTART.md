@@ -119,11 +119,13 @@ modules are pasted, never imported*.
 RunDocTests
 ```
 
-Around 95 checks against Word's actual behaviour — styles, settings, text
-measurement, page geometry, and the scratch-document lifecycle. **Expect
-`ALL PASS`.** It works only in blank documents it creates and closes without
-saving, it touches nothing you have open, and it asserts at the end that it left
-the document count where it found it.
+Around 250 checks against Word's actual behaviour, in eleven sections: styles,
+style-name collision, settings, text measurement, render/measure agreement,
+rendering geometry, page geometry, the scratch-document lifecycle, the round trip,
+the seven commands, and the event handlers. **Expect `ALL PASS`.** It works only in
+blank documents it creates and closes without saving, it touches nothing you have
+open, it writes nothing to disk, and it asserts at the end that it left the document
+count where it found it.
 
 Run this *before* the manual tests below. Almost every way the document layer can
 be wrong produces a wrong layout **silently** rather than an error — a font
@@ -132,7 +134,8 @@ returned zeros — and all of them look exactly like "the wrap algorithm is brok
 which is the one part already proven. Looking at a rendered example cannot tell
 those apart. These checks can.
 
-Two of them are worth knowing by name:
+Five of them are worth knowing by name, because each one stands in for a whole
+class of silent wrongness:
 
 - **`widths are strictly increasing for i < iii < WWW`** — if measurement has
   failed in any way, it returns zeros, and zeros are indistinguishable from empty
@@ -140,6 +143,21 @@ Two of them are worth knowing by name:
 - **`measured width of ERG matches the drawn width`** — measurement and drawing
   are separate code paths that must produce the same glyphs. Nothing in the design
   enforces that; only this comparison does.
+- **`every form sits directly above its gloss`** — within a wrap line, all tier
+  rows must report the same width for the same column. This is the looking test,
+  as arithmetic.
+- **`no row is wider than the text area`** — likewise for "nothing extends past
+  the right margin".
+- **`re-wrapping twice leaves the document identical`** and **`widening it pulls
+  them back up`** — together these are the thesis of the design: the plan is
+  recomputed from the full column list every time rather than patched, which is
+  why pull-back-up needs no code of its own.
+
+Three sections check things that cannot be established by reading the code at all,
+because they are claims about what Word does: the render/measure agreement, the
+seven commands each leaving `gBusy` clear and no scratch document leaked on both a
+success and a failure path, and whether `WithEvents` on `Word.Application` fires
+and whether the re-entrancy guard holds.
 
 If a section reports `CRASH`, the run continues to the next one — send me the
 whole report. A crashed section is usually a VBA construct that compiles and then

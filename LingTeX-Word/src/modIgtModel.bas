@@ -683,10 +683,19 @@ Public Function SplitColumn(ByRef ex As IgtExample, ByVal colIdx As Long, _
     Dim leftPart() As String, rightPart() As String
     Dim cell As String, seen As Long, at As Long
 
+    ' Each early exit names its own reason. The caller reports
+    ' "No morpheme break was found in: " & outShortTiers, so an empty string here
+    ' produced a message that stopped at the colon with nothing after it.
     outShortTiers = ""
-    If colIdx < 0 Or colIdx >= ex.ColCount Then Exit Function
+    If colIdx < 0 Or colIdx >= ex.ColCount Then
+        outShortTiers = "(that column is outside the example)"
+        Exit Function
+    End If
     If occurrence < 1 Then occurrence = 1
-    If ex.TierCount = 0 Then Exit Function
+    If ex.TierCount = 0 Then
+        outShortTiers = "(the example has no tiers)"
+        Exit Function
+    End If
 
     ReDim leftPart(0 To ex.TierCount - 1)
     ReDim rightPart(0 To ex.TierCount - 1)
