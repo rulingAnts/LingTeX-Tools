@@ -35,6 +35,9 @@ Option Explicit
 ' Word reports an undefined (mixed) formatting value as this.
 Private Const WD_UNDEFINED As Long = 9999999
 
+' Why the last read gave up. Empty after a clean one.
+Public gReadBackError As String
+
 
 '=============================================================================
 ' -- FINDING OUR TABLES -----------------------------------------------------
@@ -95,8 +98,9 @@ Public Function ReadExampleFromTable(tbl As Table) As IgtExample
     Dim lineCols() As Long, totalCols As Long, outCol As Long
     Dim r As Long
 
+    gReadBackError = ""
     If tbl Is Nothing Then Exit Function
-    On Error GoTo Done
+    On Error GoTo Failed
 
     nRows = tbl.Rows.Count
     If nRows = 0 Then Exit Function
@@ -141,8 +145,21 @@ Public Function ReadExampleFromTable(tbl As Table) As IgtExample
         outCol = outCol + lineCols(g)
     Next g
 
-Done:
     ReadExampleFromTable = ex
+    Exit Function
+
+Failed:
+    ' Return NOTHING, not what was assembled so far.
+    '
+    ' This used to fall through to "ReadExampleFromTable = ex", handing back a model
+    ' with a full TierCount and ColCount and missing cells in the middle -- which
+    ' RewrapTable then redrew, losing the user's text with nothing to distinguish it
+    ' from a correct re-wrap. An empty example trips every caller's existing
+    ' TierCount check instead.
+    gReadBackError = "reading the table stopped at row " & CStr(r) & _
+                     " (" & CStr(Err.Number) & ": " & Err.Description & ")"
+    Err.Clear
+    ReadExampleFromTable = NewExample(0, 0)
 End Function
 
 '-----------------------------------------------------------------------------
@@ -183,6 +200,19 @@ End Function
 
 ' A generic role for a row whose style has been stripped, so the table is still
 ' readable even after a round trip through an editor that lost the styles.
+'-----------------------------------------------------------------------------
+' A role for a row whose paragraph style told us nothing -- a table whose styles
+' were stripped, or one built by hand.
+'
+' Every index below six gets a DIFFERENT role. It used to return ROLE_CATEGORY for
+' every index from three up, so a five-tier table recovered with two tiers sharing
+' a role, which means two rows sharing a paragraph style and the tier distinction
+' gone for good on the next render.
+'
+' There are only six roles, so a table with more than six tiers still has to repeat
+' one. Six covers every real example -- FLEx offers about five tiers -- and the
+' floor is at least explicit rather than starting at three.
+'-----------------------------------------------------------------------------
 Private Function RoleOrDefault(ByVal role As String, ByVal idx As Long) As String
     If role <> "" Then
         RoleOrDefault = role
@@ -190,8 +220,11 @@ Private Function RoleOrDefault(ByVal role As String, ByVal idx As Long) As Strin
     End If
     Select Case idx
         Case 0: RoleOrDefault = ROLE_VERNACULAR
-        Case 1: RoleOrDefault = ROLE_GLOSS
-        Case 2: RoleOrDefault = ROLE_WORDGLOSS
+        Case 1: RoleOrDefault = ROLE_MORPHEMES
+        Case 2: RoleOrDefault = ROLE_GLOSS
+        Case 3: RoleOrDefault = ROLE_WORDGLOSS
+        Case 4: RoleOrDefault = ROLE_CATEGORY
+        Case 5: RoleOrDefault = ROLE_FREE
         Case Else: RoleOrDefault = ROLE_CATEGORY
     End Select
 End Function
@@ -221,7 +254,11 @@ End Function
 '                          character, which is the only way to tell which run is
 '                          which.
 '-----------------------------------------------------------------------------
-Private Function CellTextRestored(tbl As Table, ByVal r As Long, ByVal c As Long) As String
+' Set by modDocTests to force the slow, definitely-correct path, so the two can be
+' compared on a real table. Never set in normal use.
+Public gForceSlowRestore As Boolean
+
+Public Function CellTextRestored(tbl As Table, ByVal r As Long, ByVal c As Long) As String
     Dim rng As Range
     Dim raw As String
     Dim sc As Long
@@ -248,30 +285,68 @@ Private Function CellTextRestored(tbl As Table, ByVal r As Long, ByVal c As Long
     On Error GoTo 0
 
     If sc = 0 Then
+        ' Nothing is in small caps, so nothing was lowercased.
         CellTextRestored = raw
         Exit Function
-    ElseIf sc <> WD_UNDEFINED Then
+    End If
+
+    '-----------------------------------------------------------------------
+    ' Small caps are present somewhere. Decide PER CHARACTER, by the character
+    ' STYLE, and read each character out of the RANGE.
+    '
+    ' Two bugs are avoided by doing it this way rather than by the uniform
+    ' shortcut this used to take.
+    '
+    ' The style, not the font: a UNIFORMLY small-capped cell used to be
+    ' upper-cased wholesale on the strength of Font.SmallCaps alone -- so a
+    ' vernacular word a user had small-capped themselves came back as OZIVELA.
+    ' Only runs carrying OUR character style were ever lowercased, so only those
+    ' may be put back.
+    '
+    ' And reading from the range, not from a cleaned string: the text was cleaned
+    ' and trimmed first, then indexed with Mid$ alongside rng.Characters(i) -- two
+    ' indexes into different strings. One leading space in the cell desynchronised
+    ' them and "erg" came back as "eRG".
+    '-----------------------------------------------------------------------
+    ' Fast path: the WHOLE cell is one grammatical gloss, which is the common case
+    ' ("ERG", "FOC", "1SG"). Reading a character style off a range whose runs
+    ' disagree either raises or reports something other than our style, so a false
+    ' positive is not available -- and modDocTests asserts this path and the
+    ' per-character one below agree, because the per-character path is the one that
+    ' is definitely right and this is only here for speed. rng.Characters(i) is a
+    ' round trip into Word per character, and Mac Word feels those.
+    nm = ""
+    On Error Resume Next
+    nm = rng.Style
+    Err.Clear
+    On Error GoTo 0
+    If nm = STYLE_GRAM And Not gForceSlowRestore Then
         CellTextRestored = UCase$(raw)
         Exit Function
     End If
 
-    ' Mixed: decide per character by the style actually applied.
-    n = Len(raw)
+    n = rng.Characters.Count
     For i = 1 To n
         nm = ""
+        Set ch = Nothing
         On Error Resume Next
         Set ch = rng.Characters(i)
-        nm = ch.Style
+        If Not ch Is Nothing Then nm = ch.Style
         Err.Clear
         On Error GoTo 0
+        If ch Is Nothing Then GoTo NextChar
+
         If nm = STYLE_GRAM Then
-            out = out & UCase$(Mid$(raw, i, 1))
+            out = out & UCase$(ch.Text)
         Else
-            out = out & Mid$(raw, i, 1)
+            out = out & ch.Text
         End If
+NextChar:
     Next i
 
-    CellTextRestored = out
+    ' Cleaned only at the end, so the control characters Word keeps in cell text
+    ' never take part in the indexing above.
+    CellTextRestored = CleanCellText(out)
 End Function
 
 ' Strip the control characters Word puts in cell text, and any stray whitespace.

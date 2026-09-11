@@ -239,7 +239,7 @@ Order to add them
   14-clsAppEvents          CLASS MODULE
 
   Then, in the Immediate window:   RunDocTests
-  Expect ALL PASS again -- around 95 checks against Word's actual behaviour.
+  Expect ALL PASS again -- around 250 checks against Word's actual behaviour.
   See QUICKSTART.md for what to test by hand after that.
 
 VBA compiles the whole project at once, so stage 1 only works because those six

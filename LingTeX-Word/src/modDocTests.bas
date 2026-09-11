@@ -72,6 +72,9 @@ Public Sub RunDocTests()
     RunSection "rendering"
     RunSection "geometry"
     RunSection "scratch"
+    RunSection "roundtrip"
+    RunSection "commands"
+    RunSection "events"
 
     ' Anything left open is a leak, and a leak is a finding.
     ReleaseScratch
@@ -106,6 +109,9 @@ Private Sub RunSection(ByVal which As String)
         Case "rendering":    TestRendering
         Case "geometry":     TestAvailableWidth
         Case "scratch":      TestScratchLifecycle
+        Case "roundtrip":    TestRoundTrip
+        Case "commands":     TestCommands
+        Case "events":       TestEvents
         Case Else
             ' A section listed in RunDocTests with no arm here would otherwise run
             ' nothing at all and still report PASS for the whole suite -- silence
@@ -1322,6 +1328,739 @@ Private Function LastRowKeepsWithNext(tbl As Table) As Boolean
     On Error GoTo 0
     LastRowKeepsWithNext = (v = True)
 End Function
+
+
+'=============================================================================
+' -- ROUND TRIP (modRender + modReadBack) -----------------------------------
+'=============================================================================
+
+' THE THESIS OF THE DESIGN, AS A TEST.
+'
+' "The wrap planner recomputes from the full column list every time, rather than
+' patching what is there" is the claim that makes pull-back-up work without a
+' second code path: widen the margins and the columns come back up because the plan
+' is recomputed, not diffed. Two properties establish it.
+'
+'   Round trip       Reading back a drawn example gives the model it was drawn
+'                    from, field for field. If that holds, the document really is
+'                    self-describing and no state is kept anywhere else.
+'   Idempotence      Re-wrapping twice leaves the document byte-identical. If that
+'                    holds, a re-wrap is a function of the model and the available
+'                    width alone.
+'
+' Both are run at widths that force one, two and three wrap lines, because a bug in
+' the ragged-row assembly only shows up once there is more than one group.
+Private Sub TestRoundTrip()
+    Dim doc As Document
+
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "round trip: could create a blank document", False
+        Exit Sub
+    End If
+    EnsureStyles doc, True
+    ClearCache
+
+    ' Letter portrait: one wrap line for a short example.
+    SetPageGeometry doc, 612, 792, 72
+    CheckRoundTripAt doc, "wide page"
+
+    ' Narrow enough to force wrapping.
+    SetPageGeometry doc, 306, 792, 72
+    CheckRoundTripAt doc, "narrow page"
+
+    ' Narrower still.
+    SetPageGeometry doc, 234, 792, 72
+    CheckRoundTripAt doc, "very narrow page"
+
+    SetPageGeometry doc, 612, 792, 72
+    CheckIdempotence doc
+    CheckPullBackUp doc
+    CheckSmallCapsRestored doc
+    CheckRestoreFastPathAgrees doc
+    CheckEscapeHatch doc
+    CheckReadBackIsReadOnly doc
+
+    CloseNoSave doc
+End Sub
+
+' Draw, read back, compare every field.
+Private Sub CheckRoundTripAt(doc As Document, ByVal what As String)
+    Dim ex As IgtExample, back As IgtExample
+    Dim tbl As Table
+    Dim nLines As Long
+
+    ex = ThreeTierExample()
+    doc.Content.Delete
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then
+        Ok "round trip (" & what & "): drawn", False
+        Emit "         " & gRenderError
+        Exit Sub
+    End If
+
+    nLines = tbl.Rows.Count \ 2          ' two interlinear tiers in the fixture
+    back = ReadExampleFromTable(tbl)
+    AbsorbFreeParagraphs back, tbl
+
+    Emit "  ..     " & what & ": " & CStr(nLines) & " wrap line(s), " & _
+         CStr(tbl.Rows.Count) & " rows"
+    CompareExamples what, ex, back
+End Sub
+
+' Field for field, with the free tier accounted for: the free translations come back
+' through AbsorbFreeParagraphs rather than as a tier of columns.
+Private Sub CompareExamples(ByVal what As String, ex As IgtExample, back As IgtExample)
+    Dim t As Long, c As Long
+    Dim interIn As Long, interOut As Long
+    Dim idxIn() As Long, idxOut() As Long
+    Dim bad As String
+
+    Eq "round trip (" & what & "): column count", _
+        CStr(back.ColCount), CStr(ex.ColCount)
+
+    interIn = InterlinearTierList(ex, idxIn)
+    interOut = InterlinearTierList(back, idxOut)
+    Eq "round trip (" & what & "): interlinear tier count", _
+        CStr(interOut), CStr(interIn)
+
+    If interOut <> interIn Or back.ColCount <> ex.ColCount Then Exit Sub
+
+    For t = 0 To interIn - 1
+        If back.Tiers(idxOut(t)) <> ex.Tiers(idxIn(t)) Then
+            bad = bad & " tier " & CStr(t) & ": " & back.Tiers(idxOut(t)) & _
+                  " not " & ex.Tiers(idxIn(t)) & ";"
+        End If
+        For c = 0 To ex.ColCount - 1
+            If back.Cells(idxOut(t), c) <> ex.Cells(idxIn(t), c) Then
+                bad = bad & " (" & CStr(t) & "," & CStr(c) & "): [" & _
+                      back.Cells(idxOut(t), c) & "] not [" & _
+                      ex.Cells(idxIn(t), c) & "];"
+            End If
+        Next c
+    Next t
+
+    Ok "round trip (" & what & "): every cell and tier comes back unchanged", _
+        (bad = "")
+    If bad <> "" Then Emit "        " & bad
+
+    Eq "round trip (" & what & "): free translation count", _
+        CStr(back.FreeCount), CStr(ex.FreeCount)
+    If back.FreeCount = ex.FreeCount And ex.FreeCount > 0 Then
+        Eq "round trip (" & what & "): the translation text", _
+            back.FreeLines(0), ex.FreeLines(0)
+    End If
+End Sub
+
+' Re-wrapping twice must leave the document byte-identical. This is what proves a
+' re-wrap is a function of the model and the width, with nothing accumulating.
+Private Sub CheckIdempotence(doc As Document)
+    Dim ex As IgtExample
+    Dim tbl As Table
+    Dim after1 As String, after2 As String, after3 As String
+
+    ex = ThreeTierExample()
+    doc.Content.Delete
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then
+        Ok "idempotence: drawn", False
+        Exit Sub
+    End If
+
+    Set tbl = RewrapTable(tbl)
+    If tbl Is Nothing Then
+        Ok "idempotence: the first re-wrap worked", False
+        Emit "         " & gRenderError
+        Exit Sub
+    End If
+    after1 = doc.Content.Text
+
+    Set tbl = RewrapTable(tbl)
+    If tbl Is Nothing Then
+        Ok "idempotence: the second re-wrap worked", False
+        Emit "         " & gRenderError
+        Exit Sub
+    End If
+    after2 = doc.Content.Text
+
+    Set tbl = RewrapTable(tbl)
+    after3 = doc.Content.Text
+
+    Ok "re-wrapping twice leaves the document identical", (after1 = after2)
+    Ok "and a third time changes nothing either", (after2 = after3)
+    If after1 <> after2 Then
+        Emit "         length " & CStr(Len(after1)) & " then " & CStr(Len(after2))
+    End If
+End Sub
+
+' PUSH DOWN, THEN PULL BACK UP. The round trip that needs no separate code path,
+' because the plan is recomputed rather than patched.
+Private Sub CheckPullBackUp(doc As Document)
+    Dim ex As IgtExample
+    Dim tbl As Table
+    Dim wide As Long, narrow As Long, backWide As Long
+
+    ex = ThreeTierExample()
+    doc.Content.Delete
+    SetPageGeometry doc, 612, 792, 72
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then
+        Ok "pull back up: drawn", False
+        Exit Sub
+    End If
+    wide = tbl.Rows.Count
+
+    ' Narrow the page: columns must push down onto more rows.
+    SetPageGeometry doc, 234, 792, 72
+    Set tbl = RewrapTable(tbl)
+    If tbl Is Nothing Then
+        Ok "pull back up: re-wrapped narrow", False
+        Emit "         " & gRenderError
+        Exit Sub
+    End If
+    narrow = tbl.Rows.Count
+
+    ' Widen it again: they must come back up.
+    SetPageGeometry doc, 612, 792, 72
+    Set tbl = RewrapTable(tbl)
+    If tbl Is Nothing Then
+        Ok "pull back up: re-wrapped wide again", False
+        Emit "         " & gRenderError
+        Exit Sub
+    End If
+    backWide = tbl.Rows.Count
+
+    Ok "narrowing the page pushes columns down", (narrow > wide)
+    Ok "widening it pulls them back up", (backWide = wide)
+    Emit "         rows: " & CStr(wide) & " wide, " & CStr(narrow) & _
+         " narrow, " & CStr(backWide) & " wide again"
+
+    ' And the content survived both.
+    CheckContentSurvived ex, tbl
+End Sub
+
+Private Sub CheckContentSurvived(ex As IgtExample, tbl As Table)
+    Dim back As IgtExample
+    back = ReadExampleFromTable(tbl)
+    If back.TierCount > 0 Then AbsorbFreeParagraphs back, tbl
+    CompareExamples "after push down and pull back up", ex, back
+End Sub
+
+' The lowercasing that small caps requires must be REVERSIBLE. "follow.CMP" is the
+' case that matters: one cell, a lexical part and a grammatical part.
+Private Sub CheckSmallCapsRestored(doc As Document)
+    Dim ex As IgtExample, back As IgtExample
+    Dim tbl As Table
+
+    ex = TwoTierExample()
+    doc.Content.Delete
+    SetPageGeometry doc, 612, 792, 72
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then
+        Ok "small caps restored: drawn", False
+        Exit Sub
+    End If
+    back = ReadExampleFromTable(tbl)
+    If back.TierCount = 0 Then
+        Ok "small caps restored: read back", False
+        Exit Sub
+    End If
+
+    Eq "fox=ERG survives the small-caps round trip", back.Cells(1, 0), "fox=ERG"
+    Eq "follow.CMP=REL survives it too (the mixed-run case)", _
+        back.Cells(1, 1), "follow.CMP=REL"
+    Eq "a lexical gloss is untouched", back.Cells(1, 2), "dream"
+    Eq "and the vernacular row is untouched", back.Cells(0, 0), "vu=ve"
+End Sub
+
+' CellTextRestored has a fast path for a cell that is entirely one grammatical
+' gloss, and a per-character path that is definitely right. The fast path reads a
+' character style off a whole range, which the probe never covered -- so rather than
+' trust it, assert the two agree on a real table.
+Private Sub CheckRestoreFastPathAgrees(doc As Document)
+    Dim ex As IgtExample
+    Dim tbl As Table
+    Dim fast As String, slow As String
+    Dim r As Long, c As Long
+    Dim bad As String
+
+    ex = TwoTierExample()
+    doc.Content.Delete
+    SetPageGeometry doc, 612, 792, 72
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then Exit Sub
+
+    For r = 1 To tbl.Rows.Count
+        For c = 1 To tbl.Rows(r).Cells.Count
+            gForceSlowRestore = False
+            fast = CellTextRestored(tbl, r, c)
+            gForceSlowRestore = True
+            slow = CellTextRestored(tbl, r, c)
+            gForceSlowRestore = False
+            If fast <> slow Then
+                bad = bad & " (" & CStr(r) & "," & CStr(c) & "): fast [" & fast & _
+                      "] slow [" & slow & "];"
+            End If
+        Next c
+    Next r
+
+    Ok "the restore fast path agrees with the per-character path", (bad = "")
+    If bad <> "" Then
+        Emit "        " & bad
+        Emit "        The per-character path is the correct one. If this fails,"
+        Emit "        reading a character style off a whole range does not behave"
+        Emit "        as assumed on this build, and the fast path must go."
+    End If
+End Sub
+
+' Changing a table's style is the documented escape hatch: the add-in stops touching
+' it. That has to actually work, or a user cannot opt a table out.
+Private Sub CheckEscapeHatch(doc As Document)
+    Dim ex As IgtExample
+    Dim tbl As Table
+    Dim before As Long
+
+    ex = TwoTierExample()
+    doc.Content.Delete
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then Exit Sub
+
+    Ok "a drawn table is recognised as interlinear", IsInterlinearTable(tbl)
+    before = AllInterlinearTables(doc).Count
+
+    ' "Normal Table" is a built-in name and may be localised, so the change is
+    ' verified rather than assumed -- otherwise a failed assignment would look like a
+    ' broken escape hatch.
+    If Not ChangeTableStyle(tbl, doc) Then
+        Emit "  SKIP   could not change the table's style to opt it out"
+        Exit Sub
+    End If
+
+    Ok "changing the style opts the table out", (Not IsInterlinearTable(tbl))
+    Ok "and it drops out of the document's list", _
+        (AllInterlinearTables(doc).Count = before - 1)
+    Ok "FindExampleAt no longer finds it", _
+        (FindExampleAt(tbl.Range) Is Nothing)
+End Sub
+
+' Off the interlinear style, by whatever name the built-in table style has here.
+Private Function ChangeTableStyle(tbl As Table, doc As Document) As Boolean
+    On Error Resume Next
+    tbl.Style = doc.Styles(wdStyleTableGrid)
+    If Err.Number <> 0 Then
+        Err.Clear
+        tbl.Style = doc.Styles("Normal Table")
+    End If
+    Err.Clear
+    On Error GoTo 0
+    ChangeTableStyle = (Not TableStyleIs(tbl, STYLE_TABLE))
+End Function
+
+' Reading must not change anything. A read that edits the document would make
+' idempotence meaningless.
+Private Sub CheckReadBackIsReadOnly(doc As Document)
+    Dim ex As IgtExample
+    Dim tbl As Table
+    Dim textBefore As String, endBefore As Long
+
+    ex = ThreeTierExample()
+    doc.Content.Delete
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then Exit Sub
+
+    textBefore = doc.Content.Text
+    endBefore = doc.Content.End
+
+    ex = ReadExampleFromTable(tbl)
+    AbsorbFreeParagraphs ex, tbl
+    ex = ReadExampleFromTable(tbl)
+
+    Ok "reading a table changes no text", (doc.Content.Text = textBefore)
+    Ok "and moves nothing", (doc.Content.End = endBefore)
+End Sub
+
+
+'=============================================================================
+' -- COMMANDS (modLingTeX) --------------------------------------------------
+'=============================================================================
+
+' Every command, on a success path AND a forced-failure path, must leave the world
+' as it found it: gBusy clear, screen updating on, no scratch document leaked, no
+' custom undo record open. Seven commands times two paths from one loop, which is
+' TESTING.md's "after any command" checklist made mechanical.
+'
+' Possible at all only because every message now goes through Report: with MsgBox
+' these would each block on a modal dialog.
+Private Sub TestCommands()
+    Dim doc As Document
+    Dim savedQuiet As Boolean
+
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "commands: could create a blank document", False
+        Exit Sub
+    End If
+    EnsureStyles doc, True
+    doc.Activate
+
+    savedQuiet = gQuiet
+    gQuiet = True
+    gQuietAnswer = False
+
+    Eq "LingTeXPing answers (so the project compiled)", _
+        LingTeXPing(), "LingTeX-Word loaded"
+
+    ' Cursor outside any example: every command must be a clean no-op.
+    CheckCommandIsNoOp doc, "LingTeXRewrapCurrent"
+    CheckCommandIsNoOp doc, "LingTeXSplitColumn"
+    CheckCommandIsNoOp doc, "LingTeXMergeColumns"
+    CheckCommandIsNoOp doc, "LingTeXCheckExample"
+    CheckCommandIsNoOp doc, "LingTeXConvertTableToIgt"
+
+    ' And on a document with no examples at all.
+    CheckRewrapAllOnEmpty doc
+
+    ' Then with a real example present.
+    CheckRewrapAllCounts doc
+    CheckSplitThenMerge doc
+    CheckConvertPlainTable doc
+
+    gQuiet = savedQuiet
+    CloseNoSave doc
+End Sub
+
+' Run a command with the cursor in ordinary text. Nothing may change, and the state
+' must be clean afterwards.
+Private Sub CheckCommandIsNoOp(doc As Document, ByVal name As String)
+    Dim before As String
+    Dim tablesBefore As Long, docsBefore As Long
+
+    doc.Content.Delete
+    doc.Content.Text = "Just some ordinary prose." & vbCr
+    doc.Range(0, 0).Select
+
+    before = doc.Content.Text
+    tablesBefore = doc.Tables.Count
+    ReleaseScratch
+    docsBefore = Documents.Count
+    gLastMessage = ""
+
+    RunCommandByName name
+
+    Ok name & " outside an example changes no text", (doc.Content.Text = before)
+    Ok name & " outside an example adds no table", _
+        (doc.Tables.Count = tablesBefore)
+    Ok name & " says something rather than nothing", (gLastMessage <> "")
+    CheckStateIsClean name, docsBefore
+End Sub
+
+' gBusy clear, screen updating on, no leaked document, no open undo record.
+Private Sub CheckStateIsClean(ByVal name As String, ByVal docsBefore As Long)
+    Ok name & " leaves gBusy clear", (gBusy = False)
+    Ok name & " leaves ScreenUpdating on", (Application.ScreenUpdating = True)
+    ReleaseScratch
+    Ok name & " leaks no document", (Documents.Count = docsBefore)
+    Ok name & " leaves no undo record open", (Not UndoRecordIsOpen())
+End Sub
+
+' A custom undo record left open swallows everything the user does next into it.
+Private Function UndoRecordIsOpen() As Boolean
+    Dim ur As Object
+    On Error Resume Next
+    Set ur = Application.UndoRecord
+    If ur Is Nothing Then
+        Err.Clear
+        On Error GoTo 0
+        Exit Function               ' no UndoRecord on this build: nothing to leave open
+    End If
+    UndoRecordIsOpen = ur.IsRecordingCustomRecord
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+Private Sub RunCommandByName(ByVal name As String)
+    On Error Resume Next
+    Select Case name
+        Case "LingTeXRewrapCurrent":    LingTeXRewrapCurrent
+        Case "LingTeXRewrapAll":        LingTeXRewrapAll
+        Case "LingTeXSplitColumn":      LingTeXSplitColumn
+        Case "LingTeXMergeColumns":     LingTeXMergeColumns
+        Case "LingTeXCheckExample":     LingTeXCheckExample
+        Case "LingTeXConvertTableToIgt": LingTeXConvertTableToIgt
+        Case "LingTeXInsertInterlinear": LingTeXInsertInterlinear
+    End Select
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+Private Sub CheckRewrapAllOnEmpty(doc As Document)
+    Dim before As String
+    Dim docsBefore As Long
+
+    doc.Content.Delete
+    doc.Content.Text = "No examples here." & vbCr
+    before = doc.Content.Text
+    ReleaseScratch
+    docsBefore = Documents.Count
+    gLastMessage = ""
+
+    RunCommandByName "LingTeXRewrapAll"
+
+    Ok "RewrapAll on a document with no examples changes nothing", _
+        (doc.Content.Text = before)
+    Ok "and says so", (InStr(gLastMessage, "no interlinear examples") > 0)
+    If InStr(gLastMessage, "no interlinear examples") = 0 Then
+        Emit "         said: " & gLastMessage
+    End If
+    CheckStateIsClean "LingTeXRewrapAll (empty)", docsBefore
+End Sub
+
+' The count must be what was actually re-wrapped. This reported 0 for a successful
+' run, because it read Err.Number -- which EnsureTableStyle leaves set to 4198 on
+' Mac by design, the first time an example is drawn in a fresh document.
+Private Sub CheckRewrapAllCounts(doc As Document)
+    Dim ex As IgtExample
+    Dim tbl As Table
+    Dim docsBefore As Long
+
+    doc.Content.Delete
+    SetPageGeometry doc, 612, 792, 72
+    ex = ThreeTierExample()
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then
+        Ok "RewrapAll count: an example could be drawn", False
+        Exit Sub
+    End If
+
+    ReleaseScratch
+    docsBefore = Documents.Count
+    gLastMessage = ""
+    RunCommandByName "LingTeXRewrapAll"
+
+    Ok "RewrapAll reports re-wrapping 1 example, not 0", _
+        (InStr(gLastMessage, "Re-wrapped 1 interlinear example") > 0)
+    Emit "         said: " & gLastMessage
+    CheckStateIsClean "LingTeXRewrapAll (one example)", docsBefore
+End Sub
+
+' Split then merge must be the identity. Split is how a user takes one aligned slot
+' apart; merge is how they put it back, and a pair that does not invert loses text.
+Private Sub CheckSplitThenMerge(doc As Document)
+    Dim ex As IgtExample
+    Dim tbl As Table
+    Dim before As String, afterSplit As String, afterMerge As String
+
+    doc.Content.Delete
+    SetPageGeometry doc, 612, 792, 72
+    ex = TwoTierExample()
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then
+        Ok "split/merge: an example could be drawn", False
+        Exit Sub
+    End If
+    before = TsvOfTable(tbl)
+
+    ' Cell (1,1) holds vu=ve / fox=ERG, which has a break to split on.
+    On Error Resume Next
+    tbl.Cell(1, 1).Range.Select
+    Err.Clear
+    On Error GoTo 0
+
+    gLastMessage = ""
+    RunCommandByName "LingTeXSplitColumn"
+    Set tbl = FindExampleAt(Selection.Range)
+    If tbl Is Nothing Then
+        Ok "split/merge: the example survived the split", False
+        Emit "         said: " & gLastMessage
+        Exit Sub
+    End If
+    afterSplit = TsvOfTable(tbl)
+
+    Ok "splitting a column changes the model", (afterSplit <> before)
+    Ok "and the split column count is one higher", _
+        (TableColumnCount(tbl) = ex.ColCount + 1)
+
+    ' Put it back.
+    On Error Resume Next
+    tbl.Cell(1, 1).Range.Select
+    Err.Clear
+    On Error GoTo 0
+
+    gLastMessage = ""
+    RunCommandByName "LingTeXMergeColumns"
+    Set tbl = FindExampleAt(Selection.Range)
+    If tbl Is Nothing Then
+        Ok "split/merge: the example survived the merge", False
+        Emit "         said: " & gLastMessage
+        Exit Sub
+    End If
+    afterMerge = TsvOfTable(tbl)
+
+    Eq "split then merge is the identity", afterMerge, before
+End Sub
+
+' A plain table typed by hand or pasted from a spreadsheet must be adoptable.
+Private Sub CheckConvertPlainTable(doc As Document)
+    Dim tbl As Table
+    Dim back As IgtExample
+    Dim docsBefore As Long
+
+    doc.Content.Delete
+    Set tbl = Nothing
+    On Error Resume Next
+    Set tbl = doc.Tables.Add(Range:=doc.Content, NumRows:=2, NumColumns:=3)
+    Err.Clear
+    On Error GoTo 0
+    If tbl Is Nothing Then
+        Emit "  SKIP   could not add a plain table to convert"
+        Exit Sub
+    End If
+
+    SetPlainCell tbl, 1, 1, "vu=ve"
+    SetPlainCell tbl, 1, 2, "levo=zi"
+    SetPlainCell tbl, 1, 3, "zuvo"
+    SetPlainCell tbl, 2, 1, "fox=ERG"
+    SetPlainCell tbl, 2, 2, "follow.CMP=REL"
+    SetPlainCell tbl, 2, 3, "dream"
+
+    Ok "a plain table is not yet interlinear", (Not IsInterlinearTable(tbl))
+
+    On Error Resume Next
+    tbl.Cell(1, 1).Range.Select
+    Err.Clear
+    On Error GoTo 0
+
+    ReleaseScratch
+    docsBefore = Documents.Count
+    gLastMessage = ""
+    RunCommandByName "LingTeXConvertTableToIgt"
+
+    Set tbl = FindExampleAt(Selection.Range)
+    Ok "converting adopts the table as interlinear", (Not tbl Is Nothing)
+    If tbl Is Nothing Then
+        Emit "         said: " & gLastMessage
+        Exit Sub
+    End If
+
+    back = ReadExampleFromTable(tbl)
+    Eq "the converted table keeps its first cell", back.Cells(0, 0), "vu=ve"
+    Eq "and its grammatical gloss, capitals and all", back.Cells(1, 0), "fox=ERG"
+    CheckStateIsClean "LingTeXConvertTableToIgt", docsBefore
+End Sub
+
+' A table's model as tab-separated text, through a local rather than by passing a
+' function's UDT return straight into a ByRef UDT parameter -- IgtExample carries
+' three dynamic array members, and the array form of that pattern fails at RUN time
+' in VBA rather than at compile time.
+Private Function TsvOfTable(tbl As Table) As String
+    Dim ex As IgtExample
+    ex = ReadExampleFromTable(tbl)
+    TsvOfTable = ModelToTsv(ex)
+End Function
+
+Private Sub SetPlainCell(tbl As Table, ByVal r As Long, ByVal c As Long, _
+        ByVal v As String)
+    Dim rng As Range
+    On Error Resume Next
+    Set rng = tbl.Cell(r, c).Range
+    If Not rng Is Nothing Then
+        rng.End = rng.End - 1
+        rng.Text = v
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+
+'=============================================================================
+' -- EVENTS (clsAppEvents) --------------------------------------------------
+'=============================================================================
+
+' Whether the event handlers fire at all, and whether the re-entrancy guard holds.
+' Neither can be established by reading the code: WithEvents on Word.Application is
+' one of the things the probe never covered, and "gBusy prevents re-entry" is a
+' claim about what Word does while our code is running.
+Private Sub TestEvents()
+    Dim ev As clsAppEvents
+    Dim doc As Document
+    Dim savedQuiet As Boolean
+
+    Set ev = New clsAppEvents
+    Ok "clsAppEvents really is a class module", (TypeName(ev) = "clsAppEvents")
+
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "events: could create a blank document", False
+        Exit Sub
+    End If
+    EnsureStyles doc, True
+    doc.Activate
+
+    savedQuiet = gQuiet
+    gQuiet = True
+
+    ev.Attach
+    Ok "Attach resets the handler counter", (ev.mHandlerCount = 0)
+
+    ' DocumentBeforeSave only fires on a real save, and this suite writes nothing to
+    ' disk, so the save path stays a manual check -- see TESTING.md. What IS checked
+    ' here is the part that can be: the class instantiates as a class, Attach and
+    ' Detach work, and the re-entrancy guard holds.
+    SetSettingRewrapOnSave doc, True
+    Ok "rewrap-on-save reads back as on", (SettingRewrapOnSave(doc) = True)
+
+    ' Re-entrancy: with gBusy set, a handler must do nothing at all.
+    gBusy = True
+    CheckHandlerRespectsBusy ev, doc
+    gBusy = False
+
+    ev.Detach
+    Ok "Detach does not raise", True
+
+    ' Twice in a row must be safe -- AutoExit can run more than once.
+    ev.Detach
+    Ok "Detach twice does not raise", True
+
+    gQuiet = savedQuiet
+    CloseNoSave doc
+End Sub
+
+' The handler must not act while a command is in flight. Word has no
+' Application.EnableEvents, so gBusy is the only thing preventing an edit made by a
+' re-wrap from triggering another re-wrap.
+Private Sub CheckHandlerRespectsBusy(ev As clsAppEvents, doc As Document)
+    Dim ex As IgtExample
+    Dim tbl As Table
+    Dim textBefore As String
+    Dim countBefore As Long
+
+    gBusy = False
+    doc.Content.Delete
+    SetPageGeometry doc, 612, 792, 72
+    ex = ThreeTierExample()
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then Exit Sub
+
+    ' Make the table stale, so a re-wrap WOULD change something if one happened.
+    SetPageGeometry doc, 234, 792, 72
+
+    gBusy = True
+    countBefore = ev.mHandlerCount
+    textBefore = doc.Content.Text
+
+    ' Moving the cursor is what the selection handler watches.
+    On Error Resume Next
+    doc.Range(0, 0).Select
+    Err.Clear
+    On Error GoTo 0
+
+    Ok "while busy, a cursor move re-wraps nothing", _
+        (doc.Content.Text = textBefore)
+    Ok "and the handler did no work", (ev.mHandlerCount = countBefore)
+
+    gBusy = False
+    SetPageGeometry doc, 612, 792, 72
+End Sub
 
 
 '=============================================================================

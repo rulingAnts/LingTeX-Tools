@@ -80,8 +80,14 @@ End Function
 ' Runs when Word loads the add-in from its STARTUP folder.
 Public Sub AutoExec()
     On Error Resume Next
+    ' Cleared here as well as set and unset around each command. gBusy wedged True
+    ' -- by Ctrl+Break during a render, or a reset of the VBA project -- made every
+    ' ribbon button do nothing at all, silently, for the rest of the Word session.
+    ' Restarting Word fixed it, but only if you guessed that was the problem.
+    gBusy = False
     Set mEvents = New clsAppEvents
     mEvents.Attach
+    Err.Clear
     On Error GoTo 0
 End Sub
 
@@ -111,7 +117,13 @@ Public Sub LingTeXInsertInterlinear()
     Dim warnings As Collection
     Dim fromClipboard As Boolean
 
-    If gBusy Then Exit Sub
+    If gBusy Then
+        ' Not silence: a stuck flag would otherwise look like a dead button.
+        Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
+               "If this keeps happening, run AutoExec in the Immediate window " & _
+               "(or restart Word) to clear it.", vbInformation
+        Exit Sub
+    End If
     On Error GoTo Fail
     Set doc = ActiveDocument
 
@@ -196,7 +208,13 @@ Public Sub LingTeXConvertTableToIgt()
     Dim r As Long, c As Long
     Dim tsv As String, rowText As String
 
-    If gBusy Then Exit Sub
+    If gBusy Then
+        ' Not silence: a stuck flag would otherwise look like a dead button.
+        Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
+               "If this keeps happening, run AutoExec in the Immediate window " & _
+               "(or restart Word) to clear it.", vbInformation
+        Exit Sub
+    End If
     On Error GoTo Fail
 
     If Not Selection.Information(wdWithInTable) Then
@@ -265,7 +283,13 @@ End Sub
 ' Re-wrap the example containing the cursor.
 Public Sub LingTeXRewrapCurrent()
     Dim tbl As Table
-    If gBusy Then Exit Sub
+    If gBusy Then
+        ' Not silence: a stuck flag would otherwise look like a dead button.
+        Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
+               "If this keeps happening, run AutoExec in the Immediate window " & _
+               "(or restart Word) to clear it.", vbInformation
+        Exit Sub
+    End If
     On Error GoTo Fail
 
     Set tbl = FindExampleAt(Selection.Range)
@@ -294,8 +318,25 @@ Fail:
 End Sub
 
 ' Re-wrap every example in the active document.
+'
+' ActiveDocument is evaluated behind a handler, unlike every other command here:
+' with no document open it raises, and without this the user got a bare VBA error
+' dialog with a line number in it.
 Public Sub LingTeXRewrapAll()
-    RewrapDocument ActiveDocument, True
+    Dim doc As Document
+
+    On Error GoTo Fail
+    Set doc = ActiveDocument
+    On Error GoTo 0
+    If doc Is Nothing Then
+        Report "Open a document first.", vbInformation
+        Exit Sub
+    End If
+    RewrapDocument doc, True
+    Exit Sub
+
+Fail:
+    Report "Open a document first.", vbInformation
 End Sub
 
 '-----------------------------------------------------------------------------
@@ -314,7 +355,18 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
     Dim restore As Boolean
 
     If doc Is Nothing Then Exit Sub
-    If gBusy Then Exit Sub
+    If gBusy Then
+        ' Reported only when the user asked for this. RewrapDocument is ALSO the
+        ' re-entrancy path -- clsAppEvents calls it on save with showResult False,
+        ' and putting a dialog in front of someone saving a document would be worse
+        ' than the silence it replaces. The seven commands report; this does not.
+        If showResult Then
+            Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
+                   "If this keeps happening, run AutoExec in the Immediate " & _
+                   "window (or restart Word) to clear it.", vbInformation
+        End If
+        Exit Sub
+    End If
     On Error GoTo Fail
 
     Set tables = AllInterlinearTables(doc)
@@ -434,7 +486,13 @@ Public Sub LingTeXSplitColumn()
     Dim shortTiers As String
     Dim okAll As Boolean
 
-    If gBusy Then Exit Sub
+    If gBusy Then
+        ' Not silence: a stuck flag would otherwise look like a dead button.
+        Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
+               "If this keeps happening, run AutoExec in the Immediate window " & _
+               "(or restart Word) to clear it.", vbInformation
+        Exit Sub
+    End If
     On Error GoTo Fail
 
     Set tbl = FindExampleAt(Selection.Range)
@@ -452,6 +510,7 @@ Public Sub LingTeXSplitColumn()
     End If
 
     ex = ReadExampleFromTable(tbl)
+    If Not ExampleWasRead(ex) Then Exit Sub
     AbsorbFreeParagraphs ex, tbl
     okAll = SplitColumn(ex, flatCol, 1, shortTiers)
 
@@ -493,7 +552,13 @@ Public Sub LingTeXMergeColumns()
     Dim firstCol As Long, lastCol As Long
     Dim nCells As Long
 
-    If gBusy Then Exit Sub
+    If gBusy Then
+        ' Not silence: a stuck flag would otherwise look like a dead button.
+        Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
+               "If this keeps happening, run AutoExec in the Immediate window " & _
+               "(or restart Word) to clear it.", vbInformation
+        Exit Sub
+    End If
     On Error GoTo Fail
 
     Set tbl = FindExampleAt(Selection.Range)
@@ -523,6 +588,7 @@ Public Sub LingTeXMergeColumns()
     End If
 
     ex = ReadExampleFromTable(tbl)
+    If Not ExampleWasRead(ex) Then Exit Sub
     AbsorbFreeParagraphs ex, tbl
     If lastCol > ex.ColCount - 1 Then lastCol = ex.ColCount - 1
     If Not MergeColumns(ex, firstCol, lastCol) Then
@@ -563,7 +629,13 @@ Public Sub LingTeXCheckExample()
     Dim warnings As Collection
     Dim nFixable As Long
 
-    If gBusy Then Exit Sub
+    If gBusy Then
+        ' Not silence: a stuck flag would otherwise look like a dead button.
+        Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
+               "If this keeps happening, run AutoExec in the Immediate window " & _
+               "(or restart Word) to clear it.", vbInformation
+        Exit Sub
+    End If
     On Error GoTo Fail
 
     Set tbl = FindExampleAt(Selection.Range)
@@ -574,6 +646,7 @@ Public Sub LingTeXCheckExample()
     End If
 
     ex = ReadExampleFromTable(tbl)
+    If Not ExampleWasRead(ex) Then Exit Sub
     AbsorbFreeParagraphs ex, tbl
     Set warnings = CheckExample(ex)
 
@@ -716,6 +789,25 @@ Private Function WarningText(warnings As Collection) As String
     WarningText = s
 End Function
 
+'-----------------------------------------------------------------------------
+' Did the read actually produce a model?
+'
+' AbsorbFreeParagraphs calls AddFreeLine, which does UBound(ex.FreeLines) -- and on
+' a model that never went through NewExample that array is unallocated and UBound
+' raises error 9. ReadExampleFromTable returns exactly such a model when it bails
+' out early. RewrapTable always checked first; the three column commands did not,
+' so each of them could die with a bare VBA error on a table it could not read.
+'-----------------------------------------------------------------------------
+Private Function ExampleWasRead(ex As IgtExample) As Boolean
+    If ex.TierCount > 0 And ex.ColCount > 0 Then
+        ExampleWasRead = True
+        Exit Function
+    End If
+    Report "That example could not be read." & _
+           IIf(gReadBackError = "", "", vbCr & vbCr & gReadBackError), _
+           vbExclamation
+End Function
+
 ' Show the findings.  Silent when there are none, so it is safe to call after
 ' every operation.
 Private Sub ReportWarnings(warnings As Collection, ByVal alsoWhenEmpty As Boolean)
@@ -747,7 +839,10 @@ End Sub
 ' failing to compile.  That is what makes the guard unnecessary: there is nothing
 ' to compile out.
 
-Private Sub BeginUndo(ByVal label As String)
+' Public so clsAppEvents can collapse an automatic re-wrap into one undo step too.
+' Without that, reversing a re-wrap nobody asked for -- it fires on a cursor move --
+' takes an unknown number of Ctrl+Z presses.
+Public Sub BeginUndo(ByVal label As String)
     Dim ur As Object
     On Error Resume Next
     Set ur = Application.UndoRecord
@@ -759,7 +854,7 @@ Private Sub BeginUndo(ByVal label As String)
     On Error GoTo 0
 End Sub
 
-Private Sub EndUndo()
+Public Sub EndUndo()
     Dim ur As Object
     On Error Resume Next
     Set ur = Application.UndoRecord

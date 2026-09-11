@@ -446,11 +446,31 @@ def check_call_arity(files):
     CALL = re.compile(r"(?<![.\w])([A-Za-z_]\w*)\s*\(")
     STMT = re.compile(r"^(?:Call\s+)?([A-Za-z_]\w*)(?:\s+(.*))?$", re.I)
 
+    def mask_strings(s):
+        """Blank out string literal CONTENTS, keeping length so offsets still line up.
+
+        Without this, a procedure name mentioned inside a string -- a test asserting
+        on "LingTeXRewrapAll (empty)", say -- reads as a call with one argument. That
+        false positive is worse than a miss: it teaches whoever sees it that this
+        check cries wolf.
+        """
+        out, instr = [], False
+        for ch in s:
+            if ch == '"':
+                instr = not instr
+                out.append(ch)
+            elif instr:
+                out.append(" ")
+            else:
+                out.append(ch)
+        return "".join(out)
+
     problems = []
     for f in engine:
-        for n, t_ in logical_lines(f.read_text(encoding="utf-8")):
-            if SKIP.match(t_):
+        for n, t_raw in logical_lines(f.read_text(encoding="utf-8")):
+            if SKIP.match(t_raw):
                 continue
+            t_ = mask_strings(t_raw)
 
             # Function-style:  Name(args)
             for m in CALL.finditer(t_):

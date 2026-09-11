@@ -47,9 +47,22 @@ Attribute mApp.VB_VarHelpID = -1
 Private mLastTableStart As Long
 Private mLastDocName    As String
 
+' Automatic re-wrapping fires on every cursor move out of an example, so a failure
+' must be said ONCE rather than on every keystroke afterwards.
+Private mWarnedThisDoc  As Boolean
+
+' How many times the handlers have actually done work. Not used by the add-in --
+' modDocTests reads it to prove that a re-wrap triggered from a handler does not
+' re-enter the handler, which is what gBusy is there to prevent and what no amount
+' of reading the code can establish.
+Public mHandlerCount As Long
+
 Public Sub Attach()
     Set mApp = Word.Application
     mLastTableStart = -1
+    mLastDocName = ""
+    mWarnedThisDoc = False
+    mHandlerCount = 0
 End Sub
 
 Public Sub Detach()
@@ -69,6 +82,7 @@ Private Sub mApp_DocumentBeforeSave(ByVal Doc As Document, _
     If gBusy Then Exit Sub
     If Doc Is Nothing Then Exit Sub
     If Not SettingRewrapOnSave(Doc) Then Exit Sub
+    mHandlerCount = mHandlerCount + 1
     RewrapDocument Doc, False
     Err.Clear
 End Sub
@@ -84,6 +98,7 @@ Private Sub mApp_WindowSelectionChange(ByVal Sel As Selection)
     Dim nowStart As Long
     Dim doc As Document
     Dim leaving As Table
+    Dim done As Table
 
     On Error Resume Next
     If gBusy Then Exit Sub
@@ -98,6 +113,9 @@ Private Sub mApp_WindowSelectionChange(ByVal Sel As Selection)
         nowStart = tbl.Range.Start
     End If
 
+    ' A different document, so the once-per-document warning starts again.
+    If doc.Name <> mLastDocName Then mWarnedThisDoc = False
+
     ' Still in the same example: nothing to do.
     If nowStart = mLastTableStart And doc.Name = mLastDocName Then Exit Sub
 
@@ -106,12 +124,47 @@ Private Sub mApp_WindowSelectionChange(ByVal Sel As Selection)
         ' We have just left the example that started at mLastTableStart.
         Set leaving = ExampleStartingAt(doc, mLastTableStart)
         If Not leaving Is Nothing Then
+            '---------------------------------------------------------------
+            ' ONE UNDO STEP, AND A REAL ERROR TRAP.
+            '
+            ' A re-wrap deletes and rebuilds a table, so without BeginUndo /
+            ' EndUndo the user needs an unknown number of Ctrl+Z presses to
+            ' reverse something they never asked for -- this fires on a cursor
+            ' move. Every command in modLingTeX wraps its work this way; this
+            ' handler did not.
+            '
+            ' And the trap is narrowed to this call. The whole handler ran under
+            ' one On Error Resume Next, which covered RewrapTable as well -- so
+            ' when a re-wrap failed after deleting the old table, the example was
+            ' destroyed on a cursor move with nothing reported anywhere.
+            ' RewrapTable now plans before it deletes, so that window is small,
+            ' but a handler that cannot report is not a place to rely on it.
+            '---------------------------------------------------------------
+            mHandlerCount = mHandlerCount + 1
             gBusy = True
             Application.ScreenUpdating = False
-            RewrapTable leaving
+            On Error GoTo RewrapFailed
+            BeginUndo "Re-wrap interlinear example"
+            Set done = RewrapTable(leaving)
+            EndUndo
+            On Error Resume Next
             Application.ScreenUpdating = True
             gBusy = False
             ReleaseScratch
+
+            If done Is Nothing Then
+                ' Left alone rather than damaged -- RewrapTable plans first. Say so
+                ' once; this fires on cursor movement and must not nag.
+                If Not mWarnedThisDoc Then
+                    mWarnedThisDoc = True
+                    Report "An interlinear example could not be re-wrapped " & _
+                           "automatically, so it was left as it was." & vbCr & vbCr & _
+                           IIf(gRenderError = "", "", gRenderError & vbCr & vbCr) & _
+                           "Automatic re-wrapping on cursor movement can be turned " & _
+                           "off in the settings.", vbExclamation
+                End If
+            End If
+
             ' Positions moved, so re-read where we are now.
             Set tbl = FindExampleAt(Selection.Range)
             If tbl Is Nothing Then
@@ -124,6 +177,23 @@ Private Sub mApp_WindowSelectionChange(ByVal Sel As Selection)
 
     mLastTableStart = nowStart
     mLastDocName = doc.Name
+    Err.Clear
+    Exit Sub
+
+RewrapFailed:
+    ' Only reachable if RewrapTable raised rather than returning Nothing.
+    On Error Resume Next
+    EndUndo
+    Application.ScreenUpdating = True
+    gBusy = False
+    ReleaseScratch
+    If Not mWarnedThisDoc Then
+        mWarnedThisDoc = True
+        Report "Automatic re-wrapping stopped with an error: " & _
+               CStr(Err.Number) & ": " & Err.Description & vbCr & vbCr & _
+               "It can be turned off in the settings.", vbExclamation
+    End If
+    mLastTableStart = nowStart
     Err.Clear
 End Sub
 
