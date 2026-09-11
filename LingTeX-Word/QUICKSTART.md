@@ -319,10 +319,19 @@ from `tools/ImportModules.bas` to pick up `ImportLingTeXModulesQuiet`. Set
 
 `--no-pull`, `--no-import`, and `--tests all` / `--tests doc` do what they say.
 
-**Its one hole.** A *compile* error is a modal dialog inside the VBA editor, and no
-macro can suppress it — so if a module does not compile, the script waits and Word
-sits there with the dialog open. Switch to Word and read it. Every compile-error
-class that reaches you becomes a `vba-lint.py` rule, so this should get rarer.
+**Dialogs.** A compile error, a run-time error outside every trap, and the
+macro-security prompt all appear as modal dialogs, and `run VB macro` blocks until
+one is dismissed. The runner polls Word's windows through System Events while each
+macro runs, **reads any dialog's text, prints it, and dismisses it** — so a compile
+error arrives on the terminal as text, and the macro-security prompt never stops a
+run. It needs Accessibility permission for your terminal (System Settings →
+Privacy & Security → Accessibility); without it the script says so and dialogs
+have to be dismissed by hand. What it cannot read is *which line*: the VBA editor
+highlights that, and a screenshot of it is the fastest diagnosis there is.
+
+For a Claude Code session running on this Mac, `LOCAL-SESSION.md` is the handoff:
+with the runner and dialog capture it can edit, lint, run and read without a
+person in the loop.
 
 `tools/run-in-word.ps1` is the Windows twin, for Parallels. Driving Word over COM
 with the editor hidden, a compile error comes back as an *exception naming the
