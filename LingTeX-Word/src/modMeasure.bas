@@ -56,17 +56,17 @@ Option Explicit
 
 ' Word's maximum page dimension is 22 inches.  Wide enough that a single word
 ' never wraps, which is all the method requires.
-Private Const SCRATCH_PAGE_WIDTH_IN As Single = 22
+Private Const SCRATCH_PAGE_WIDTH_IN As Double = 22
 
 ' Word's "mixed value" sentinel, returned by a font property read over a range
 ' whose runs disagree.
-Private Const WD_UNDEFINED_SIZE As Single = 9999999
+Private Const WD_UNDEFINED_SIZE As Double = 9999999
 
 ' Half an inch: below this a wrap line cannot hold anything useful.
-Private Const MIN_TEXT_WIDTH As Single = 36
+Private Const MIN_TEXT_WIDTH As Double = 36
 
 ' Letter portrait, one-inch margins.
-Private Const FALLBACK_TEXT_WIDTH As Single = 468
+Private Const FALLBACK_TEXT_WIDTH As Double = 468
 
 ' True when AvailableTextWidth could not work the geometry out and used
 ' FALLBACK_TEXT_WIDTH instead.
@@ -82,7 +82,7 @@ Private mCache   As Collection
 '-- Resolved appearance of one tier, used as part of the cache key ------------
 Public Type TierFont
     Name      As String
-    Size      As Single
+    Size      As Double
     Bold      As Boolean
     Italic    As Boolean
     SmallCaps As Boolean
@@ -139,8 +139,8 @@ End Sub
 ' after the fact, which is exactly why re-wrapping has to recompute instead of
 ' remembering.
 '-----------------------------------------------------------------------------
-Public Function AvailableTextWidth(rng As Range) As Single
-    Dim w As Single
+Public Function AvailableTextWidth(rng As Range) As Double
+    Dim w As Double
     gAvailWidthFellBack = False
     Dim ps As PageSetup
     Dim para As Paragraph
@@ -263,11 +263,11 @@ End Function
 ' width in points.  Free-translation rows are measured as 0: they are laid out as
 ' paragraphs under the table, not as columns.
 '-----------------------------------------------------------------------------
-Public Sub MeasureExample(ex As IgtExample, doc As Document, ByRef widths() As Single)
+Public Sub MeasureExample(ex As IgtExample, doc As Document, ByRef widths() As Double)
     Dim t As Long, c As Long
     Dim tf As TierFont
     Dim texts() As String
-    Dim rowWidths() As Single
+    Dim rowWidths() As Double
 
     ClearMeasureFailure
 
@@ -305,13 +305,13 @@ End Sub
 ' under one document's settings and drawing under another's is how a cached width
 ' ends up belonging to the wrong document.
 Public Function MeasureTexts(texts() As String, tf As TierFont, _
-        ByVal role As String, srcDoc As Document) As Single()
+        ByVal role As String, srcDoc As Document) As Double()
 
-    Dim out() As Single
+    Dim out() As Double
     Dim i As Long, n As Long
     Dim missIdx() As Long, missText() As String, nMiss As Long
-    Dim key As String, w As Single
-    Dim fresh() As Single
+    Dim key As String, w As Double
+    Dim fresh() As Double
 
     ' An unallocated texts() raises error 9 on UBound, which is the case that
     ' actually happens -- an allocated array always has at least one element, so
@@ -370,13 +370,13 @@ End Function
 ' paragraph would double the position calls for an answer that cannot differ.
 '-----------------------------------------------------------------------------
 Private Function MeasureByPosition(texts() As String, tf As TierFont, _
-        ByVal role As String, srcDoc As Document) As Single()
+        ByVal role As String, srcDoc As Document) As Double()
 
-    Dim out() As Single
+    Dim out() As Double
     Dim doc As Document
     Dim rng As Range, para As Range
     Dim i As Long, n As Long
-    Dim baseX As Single, endX As Single
+    Dim baseX As Double, endX As Double
     Dim joined As String
 
     If Not IsArrayAllocated(texts) Then
@@ -528,7 +528,7 @@ End Function
 ' and every column comes out wrong with nothing raised anywhere.
 '-----------------------------------------------------------------------------
 Private Sub ApplyTierFont(rng As Range, tf As TierFont)
-    Dim gotSize As Single
+    Dim gotSize As Double
 
     On Error Resume Next
     With rng.Font
@@ -673,20 +673,20 @@ Private Sub EnsureCache()
     If mCache Is Nothing Then Set mCache = New Collection
 End Sub
 
-Private Function CacheLookup(ByVal key As String, ByRef outWidth As Single) As Boolean
+Private Function CacheLookup(ByVal key As String, ByRef outWidth As Double) As Boolean
     Dim v As Variant
     EnsureCache
     On Error Resume Next
     v = mCache(key)
     If Err.Number = 0 Then
-        outWidth = CSng(v)
+        outWidth = CDbl(v)
         CacheLookup = True
     End If
     Err.Clear
     On Error GoTo 0
 End Function
 
-Private Sub CacheStore(ByVal key As String, ByVal w As Single)
+Private Sub CacheStore(ByVal key As String, ByVal w As Double)
     EnsureCache
     On Error Resume Next
     mCache.Add w, key

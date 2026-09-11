@@ -83,13 +83,13 @@ End Function
 ' firstIndent   indent of the first wrap line
 ' contIndent    indent of every later wrap line
 '-----------------------------------------------------------------------------
-Public Function ComputeWrapLines(colWidths() As Single, noBreakBefore() As Boolean, _
-        ByVal availWidth As Single, ByVal firstIndent As Single, _
-        ByVal contIndent As Single) As Long()
+Public Function ComputeWrapLines(colWidths() As Double, noBreakBefore() As Boolean, _
+        ByVal availWidth As Double, ByVal firstIndent As Double, _
+        ByVal contIndent As Double) As Long()
 
     Dim lines() As Long, nLines As Long
     Dim n As Long, i As Long, j As Long, k As Long
-    Dim cur As Long, curW As Single, budget As Single
+    Dim cur As Long, curW As Double, budget As Double
 
     n = UBound(colWidths) - LBound(colWidths) + 1
     If n <= 0 Then
@@ -168,11 +168,11 @@ End Function
 '
 ' cellWidths is (tierIndex, columnIndex), as produced by modMeasure.
 '-----------------------------------------------------------------------------
-Public Function ColumnWidths(ex As IgtExample, cellWidths() As Single, _
-        ByVal gap As Single) As Single()
+Public Function ColumnWidths(ex As IgtExample, cellWidths() As Double, _
+        ByVal gap As Double) As Double()
 
-    Dim widths() As Single
-    Dim c As Long, t As Long, w As Single
+    Dim widths() As Double
+    Dim c As Long, t As Long, w As Double
 
     If ex.ColCount = 0 Then
         ReDim widths(0 To 0)

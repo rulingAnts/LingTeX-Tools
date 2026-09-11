@@ -196,10 +196,10 @@ End Sub
 
 ' One paragraph style: present, right kind, right spacing, tight formatting.
 Private Sub CheckParaStyle(doc As Document, ByVal role As String, _
-        ByVal wantSpaceAfter As Single)
+        ByVal wantSpaceAfter As Double)
 
     Dim nm As String
-    Dim got As Single
+    Dim got As Double
 
     nm = ParaStyleName(role)
     If Not StyleExistsOfType(doc, nm, wdStyleTypeParagraph) Then
@@ -227,7 +227,7 @@ End Function
 ' A user who has set their gloss font keeps it.
 Private Function NonClobberHolds(doc As Document) As Boolean
     Dim nm As String
-    Dim got As Single
+    Dim got As Double
 
     nm = ParaStyleName(ROLE_GLOSS)
     On Error Resume Next
@@ -415,7 +415,7 @@ End Sub
 ' 6.5 rather than 6, because a Single written with CStr and read with CSng is
 ' where a locale that writes "6,5" shows up.
 Private Sub CheckSingleRoundTrip(doc As Document, ByVal which As String)
-    Dim got As Single
+    Dim got As Double
 
     Select Case which
         Case "Gap"
@@ -516,7 +516,7 @@ End Sub
 Private Sub TestMeasure()
     Dim doc As Document
     Dim tf As TierFont
-    Dim w() As Single
+    Dim w() As Double
 
     Set doc = NewBlankDoc()
     If doc Is Nothing Then
@@ -567,7 +567,7 @@ End Sub
 
 ' MeasureTexts takes a String array; Array() gives a Variant array.
 Private Function WidthsOf(vals As Variant, tf As TierFont, _
-        ByVal role As String, doc As Document) As Single()
+        ByVal role As String, doc As Document) As Double()
 
     Dim texts() As String
     Dim i As Long
@@ -587,9 +587,9 @@ End Function
 ' boundary, this is where it shows -- because measuring each string alone cannot
 ' make either mistake.
 Private Function BatchEqualsSingles(tf As TierFont, doc As Document) As Boolean
-    Dim batch() As Single
-    Dim one() As Single
-    Dim a As Single, b As Single, c As Single
+    Dim batch() As Double
+    Dim one() As Double
+    Dim a As Double, b As Double, c As Double
 
     ClearCache
     batch = WidthsOf(Array("i", "iii", "WWW"), tf, ROLE_GLOSS, doc)
@@ -618,7 +618,7 @@ End Function
 ' the first measurement was served to both.
 Private Function RoleAffectsWidth(doc As Document) As Boolean
     Dim tfG As TierFont, tfM As TierFont
-    Dim wG() As Single, wM() As Single
+    Dim wG() As Double, wM() As Double
 
     tfG = ResolveTierFont(doc, ROLE_GLOSS)
     tfM = ResolveTierFont(doc, ROLE_MORPHEMES)
@@ -643,7 +643,7 @@ End Function
 
 Private Function CacheHitIsFree(tf As TierFont, doc As Document) As Boolean
     Dim n As Long
-    Dim w() As Single
+    Dim w() As Double
 
     ClearCache
     w = WidthsOf(Array("cachecheck"), tf, ROLE_GLOSS, doc)
@@ -659,7 +659,7 @@ Private Function CacheHitIsFree(tf As TierFont, doc As Document) As Boolean
 End Function
 
 Private Function ClearCacheWorks(tf As TierFont, doc As Document) As Boolean
-    Dim first() As Single, again() As Single
+    Dim first() As Double, again() As Double
 
     ClearCache
     first = WidthsOf(Array("clearcheck"), tf, ROLE_GLOSS, doc)
@@ -678,7 +678,7 @@ End Function
 ' was empty.
 Private Sub CheckMeasureExampleShape(doc As Document)
     Dim ex As IgtExample
-    Dim widths() As Single
+    Dim widths() As Double
     Dim okShape As Boolean
     Dim freeIdx As Long, c As Long
     Dim allZero As Boolean
@@ -760,8 +760,8 @@ Private Sub CheckAgreementFor(doc As Document, ByVal text As String, _
         ByVal role As String)
 
     Dim tf As TierFont
-    Dim measured() As Single
-    Dim drawn As Single
+    Dim measured() As Double
+    Dim drawn As Double
 
     tf = ResolveTierFont(doc, role)
     ClearCache
@@ -782,10 +782,10 @@ End Sub
 ' real character style -- then read where it ends. Returns -1 if that could not
 ' be done.
 Private Function DrawnWidthOf(doc As Document, ByVal text As String, _
-        ByVal role As String) As Single
+        ByVal role As String) As Double
 
     Dim para As Range
-    Dim startX As Single, endX As Single
+    Dim startX As Double, endX As Double
 
     DrawnWidthOf = -1
 
@@ -846,7 +846,7 @@ End Sub
 
 Private Sub TestAvailableWidth()
     Dim doc As Document
-    Dim w As Single
+    Dim w As Double
 
     Set doc = NewBlankDoc()
     If doc Is Nothing Then
@@ -883,7 +883,7 @@ Private Sub TestAvailableWidth()
 End Sub
 
 Private Function LandscapeIsWider(doc As Document) As Boolean
-    Dim portrait As Single, landscape As Single
+    Dim portrait As Double, landscape As Double
 
     SetPageGeometry doc, 612, 792, 72
     portrait = AvailableTextWidth(doc.Content)
@@ -898,7 +898,7 @@ Private Function LandscapeIsWider(doc As Document) As Boolean
 End Function
 
 Private Function IndentSubtracts(doc As Document) As Boolean
-    Dim plain As Single, indented As Single
+    Dim plain As Double, indented As Double
 
     SetPageGeometry doc, 612, 792, 72
     On Error Resume Next
@@ -924,8 +924,8 @@ Private Function IndentSubtracts(doc As Document) As Boolean
     On Error GoTo 0
 End Function
 
-Private Sub SetPageGeometry(doc As Document, ByVal wide As Single, _
-        ByVal high As Single, ByVal margin As Single)
+Private Sub SetPageGeometry(doc As Document, ByVal wide As Double, _
+        ByVal high As Double, ByVal margin As Double)
 
     On Error Resume Next
     With doc.PageSetup
@@ -948,7 +948,7 @@ End Sub
 Private Sub TestScratchLifecycle()
     Dim doc As Document
     Dim tf As TierFont
-    Dim w() As Single
+    Dim w() As Double
     Dim n As Long
 
     Set doc = NewBlankDoc()
@@ -1097,7 +1097,7 @@ Private Sub CheckColumnAlignment(tbl As Table, ex As IgtExample)
     Dim nLines As Long
     Dim g As Long, i As Long, c As Long
     Dim firstRow As Long, cells As Long
-    Dim w0 As Single, wi As Single
+    Dim w0 As Double, wi As Double
     Dim bad As String
 
     nInter = InterlinearTierList(ex, interTiers)
@@ -1135,10 +1135,10 @@ End Sub
 
 ' NOTHING EXTENDS PAST THE RIGHT MARGIN, as arithmetic rather than as a look.
 Private Sub CheckRowWidthsFit(tbl As Table, doc As Document)
-    Dim avail As Single
+    Dim avail As Double
     Dim r As Long, c As Long
-    Dim total As Single
-    Dim worst As Single
+    Dim total As Double
+    Dim worst As Double
     Dim bad As String
 
     avail = AvailableTextWidth(doc.Content)
@@ -1159,7 +1159,7 @@ Private Sub CheckRowWidthsFit(tbl As Table, doc As Document)
     If bad <> "" Then Emit "        " & bad
 End Sub
 
-Private Function CellWidthOf(tbl As Table, ByVal r As Long, ByVal c As Long) As Single
+Private Function CellWidthOf(tbl As Table, ByVal r As Long, ByVal c As Long) As Double
     On Error Resume Next
     CellWidthOf = tbl.Cell(r, c).Width
     Err.Clear
