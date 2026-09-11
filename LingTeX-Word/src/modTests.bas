@@ -154,8 +154,8 @@ End Sub
 ' The first few failure names, for the dialog. A long list in a MsgBox is
 ' unreadable, and the document has the full detail anyway.
 Private Sub NoteFailure(ByVal name As String)
-    If mFail > 6 Then Exit Sub
-    If mFail = 6 Then
+    If mFail > 8 Then Exit Sub
+    If mFail = 8 Then
         mFirstFails = mFirstFails & "  ... see the report for the rest" & vbCr
     Else
         mFirstFails = mFirstFails & "  " & name & vbCr
