@@ -216,7 +216,14 @@ Public Function RewrapTable(tbl As Table) As Table
     ' example -- and in RewrapDocument and the selection-change handler that raise
     ' is swallowed, so it destroys it silently. Planning first means every failure
     ' that can be anticipated is found while the table is still on the page.
-    If Not PlanExample(ex, tbl.Range, doc, interTiers, nInter, colW, _
+    ' Planned against the paragraph AFTER the table, never against tbl.Range.
+    ' AvailableTextWidth treats a range inside a table as "the cell is the
+    ' container" and returns that cell's width -- correct when inserting into a
+    ' cell, and exactly wrong here, where it made every re-wrap plan against a few
+    ' points of budget. Before planning moved ahead of the delete, the old table was
+    ' already gone at this point and the anchor was outside it; the reorder that
+    ' made re-wrapping safe quietly changed what the budget was measured from.
+    If Not PlanExample(ex, RangeAfterTable(tbl), doc, interTiers, nInter, colW, _
                        lineStarts, nLines, maxCols, why) Then
         gRenderError = why
         Exit Function                      ' table untouched
@@ -322,7 +329,9 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
             surplus = maxCols - lineCols
             For k = 1 To surplus
                 On Error Resume Next
-                tbl.Rows(r).Cells(lineCols + 1).Delete
+                ' The shift is named, not defaulted: an unspecified ShiftCells is the
+                ' one path by which this could raise a "Delete Cells" question.
+                tbl.Rows(r).Cells(lineCols + 1).Delete ShiftCells:=wdDeleteCellsShiftLeft
                 Err.Clear
                 On Error GoTo 0
             Next k
@@ -661,6 +670,13 @@ End Sub
 ' Document.Paragraphs to find it is O(n), and doing that inside a loop over
 ' every example in the document is O(n squared) -- slow enough to notice on a
 ' long grammar.
+' A collapsed range at the table's end: the first position outside it. Word keeps
+' a paragraph after every table, so this always exists. Used wherever the page
+' geometry around a table is wanted rather than the geometry of a cell in it.
+Public Function RangeAfterTable(tbl As Table) As Range
+    Set RangeAfterTable = tbl.Range.Document.Range(tbl.Range.End, tbl.Range.End)
+End Function
+
 ' These five walk and read the paragraphs that follow a table -- the free
 ' translations. Public rather than Private so modDocTests can assert on THESE
 ' rather than on a copy of them: a test that reimplements the logic it is checking
