@@ -291,8 +291,8 @@ Public Sub DiagnoseWrap()
     Emit "        ok, UBound=" & CStr(UBound(lineStarts))
 
     stepNo = 9
-    Emit "step 9  call PlanStarts end to end"
-    Emit "        result = " & PlanStarts("10,10,10", "0,0,0", 30)
+    Emit "step 9  call WrapOf end to end"
+    Emit "        result = " & WrapOf(Array(10, 10, 10), Array(0, 0, 0), 30)
 
     Emit ""
     Emit "COMPLETED with no error. The crash is somewhere else."
@@ -918,81 +918,101 @@ End Sub
 ' -- WRAP PLANNER -----------------------------------------------------------
 '=============================================================================
 
+'-----------------------------------------------------------------------------
+' Wrap planner tests.
+'
+' Structured as one tiny function per case, each with its own error trap that
+' returns the error as its RESULT rather than letting it propagate. So a case
+' that blows up shows as a failure with the error number printed inline, next to
+' the case that caused it, and every other case still runs.
+'
+' That shape is deliberate. The previous version was a single Sub with many
+' locals calling a helper that itself declared four arrays, and it died with
+' run-time error 6 on its first assertion -- while TypeCheck, whose tests are one
+' tiny function apiece with one or two locals, ran all eleven of its cases
+' without trouble on the same build. Whatever the underlying cause, small
+' procedures with few locals work here and large ones did not, and a test harness
+' that cannot survive its own subject is worthless.
+'
+' Widths and flags come in as Variant arrays from Array(), so there is no string
+' parsing between the test and the thing under test.
+'-----------------------------------------------------------------------------
 Private Sub TestWrapPlanner()
     Section "Wrap planner"
 
     Eq "exact fit stays on one line", _
-       PlanStarts("10,10,10", "0,0,0", 30), "0"
+       WrapOf(Array(10, 10, 10), Array(0, 0, 0), 30), "0"
     Eq "one column over the budget wraps", _
-       PlanStarts("10,10,10", "0,0,0", 25), "0,2"
+       WrapOf(Array(10, 10, 10), Array(0, 0, 0), 25), "0,2"
     Eq "three wrap lines", _
-       PlanStarts("10,10,10,10,10,10", "0,0,0,0,0,0", 25), "0,2,4"
+       WrapOf(Array(10, 10, 10, 10, 10, 10), Array(0, 0, 0, 0, 0, 0), 25), "0,2,4"
     Eq "an over-wide single column gets its own line and overflows", _
-       PlanStarts("10,100,10", "0,0,0", 25), "0,1,2"
+       WrapOf(Array(10, 100, 10), Array(0, 0, 0), 25), "0,1,2"
     Eq "widening pulls columns back up (same input, bigger budget)", _
-       PlanStarts("10,10,10,10", "0,0,0,0", 100), "0"
+       WrapOf(Array(10, 10, 10, 10), Array(0, 0, 0, 0), 100), "0"
 
     ' A leading-boundary column must never start a line, so the break moves back
     ' and "kata" stays with "-bi".
     Eq "a wrap line never starts on a continuation column", _
-       PlanStarts("10,10,10", "0,0,1", 25), "0,1"
+       WrapOf(Array(10, 10, 10), Array(0, 0, 1), 25), "0,1"
     Eq "backing up is abandoned rather than emptying a line", _
-       PlanStarts("10,10", "0,1", 15), "0,1"
+       WrapOf(Array(10, 10), Array(0, 1), 15), "0,1"
 
-    ' The same flags derived from real data rather than written by hand.
+    TestNoBreakFlagsFromData
+End Sub
+
+'-----------------------------------------------------------------------------
+' Plan a wrap and render the line starts as "0,2,4".
+' Returns the error text instead of raising, so one bad case cannot hide the rest.
+'-----------------------------------------------------------------------------
+Private Function WrapOf(widthsV As Variant, flagsV As Variant, _
+        ByVal avail As Single) As String
+
+    Dim widths() As Single
+    Dim flags() As Boolean
+    Dim starts() As Long
+    Dim i As Long
+    Dim s As String
+
+    On Error GoTo Failed
+
+    ReDim widths(0 To UBound(widthsV))
+    ReDim flags(0 To UBound(widthsV))
+    For i = 0 To UBound(widthsV)
+        widths(i) = CSng(widthsV(i))
+        flags(i) = (CLng(flagsV(i)) <> 0)
+    Next i
+
+    starts = ComputeWrapLines(widths, flags, avail, 0, 0)
+
+    For i = LBound(starts) To UBound(starts)
+        If s <> "" Then s = s & ","
+        s = s & CStr(starts(i))
+    Next i
+    WrapOf = s
+    Exit Function
+
+Failed:
+    WrapOf = "ERROR " & CStr(Err.Number) & ": " & Err.Description
+End Function
+
+' The same flags derived from real data rather than written by hand.
+' Separated out so its IgtExample local is not in scope for the cases above.
+Private Sub TestNoBreakFlagsFromData()
     Dim ex As IgtExample
     Dim flags() As Boolean
+
+    On Error GoTo Failed
     ex = ModelFromText(Vector2Raw(), igtMorphemeAligned)
     flags = NoBreakFlags(ex)
     Ok "NoBreakFlags never flags the first column", (flags(0) = False)
     Ok "NoBreakFlags flags the enclitic columns of example 2", (CountTrue(flags) > 0)
+    Exit Sub
+
+Failed:
+    Ok "NoBreakFlags from real data (error " & CStr(Err.Number) & ": " & _
+       Err.Description & ")", False
 End Sub
-
-'-----------------------------------------------------------------------------
-' Plan a wrap from comma-separated widths and flags, and render the resulting
-' line starts as "0,2,4".
-'
-' Deliberately ONE function with ONE local array, rather than a Plan() that
-' returns an array and a Starts() that takes one. VBA is awkward about arrays
-' crossing function boundaries -- a function's array return cannot be passed
-' straight into an array parameter, because that parameter is ByRef and a result
-' has nothing to refer to -- and every boundary is somewhere for that to go
-' wrong at RUN time rather than compile time. The only array here is local, and
-' the only call out is to ComputeWrapLines itself, which is the thing under test.
-'
-' Val() rather than CSng(): Val always reads "." as the decimal separator, while
-' CSng follows the machine's locale. This is a tool for fieldwork linguists, who
-' are not reliably on an English-locale machine.
-'-----------------------------------------------------------------------------
-Private Function PlanStarts(ByVal widthCsv As String, ByVal flagCsv As String, _
-        ByVal avail As Single) As String
-
-    Dim wParts() As String, fParts() As String
-    Dim widths() As Single, flags() As Boolean
-    Dim lineStarts() As Long
-    Dim i As Long, s As String
-
-    wParts = Split(widthCsv, ",")
-    fParts = Split(flagCsv, ",")
-    ReDim widths(0 To UBound(wParts))
-    ReDim flags(0 To UBound(wParts))
-
-    For i = 0 To UBound(wParts)
-        widths(i) = CSng(Val(Trim$(wParts(i))))
-        ' VBA's And does NOT short-circuit, so the bounds test has to be its own
-        ' statement; as one condition, fParts(i) would still be evaluated.
-        flags(i) = False
-        If i <= UBound(fParts) Then flags(i) = (Trim$(fParts(i)) = "1")
-    Next i
-
-    lineStarts = ComputeWrapLines(widths, flags, avail, 0, 0)
-
-    For i = LBound(lineStarts) To UBound(lineStarts)
-        If s <> "" Then s = s & ","
-        s = s & CStr(lineStarts(i))
-    Next i
-    PlanStarts = s
-End Function
 
 Private Function CountTrue(flags() As Boolean) As Long
     Dim i As Long, n As Long
