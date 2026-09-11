@@ -80,6 +80,7 @@ Public Sub ImportLingTeXModules()
     Dim i As Long
     Dim leaf As String, fullPath As String
     Dim compName As String
+    Dim note As String
     Dim log As String
     Dim okCount As Long, failCount As Long
 
@@ -107,18 +108,15 @@ Public Sub ImportLingTeXModules()
             ' Replace rather than duplicate, so re-running picks up edits.
             RemoveComponent vbp, compName
 
-            On Error Resume Next
-            vbp.VBComponents.Import fullPath
-            If Err.Number = 0 Then
-                log = log & "  ok       " & leaf & vbCr
+            note = ImportOne(vbp, fullPath, compName, IsClassFile(leaf))
+            If note = "" Then
+                log = log & "  ok       " & leaf & _
+                      IIf(IsClassFile(leaf), "   (class module)", "") & vbCr
                 okCount = okCount + 1
             Else
-                log = log & "  FAILED   " & leaf & "  (" & CStr(Err.Number) & _
-                      ": " & Err.Description & ")" & vbCr
+                log = log & "  FAILED   " & leaf & "  (" & note & ")" & vbCr
                 failCount = failCount + 1
-                Err.Clear
             End If
-            On Error GoTo 0
         End If
     Next i
 
@@ -172,6 +170,169 @@ End Sub
 ' 6068 is the one error worth handling by name, because the fix is a setting
 ' rather than anything about this code, and the message is otherwise cryptic.
 '-----------------------------------------------------------------------------
+'-----------------------------------------------------------------------------
+' Bring one file in. Returns "" on success, or a description of what failed.
+'
+' A CLASS MODULE IS NEVER IMPORTED. VBComponents.Import decides what kind of
+' component to create by parsing the file header, and when it misreads the
+'
+'     VERSION 1.0 CLASS
+'     BEGIN
+'       MultiUse = -1  'True
+'     END
+'
+' preamble it creates a STANDARD module instead, leaving those four lines in the
+' code as syntax errors. The module then cannot compile at all -- clsAppEvents
+' declares "Private WithEvents mApp As Word.Application", which is legal only in a
+' class module -- and the failure reads as a bug in the module rather than as a
+' bad import. A bare-LF .cls is one way to trigger it (the repository pins CRLF in
+' .gitattributes for exactly this reason), but rather than depend on that holding,
+' classes are built explicitly here: create the component, name it, and put the
+' source in. There is nothing left to guess at.
+'
+' Standard modules still go through Import, which reads Attribute VB_Name and so
+' names them without being told.
+'-----------------------------------------------------------------------------
+Private Function ImportOne(vbp As Object, ByVal fullPath As String, _
+        ByVal compName As String, ByVal asClass As Boolean) As String
+
+    Dim comp As Object
+    Dim code As String
+
+    If Not asClass Then
+        On Error Resume Next
+        vbp.VBComponents.Import fullPath
+        If Err.Number <> 0 Then
+            ImportOne = CStr(Err.Number) & ": " & Err.Description
+            Err.Clear
+        End If
+        On Error GoTo 0
+        Exit Function
+    End If
+
+    code = ReadTextFile(fullPath)
+    If code = "" Then
+        ImportOne = "could not read the file, or it is empty"
+        Exit Function
+    End If
+    code = StripVbaMetadata(code)
+
+    On Error Resume Next
+    ' 2 = vbext_ct_ClassModule. The constant is not available late-bound.
+    Set comp = vbp.VBComponents.Add(2)
+    If Err.Number <> 0 Or comp Is Nothing Then
+        ImportOne = "could not add a class module (" & CStr(Err.Number) & ": " & _
+                    Err.Description & ")"
+        Err.Clear
+        On Error GoTo 0
+        Exit Function
+    End If
+
+    comp.Name = compName
+    If Err.Number <> 0 Then
+        ImportOne = "could not name it " & compName & " (" & CStr(Err.Number) & _
+                    ": " & Err.Description & ")"
+        Err.Clear
+        On Error GoTo 0
+        Exit Function
+    End If
+
+    ' A new class module may already carry Option Explicit, depending on the
+    ' editor's "Require Variable Declaration" setting, and a second one is a
+    ' compile error. Clear it out before adding the source.
+    With comp.CodeModule
+        If .CountOfLines > 0 Then .DeleteLines 1, .CountOfLines
+        .AddFromString code
+    End With
+    If Err.Number <> 0 Then
+        ImportOne = "could not add the code (" & CStr(Err.Number) & ": " & _
+                    Err.Description & ")"
+        Err.Clear
+    End If
+    On Error GoTo 0
+End Function
+
+Private Function IsClassFile(ByVal leaf As String) As Boolean
+    IsClassFile = (LCase$(Right$(leaf, 4)) = ".cls")
+End Function
+
+'-----------------------------------------------------------------------------
+' A whole text file as one string, with CRLF line endings.
+'
+' Read as binary rather than with Line Input so the file's own line endings do
+' not matter: both are normalised here. That is the point of doing it this way --
+' the bug being avoided is a line-ending bug.
+'-----------------------------------------------------------------------------
+Private Function ReadTextFile(ByVal fullPath As String) As String
+    Dim fn As Integer
+    Dim buf As String
+
+    On Error GoTo Failed
+    fn = FreeFile
+    Open fullPath For Binary Access Read As #fn
+    If LOF(fn) > 0 Then
+        buf = Space$(LOF(fn))
+        Get #fn, 1, buf
+    End If
+    Close #fn
+
+    ' CRLF -> LF -> CR -> LF collapses every convention to LF, then one pass
+    ' back to CRLF. Doing it in this order means a CRLF file is not turned into
+    ' CR CR LF.
+    buf = Replace(buf, vbCrLf, vbLf)
+    buf = Replace(buf, vbCr, vbLf)
+    ReadTextFile = Replace(buf, vbLf, vbCrLf)
+    Exit Function
+
+Failed:
+    On Error Resume Next
+    Close #fn
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+'-----------------------------------------------------------------------------
+' Strip what the importer reads and the editor rejects: the .cls preamble and
+' every Attribute line, including the member attribute buried mid-file in
+' clsAppEvents.  Mirrors strip_metadata in tools/make-paste-bundle.sh.
+'-----------------------------------------------------------------------------
+Private Function StripVbaMetadata(ByVal code As String) As String
+    Dim lines() As String
+    Dim i As Long
+    Dim ln As String, t As String
+    Dim inPre As Boolean, started As Boolean
+    Dim out As String
+
+    lines = Split(code, vbCrLf)
+    For i = 0 To UBound(lines)
+        ln = lines(i)
+        t = Trim$(ln)
+
+        If Left$(t, 12) = "VERSION 1.0 " Then
+            ' skip
+        ElseIf t = "BEGIN" And Not started Then
+            inPre = True
+        ElseIf t = "END" And inPre Then
+            inPre = False
+        ElseIf inPre Then
+            ' skip the MultiUse line and anything else in the preamble
+        ElseIf Left$(t, 10) = "Attribute " Then
+            ' skip
+        ElseIf Not started And t = "" Then
+            ' skip leading blanks so the result begins at Option Explicit
+        Else
+            started = True
+            If out = "" Then
+                out = ln
+            Else
+                out = out & vbCrLf & ln
+            End If
+        End If
+    Next i
+
+    StripVbaMetadata = out
+End Function
+
 Private Function GetProject() As Object
     Dim vbp As Object
 
