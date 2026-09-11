@@ -38,7 +38,18 @@ Option Explicit
 ' Pure ASCII on purpose -- see the header of modFlexParse.bas.
 '=============================================================================
 
-' Flip to False to use the Range.Information fallback (see above).
+'-----------------------------------------------------------------------------
+' IF COLUMNS COME OUT THE WRONG WIDTH, CHANGE THIS TO False AND RE-RUN.
+'
+' That switches from reading autofitted cell widths to reading
+' Range.Information positions -- a complete second implementation of the same
+' measurement, below.  It is the first thing to try before debugging anything
+' else, because every column width flows from here: if the autofit read does not
+' work on a given Word build, nothing downstream can look right.
+'
+' tools/probe/modProbe.bas reports which method works on a given install
+' (section 3 for this one, section 5 for the fallback).  See QUICKSTART.md.
+'-----------------------------------------------------------------------------
 Private Const USE_AUTOFIT As Boolean = True
 
 ' Word's maximum page dimension is 22 inches.  Nothing an interlinear example

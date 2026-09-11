@@ -69,6 +69,11 @@ extension/safari/build/
 # Distribution zips (produced by extension/build.sh --zip and the release workflow)
 extension/*.zip
 
+# ── LingTeX-Word generated output ─────────────────────────────────────────────
+# The paste bundle is regenerated from src/ by tools/make-paste-bundle.sh, and the
+# packaged installers are built in CI. Neither is source.
+LingTeX-Word/build/
+
 # ── Build / release artifacts ─────────────────────────────────────────────────
 *.dmg
 *.pkg

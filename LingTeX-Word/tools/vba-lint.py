@@ -24,7 +24,9 @@ import re
 import sys
 import pathlib
 
-SRC = pathlib.Path(__file__).resolve().parent.parent / "src"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+# The engine, plus the standalone probe module that ships for pasting into Word.
+SRC_DIRS = [ROOT / "src", ROOT / "tools" / "probe"]
 
 # Platform traps. Each of these exists on Windows Word and not on Mac Word.
 WINDOWS_ONLY = {
@@ -37,6 +39,24 @@ WINDOWS_ONLY = {
     r"\bCreateObject\s*\(": "CreateObject reaches for COM, which Mac Word lacks; avoid it",
     r"\bDeclare\s+(PtrSafe\s+)?(Function|Sub)\b": "Win32 Declare needs an #If Mac Then guard",
 }
+
+# VBA keywords and statement names that must not be used as a procedure name.
+# Declaring e.g. "Private Sub Line(...)" compiles in some contexts and then
+# collides with the Line Input statement in a way that reads as nonsense. Only
+# names we DEFINE are checked -- calling Left$, Len, Format and friends is fine.
+RESERVED_PROC_NAMES = set("""
+line input output print write get put open close name error resume stop loop next
+set let option type end call exit kill dir date time timer seek lock unlock width
+reset randomize beep mod and or not xor eqv imp is like to step then else each in
+as byval byref optional paramarray preserve static public private friend dim redim
+const declare sub function property event implements withevents new nothing true
+false empty null me on goto gosub return select case with do while until wend for
+if elseif rem attribute enum erase spc tab string space len left right mid abs sgn
+int fix log exp sqr rnd format val str chr asc iif choose switch array lbound
+ubound split join replace instr trim ltrim rtrim ucase lcase cint clng csng cdbl
+cstr cbool cdate cvar typename vartype isnull isempty iserror isnumeric isdate
+isarray isobject ismissing
+""".split())
 
 # Statements that open a block, paired with the statement that closes it.
 OPENERS = [
@@ -172,6 +192,12 @@ def check(path):
                 stack.pop()
             continue
 
+        m = re.match(r"^(?:Public\s+|Private\s+|Friend\s+)?(?:Static\s+)?"
+                     r"(?:Sub|Function|Property\s+(?:Get|Let|Set))\s+([A-Za-z_]\w*)",
+                     t, re.I)
+        if m and m.group(1).lower() in RESERVED_PROC_NAMES:
+            problems.append((n, f"'{m.group(1)}' is a VBA keyword or built-in; rename the procedure"))
+
         for pat, kind, _ in OPENERS:
             if kind is None:
                 continue
@@ -195,10 +221,68 @@ def check(path):
     return problems
 
 
+# QUICKSTART.md promises that these six modules compile and run RunAllTests on
+# their own, with the Word object model uninvolved. That is only true while they
+# reference nothing defined in the other seven, so it is checked rather than
+# trusted -- a stray call added later would silently break the staged install path.
+STAGE1 = {
+    "modFlexParse.bas", "modIgtModel.bas", "modLeipzig.bas",
+    "modWrap.bas", "modTests.bas", "clsIgtWarning.cls",
+}
+# Not part of the engine; shipped to be pasted on its own.
+STANDALONE = {"modProbe.bas"}
+
+
+def proc_names(text):
+    """Procedure and Const names defined in a module."""
+    names = set()
+    for _, t in logical_lines(text):
+        m = re.match(r"^(?:Public\s+|Private\s+|Friend\s+)?(?:Static\s+)?"
+                     r"(?:Sub|Function|Property\s+(?:Get|Let|Set))\s+([A-Za-z_]\w*)", t, re.I)
+        if m:
+            names.add(m.group(1))
+        m = re.match(r"^(?:Public\s+|Private\s+)?Const\s+([A-Za-z_]\w*)", t, re.I)
+        if m:
+            names.add(m.group(1))
+    return names
+
+
+def check_stage1_independence(files):
+    """Stage-1 modules must not reference anything only stage 2 defines."""
+    engine = [f for f in files if f.name not in STANDALONE]
+    if not any(f.name in STAGE1 for f in engine):
+        return []
+
+    stage1_defs, stage2_defs = set(), {}
+    for f in engine:
+        names = proc_names(f.read_text(encoding="utf-8"))
+        if f.name in STAGE1:
+            stage1_defs |= names
+        else:
+            for nm in names:
+                stage2_defs.setdefault(nm, f.name)
+
+    problems = []
+    for f in engine:
+        if f.name not in STAGE1:
+            continue
+        for n, t in logical_lines(f.read_text(encoding="utf-8")):
+            for nm, owner in stage2_defs.items():
+                if nm in stage1_defs:
+                    continue
+                if re.search(r"(?<![.\w])" + re.escape(nm) + r"(?![\w])", t):
+                    problems.append(
+                        f"{f.name}:{n}: stage-1 module references '{nm}', which only "
+                        f"{owner} defines -- this breaks the staged install in QUICKSTART.md")
+    return problems
+
+
 def main():
-    files = sorted(list(SRC.glob("*.bas")) + list(SRC.glob("*.cls")))
+    files = []
+    for d in SRC_DIRS:
+        files += sorted(list(d.glob("*.bas")) + list(d.glob("*.cls")))
     if not files:
-        print("no VBA sources found in " + str(SRC))
+        print("no VBA sources found in " + ", ".join(str(d) for d in SRC_DIRS))
         return 1
 
     total = 0
@@ -209,6 +293,15 @@ def main():
         print(f"  {mark}  {f.name}")
         for n, msg in sorted(problems):
             print(f"          {f.name}:{n}: {msg}")
+
+    stage = check_stage1_independence(files)
+    if stage:
+        total += len(stage)
+        print("  FAIL  stage-1 independence")
+        for msg in stage:
+            print("          " + msg)
+    else:
+        print("  OK    stage-1 independence (QUICKSTART.md staged install)")
 
     print()
     print("ALL PASS" if total == 0 else f"{total} problem(s)")
