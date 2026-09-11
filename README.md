@@ -9,12 +9,21 @@ Linguistic fieldwork macro tools for LaTeX — available in four formats:
 | **Firefox extension** | `extension/firefox/` | MV2; same features as Chrome |
 | **Safari extension** | planned | Not yet available — Safari CI build currently failing |
 | **Desktop app (Tauri)** | `tauri/` | Menu-bar / system-tray; OS-wide keyboard shortcuts type converted text at the cursor |
+| **Word add-in** | `LingTeX-Word/` | **LingTeX-Word** — a separate sub-project with its own downloads. Pastes FLEx interlinear into Word as borderless, auto-wrapping tables rather than LaTeX |
 
 ## What it does
 
 - **FLEx Interlinear** — converts copied FLEx interlinear text into a `\gll` block (langsci-gb4e / gb4e); configurable grammatical gloss command (`\textsc` default), gloss case transformation (capitalize / lowercase / uppercase / none), per-word object-language formatting (`\textit` default), and source reference command
 - **Phonology Assistant** — converts PA tab-separated clipboard rows into `\exampleentry` rows
 - **Custom TSV profiles** — user-configurable row templates for any tab-separated source
+
+Separately, **LingTeX-Word** (`LingTeX-Word/`) targets Microsoft Word rather than
+LaTeX: it pastes FLEx interlinear text in as a borderless table that auto-wraps to
+the page, re-flowing columns as margins, fonts or content change. It enforces the
+Leipzig conventions (matching morpheme break characters across a column, no spaces
+in interlinear cells) without restricting you to any list of abbreviations, and an
+alignment column may hold a word, a morpheme, or part of a word. See
+[`LingTeX-Word/README.md`](LingTeX-Word/README.md).
 
 Works with the [LingTeX template](https://github.com/rulingAnts/LingTeX) out of the box.
 Every command name is configurable so the tools work with any LaTeX preamble.
@@ -57,6 +66,17 @@ LingTeX-Tools/
 │   │   └── icons/               #   App icons (PNG / ICNS / ICO)
 │   ├── build.sh                 #   Syncs core.js, then runs cargo tauri build/dev
 │   └── README.md                #   Tauri-specific setup instructions
+│
+├── LingTeX-Word/                # ★ LingTeX-Word — the Word add-in (separate sub-project)
+│   ├── src/                     #   VBA source of truth (.bas / .cls) + ribbon XML
+│   ├── tools/                   #   reference.js (executable spec), parity-test.js, vba-lint.py
+│   ├── installer/               #   NSIS (Windows) and uncompiled AppleScript (Mac)
+│   ├── README.md                #   Architecture, Mac VBA constraints, install
+│   └── TESTING.md               #   Manual Word checklist (Windows + Mac)
+│
+├── word_processing_tools/       # Superseded experiments, kept as reference
+│   ├── FLExToWord.bas           #   OMML/equation-frame macro — dead end, see its banner
+│   └── XLingPaperSimpleInterlinearizer.html
 │
 ├── .github/workflows/
 │   ├── release.yml              # CI: builds all artifacts on version tag push

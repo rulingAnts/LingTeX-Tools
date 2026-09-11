@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  LingTeX-Word ribbon.
+
+  This part is injected into LingTeX-Word.dotm at packaging time (see
+  ..\tools\build-dotm.ps1).  It is tracked as a source file so the ribbon is
+  reviewable in the repository rather than buried inside a binary.
+
+  Every onAction points at a Rbn* procedure in modLingTeX.bas.  Those take their
+  control argument As Variant rather than As IRibbonControl, so the VBA project
+  needs no reference to the Office object library, which keeps the modules
+  importable into a bare project on Windows and on Mac alike.
+
+  imageMso names are built-in Office icons, so no image resources have to ship.
+  Mac Word honours customUI from a startup template, but its icon set is not
+  identical to Windows; if one of these comes through blank on Mac, substitute
+  another imageMso rather than embedding a bitmap.
+
+  (Note for editors: an XML comment may not contain two consecutive hyphens,
+  so prose in here uses commas where the rest of the project uses dashes.)
+-->
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui">
+  <ribbon>
+    <tabs>
+      <tab id="LingTeXTab" label="LingTeX">
+
+        <group id="LingTeXInterlinearGroup" label="Interlinear">
+          <button id="LingTeXInsert"
+                  label="Insert Interlinear"
+                  size="large"
+                  imageMso="TableInsertExcel"
+                  onAction="RbnInsert"
+                  screentip="Insert an interlinear example"
+                  supertip="Copy an interlinear selection in FLEx and click here, or paste the text into the document, select it, and click here. The example is drawn as a borderless table, one column per alignment slot, wrapped to the page."/>
+          <button id="LingTeXConvert"
+                  label="Convert Table"
+                  size="large"
+                  imageMso="TableStylesGalleryWord"
+                  onAction="RbnConvertTable"
+                  screentip="Convert a plain table into an interlinear example"
+                  supertip="Turns an ordinary Word table -- typed by hand or pasted from a spreadsheet -- into an auto-wrapping interlinear example. One row per tier."/>
+        </group>
+
+        <group id="LingTeXLayoutGroup" label="Layout">
+          <button id="LingTeXRewrapCurrent"
+                  label="Re-wrap This"
+                  imageMso="TableAutoFitWindow"
+                  onAction="RbnRewrapCurrent"
+                  screentip="Re-wrap the example at the cursor"
+                  supertip="Recomputes the wrap from scratch, so columns move down when space runs out and back up when it is freed -- after a margin, font or orientation change, or an edit."/>
+          <button id="LingTeXRewrapAll"
+                  label="Re-wrap All"
+                  imageMso="TableAutoFitContents"
+                  onAction="RbnRewrapAll"
+                  screentip="Re-wrap every example in the document"
+                  supertip="Also runs automatically when the document is saved. Turn that off with the LingTeX_RewrapOnSave document variable."/>
+        </group>
+
+        <group id="LingTeXAlignGroup" label="Alignment">
+          <button id="LingTeXSplit"
+                  label="Split Column"
+                  imageMso="TableCellsSplit"
+                  onAction="RbnSplitColumn"
+                  screentip="Split the column at the cursor"
+                  supertip="Pulls an affix, clitic or reduplicant out into an alignment column of its own, carrying the morpheme break character onto the start of the new column on every interlinear tier. Use it to morpheme-align part of an otherwise word-aligned example."/>
+          <button id="LingTeXMerge"
+                  label="Merge Columns"
+                  imageMso="TableCellsMerge"
+                  onAction="RbnMergeColumns"
+                  screentip="Merge columns back together"
+                  supertip="Select across several cells to merge exactly those. With the cursor in a single cell, that column is merged with the one after it."/>
+        </group>
+
+        <group id="LingTeXCheckGroup" label="Check">
+          <button id="LingTeXCheck"
+                  label="Check Glossing"
+                  size="large"
+                  imageMso="SpellingAndGrammar"
+                  onAction="RbnCheck"
+                  screentip="Check the example against the glossing conventions"
+                  supertip="Reports columns whose cells disagree about a morpheme break character, spaces inside interlinear cells, form and gloss showing a different number of morpheme breaks, and unmatched infix brackets. Offers to fix the ones that have a single right answer. Grammatical glosses are recognised by their shape, so your own abbreviations are never flagged as unknown."/>
+        </group>
+
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>

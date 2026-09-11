@@ -1,0 +1,517 @@
+Attribute VB_Name = "modTests"
+Option Explicit
+
+'=============================================================================
+' modTests  --  LingTeX-Word
+'
+' Self-tests.  Run RunAllTests from the Immediate window (Ctrl+G) after importing
+' the modules:
+'
+'     RunAllTests
+'
+' Results print as PASS / FAIL lines followed by a summary.  This is the main gate
+' before trying anything in a real document, and it runs identically on Windows
+' Word and Mac Word -- which is the whole point, since nothing else in this
+' project can be executed on both.
+'
+' These cases MIRROR ..\tools\parity-test.js, which runs the same algorithms in
+' JavaScript against docs\core.js and can therefore run in CI.  The golden vectors
+' come from ..\..\PROMPT.md, the specification of the FLEx clipboard format, and
+' have been checked byte-for-byte against core.js.  If you change an algorithm,
+' change both test files.
+'
+' Everything here is pure computation: no documents are opened, nothing is drawn,
+' and the measurement and rendering modules are not involved.  Those need a real
+' Word document and are covered by ..\TESTING.md instead.
+'
+' Pure ASCII on purpose -- see the header of modFlexParse.bas.
+'=============================================================================
+
+Private mPass As Long
+Private mFail As Long
+
+'=============================================================================
+' -- RUNNER -----------------------------------------------------------------
+'=============================================================================
+
+Public Sub RunAllTests()
+    mPass = 0
+    mFail = 0
+
+    Debug.Print ""
+    Debug.Print "LingTeX-Word self-tests"
+    Debug.Print "======================="
+
+    TestGoldenVectors
+    TestProjections
+    TestRouting
+    TestColumnEditing
+    TestLeipzigChecks
+    TestGramGlossDetection
+    TestWrapPlanner
+
+    Debug.Print ""
+    If mFail = 0 Then
+        Debug.Print "ALL PASS -- " & CStr(mPass) & " passed"
+    Else
+        Debug.Print "FAILURES -- " & CStr(mPass) & " passed, " & CStr(mFail) & " FAILED"
+    End If
+End Sub
+
+Private Sub Ok(ByVal name As String, ByVal cond As Boolean)
+    If cond Then
+        mPass = mPass + 1
+        Debug.Print "  PASS  " & name
+    Else
+        mFail = mFail + 1
+        Debug.Print "  FAIL  " & name
+    End If
+End Sub
+
+Private Sub Eq(ByVal name As String, ByVal actual As String, ByVal expected As String)
+    If actual = expected Then
+        mPass = mPass + 1
+        Debug.Print "  PASS  " & name
+    Else
+        mFail = mFail + 1
+        Debug.Print "  FAIL  " & name
+        Debug.Print "          actual:   " & actual
+        Debug.Print "          expected: " & expected
+    End If
+End Sub
+
+Private Sub Section(ByVal title As String)
+    Debug.Print ""
+    Debug.Print title
+End Sub
+
+
+'=============================================================================
+' -- GOLDEN VECTORS ---------------------------------------------------------
+'=============================================================================
+' From PROMPT.md.  Tabs are written as ChrW here rather than as literal tab
+' characters, because a tab inside a .bas string literal is easy to destroy with
+' an editor that trims or converts whitespace -- and a silently mangled vector
+' would turn this gate into a rubber stamp.
+
+Private Function T() As String
+    T = vbTab
+End Function
+
+' PROMPT.md example 1, input.
+Private Function Vector1Raw() As String
+    Vector1Raw = _
+        "Morphemes" & T & "a" & T & "bujo" & T & "edi" & T & T & "di" & T & "=de" & _
+            T & "deda" & T & T & T & "=di" & T & "bu" & T & "a" & T & "bujo" & vbLf & _
+        T & "Lex. Gloss" & T & "1SG" & T & "speak" & T & "DEM" & T & "***" & T & "pig" & _
+            T & "ERG" & T & T & "attack" & T & ".CMP" & T & "REL" & T & "FOC" & _
+            T & "1SG" & T & "speak" & vbLf & _
+        "Free Eng Concerning what I'm talking about."
+End Function
+
+Private Function Vector1Forms() As String
+    Vector1Forms = "a" & T & "bujo" & T & "edi" & T & T & "di=de" & T & "deda=di" & _
+                   T & "bu" & T & "a" & T & "bujo"
+End Function
+
+Private Function Vector1Glosses() As String
+    Vector1Glosses = "1SG" & T & "speak" & T & "DEM" & T & "***" & T & "pig=ERG" & _
+                     T & "attack.CMP=REL" & T & "FOC" & T & "1SG" & T & "speak"
+End Function
+
+' PROMPT.md example 2, input.  Exercises prefix and suffix stacking, a proper
+' noun gloss, punctuation attachment, and double enclitics.
+Private Function Vector2Raw() As String
+    Vector2Raw = _
+        "Morphemes" & T & "dae" & T & "kudi" & T & T & T & "kada" & T & T & T & "=te" & _
+            T & "bo" & T & "=taha" & T & "Edefina" & T & "bi" & T & ":" & _
+            T & "dae" & T & "kudi" & T & T & T & "kada" & T & T & T & "=te" & _
+            T & "Su" & T & "di" & T & "=de" & T & "deda" & T & T & T & "=di" & _
+            T & "bu" & T & "a" & T & "bujo" & T & "=de" & T & "=di" & vbLf & _
+        T & "Lex. Gloss" & T & "dog" & T & T & "take" & T & ".CMP" & T & T & "carry" & _
+            T & ".CMP" & T & "SEQ" & T & "3SG" & T & "two" & T & "P.N." & T & "ACMP" & _
+            T & T & "dog" & T & T & "take" & T & ".CMP" & T & T & "carry" & T & ".CMP" & _
+            T & "SEQ" & T & "P.N." & T & "pig" & T & "ERG" & T & T & "attack" & _
+            T & ".CMP" & T & "REL" & T & "FOC" & T & "1SG" & T & "speak" & T & "ABL" & _
+            T & "REL" & vbLf & _
+        "Free Eng (When) she took her dogs."
+End Function
+
+Private Function Vector2Forms() As String
+    Vector2Forms = "dae" & T & "kudi" & T & "kada=te" & T & "bo=taha" & T & "Edefina" & _
+        T & "bi:" & T & "dae" & T & "kudi" & T & "kada=te" & T & "Su" & T & "di=de" & _
+        T & "deda=di" & T & "bu" & T & "a" & T & "bujo=de=di"
+End Function
+
+Private Function Vector2Glosses() As String
+    Vector2Glosses = "dog" & T & "take.CMP" & T & "carry.CMP=SEQ" & T & "3SG=two" & _
+        T & "P.N." & T & "ACMP" & T & "dog" & T & "take.CMP" & T & "carry.CMP=SEQ" & _
+        T & "P.N." & T & "pig=ERG" & T & "attack.CMP=REL" & T & "FOC" & T & "1SG" & _
+        T & "speak=ABL=REL"
+End Function
+
+Private Sub TestGoldenVectors()
+    Section "Golden vectors (PROMPT.md)"
+    CheckVector "example 1", Vector1Raw(), Vector1Forms(), Vector1Glosses(), _
+                "Concerning what I'm talking about."
+    CheckVector "example 2", Vector2Raw(), Vector2Forms(), Vector2Glosses(), _
+                "(When) she took her dogs."
+End Sub
+
+Private Sub CheckVector(ByVal name As String, ByVal raw As String, _
+        ByVal wantForms As String, ByVal wantGlosses As String, ByVal wantFree As String)
+
+    Dim ex As IgtExample
+    ex = ModelFromText(raw, igtWordAligned)
+
+    Ok name & ": parsed", (ex.TierCount >= 2 And ex.ColCount > 0)
+    If ex.TierCount < 2 Then Exit Sub
+
+    Eq name & ": word-aligned forms", RowText(ex, 0), wantForms
+    Eq name & ": word-aligned glosses", RowText(ex, 1), wantGlosses
+    Ok name & ": free translation captured", (ex.FreeCount = 1)
+    If ex.FreeCount = 1 Then Eq name & ": free translation text", ex.FreeLines(0), wantFree
+End Sub
+
+Private Function RowText(ex As IgtExample, ByVal t As Long) As String
+    Dim c As Long, s As String
+    For c = 0 To ex.ColCount - 1
+        If c > 0 Then s = s & vbTab
+        s = s & ex.Cells(t, c)
+    Next c
+    RowText = s
+End Function
+
+
+'=============================================================================
+' -- PROJECTIONS ------------------------------------------------------------
+'=============================================================================
+
+Private Sub TestProjections()
+    Section "Projections (word-aligned vs morpheme-aligned)"
+    CheckProjection "example 1", Vector1Raw()
+    CheckProjection "example 2", Vector2Raw()
+End Sub
+
+Private Sub CheckProjection(ByVal name As String, ByVal raw As String)
+    Dim word As IgtExample, morph As IgtExample
+    Dim warnings As Collection
+    Dim w As Variant
+    Dim nBreakWarnings As Long
+    Dim flags() As Boolean
+    Dim c As Long
+
+    word = ModelFromText(raw, igtWordAligned)
+    morph = ModelFromText(raw, igtMorphemeAligned)
+
+    Ok name & ": morpheme-aligned has at least as many columns", _
+       (morph.ColCount >= word.ColCount)
+
+    ' A morpheme-aligned projection must satisfy invariant 1 BY CONSTRUCTION:
+    ' the boundary character is written onto both cells of every split.
+    Set warnings = CheckExample(morph)
+    For Each w In warnings
+        If w.Code = WARN_BREAK_MISSING Or w.Code = WARN_BREAK_CONFLICT Then
+            nBreakWarnings = nBreakWarnings + 1
+        End If
+    Next w
+    Ok name & ": morpheme-aligned satisfies break-char agreement", (nBreakWarnings = 0)
+
+    ' Merging every continuation column back into its head must reproduce the
+    ' word-aligned projection: the two are views of one segment list, not two
+    ' separate parsers.
+    flags = NoBreakFlags(morph)
+    For c = morph.ColCount - 1 To 1 Step -1
+        If flags(c) Then MergeColumns morph, c - 1, c
+    Next c
+    Eq name & ": merging continuations reproduces word-aligned forms", _
+       RowText(morph, 0), RowText(word, 0)
+    Eq name & ": merging continuations reproduces word-aligned glosses", _
+       RowText(morph, 1), RowText(word, 1)
+End Sub
+
+
+'=============================================================================
+' -- INPUT ROUTING ----------------------------------------------------------
+'=============================================================================
+
+Private Sub TestRouting()
+    Dim ex As IgtExample
+    Dim tsv As String
+
+    Section "Input routing"
+
+    Ok "recognises FLEx text by its tier labels", LooksLikeFlex(Vector1Raw())
+    Ok "recognises a space-separated labelled block", _
+       LooksLikeFlex("Morphemes kata -bi" & vbLf & "LexGloss go DIST")
+    Ok "recognises the spaced label spellings", _
+       LooksLikeFlex("Morphemes" & T & "kata" & vbLf & T & "Lex. Gloss" & T & "go")
+    Ok "does NOT mistake plain TSV for FLEx", _
+       (LooksLikeFlex("kata-bi" & T & "di" & vbLf & "go-DIST" & T & "pig") = False)
+
+    ' The FLEx parser treats column 0 as a tier label, so plain TSV sent down that
+    ' path would lose the first cell of every row.  This is the round trip that
+    ' matters: the add-in's own TSV has to come back in unchanged.
+    tsv = "kata-bi" & T & "di" & vbLf & "go-DIST" & T & "pig" & vbLf & "He went far away."
+    ex = ModelFromText(tsv, igtWordAligned)
+    Ok "plain TSV parses", (ex.TierCount = 2 And ex.ColCount = 2)
+    If ex.TierCount = 2 Then
+        Eq "plain TSV keeps its first column", RowText(ex, 0), "kata-bi" & T & "di"
+        Eq "plain TSV keeps its gloss row", RowText(ex, 1), "go-DIST" & T & "pig"
+    End If
+    Ok "plain TSV lifts the untabbed line to a free translation", (ex.FreeCount = 1)
+
+    ' Full round trip: FLEx in, TSV out, TSV back in, same grid.
+    Dim first As IgtExample, again As IgtExample
+    first = ModelFromText(Vector1Raw(), igtWordAligned)
+    again = ModelFromText(ModelToTsv(first), igtWordAligned)
+    Eq "TSV round trip preserves the form row", RowText(again, 0), RowText(first, 0)
+    Eq "TSV round trip preserves the gloss row", RowText(again, 1), RowText(first, 1)
+End Sub
+
+
+'=============================================================================
+' -- COLUMN EDITING ---------------------------------------------------------
+'=============================================================================
+
+Private Function TwoTier(ByVal form As String, ByVal gloss As String) As IgtExample
+    Dim ex As IgtExample
+    Dim f() As String, g() As String
+    Dim c As Long
+
+    f = Split(form, vbTab)
+    g = Split(gloss, vbTab)
+    ex = NewExample(2, UBound(f) + 1)
+    ex.Tiers(0) = ROLE_MORPHEMES
+    ex.Tiers(1) = ROLE_GLOSS
+    For c = 0 To UBound(f)
+        ex.Cells(0, c) = f(c)
+        If c <= UBound(g) Then ex.Cells(1, c) = g(c)
+    Next c
+    TwoTier = ex
+End Function
+
+Private Sub TestColumnEditing()
+    Dim ex As IgtExample
+    Dim shortTiers As String
+    Dim okAll As Boolean
+
+    Section "Column split and merge"
+
+    '-- a clean split --------------------------------------------------------
+    ex = TwoTier("kata-bi" & T & "di", "go-DIST" & T & "pig")
+    okAll = SplitColumn(ex, 0, 1, shortTiers)
+    Ok "split: reports success", okAll
+    Eq "split: form pieces", ex.Cells(0, 0) & "|" & ex.Cells(0, 1), "kata|-bi"
+    Eq "split: gloss pieces", ex.Cells(1, 0) & "|" & ex.Cells(1, 1), "go|-DIST"
+    Ok "split: the boundary leads both new cells, so invariant 1 holds", _
+       (CountBreakWarnings(ex) = 0)
+    Eq "split: the untouched column moved right", ex.Cells(0, 2), "di"
+
+    MergeColumns ex, 0, 1
+    Eq "merge: restores the form", ex.Cells(0, 0), "kata-bi"
+    Eq "merge: restores the gloss", ex.Cells(1, 0), "go-DIST"
+
+    '-- a tier with no matching boundary is never guessed at ----------------
+    ex = TwoTier("kata-bi", "gone")
+    okAll = SplitColumn(ex, 0, 1, shortTiers)
+    Ok "split: reports failure when a tier has no boundary", (okAll = False)
+    Eq "split: names the short tier", shortTiers, ROLE_GLOSS
+    Eq "split: the short tier keeps its cell whole on the left", ex.Cells(1, 0), "gone"
+    Eq "split: the short tier leaves the right column empty", ex.Cells(1, 1), ""
+
+    '-- a leading boundary belongs to the column, it is not a split point ---
+    ex = TwoTier("=de=di", "=ABL=REL")
+    SplitColumn ex, 0, 1, shortTiers
+    Eq "split: does not split on a leading boundary", _
+       ex.Cells(0, 0) & "|" & ex.Cells(0, 1), "=de|=di"
+
+    '-- insert and delete ---------------------------------------------------
+    ex = TwoTier("a" & T & "b", "A" & T & "B")
+    InsertColumn ex, 1
+    Eq "insert: shifts the tail right", _
+       ex.Cells(0, 0) & "|" & ex.Cells(0, 1) & "|" & ex.Cells(0, 2), "a||b"
+    DeleteColumn ex, 1
+    Eq "delete: closes the gap", ex.Cells(0, 0) & "|" & ex.Cells(0, 1), "a|b"
+End Sub
+
+Private Function CountBreakWarnings(ex As IgtExample) As Long
+    Dim w As Variant, n As Long
+    For Each w In CheckExample(ex)
+        If w.Code = WARN_BREAK_MISSING Or w.Code = WARN_BREAK_CONFLICT Then n = n + 1
+    Next w
+    CountBreakWarnings = n
+End Function
+
+Private Function HasWarning(ex As IgtExample, ByVal code As String) As Boolean
+    Dim w As Variant
+    For Each w In CheckExample(ex)
+        If w.Code = code Then
+            HasWarning = True
+            Exit Function
+        End If
+    Next w
+End Function
+
+
+'=============================================================================
+' -- LEIPZIG CHECKS ---------------------------------------------------------
+'=============================================================================
+
+Private Sub TestLeipzigChecks()
+    Dim ex As IgtExample
+    Dim n As Long
+
+    Section "Leipzig checks"
+
+    '-- invariant 1: a column where only some cells carry the break char ---
+    ex = TwoTier("-bi", "DIST")
+    Ok "detects a column where only some cells carry the break character", _
+       HasWarning(ex, WARN_BREAK_MISSING)
+    Ok "auto-fix adds the agreed character", FixColumnBreakChars(ex, 0)
+    Eq "auto-fix result", ex.Cells(1, 0), "-DIST"
+    Ok "no break-char warning remains", (CountBreakWarnings(ex) = 0)
+
+    '-- a conflict is reported, never silently resolved ---------------------
+    ex = TwoTier("-bi", "=DIST")
+    Ok "detects conflicting break characters", HasWarning(ex, WARN_BREAK_CONFLICT)
+    Ok "auto-fix refuses to pick one", (FixColumnBreakChars(ex, 0) = False)
+
+    '-- invariant 2: no spaces in an interlinear cell ----------------------
+    ex = TwoTier("kata", "went away")
+    Ok "detects a space inside an interlinear cell", HasWarning(ex, WARN_SPACE_IN_CELL)
+    n = FixCellSpaces(ex, ".")
+    Ok "space fix reports one cell changed", (n = 1)
+    Eq "space fix result", ex.Cells(1, 0), "went.away"
+    Ok "no space warning remains", (HasWarning(ex, WARN_SPACE_IN_CELL) = False)
+
+    '-- a free-translation row keeps its spaces ----------------------------
+    ex = TwoTier("kata", "go")
+    InsertTierRow ex, 2, ROLE_FREE
+    ex.Cells(2, 0) = "He went away."
+    Ok "a free row is exempt from the space rule", _
+       (HasWarning(ex, WARN_SPACE_IN_CELL) = False)
+    FixCellSpaces ex, "."
+    Eq "a free row keeps its spaces through a fix", ex.Cells(2, 0), "He went away."
+
+    '-- rule 2 counts segmentable breaks only ------------------------------
+    ex = TwoTier("kada=te", "carry.CMP=SEQ")
+    Ok "rule 2 ignores "".""  and "":""", (HasWarning(ex, WARN_PARITY) = False)
+    ex = TwoTier("kada=te", "carry-CMP=SEQ")
+    Ok "rule 2 flags a real boundary mismatch", HasWarning(ex, WARN_PARITY)
+
+    '-- rule 8 ------------------------------------------------------------
+    ex = TwoTier("k<um>ain", "eat<INF")
+    Ok "detects an unmatched infix bracket", HasWarning(ex, WARN_UNMATCHED)
+End Sub
+
+
+'=============================================================================
+' -- GRAMMATICAL GLOSS DETECTION --------------------------------------------
+'=============================================================================
+
+Private Sub TestGramGlossDetection()
+    Section "Grammatical-gloss detection (no abbreviation allow-list)"
+
+    ' Cases from word_processing_tools\FLExToWord_TestChecklist.md section 11,
+    ' with one correction.  That table claims "3sg" is NOT a grammatical gloss
+    ' while also claiming "1s" IS one, "(digit-initial)" -- it contradicts itself.
+    ' docs\core.js settles it: the second branch of its pattern is [0-9]\w+ and its
+    ' docblock reads "OR digit-initial (3sg, 1pl)".  That is also the right answer
+    ' typographically: someone writing "3sg" means the same category as "3SG" and
+    ' wants the same small caps.
+    CheckGram "FOC", True
+    CheckGram "3SG", True
+    CheckGram "3sg", True
+    CheckGram "1s", True
+    CheckGram "bark", False
+    CheckGram "P.N.", False
+    CheckGram "N.", False
+    CheckGram "A.", False
+    CheckGram "DIST", True
+    CheckGram "CMP", True
+    CheckGram "ERG", True
+    CheckGram "POSS", True
+    ' The point of having no allow-list: an abbreviation nobody has ever published
+    ' is still recognised, because recognition is structural.
+    CheckGram "NOTALEIPZIGABBREVIATION", True
+End Sub
+
+Private Sub CheckGram(ByVal tok As String, ByVal want As Boolean)
+    Ok "IsGramGloss(" & tok & ") = " & CStr(want), (IsGramGloss(tok) = want)
+End Sub
+
+
+'=============================================================================
+' -- WRAP PLANNER -----------------------------------------------------------
+'=============================================================================
+
+Private Sub TestWrapPlanner()
+    Section "Wrap planner"
+
+    Eq "exact fit stays on one line", _
+       Starts(Plan("10,10,10", "0,0,0", 30)), "0"
+    Eq "one column over the budget wraps", _
+       Starts(Plan("10,10,10", "0,0,0", 25)), "0,2"
+    Eq "three wrap lines", _
+       Starts(Plan("10,10,10,10,10,10", "0,0,0,0,0,0", 25)), "0,2,4"
+    Eq "an over-wide single column gets its own line and overflows", _
+       Starts(Plan("10,100,10", "0,0,0", 25)), "0,1,2"
+    Eq "widening pulls columns back up (same input, bigger budget)", _
+       Starts(Plan("10,10,10,10", "0,0,0,0", 100)), "0"
+
+    ' A leading-boundary column must never start a line, so the break moves back
+    ' and "kata" stays with "-bi".
+    Eq "a wrap line never starts on a continuation column", _
+       Starts(Plan("10,10,10", "0,0,1", 25)), "0,1"
+    Eq "backing up is abandoned rather than emptying a line", _
+       Starts(Plan("10,10", "0,1", 15)), "0,1"
+
+    ' The same flags derived from real data rather than written by hand.
+    Dim ex As IgtExample
+    Dim flags() As Boolean
+    ex = ModelFromText(Vector2Raw(), igtMorphemeAligned)
+    flags = NoBreakFlags(ex)
+    Ok "NoBreakFlags never flags the first column", (flags(0) = False)
+    Ok "NoBreakFlags flags the enclitic columns of example 2", (CountTrue(flags) > 0)
+End Sub
+
+' Run the planner over comma-separated widths and flags.
+Private Function Plan(ByVal widthCsv As String, ByVal flagCsv As String, _
+        ByVal avail As Single) As Long()
+    Dim wParts() As String, fParts() As String
+    Dim widths() As Single, flags() As Boolean
+    Dim i As Long
+
+    wParts = Split(widthCsv, ",")
+    fParts = Split(flagCsv, ",")
+    ReDim widths(0 To UBound(wParts))
+    ReDim flags(0 To UBound(wParts))
+    For i = 0 To UBound(wParts)
+        widths(i) = CSng(wParts(i))
+        ' VBA's And does NOT short-circuit, so the bounds test must be a separate
+        ' statement -- written as one condition, fParts(i) would still be
+        ' evaluated and would raise subscript out of range.
+        flags(i) = False
+        If i <= UBound(fParts) Then flags(i) = (fParts(i) = "1")
+    Next i
+
+    Plan = ComputeWrapLines(widths, flags, avail, 0, 0)
+End Function
+
+Private Function Starts(lineStarts() As Long) As String
+    Dim i As Long, s As String
+    For i = LBound(lineStarts) To UBound(lineStarts)
+        If s <> "" Then s = s & ","
+        s = s & CStr(lineStarts(i))
+    Next i
+    Starts = s
+End Function
+
+Private Function CountTrue(flags() As Boolean) As Long
+    Dim i As Long, n As Long
+    For i = LBound(flags) To UBound(flags)
+        If flags(i) Then n = n + 1
+    Next i
+    CountTrue = n
+End Function
