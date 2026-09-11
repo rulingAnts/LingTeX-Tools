@@ -6,7 +6,7 @@ Option Explicit
 '
 ' ONE PASTE, THEN THE OTHER THIRTEEN MODULES IMPORT THEMSELVES.
 '
-' Replaces thirteen trips through File > Import File..., and can build the
+' Replaces fourteen trips through File > Import File..., and can build the
 ' distributable template too.
 '
 ' ---------------------------------------------------------------------------
@@ -67,7 +67,7 @@ Private Const MODULE_LIST As String = _
     "modFlexParse.bas|modIgtModel.bas|modLeipzig.bas|modWrap.bas|" & _
     "clsIgtWarning.cls|modTests.bas|" & _
     "modStyles.bas|modSettings.bas|modMeasure.bas|modRender.bas|" & _
-    "modReadBack.bas|modLingTeX.bas|clsAppEvents.cls"
+    "modReadBack.bas|modLingTeX.bas|modDocTests.bas|clsAppEvents.cls"
 
 
 '=============================================================================
@@ -123,7 +123,7 @@ Public Sub ImportLingTeXModules()
     Report "Imported " & CStr(okCount) & " of " & CStr(UBound(names) + 1) & _
            " modules" & IIf(failCount > 0, ", " & CStr(failCount) & " FAILED", "") & _
            "." & vbCr & vbCr & log & vbCr & _
-           "Next: run RunAllTests, then AutoExec.", _
+           "Next: run RunAllTests, then RunDocTests, then AutoExec.", _
            (failCount = 0)
 End Sub
 

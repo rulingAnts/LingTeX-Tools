@@ -62,6 +62,16 @@ Private Const SCRATCH_PAGE_WIDTH_IN As Single = 22
 ' whose runs disagree.
 Private Const WD_UNDEFINED_SIZE As Single = 9999999
 
+' Half an inch: below this a wrap line cannot hold anything useful.
+Private Const MIN_TEXT_WIDTH As Single = 36
+
+' Letter portrait, one-inch margins.
+Private Const FALLBACK_TEXT_WIDTH As Single = 468
+
+' True when AvailableTextWidth could not work the geometry out and used
+' FALLBACK_TEXT_WIDTH instead.
+Public gAvailWidthFellBack As Boolean
+
 Private mScratch As Document
 Private mCache   As Collection
 
@@ -126,17 +136,22 @@ End Type
 '-----------------------------------------------------------------------------
 Public Function AvailableTextWidth(rng As Range) As Single
     Dim w As Single
+    gAvailWidthFellBack = False
     Dim ps As PageSetup
     Dim para As Paragraph
 
     On Error GoTo Fallback
 
     ' Inside a table cell the cell is the container, not the page.
+    ' The floor at the bottom of this function applies here too: this path used to
+    ' return the cell width directly, so a 5-point cell produced a 5-point budget
+    ' and one column per wrap line.
     If rng.Information(wdWithInTable) Then
         On Error Resume Next
         w = rng.Cells(1).Width
         On Error GoTo Fallback
         If w > 0 Then
+            If w < MIN_TEXT_WIDTH Then w = MIN_TEXT_WIDTH
             AvailableTextWidth = w
             Exit Function
         End If
@@ -153,13 +168,18 @@ Public Function AvailableTextWidth(rng As Range) As Single
     Set para = rng.Paragraphs(1)
     w = w - para.LeftIndent - para.RightIndent
 
-    If w < 36 Then w = 36                  ' never return an unusable budget
+    If w < MIN_TEXT_WIDTH Then w = MIN_TEXT_WIDTH   ' never an unusable budget
     AvailableTextWidth = w
     Exit Function
 
 Fallback:
-    ' Letter portrait with one-inch margins, as a last resort.
-    AvailableTextWidth = 468
+    ' Letter portrait with one-inch margins, as a last resort. Recorded, because
+    ' silently handing an A5 page or a landscape section Letter-portrait geometry
+    ' is a wrong layout that looks like a planner bug. A caller can tell the
+    ' difference; modDocTests asserts the computed path is the one taken by
+    ' checking that half-inch margins give 540, which this cannot produce.
+    gAvailWidthFellBack = True
+    AvailableTextWidth = FALLBACK_TEXT_WIDTH
 End Function
 
 
@@ -209,6 +229,25 @@ Private Function FontKey(tf As TierFont) As String
               CStr(tf.Bold) & CStr(tf.Italic) & CStr(tf.SmallCaps)
 End Function
 
+'-----------------------------------------------------------------------------
+' The full cache key: everything that can change the measured width.
+'
+' The font alone is not enough. The ROLE decides, through TierTakesSmallCaps,
+' whether grammatical glosses are lowercased and drawn in small capitals at all --
+' so "PST" is one width on a Gloss row and another on a Morphemes row even with
+' an identical font. Two roles that resolve to the same TierFont were serving each
+' other's widths, which EnsureStyles normally hides by making Morphemes italic,
+' and stops hiding the moment a user sets that style upright.
+'
+' The lowercase setting is in the key for the same reason: turning it off changes
+' what is drawn, so it changes the width.
+'-----------------------------------------------------------------------------
+Private Function MeasureKey(tf As TierFont, ByVal role As String, _
+        ByVal text As String, srcDoc As Document) As String
+    MeasureKey = FontKey(tf) & "|" & role & "|" & _
+                 IIf(SettingLowercaseGramGloss(srcDoc), "lc", "asis") & "|" & text
+End Function
+
 
 '=============================================================================
 ' -- CELL MEASUREMENT -------------------------------------------------------
@@ -244,7 +283,7 @@ Public Sub MeasureExample(ex As IgtExample, doc As Document, ByRef widths() As S
             texts(c) = ex.Cells(t, c)
         Next c
 
-        rowWidths = MeasureTexts(texts, tf, ex.Tiers(t))
+        rowWidths = MeasureTexts(texts, tf, ex.Tiers(t), doc)
         For c = 0 To ex.ColCount - 1
             widths(t, c) = rowWidths(c)
         Next c
@@ -256,8 +295,12 @@ End Sub
 ' Measure an array of strings in one tier's appearance.  Cache hits are served
 ' without touching Word at all.
 '-----------------------------------------------------------------------------
+' srcDoc is the USER'S document, not the scratch one: it is where the settings and
+' the styles live. Threaded all the way down to the transform, because measuring
+' under one document's settings and drawing under another's is how a cached width
+' ends up belonging to the wrong document.
 Public Function MeasureTexts(texts() As String, tf As TierFont, _
-        ByVal role As String) As Single()
+        ByVal role As String, srcDoc As Document) As Single()
 
     Dim out() As Single
     Dim i As Long, n As Long
@@ -288,7 +331,7 @@ Public Function MeasureTexts(texts() As String, tf As TierFont, _
     For i = 0 To n - 1
         If Trim$(texts(i)) = "" Then
             out(i) = 0
-        ElseIf CacheLookup(FontKey(tf) & "|" & texts(i), w) Then
+        ElseIf CacheLookup(MeasureKey(tf, role, texts(i), srcDoc), w) Then
             out(i) = w
         Else
             missIdx(nMiss) = i
@@ -299,10 +342,10 @@ Public Function MeasureTexts(texts() As String, tf As TierFont, _
 
     If nMiss > 0 Then
         ReDim Preserve missText(0 To nMiss - 1)
-        fresh = MeasureByPosition(missText, tf, role)
+        fresh = MeasureByPosition(missText, tf, role, srcDoc)
         For i = 0 To nMiss - 1
             out(missIdx(i)) = fresh(i)
-            CacheStore FontKey(tf) & "|" & missText(i), fresh(i)
+            CacheStore MeasureKey(tf, role, missText(i), srcDoc), fresh(i)
         Next i
     End If
 
@@ -322,7 +365,7 @@ End Function
 ' paragraph would double the position calls for an answer that cannot differ.
 '-----------------------------------------------------------------------------
 Private Function MeasureByPosition(texts() As String, tf As TierFont, _
-        ByVal role As String) As Single()
+        ByVal role As String, srcDoc As Document) As Single()
 
     Dim out() As Single
     Dim doc As Document
@@ -348,10 +391,28 @@ Private Function MeasureByPosition(texts() As String, tf As TierFont, _
         Exit Function
     End If
 
-    ' One paragraph per string, in a single insertion.
-    joined = texts(LBound(texts))
+    '-----------------------------------------------------------------------
+    ' MEASURE WHAT WILL BE DRAWN, NOT WHAT IS IN THE MODEL.
+    '
+    ' The renderer does not write the model text. It writes
+    ' TransformedCellText, which LOWERCASES grammatical glosses, because Word's
+    ' small-caps attribute only affects lowercase letters: "ERG" under small caps
+    ' renders as full-size capitals, "erg" renders as the small capitals Leipzig
+    ' asks for.
+    '
+    ' So measuring the model text and then turning small caps on measured "ERG"
+    ' at FULL CAPITAL width while the renderer drew "erg" at small-capital
+    ' width. Every grammatical gloss came out over-measured, every column was
+    ' wider than it needed to be, and every example wrapped earlier than it
+    ' should have -- with nothing anywhere reporting a problem.
+    '
+    ' One transform, used by both. ApplyGramGlossRuns below still takes the raw
+    ' source text, exactly as WriteCellText passes it, because it computes
+    ' offsets over a string of the same length.
+    '-----------------------------------------------------------------------
+    joined = TransformedCellText(texts(LBound(texts)), role, srcDoc)
     For i = LBound(texts) + 1 To UBound(texts)
-        joined = joined & vbCr & texts(i)
+        joined = joined & vbCr & TransformedCellText(texts(i), role, srcDoc)
     Next i
 
     On Error GoTo Bail
@@ -367,6 +428,19 @@ Private Function MeasureByPosition(texts() As String, tf As TierFont, _
         .Alignment = wdAlignParagraphLeft
     End With
 
+    ' One paragraph per string is the entire basis of reading widths by index.
+    ' A single embedded CR, LF or Chr(11) in any cell splits it into two
+    ' paragraphs and shifts every subsequent measurement onto the wrong string --
+    ' silently, because reading past the end just returns Nothing. Checked rather
+    ' than assumed.
+    If doc.Paragraphs.Count <> n Then
+        MeasureFail "expected " & CStr(n) & " measuring paragraphs, got " & _
+                    CStr(doc.Paragraphs.Count) & _
+                    " (a cell probably contains a line break)"
+        MeasureByPosition = out
+        Exit Function
+    End If
+
     ' Format each paragraph as the renderer will draw it, small caps included.
     For i = 0 To n - 1
         Set para = ParagraphBody(doc, i + 1)
@@ -376,8 +450,14 @@ Private Function MeasureByPosition(texts() As String, tf As TierFont, _
         End If
     Next i
 
-    baseX = doc.Paragraphs(1).Range.Characters(1) _
-               .Information(wdHorizontalPositionRelativeToTextBoundary)
+    ' Collapsed to the very start of the text, which is the only form the probe
+    ' verified (tools/probe/modProbe.bas section 5 read Information on an
+    ' insertion point). This was Characters(1) -- a ONE-CHARACTER range, not an
+    ' insertion point -- and if Word reports the end of an expanded range then
+    ' every width was short by the width of the first character.
+    Set para = doc.Paragraphs(1).Range.Duplicate
+    para.Collapse wdCollapseStart
+    baseX = para.Information(wdHorizontalPositionRelativeToTextBoundary)
 
     For i = 0 To n - 1
         Set para = ParagraphBody(doc, i + 1)
@@ -536,12 +616,24 @@ Private Function EnsureScratch() As Document
     Set EnsureScratch = doc
 End Function
 
-' Cell padding is zeroed on both the measurement table and the rendered table, so
-' the measured number is pure content width and the space between columns is
-' controlled entirely by the configured gap.  Wrapped in error handling because
-' these properties are the least certain part of the object model on Mac Word --
-' if they are missing, both tables simply keep Word's default padding and the
-' measurement stays consistent with the drawing.
+'-----------------------------------------------------------------------------
+' Zero a drawn table's cell padding.
+'
+' NOT cosmetic, and NOT harmless if it fails. Measurement happens in paragraphs,
+' which have no cell padding, so a measured width is pure content width. If the
+' drawn table keeps Word's default 5.4 points each side, every cell is about 10.8
+' points narrower than its content needs and the text wraps inside the cell --
+' which looks like a wrap-planner bug and is not one.
+'
+' An earlier comment here said a failure was harmless because "both tables keep
+' Word's default padding and the measurement stays consistent with the drawing".
+' That was true of the autofit measurement method, which used a table. That method
+' is gone. Do not restore the reassurance along with it.
+'
+' Still error-guarded, because these are among the least certain properties on Mac
+' Word -- but the failure is now recorded, and modDocTests asserts all four are
+' zero on a drawn table rather than shrugging at a non-zero one.
+'-----------------------------------------------------------------------------
 Public Sub ZeroTablePadding(tbl As Table)
     On Error Resume Next
     tbl.LeftPadding = 0
@@ -549,6 +641,11 @@ Public Sub ZeroTablePadding(tbl As Table)
     tbl.TopPadding = 0
     tbl.BottomPadding = 0
     tbl.Spacing = 0
+    If Err.Number <> 0 Then
+        MeasureFail "could not zero the table cell padding; cells will be about " & _
+                    "10.8pt too narrow and text will wrap inside them"
+        Err.Clear
+    End If
     On Error GoTo 0
 End Sub
 

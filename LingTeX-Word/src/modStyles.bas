@@ -79,9 +79,42 @@ End Function
 ' Make sure every style the renderer needs exists in this document.
 ' Existing styles are left exactly as the user has them.
 '-----------------------------------------------------------------------------
-Public Sub EnsureStyles(doc As Document)
-    Dim bodyFont As String, bodySize As Single
+'-----------------------------------------------------------------------------
+' Make sure every style the add-in needs exists in this document.
+'
+' Called once per render, and each call costs roughly eleven round trips into
+' Word's object model -- which on Mac Word is slow enough to notice, multiplied by
+' every example in a whole-document re-wrap. So the answer is remembered per
+' document, in the same document-variable store the settings use, and the work is
+' done once. mStyledDoc is the within-session fast path; the document variable
+' survives save and reopen.
+'
+' Passing force:=True redoes the work regardless, for a test that has deliberately
+' broken a style.
+'-----------------------------------------------------------------------------
+' A style name collided with a style of the wrong kind. Empty after a clean run.
+Public gStyleError As String
 
+Public Sub EnsureStyles(doc As Document, Optional ByVal force As Boolean = False)
+    Dim bodyFont As String, bodySize As Single
+    Dim createdAny As Boolean
+
+    If Not force Then
+        If Not mStyledDoc Is Nothing Then
+            If mStyledDoc Is doc Then Exit Sub
+        End If
+        ' The mark plus ONE probe, not eleven. The mark alone would be wrong for a
+        ' document whose styles were deleted by hand after it was set.
+        If StylesAlreadyMade(doc) Then
+            If StyleExistsOfType(doc, STYLE_TABLE, wdStyleTypeTable) Then
+                Set mStyledDoc = doc
+                Exit Sub
+            End If
+        End If
+    End If
+
+    mCreatedStyle = False
+    gStyleError = ""
     bodyFont = BodyFontName(doc)
     bodySize = BodyFontSize(doc)
 
@@ -96,7 +129,31 @@ Public Sub EnsureStyles(doc As Document)
 
     EnsureGramStyle doc, bodyFont
     EnsureTableStyle doc
+
+    createdAny = mCreatedStyle
+
+    ' A newly created or changed style invalidates every width measured under the
+    ' old appearance. ClearCache's own comment has always said to call it here;
+    ' until now nothing did, anywhere in the project.
+    If createdAny Then ClearCache
+
+    ' Only remember success. A wrong-kind name collision means some style is
+    ' missing, so the next call has to look again and report again rather than
+    ' take a stale mark for an answer.
+    If gStyleError = "" Then
+        Set mStyledDoc = doc
+        MarkStylesMade doc
+    Else
+        Set mStyledDoc = Nothing
+    End If
 End Sub
+
+' Remembered for the session. A document object identity check is enough to skip
+' the common case of many examples in one document.
+Private mStyledDoc As Document
+
+' Set by the Ensure*Style helpers when they actually add a style.
+Private mCreatedStyle As Boolean
 
 Private Sub EnsureParaStyle(doc As Document, ByVal role As String, _
         ByVal fontName As String, ByVal fontSize As Single, _
@@ -106,10 +163,19 @@ Private Sub EnsureParaStyle(doc As Document, ByVal role As String, _
     Dim st As Style
 
     nm = ParaStyleName(role)
-    If StyleExists(doc, nm) Then Exit Sub          ' never clobber the user's
+    If StyleExistsOfType(doc, nm, wdStyleTypeParagraph) Then Exit Sub  ' never clobber
+    If StyleExists(doc, nm) Then
+        ' Right name, wrong kind. Creating it is impossible and skipping it leaves
+        ' every row of every example unstyled, so say so.
+        gStyleError = "A style called """ & nm & """ already exists in this " & _
+                      "document but is not a paragraph style, so interlinear rows " & _
+                      "cannot be tagged. Rename or delete it and try again."
+        Exit Sub
+    End If
 
     On Error Resume Next
     Set st = doc.Styles.Add(Name:=nm, Type:=wdStyleTypeParagraph)
+    If Not st Is Nothing Then mCreatedStyle = True
     Err.Clear
     On Error GoTo 0
     If st Is Nothing Then Exit Sub
@@ -150,10 +216,17 @@ End Sub
 '-----------------------------------------------------------------------------
 Private Sub EnsureGramStyle(doc As Document, ByVal fontName As String)
     Dim st As Style
-    If StyleExists(doc, STYLE_GRAM) Then Exit Sub
+    If StyleExistsOfType(doc, STYLE_GRAM, wdStyleTypeCharacter) Then Exit Sub
+    If StyleExists(doc, STYLE_GRAM) Then
+        gStyleError = "A style called """ & STYLE_GRAM & """ already exists but is " & _
+                      "not a character style, so small capitals cannot be marked " & _
+                      "reversibly. Rename or delete it and try again."
+        Exit Sub
+    End If
 
     On Error Resume Next
     Set st = doc.Styles.Add(Name:=STYLE_GRAM, Type:=wdStyleTypeCharacter)
+    If Not st Is Nothing Then mCreatedStyle = True
     Err.Clear
     On Error GoTo 0
     If st Is Nothing Then Exit Sub
@@ -190,10 +263,17 @@ End Sub
 ' "Re-wrapped 0 interlinear examples" for a run that had just re-wrapped them all.
 Private Sub EnsureTableStyle(doc As Document)
     Dim st As Style
-    If StyleExists(doc, STYLE_TABLE) Then Exit Sub
+    If StyleExistsOfType(doc, STYLE_TABLE, wdStyleTypeTable) Then Exit Sub
+    If StyleExists(doc, STYLE_TABLE) Then
+        gStyleError = "A style called """ & STYLE_TABLE & """ already exists but is " & _
+                      "not a table style, so examples cannot be tagged as " & _
+                      "interlinear. Rename or delete it and try again."
+        Exit Sub
+    End If
 
     On Error Resume Next
     Set st = doc.Styles.Add(Name:=STYLE_TABLE, Type:=wdStyleTypeTable)
+    If Not st Is Nothing Then mCreatedStyle = True
     Err.Clear
     On Error GoTo 0
     If st Is Nothing Then Exit Sub
@@ -216,6 +296,76 @@ Private Sub EnsureTableStyle(doc As Document)
     On Error GoTo 0
 End Sub
 
+' Whether this document has already been through EnsureStyles, recorded where the
+' settings live so it survives save and reopen. Versioned, so a future change to
+' the style set re-runs rather than trusting a stale mark.
+Private Const STYLES_MADE_VAR As String = "LingTeX_StylesMade"
+Private Const STYLES_VERSION As String = "1"
+
+Private Function StylesAlreadyMade(doc As Document) As Boolean
+    Dim v As String
+    On Error Resume Next
+    v = CStr(doc.Variables(STYLES_MADE_VAR).Value)
+    Err.Clear
+    On Error GoTo 0
+    StylesAlreadyMade = (v = STYLES_VERSION)
+End Function
+
+Private Sub MarkStylesMade(doc As Document)
+    On Error Resume Next
+    doc.Variables(STYLES_MADE_VAR).Value = STYLES_VERSION
+    If Err.Number <> 0 Then
+        Err.Clear
+        doc.Variables.Add Name:=STYLES_MADE_VAR, Value:=STYLES_VERSION
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+'-----------------------------------------------------------------------------
+' Does a style of this name AND THIS KIND exist?
+'
+' The type check is the point. Without it, a document that already has a
+' CHARACTER style called "LingTeX Gloss" -- from an earlier paste, a template, or
+' another tool -- made EnsureParaStyle skip creating the paragraph style it
+' needed. ApplyParaStyle then failed silently, RowRole read the paragraph style and
+' got "Normal", every role came back empty, and DetectGroupSize fell back to the
+' row count: the entire wrapped table read back as one giant wrap line. A name
+' collision of the wrong kind is worth noticing, not skipping.
+'
+' wantType of 0 means "any kind", for callers that only care about the name.
+'-----------------------------------------------------------------------------
+Public Function StyleExistsOfType(doc As Document, ByVal nm As String, _
+        ByVal wantType As Long) As Boolean
+
+    Dim st As Style
+    Dim got As Long
+
+    On Error Resume Next
+    Set st = doc.Styles(nm)
+    If Err.Number <> 0 Or st Is Nothing Then
+        Err.Clear
+        On Error GoTo 0
+        Exit Function
+    End If
+    If wantType = 0 Then
+        StyleExistsOfType = True
+        Err.Clear
+        On Error GoTo 0
+        Exit Function
+    End If
+    got = st.Type
+    If Err.Number <> 0 Then
+        Err.Clear
+        On Error GoTo 0
+        Exit Function
+    End If
+    Err.Clear
+    On Error GoTo 0
+    StyleExistsOfType = (got = wantType)
+End Function
+
+' The name alone, for callers that genuinely do not care about the kind.
 Public Function StyleExists(doc As Document, ByVal nm As String) As Boolean
     Dim st As Style
     On Error Resume Next

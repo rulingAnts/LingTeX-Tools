@@ -46,7 +46,7 @@ out="$root/build/paste"
 # compile and run RunAllTests on their own, with the Word object model entirely
 # uninvolved. See QUICKSTART.md.
 STAGE1="modFlexParse modIgtModel modLeipzig modWrap clsIgtWarning modTests"
-STAGE2="modStyles modSettings modMeasure modRender modReadBack modLingTeX clsAppEvents"
+STAGE2="modStyles modSettings modMeasure modRender modReadBack modLingTeX modDocTests clsAppEvents"
 
 rm -rf "$out"
 mkdir -p "$out"
@@ -235,9 +235,12 @@ Order to add them
   10-modRender
   11-modReadBack
   12-modLingTeX
-  13-clsAppEvents          CLASS MODULE
+  13-modDocTests
+  14-clsAppEvents          CLASS MODULE
 
-  Then run RunDocTests, and see QUICKSTART.md for what to test by hand.
+  Then, in the Immediate window:   RunDocTests
+  Expect ALL PASS again -- around 95 checks against Word's actual behaviour.
+  See QUICKSTART.md for what to test by hand after that.
 
 VBA compiles the whole project at once, so stage 1 only works because those six
 modules reference nothing defined in the other seven. That is checked

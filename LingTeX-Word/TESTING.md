@@ -18,7 +18,7 @@ python3 LingTeX-Word/tools/vba-lint.py
 - [x] `parity-test.js` — 78 assertions pass. Golden vectors derived from
       `PROMPT.md` at run time, checked against both the expected output written
       in the spec **and** the live output of `docs/core.js`.
-- [x] `vba-lint.py` — all 13 VBA sources pass: block balance, pure ASCII,
+- [x] `vba-lint.py` — all 14 VBA sources pass: block balance, pure ASCII,
       `Option Explicit`, `Attribute VB_Name`, no Windows-only APIs, no
       non-short-circuit `And`/`Or` bounds guards.
 
@@ -144,7 +144,7 @@ Free Eng (When) she took her dogs hunting.
 | Check | Windows | Mac |
 |---|---|---|
 | **Windows:** one Ctrl+Z undoes a whole insert | ☐ | n/a |
-| **Mac:** repeated Ctrl+Z undoes an insert (multi-step is expected — `Application.UndoRecord` is Windows-only) | n/a | ☐ |
+| **Mac:** one Cmd+Z undoes a whole insert — `Application.UndoRecord` **is** present on Mac Word 16.112 (probe section 12), so undo is single-step on both platforms | n/a | ☐ |
 | Undo after a re-wrap restores the previous layout | ☐ | ☐ |
 | A document with 20+ examples: `LingTeXRewrapAll` completes in a few seconds | ☐ | ☐ |
 | `LingTeXRewrapAll` on a document with no examples → a clear message, no error | ☐ | ☐ |

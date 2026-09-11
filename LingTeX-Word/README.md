@@ -284,7 +284,7 @@ for Mac**. Two of them were wrong.
 | `Document.Variables` round trip | **Works** |
 | `Application.UndoRecord` | **Present on Mac.** The `#If Mac Then` guard was needless and is gone, so Mac gets single-step undo too |
 | VBA file write and read | **Works**, but redirected into Word's sandbox container rather than the real temp directory |
-| `VBProject.VBComponents.Import` | **Blocked on Mac**, error 6068, with no setting to grant it. On **Windows** the same error is what you get until "Trust access to the VBA project object model" is ticked in the Trust Center, after which `tools/ImportModules.bas` imports all thirteen modules from one paste. The template is cross-platform, so building on Windows and testing on Mac is a fine split |
+| `VBProject.VBComponents.Import` | **Blocked on Mac**, error 6068, with no setting to grant it. On **Windows** the same error is what you get until "Trust access to the VBA project object model" is ticked in the Trust Center, after which `tools/ImportModules.bas` imports all fourteen modules from one paste. The template is cross-platform, so building on Windows and testing on Mac is a fine split |
 | `Application.FileDialog` | **Absent** on Mac, error 5948. No folder picker for the add-in or any bootstrap — relevant to the Phase 2 form |
 
 A second probe, `tools/probe/Probe AppleScript Bridge.applescript`, asked what
