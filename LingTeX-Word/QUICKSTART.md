@@ -43,8 +43,11 @@ The two findings that matter most:
   nothing downstream will look right until it does.
 - **"14. VBProject access and Import"** decides how much manual work the rest of
   this costs. If it says `AVAILABLE`, one pasted bootstrap can import everything
-  and build the template. If `BLOCKED`, it is fourteen File → Import File… picks
-  instead — dull but completely reliable.
+  and build the template. If it says `BLOCKED`, **check the VBA trust setting
+  before resigning yourself** — `BLOCKED` almost always means it is not on yet, on
+  either platform, rather than that the machine cannot do it. See *The shortcut*
+  below. Genuinely blocked, it is fourteen File → Import File… picks instead —
+  dull but completely reliable.
 
 ### Also worth 60 seconds: the AppleScript bridge
 
@@ -253,25 +256,36 @@ path included. If the Window menu shows a stray blank document, type
 
 ---
 
-## Shortcut if you are on Windows: import them automatically
+## The shortcut: import them automatically
 
-On Windows, VBA is allowed to rewrite its own project once one setting is on, and
-then a single pasted macro can import all fourteen modules and save the template.
+VBA is allowed to rewrite its own project once one setting is on, and then a single
+pasted macro can import all fourteen modules and save the template. **This works on
+both platforms** — see the note below if you have read otherwise here before.
 
-1. **File → Options → Trust Center → Trust Center Settings… → Macro Settings**,
-   tick **"Trust access to the VBA project object model"**, restart Word.
+1. Turn on the VBA trust setting and restart Word:
+   - **Windows:** File → Options → Trust Center → Trust Center Settings… →
+     Macro Settings, tick **"Trust access to the VBA project object model"**.
+   - **Mac:** Word → Preferences → Security & Privacy, tick the same
+     **"Trust access to the VBA project object model"** — the label is identical.
 2. Paste `tools/ImportModules.bas` into a new module named `modImport`, and set
    `SRC_FOLDER` at the top to your clone's `LingTeX-Word/src` path.
 3. Run `ImportLingTeXModules`. Re-running is safe — it replaces modules rather
    than duplicating them, so it is also how to pick up later edits to `src/`.
-4. Optionally run `SaveAsTemplate` to write `LingTeX-Word.dotm`.
+4. Run `VerifyLingTeXModules`. It reads each component's *type* out of the project
+   and reports anything missing or of the wrong kind.
+5. Optionally run `SaveAsTemplate` to write `LingTeX-Word.dotm`.
 
-**This does not work on Mac.** There is no equivalent setting in Word's interface,
-and the probe found the access blocked on Word 16.112 with no way to grant it
-(error 6068). On Mac, import by hand.
+> **This page used to say the Mac could not do this.** It said there was no
+> equivalent setting and that the access was blocked on Word 16.112 with no way to
+> grant it, and sent Mac users to fourteen manual imports. That was wrong, and the
+> way it went wrong is worth knowing: the probe reported `BLOCKED` **accurately**,
+> on a machine where the setting had not been ticked yet, and that one measurement
+> was written down as a fact about the platform. Confirmed working on Mac Word:
+> both `ImportLingTeXModules` and `VerifyLingTeXModules`, with all fourteen modules
+> and both class modules correct.
 
-The template it produces is cross-platform, so building on Windows and testing on
-Mac is a perfectly good split — nothing about the `.dotm` is Windows-specific.
+Because it works on both, there is no build-here-test-there split any more. Import,
+tests, Save As, ribbon injection and the drift guard all happen wherever you are.
 
 A note on that setting: it exists because it lets code rewrite code, and it is
 worth respecting. This add-in never asks an *end user* to enable it, and its
@@ -452,7 +466,7 @@ So: run `RunAllTests` on Windows Word as well, and get `ALL PASS` on both, befor
 any of the document-rendering work is built on top. A discrepancy found now is a
 type declaration; found later it is a mis-rendered table with no obvious cause.
 
-`tools/ImportModules.bas` makes the Windows side cheap — one paste imports all
+`tools/ImportModules.bas` makes this cheap on either platform — one paste imports all
 fourteen modules, and re-running re-syncs them after any pull.
 
 ---
@@ -484,9 +498,10 @@ arithmetic.
 ## What this does and does not prove
 
 Mac Word is the stricter target — no ActiveX, no `Scripting.Dictionary`, no
-folder picker, no programmatic VBA-project access, sandboxed file I/O — so passing
-here means Windows Word is very likely fine. Two things it cannot cover, for one
-pass on Windows later:
+folder picker, sandboxed file I/O — so passing here means Windows Word is very
+likely fine. (Programmatic VBA-project access used to be on that list; it is
+available on both once the trust setting is on.) Two things it cannot cover, for
+one pass on Windows later:
 
 - The **NSIS installer**, which does not exist yet and is Windows-only.
 - Whether custom **ribbon XML** in a STARTUP `.dotm` loads.

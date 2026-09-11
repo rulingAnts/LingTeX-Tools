@@ -13,6 +13,21 @@ Option Explicit
 ' confusing full-system failure.
 '
 ' ---------------------------------------------------------------------------
+' WHAT A VERDICT MEANS -- AND WHAT IT DOES NOT
+'
+' Every AVAILABLE / BLOCKED / USABLE line below describes THE MACHINE THAT RAN IT,
+' IN THE STATE IT WAS IN.  It is not a statement about the platform.
+'
+' This matters because of what happened with section 14.  It reported BLOCKED on a
+' Mac, accurately -- the VBA trust setting had not been ticked yet -- and that one
+' measurement was written into the docs as "Mac has no such setting, import by
+' hand".  Mac has exactly the same setting as Windows (Word > Preferences >
+' Security & Privacy > "Trust access to the VBA project object model"), and once it
+' was on, everything worked.  So a BLOCKED is a reason to go and look at the
+' machine's settings; it is never a reason to write "cannot" anywhere.
+' ---------------------------------------------------------------------------
+'
+' ---------------------------------------------------------------------------
 ' HOW TO RUN
 '
 '   1. In Word:  Tools > Macro > Visual Basic Editor   (Mac)
