@@ -162,6 +162,16 @@ Public Sub LingTeXInsertInterlinear()
         Exit Sub
     End If
 
+    ' A table came back, but something in the drawing did not take -- a cell width
+    ' Word refused, a row that could not be trimmed. The example is on the page and
+    ' may well look wrong, so it is worth saying rather than leaving the user to
+    ' wonder whether the wrap planner is broken.
+    If gRenderError <> "" Then
+        Report "The example was drawn, but not exactly as planned:" & vbCr & vbCr & _
+               gRenderError & vbCr & vbCr & _
+               "Re-wrapping it may fix the layout.", vbExclamation
+    End If
+
     ' Report only what a person has to decide; the rest was already fixed.
     Set warnings = CheckExample(ex)
     ReportWarnings warnings, False
@@ -297,7 +307,7 @@ End Sub
 '-----------------------------------------------------------------------------
 Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
     Dim tables As Collection
-    Dim i As Long, n As Long, nFailed As Long
+    Dim i As Long, n As Long, nFailed As Long, nDegraded As Long
     Dim done As Table
     Dim firstWhy As String
     Dim savedStart As Long, savedEnd As Long
@@ -349,6 +359,13 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
             If firstWhy = "" Then firstWhy = gRenderError
         Else
             n = n + 1
+            ' Drawn, but not exactly as planned. Counted as a success because the
+            ' example is on the page, and still reported, because a layout that is
+            ' quietly wrong is the thing this whole suite of changes is about.
+            If gRenderError <> "" Then
+                nDegraded = nDegraded + 1
+                If firstWhy = "" Then firstWhy = gRenderError
+            End If
         End If
         Err.Clear
         On Error GoTo Fail
@@ -368,8 +385,8 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
     gBusy = False
     ReleaseScratch
 
-    If showResult Or nFailed > 0 Then
-        If nFailed = 0 Then
+    If showResult Or nFailed > 0 Or nDegraded > 0 Then
+        If nFailed = 0 And nDegraded = 0 Then
             Report "Re-wrapped " & CStr(n) & " interlinear example" & _
                    IIf(n = 1, "", "s") & ".", vbInformation
         Else
@@ -378,6 +395,8 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
             Report "Re-wrapped " & CStr(n) & " interlinear example" & _
                    IIf(n = 1, "", "s") & ", and could not re-wrap " & _
                    CStr(nFailed) & "." & _
+                   IIf(nDegraded = 0, "", vbCr & CStr(nDegraded) & _
+                       " were drawn but not exactly as planned.") & _
                    IIf(firstWhy = "", "", vbCr & vbCr & "First problem: " & firstWhy) & _
                    vbCr & vbCr & "The examples that could not be re-wrapped were " & _
                    "left exactly as they were.", vbExclamation

@@ -69,6 +69,7 @@ Public Sub RunDocTests()
     RunSection "settings"
     RunSection "measure"
     RunSection "agreement"
+    RunSection "rendering"
     RunSection "geometry"
     RunSection "scratch"
 
@@ -102,8 +103,16 @@ Private Sub RunSection(ByVal which As String)
         Case "settings":     TestSettings
         Case "measure":      TestMeasure
         Case "agreement":    TestRenderMeasureAgreement
+        Case "rendering":    TestRendering
         Case "geometry":     TestAvailableWidth
         Case "scratch":      TestScratchLifecycle
+        Case Else
+            ' A section listed in RunDocTests with no arm here would otherwise run
+            ' nothing at all and still report PASS for the whole suite -- silence
+            ' that looks exactly like success. Caught here instead.
+            mFail = mFail + 1
+            Emit "  FAIL   section " & which & " has no arm in RunSection"
+            NoteFailure "section " & which & " is not wired up"
     End Select
     Exit Sub
 
@@ -970,6 +979,349 @@ Private Sub TestScratchLifecycle()
 
     CloseNoSave doc
 End Sub
+
+
+'=============================================================================
+' -- RENDERING (modRender) --------------------------------------------------
+'=============================================================================
+
+' Everything the drawn table must be true of, as arithmetic. "Each form sits
+' directly above its gloss" and "nothing extends past the right margin" are the
+' two things a person checks by looking; both are comparisons here.
+Private Sub TestRendering()
+    Dim doc As Document
+    Dim ex As IgtExample
+    Dim tbl As Table
+
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "rendering: could create a blank document", False
+        Exit Sub
+    End If
+    EnsureStyles doc, True
+    ClearCache
+
+    ex = ThreeTierExample()
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then
+        Ok "an example can be drawn at all", False
+        Emit "         " & gRenderError
+        CloseNoSave doc
+        Exit Sub
+    End If
+    Ok "an example can be drawn at all", True
+    Ok "nothing was reported as drawn-but-not-as-planned", (gRenderError = "")
+    If gRenderError <> "" Then Emit "         " & gRenderError
+
+    CheckTableShape tbl, ex, doc
+    CheckTableStyling tbl, doc
+    CheckColumnAlignment tbl, ex
+    CheckRowWidthsFit tbl, doc
+    CheckRowRoles tbl, ex
+    CheckSmallCapsRuns tbl
+    CheckFreeParagraphs tbl, ex, doc
+
+    CloseNoSave doc
+End Sub
+
+Private Sub CheckTableShape(tbl As Table, ex As IgtExample, doc As Document)
+    Dim nInter As Long
+    Dim interTiers() As Long
+    Dim expectRows As Long
+
+    nInter = InterlinearTierList(ex, interTiers)
+    Ok "InterlinearTierList excludes the free tier", (nInter = ex.TierCount - 1)
+
+    ' One row per interlinear tier per wrap line, and nothing else.
+    Ok "rows are a whole number of tier groups", _
+        (nInter > 0 And (tbl.Rows.Count Mod nInter) = 0)
+    expectRows = tbl.Rows.Count
+    Emit "         " & CStr(expectRows) & " rows, " & CStr(nInter) & _
+         " tiers per wrap line, " & CStr(expectRows \ nInter) & " wrap line(s)"
+
+    ' Ragged on purpose: a short wrap line is a row with FEWER cells, not a row
+    ' with empty ones. Word has to support that, and the renderer has to achieve
+    ' it -- the per-cell deletions used to be swallowed one at a time.
+    Ok "the whole column count is recovered from the ragged rows", _
+        (TableColumnCount(tbl) = ex.ColCount)
+    If TableColumnCount(tbl) <> ex.ColCount Then
+        Emit "         counted " & CStr(TableColumnCount(tbl)) & _
+             ", the example has " & CStr(ex.ColCount)
+    End If
+End Sub
+
+Private Sub CheckTableStyling(tbl As Table, doc As Document)
+    Ok "the table carries the interlinear style (which IS the tag)", _
+        TableStyleIs(tbl, STYLE_TABLE)
+    Ok "autofit is off (explicit widths are the layout)", (tbl.AllowAutoFit = False)
+    Ok "rows do not break across pages", _
+        (tbl.Rows.AllowBreakAcrossPages = False)
+
+    ' On Mac, setting borders on a table STYLE fails with 4198, so the per-table
+    ' setting in StyleTable is the only thing making the example borderless.
+    Ok "inside borders are off", _
+        (tbl.Borders.InsideLineStyle = wdLineStyleNone)
+    Ok "outside borders are off", _
+        (tbl.Borders.OutsideLineStyle = wdLineStyleNone)
+
+    ' Measurement happens in paragraphs, which have no cell padding. A drawn table
+    ' keeping Word's default 5.4pt each side makes every cell ~10.8pt too narrow
+    ' and wraps text inside it -- so a non-zero value FAILS rather than shrugs.
+    Ok "left padding is 0", (tbl.LeftPadding = 0)
+    Ok "right padding is 0", (tbl.RightPadding = 0)
+    Ok "top padding is 0", (tbl.TopPadding = 0)
+    Ok "bottom padding is 0", (tbl.BottomPadding = 0)
+End Sub
+
+Private Function TableStyleIs(tbl As Table, ByVal nm As String) As Boolean
+    Dim got As String
+    On Error Resume Next
+    got = tbl.Style
+    Err.Clear
+    On Error GoTo 0
+    TableStyleIs = (got = nm)
+End Function
+
+' THE ALIGNMENT INVARIANT. Within a wrap line, every tier row must report the same
+' width for the same column -- that is what puts each form directly above its
+' gloss, and it is the one thing the whole design rests on.
+Private Sub CheckColumnAlignment(tbl As Table, ex As IgtExample)
+    Dim nInter As Long
+    Dim interTiers() As Long
+    Dim nLines As Long
+    Dim g As Long, i As Long, c As Long
+    Dim firstRow As Long, cells As Long
+    Dim w0 As Single, wi As Single
+    Dim bad As String
+
+    nInter = InterlinearTierList(ex, interTiers)
+    If nInter < 2 Then Exit Sub
+    nLines = tbl.Rows.Count \ nInter
+
+    For g = 0 To nLines - 1
+        firstRow = g * nInter + 1
+        cells = tbl.Rows(firstRow).Cells.Count
+
+        ' Every row of the group must hold the same number of cells, too.
+        For i = 1 To nInter - 1
+            If tbl.Rows(firstRow + i).Cells.Count <> cells Then
+                bad = bad & " row " & CStr(firstRow + i) & " has " & _
+                      CStr(tbl.Rows(firstRow + i).Cells.Count) & _
+                      " cells, not " & CStr(cells) & ";"
+            End If
+        Next i
+
+        For c = 1 To cells
+            w0 = CellWidthOf(tbl, firstRow, c)
+            For i = 1 To nInter - 1
+                wi = CellWidthOf(tbl, firstRow + i, c)
+                If Abs(wi - w0) > 0.5 Then
+                    bad = bad & " line " & CStr(g + 1) & " column " & CStr(c) & _
+                          ": " & CStr(w0) & " vs " & CStr(wi) & ";"
+                End If
+            Next i
+        Next c
+    Next g
+
+    Ok "every form sits directly above its gloss (equal column widths)", (bad = "")
+    If bad <> "" Then Emit "        " & bad
+End Sub
+
+' NOTHING EXTENDS PAST THE RIGHT MARGIN, as arithmetic rather than as a look.
+Private Sub CheckRowWidthsFit(tbl As Table, doc As Document)
+    Dim avail As Single
+    Dim r As Long, c As Long
+    Dim total As Single
+    Dim worst As Single
+    Dim bad As String
+
+    avail = AvailableTextWidth(doc.Content)
+
+    For r = 1 To tbl.Rows.Count
+        total = 0
+        For c = 1 To tbl.Rows(r).Cells.Count
+            total = total + CellWidthOf(tbl, r, c)
+        Next c
+        If total > worst Then worst = total
+        If total > avail + 1 Then
+            bad = bad & " row " & CStr(r) & " is " & CStr(total) & "pt;"
+        End If
+    Next r
+
+    Ok "no row is wider than the text area", (bad = "")
+    Emit "         widest row " & CStr(worst) & "pt, text area " & CStr(avail) & "pt"
+    If bad <> "" Then Emit "        " & bad
+End Sub
+
+Private Function CellWidthOf(tbl As Table, ByVal r As Long, ByVal c As Long) As Single
+    On Error Resume Next
+    CellWidthOf = tbl.Cell(r, c).Width
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+' The paragraph style of a row's first cell IS the tier role, and read-back depends
+' on it. A row drawn without one reads back with no role at all, which collapses
+' every wrap line into one.
+Private Sub CheckRowRoles(tbl As Table, ex As IgtExample)
+    Dim nInter As Long
+    Dim interTiers() As Long
+    Dim nLines As Long
+    Dim g As Long, i As Long, r As Long
+    Dim want As String, got As String
+    Dim bad As String
+
+    nInter = InterlinearTierList(ex, interTiers)
+    If nInter = 0 Then Exit Sub
+    nLines = tbl.Rows.Count \ nInter
+
+    For g = 0 To nLines - 1
+        For i = 0 To nInter - 1
+            r = g * nInter + i + 1
+            want = ParaStyleName(ex.Tiers(interTiers(i)))
+            got = FirstCellParaStyle(tbl, r)
+            If got <> want Then
+                bad = bad & " row " & CStr(r) & ": " & got & " not " & want & ";"
+            End If
+        Next i
+    Next g
+
+    Ok "every row's first cell carries its tier's paragraph style", (bad = "")
+    If bad <> "" Then Emit "        " & bad
+End Sub
+
+Private Function FirstCellParaStyle(tbl As Table, ByVal r As Long) As String
+    On Error Resume Next
+    FirstCellParaStyle = tbl.Cell(r, 1).Range.Paragraphs(1).Style
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+' Small caps have to be applied to the GRAMMATICAL segments only, through the
+' character style, so read-back can restore the capitals. "follow.CMP" is the case
+' that matters: a lexical part and a grammatical part in one cell.
+Private Sub CheckSmallCapsRuns(tbl As Table)
+    Dim found As Boolean
+    Dim r As Long, c As Long
+    Dim txt As String
+
+    For r = 1 To tbl.Rows.Count
+        For c = 1 To tbl.Rows(r).Cells.Count
+            txt = CleanText(CellTextOf(tbl, r, c))
+            If txt = "follow.cmp" Then
+                found = True
+                Ok "follow.CMP is drawn as follow.cmp", True
+                Ok "the lexical part carries no gram-gloss style", _
+                    (Not CharHasGramStyle(tbl, r, c, 1))
+                Ok "the grammatical part carries the gram-gloss style", _
+                    CharHasGramStyle(tbl, r, c, 8)
+            ElseIf txt = "Ozivela" Then
+                ' A vernacular cell is drawn verbatim, with no run restyled, or an
+                ' all-caps object-language word would be silently small-capped.
+                Ok "a vernacular cell is drawn verbatim", True
+                Ok "and carries no gram-gloss style anywhere", _
+                    (Not CharHasGramStyle(tbl, r, c, 1))
+            End If
+        Next c
+    Next r
+
+    If Not found Then
+        Emit "  SKIP   no follow.cmp cell found to check small-caps runs"
+    End If
+End Sub
+
+Private Function CellTextOf(tbl As Table, ByVal r As Long, ByVal c As Long) As String
+    Dim rng As Range
+    On Error Resume Next
+    Set rng = tbl.Cell(r, c).Range
+    If Not rng Is Nothing Then
+        rng.End = rng.End - 1
+        CellTextOf = rng.Text
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+Private Function CharHasGramStyle(tbl As Table, ByVal r As Long, _
+        ByVal c As Long, ByVal idx As Long) As Boolean
+
+    Dim rng As Range
+    Dim nm As String
+
+    On Error Resume Next
+    Set rng = tbl.Cell(r, c).Range
+    If rng Is Nothing Then Exit Function
+    rng.End = rng.End - 1
+    nm = rng.Characters(idx).Style
+    Err.Clear
+    On Error GoTo 0
+    CharHasGramStyle = (nm = STYLE_GRAM)
+End Function
+
+Private Function CleanText(ByVal s As String) As String
+    s = Replace(s, Chr$(7), "")
+    s = Replace(s, vbCr, "")
+    s = Replace(s, vbLf, "")
+    CleanText = Trim$(s)
+End Function
+
+' The translation goes under the table, in quotes, with no stray empty paragraph on
+' either side of it -- and kept with the table, so a page break cannot separate
+' them.
+Private Sub CheckFreeParagraphs(tbl As Table, ex As IgtExample, doc As Document)
+    Dim para As Paragraph
+    Dim n As Long
+    Dim txt As String
+    Dim guard As Long
+    Dim allQuoted As Boolean
+    Dim allStyled As Boolean
+
+    If ex.FreeCount = 0 Then Exit Sub
+
+    allQuoted = True
+    allStyled = True
+    Set para = ParagraphAfterTable(tbl)
+
+    Do While Not para Is Nothing
+        guard = guard + 1
+        If guard > 16 Then Exit Do
+        txt = CleanText(para.Range.Text)
+        If txt = "" Then Exit Do
+        If Not IsFreeParagraph(para) Then Exit Do
+        n = n + 1
+        If Left$(txt, 1) <> LeftSingleQuote Then allQuoted = False
+        If Right$(txt, 1) <> RightSingleQuote Then allQuoted = False
+        Set para = NextParagraph(para)
+    Loop
+
+    Ok "there is one styled paragraph per free translation", (n = ex.FreeCount)
+    If n <> ex.FreeCount Then
+        Emit "         found " & CStr(n) & ", expected " & CStr(ex.FreeCount)
+    End If
+    Ok "each translation is wrapped in single quotation marks", allQuoted
+
+    ' The last row of the table must keep with the translation, or a page break can
+    ' fall between an example and its own gloss of itself.
+    Ok "the last table row keeps with the translation", _
+        LastRowKeepsWithNext(tbl)
+
+    ' StripQuotes is what read-back uses to take them off again, so the pair has to
+    ' invert. A pure string property, checked directly.
+    Eq "quotes round trip off a translation", _
+        StripQuotes(LeftSingleQuote & "a fox followed her" & RightSingleQuote), _
+        "a fox followed her"
+    Eq "StripQuotes leaves unquoted text alone", _
+        StripQuotes("a fox followed her"), "a fox followed her"
+End Sub
+
+Private Function LastRowKeepsWithNext(tbl As Table) As Boolean
+    Dim v As Variant
+    On Error Resume Next
+    v = tbl.Rows(tbl.Rows.Count).Range.ParagraphFormat.KeepWithNext
+    Err.Clear
+    On Error GoTo 0
+    LastRowKeepsWithNext = (v = True)
+End Function
 
 
 '=============================================================================
