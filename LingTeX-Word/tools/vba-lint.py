@@ -524,6 +524,63 @@ def check_not_equals_precedence(files):
     return problems
 
 
+def check_declarations_before_procedures(files):
+    """Module-level declarations must all precede the first procedure.
+
+    VBA's declarations section ends at the first Sub/Function/Property. A Type,
+    Enum, Declare, Const or module-level variable placed after that is a compile
+    error -- and a nasty one: a Type declared too late simply stops existing, so the
+    error is reported as "User-defined type not defined" in whichever OTHER module
+    first names it, with nothing pointing back here.
+
+    Written after exactly that: two procedures were added above "Public Type
+    TierFont" in modMeasure.bas, and modDocTests.bas took the blame.
+    """
+    DECL = re.compile(
+        r"^(?:Public\s+|Private\s+|Global\s+|Friend\s+)?"
+        r"(?:Type\s+\w+|Enum\s+\w+|Declare\s+|Const\s+|Dim\s+|WithEvents\s+|Event\s+)"
+        r"|^(?:Public|Private|Global)\s+[A-Za-z_]\w*(?:\(\))?\s+As\b"
+        r"|^(?:Public|Private)\s+[A-Za-z_]\w*\s*(?:,|$)"
+        r"|^Option\s+|^Implements\s+", re.I)
+    PROC = re.compile(r"^(?:Public\s+|Private\s+|Friend\s+)?(?:Static\s+)?"
+                      r"(?:Sub|Function|Property\s+(?:Get|Let|Set))\s+\w+", re.I)
+    ENDPROC = re.compile(r"^End\s+(?:Sub|Function|Property)\b", re.I)
+    problems = []
+    for f in files:
+        first_proc = None
+        in_type = False
+        in_proc = False
+        for n, t in logical_lines(f.read_text(encoding="utf-8")):
+            # Only lines OUTSIDE procedure bodies are module-level. A local Dim
+            # inside a Sub is not a declaration-section statement.
+            if in_proc:
+                if ENDPROC.match(t):
+                    in_proc = False
+                continue
+            if PROC.match(t):
+                in_proc = True
+                if first_proc is None:
+                    first_proc = (n, t.split("(")[0])
+                continue
+            if first_proc is None:
+                continue
+            # Inside a Type/Enum body the field lines are not declarations to flag
+            # twice; flag the block once at its head.
+            if re.match(r"^End\s+(?:Type|Enum)\b", t, re.I):
+                in_type = False
+                continue
+            if in_type:
+                continue
+            if DECL.match(t):
+                if re.match(r"^(?:Public\s+|Private\s+)?(?:Type|Enum)\s+", t, re.I):
+                    in_type = True
+                problems.append(
+                    f"{f.name}:{n}: module-level declaration after the first "
+                    f"procedure ({first_proc[1]} at line {first_proc[0]}) -- "
+                    f"compile error; move it above")
+    return problems
+
+
 def check_module_lists(files):
     """Every module in src/ must appear in both install paths, and vice versa.
 
@@ -718,6 +775,15 @@ def main():
             print("          " + msg)
     else:
         print("  OK    no `Not x = y` precedence traps")
+
+    decl = check_declarations_before_procedures(files)
+    if decl:
+        total += len(decl)
+        print("  FAIL  declarations before procedures")
+        for msg in decl:
+            print("          " + msg)
+    else:
+        print("  OK    every module-level declaration precedes the first procedure")
 
     lists = check_module_lists(files)
     if lists:

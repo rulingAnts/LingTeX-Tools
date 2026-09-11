@@ -75,6 +75,20 @@ Public gAvailWidthFellBack As Boolean
 Private mScratch As Document
 Private mCache   As Collection
 
+' A Type block MUST sit here, in the declarations section, before the first
+' procedure. It once sat below MeasureFail and ClearMeasureFailure, which made it
+' invisible to every module -- "User-defined type not defined" at the first
+' signature in modDocTests that named it, with nothing pointing at this file.
+'-- Resolved appearance of one tier, used as part of the cache key ------------
+Public Type TierFont
+    Name      As String
+    Size      As Single
+    Bold      As Boolean
+    Italic    As Boolean
+    SmallCaps As Boolean
+End Type
+
+
 '-----------------------------------------------------------------------------
 ' DID THE MEASUREMENT ACTUALLY WORK?
 '
@@ -110,15 +124,6 @@ Public Sub ClearMeasureFailure()
     gMeasureFailed = False
     gMeasureError = ""
 End Sub
-
-'-- Resolved appearance of one tier, used as part of the cache key ------------
-Public Type TierFont
-    Name      As String
-    Size      As Single
-    Bold      As Boolean
-    Italic    As Boolean
-    SmallCaps As Boolean
-End Type
 
 
 '=============================================================================
