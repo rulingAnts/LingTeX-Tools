@@ -1,6 +1,14 @@
 Attribute VB_Name = "modRender"
 Option Explicit
 
+' Word's hard limit on table columns. Tables.Add raises rather than clamping, so
+' the plan is checked against it before anything is drawn.
+Private Const MAX_TABLE_COLUMNS As Long = 63
+
+' Why the last render or re-wrap gave up, for callers that report to the user.
+' Empty after a successful one.
+Public gRenderError As String
+
 '=============================================================================
 ' modRender  --  LingTeX-Word
 '
@@ -39,36 +47,107 @@ Option Explicit
 '-----------------------------------------------------------------------------
 Public Function RenderExample(ex As IgtExample, target As Range) As Table
     Dim doc As Document
-    Dim cellWidths() As Single, colW() As Single
-    Dim flags() As Boolean, lineStarts() As Long
-    Dim avail As Single, gap As Single, contIndent As Single
+    Dim colW() As Single
+    Dim lineStarts() As Long
     Dim interTiers() As Long, nInter As Long
     Dim nLines As Long, maxCols As Long
-    Dim tbl As Table
-    Dim anchor As Range
+    Dim why As String
 
-    If ex.TierCount = 0 Or ex.ColCount = 0 Then Exit Function
     Set doc = target.Document
+    If Not PlanExample(ex, target, doc, interTiers, nInter, colW, _
+                       lineStarts, nLines, maxCols, why) Then
+        gRenderError = why
+        Exit Function
+    End If
+
+    Set RenderExample = DrawExample(ex, target, doc, interTiers, nInter, _
+                                    colW, lineStarts, nLines, maxCols)
+End Function
+
+'-----------------------------------------------------------------------------
+' Work out the layout without touching the document.
+'
+' Split out from the drawing for one reason: RewrapTable has to delete the old
+' table before it can draw the new one in its place, and everything that is
+' likely to fail lives in here -- measurement, the wrap plan, the column count.
+' Running all of it BEFORE the delete means a failure costs nothing, where it used
+' to cost the user their example.
+'
+' Returns False with a reason in why, and in that case nothing in the document has
+' been read except its page geometry.
+'-----------------------------------------------------------------------------
+Private Function PlanExample(ex As IgtExample, target As Range, doc As Document, _
+        ByRef interTiers() As Long, ByRef nInter As Long, _
+        ByRef colW() As Single, ByRef lineStarts() As Long, _
+        ByRef nLines As Long, ByRef maxCols As Long, _
+        ByRef why As String) As Boolean
+
+    Dim cellWidths() As Single
+    Dim flags() As Boolean
+    Dim avail As Single, gap As Single, contIndent As Single
+
+    why = ""
+    If ex.TierCount = 0 Or ex.ColCount = 0 Then
+        why = "the example has no tiers or no columns"
+        Exit Function
+    End If
+
     EnsureStyles doc
 
     nInter = InterlinearTierList(ex, interTiers)
-    If nInter = 0 Then Exit Function
+    If nInter = 0 Then
+        why = "the example has no interlinear tiers, only free translations"
+        Exit Function
+    End If
 
-    '-- plan ----------------------------------------------------------------
     gap = SettingGap(doc)
     contIndent = SettingContIndent(doc)
     avail = AvailableTextWidth(target)
 
     MeasureExample ex, doc, cellWidths
+    If gMeasureFailed Then
+        ' Zero widths would make roughly 78 columns "fit" a 468-point line, which
+        ' is how this used to end up asking Word for more columns than a table can
+        ' have. Stop here instead, while stopping is still free.
+        why = "the text could not be measured: " & gMeasureError
+        Exit Function
+    End If
+
     colW = ColumnWidths(ex, cellWidths, gap)
     flags = NoBreakFlags(ex)
     lineStarts = ComputeWrapLines(colW, flags, avail, 0, contIndent)
 
     nLines = UBound(lineStarts) - LBound(lineStarts) + 1
     maxCols = MaxColumnsPerLine(lineStarts, ex.ColCount)
-    If maxCols < 1 Then Exit Function
+    If maxCols < 1 Then
+        why = "the wrap planner produced no columns"
+        Exit Function
+    End If
+    If maxCols > MAX_TABLE_COLUMNS Then
+        ' A Word table cannot have more than 63 columns, and Tables.Add raises
+        ' rather than clamping. With working measurement this is unreachable --
+        ' 63 columns is over 370 points of inter-column gap alone, before any text
+        ' -- so reaching it means something upstream is wrong, and saying so is
+        ' more use than a truncated table.
+        why = "one wrap line needs " & CStr(maxCols) & " columns; a Word table " & _
+              "cannot have more than " & CStr(MAX_TABLE_COLUMNS)
+        Exit Function
+    End If
 
-    '-- draw ----------------------------------------------------------------
+    PlanExample = True
+End Function
+
+'-----------------------------------------------------------------------------
+' Draw the planned layout.  Everything here mutates the document.
+'-----------------------------------------------------------------------------
+Private Function DrawExample(ex As IgtExample, target As Range, doc As Document, _
+        interTiers() As Long, ByVal nInter As Long, _
+        colW() As Single, lineStarts() As Long, _
+        ByVal nLines As Long, ByVal maxCols As Long) As Table
+
+    Dim tbl As Table
+    Dim anchor As Range
+
     Set anchor = target.Duplicate
     anchor.Text = ""                       ' clear whatever we are replacing
 
@@ -77,12 +156,15 @@ Public Function RenderExample(ex As IgtExample, target As Range) As Table
     StyleTable tbl, doc
 
     FillTable tbl, ex, interTiers, nInter, lineStarts, colW, doc
-    SetRowKeeps tbl, nInter, nLines, doc
 
     '-- free translations, after the table ----------------------------------
+    ' Written BEFORE the row keeps, so SetRowKeeps can see the first translation
+    ' paragraph and keep the last row of the table with it. Done the other way
+    ' round, a page break can fall between an example and its translation.
     WriteFreeLines ex, tbl, doc
+    SetRowKeeps tbl, (ex.FreeCount > 0)
 
-    Set RenderExample = tbl
+    Set DrawExample = tbl
 End Function
 
 '-----------------------------------------------------------------------------
@@ -100,22 +182,58 @@ Public Function RewrapTable(tbl As Table) As Table
     Dim doc As Document
     Dim anchor As Range
     Dim startPos As Long
+    Dim colW() As Single
+    Dim lineStarts() As Long
+    Dim interTiers() As Long, nInter As Long
+    Dim nLines As Long, maxCols As Long
+    Dim why As String
 
+    gRenderError = ""
     If tbl Is Nothing Then Exit Function
     Set doc = tbl.Range.Document
 
     ex = ReadExampleFromTable(tbl)
-    If ex.TierCount = 0 Or ex.ColCount = 0 Then Exit Function
+    If ex.TierCount = 0 Or ex.ColCount = 0 Then
+        gRenderError = "the table could not be read as an interlinear example"
+        Exit Function
+    End If
 
     ' Absorb the free-translation paragraphs that belong to this example, so they
     ' are rewritten rather than duplicated.
     AbsorbFreeParagraphs ex, tbl
 
+    '-- PLAN BEFORE DELETING -----------------------------------------------
+    ' This order is the whole point. Re-wrapping cannot draw the new table until
+    ' the old one is gone, so a failure after the delete destroys the user's
+    ' example -- and in RewrapDocument and the selection-change handler that raise
+    ' is swallowed, so it destroys it silently. Planning first means every failure
+    ' that can be anticipated is found while the table is still on the page.
+    If Not PlanExample(ex, tbl.Range, doc, interTiers, nInter, colW, _
+                       lineStarts, nLines, maxCols, why) Then
+        gRenderError = why
+        Exit Function                      ' table untouched
+    End If
+
     startPos = tbl.Range.Start
     DeleteTableAndFreeLines tbl
 
     Set anchor = doc.Range(startPos, startPos)
-    Set RewrapTable = RenderExample(ex, anchor)
+
+    ' Past this point the old table is gone, so a failure here has to leave the
+    ' content behind in SOME form rather than nothing at all.
+    On Error GoTo DrawFailed
+    Set RewrapTable = DrawExample(ex, anchor, doc, interTiers, nInter, _
+                                  colW, lineStarts, nLines, maxCols)
+    Exit Function
+
+DrawFailed:
+    gRenderError = "drawing failed after the old table was removed (" & _
+                   CStr(Err.Number) & ": " & Err.Description & _
+                   "); the example was written back as tab-separated text"
+    On Error Resume Next
+    doc.Range(startPos, startPos).InsertBefore ModelToTsv(ex) & vbCr
+    Err.Clear
+    On Error GoTo 0
 End Function
 
 
@@ -229,13 +347,21 @@ End Sub
 ' AllowBreakAcrossPages already stops a single row splitting; KeepWithNext on
 ' every row but the last stops the stack being separated tier from tier.
 '-----------------------------------------------------------------------------
-Private Sub SetRowKeeps(tbl As Table, ByVal nInter As Long, _
-        ByVal nLines As Long, doc As Document)
+'-----------------------------------------------------------------------------
+' Stop a page break falling inside an example.
+'
+' Every row keeps with the next, so the wrap lines and the tiers within them stay
+' together. The LAST row keeps with the next only when a free translation follows
+' it: a translation stranded at the top of the following page is the same defect
+' as a split example, and keepLast is what prevents it. With nothing after the
+' table the last row must NOT keep, or it drags the following body paragraph along.
+'-----------------------------------------------------------------------------
+Private Sub SetRowKeeps(tbl As Table, ByVal keepLast As Boolean)
     Dim r As Long, last As Long
     On Error Resume Next
     last = tbl.Rows.Count
     For r = 1 To last
-        tbl.Rows(r).Range.ParagraphFormat.KeepWithNext = (r < last)
+        tbl.Rows(r).Range.ParagraphFormat.KeepWithNext = (r < last) Or keepLast
     Next r
     On Error GoTo 0
 End Sub
@@ -417,6 +543,16 @@ Private Sub WriteFreeLines(ex As IgtExample, tbl As Table, doc As Document)
     ' InsertBefore grows the range over what it inserted, so this styles exactly
     ' the paragraphs just added and nothing else.
     ApplyParaStyle after, doc, ROLE_FREE
+
+    ' Several translations hold together; the last one releases, so the example
+    ' does not drag the following body text onto its page.
+    On Error Resume Next
+    after.ParagraphFormat.KeepWithNext = True
+    If after.Paragraphs.Count > 0 Then
+        after.Paragraphs(after.Paragraphs.Count).KeepWithNext = False
+    End If
+    Err.Clear
+    On Error GoTo 0
 End Sub
 
 '-----------------------------------------------------------------------------
