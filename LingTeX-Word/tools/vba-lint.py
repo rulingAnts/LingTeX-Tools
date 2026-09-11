@@ -44,6 +44,25 @@ WINDOWS_ONLY = {
 # Declaring e.g. "Private Sub Line(...)" compiles in some contexts and then
 # collides with the Line Input statement in a way that reads as nonsense. Only
 # names we DEFINE are checked -- calling Left$, Len, Format and friends is fine.
+# VBA reserved words that cannot be used as an IDENTIFIER at all -- as a variable,
+# a parameter or a user-defined-type field. Using one is a bare "Syntax error"
+# with no hint as to which word is at fault, so it costs a round trip to find.
+#
+# "Any" is the one that actually bit: it is reserved because Declare statements
+# use "As Any", and it reads so much like an ordinary word that "Dim any As
+# Boolean" looks unremarkable. Note this list is deliberately NARROWER than the
+# procedure-name list below -- Format, Left, Len and friends are built-in
+# functions rather than reserved words, and VBA does allow them as variables.
+RESERVED_IDENTIFIERS = set("""
+and any as boolean byref byte byval call case close const currency declare dim do
+double each else elseif empty end endif enum eqv erase event exit false for
+friend function get gosub goto if imp implements in input integer is let lib like
+line lock long loop lset me mod new next not nothing null object on open option
+optional or paramarray preserve print private property public put raiseevent redim
+rem resume return rset seek select set single static step stop string sub then to
+true type typeof unlock until variant wend while with withevents write xor
+""".split())
+
 RESERVED_PROC_NAMES = set("""
 line input output print write get put open close name error resume stop loop next
 set let option type end call exit kill dir date time timer seek lock unlock width
@@ -113,6 +132,33 @@ def logical_lines(text):
     return out
 
 
+def declared_identifiers(t, in_type):
+    """Names introduced by a declaration on this line."""
+    out = []
+    if in_type:
+        m = re.match(r"^([A-Za-z_]\w*)\s*\(?\)?\s+As\b", t, re.I)
+        if m:
+            out.append(m.group(1))
+        return out
+
+    m = re.match(r"^(?:Public\s+|Private\s+|Friend\s+)?(?:Static\s+)?"
+                 r"(?:Sub|Function|Property\s+\w+)\s+\w+\s*\(([^)]*)\)", t, re.I)
+    if m and m.group(1).strip():
+        for part in m.group(1).split(","):
+            pm = re.search(r"(?:ByVal\s+|ByRef\s+|Optional\s+|ParamArray\s+)*([A-Za-z_]\w*)",
+                           part.strip(), re.I)
+            if pm:
+                out.append(pm.group(1))
+
+    m = re.match(r"^(?:Dim|ReDim(?:\s+Preserve)?|Static)\s+(.*)$", t, re.I)
+    if m:
+        for part in m.group(1).split(","):
+            pm = re.match(r"\s*([A-Za-z_]\w*)", part)
+            if pm:
+                out.append(pm.group(1))
+    return out
+
+
 def check(path):
     problems = []
     data = path.read_bytes()
@@ -164,8 +210,12 @@ def check(path):
         # code is worse than no rule.  The call sites carry a comment instead.
 
     # Block balance, with a stack so mismatches name the offending construct.
-    stack, scope = [], None
+    stack, scope, in_type = [], None, False
     for n, t in lines:
+        if re.match(r"^(?:Public |Private )?Type\b", t, re.I):
+            in_type = True
+        elif re.match(r"^End Type\b", t, re.I):
+            in_type = False
         low = t.lower()
 
         # Single-line If ("If x Then DoThing") opens nothing.
@@ -197,6 +247,12 @@ def check(path):
                      t, re.I)
         if m and m.group(1).lower() in RESERVED_PROC_NAMES:
             problems.append((n, f"'{m.group(1)}' is a VBA keyword or built-in; rename the procedure"))
+
+        # Reserved words as variable, parameter or UDT-field names.
+        for name in declared_identifiers(t, in_type):
+            if name.lower() in RESERVED_IDENTIFIERS:
+                problems.append((n, f"'{name}' is a VBA reserved word and cannot be an "
+                                    f"identifier; VBA reports only 'Syntax error'"))
 
         for pat, kind, _ in OPENERS:
             if kind is None:
