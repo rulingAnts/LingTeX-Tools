@@ -307,6 +307,15 @@ arrived inside a downloaded zip.
 Still unverified because Mac cannot cover them, for one pass on Windows: the NSIS
 installer, and whether custom ribbon XML in a STARTUP `.dotm` loads.
 
+**And one finding that changes the testing policy.** `MicroDiagnose` produced
+run-time error 6, *Overflow*, on `s1 = 10` where `s1` is `As Single` — a primitive
+that cannot fail on a correct implementation, and which `modProbe` had already
+used successfully on the same build. Until that is understood, Mac passing is no
+longer taken to imply Windows passing: **stage 1 must return `ALL PASS` on both
+platforms** before any document-rendering work is built on top. The wrap planner
+is pure arithmetic, so a numeric-type discrepancy would surface later as a
+mis-rendered table with no obvious cause.
+
 ---
 
 ## Development
