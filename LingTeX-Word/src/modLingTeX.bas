@@ -683,6 +683,34 @@ End Sub
 
 
 '=============================================================================
+' -- INSTALL VERIFICATION ---------------------------------------------------
+'=============================================================================
+
+'-----------------------------------------------------------------------------
+' Returns an identifying string, and exists to be called from outside Word.
+'
+' Mac Word's AppleScript dictionary has no `do Visual Basic`, so a script cannot
+' execute arbitrary VBA -- but it does have `run VB macro`, which runs a macro that
+' already exists (confirmed by tools/probe/Probe AppleScript Bridge.applescript).
+'
+' That is exactly enough for the Mac installer to CHECK ITS OWN WORK. After
+' copying the template into Word's startup folder it can relaunch Word and run
+' this; a result means the add-in genuinely loaded, an error means it did not.
+'
+' Worth having because the known silent failure is macOS quarantining a .dotm that
+' arrived inside a downloaded zip: Word then refuses to load it and the user sees
+' a successful install and no ribbon. Without a callable hook there is no way for
+' the installer to tell those apart.
+'
+' Keep it trivial, dependency-free and never-throwing: it is a heartbeat, and
+' anything it touched could become a reason for it to fail misleadingly.
+'-----------------------------------------------------------------------------
+Public Function LingTeXPing() As String
+    LingTeXPing = "LingTeX-Word loaded"
+End Function
+
+
+'=============================================================================
 ' -- RIBBON CALLBACKS -------------------------------------------------------
 '=============================================================================
 ' The ribbon passes an IRibbonControl.  These are typed as Variant rather than

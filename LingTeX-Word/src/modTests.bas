@@ -29,6 +29,8 @@ Option Explicit
 
 Private mPass As Long
 Private mFail As Long
+Private mRpt  As String
+Private mFirstFails As String
 
 '=============================================================================
 ' -- RUNNER -----------------------------------------------------------------
@@ -37,10 +39,12 @@ Private mFail As Long
 Public Sub RunAllTests()
     mPass = 0
     mFail = 0
+    mRpt = ""
+    mFirstFails = ""
 
-    Debug.Print ""
-    Debug.Print "LingTeX-Word self-tests"
-    Debug.Print "======================="
+    Emit ""
+    Emit "LingTeX-Word self-tests"
+    Emit "======================="
 
     TestGoldenVectors
     TestProjections
@@ -50,39 +54,117 @@ Public Sub RunAllTests()
     TestGramGlossDetection
     TestWrapPlanner
 
-    Debug.Print ""
+    Emit ""
     If mFail = 0 Then
-        Debug.Print "ALL PASS -- " & CStr(mPass) & " passed"
+        Emit "ALL PASS -- " & CStr(mPass) & " passed"
     Else
-        Debug.Print "FAILURES -- " & CStr(mPass) & " passed, " & CStr(mFail) & " FAILED"
+        Emit "FAILURES -- " & CStr(mPass) & " passed, " & CStr(mFail) & " FAILED"
     End If
+
+    DeliverResults
+End Sub
+
+'-----------------------------------------------------------------------------
+' Collect a line of the report.
+'
+' Debug.Print alone is not enough: it writes ONLY to the VBA editor's Immediate
+' window, and with that window closed a completed run looks exactly like a macro
+' that never ran.  Everything is therefore also accumulated for DeliverResults.
+'-----------------------------------------------------------------------------
+Private Sub Emit(ByVal s As String)
+    Debug.Print s
+    mRpt = mRpt & s & vbCr
+End Sub
+
+'-----------------------------------------------------------------------------
+' Put the results where they cannot be missed.
+'
+' A dialog always appears, carrying the counts and the first few failures, so the
+' run is never silent even if nothing else works.  The full report also goes into
+' a new document, which is far easier to select and copy than a dialog.
+'
+' Creating that document is the only thing in the whole of stage 1 that touches a
+' document at all -- no test does.  That is deliberate: it keeps a stage-1 failure
+' unambiguously about the logic rather than about Word.
+'-----------------------------------------------------------------------------
+Private Sub DeliverResults()
+    Dim d As Document
+    Dim placed As Boolean
+    Dim msg As String
+
+    On Error Resume Next
+    Set d = Documents.Add
+    If Err.Number = 0 Then
+        If Not d Is Nothing Then
+            d.Content.Text = mRpt
+            d.Content.Font.Name = "Courier New"
+            d.Content.Font.Size = 9
+            d.Content.ParagraphFormat.SpaceAfter = 0
+            placed = (Err.Number = 0)
+        End If
+    End If
+    Err.Clear
+    On Error GoTo 0
+
+    If mFail = 0 Then
+        msg = "ALL PASS" & vbCr & vbCr & CStr(mPass) & " assertions passed."
+    Else
+        msg = "FAILURES" & vbCr & vbCr & _
+              CStr(mPass) & " passed, " & CStr(mFail) & " FAILED." & vbCr & vbCr & _
+              "First failures:" & vbCr & mFirstFails
+    End If
+
+    If placed Then
+        msg = msg & vbCr & vbCr & _
+              "The full report is in the new document that just opened. " & _
+              "Select all of it, copy, and send it back."
+    Else
+        msg = msg & vbCr & vbCr & _
+              "A document could not be created to hold the full report, so it is " & _
+              "only in the Immediate window (View > Immediate Window)."
+    End If
+
+    MsgBox msg, IIf(mFail = 0, vbInformation, vbExclamation), "LingTeX-Word self-tests"
 End Sub
 
 Private Sub Ok(ByVal name As String, ByVal cond As Boolean)
     If cond Then
         mPass = mPass + 1
-        Debug.Print "  PASS  " & name
+        Emit "  PASS  " & name
     Else
         mFail = mFail + 1
-        Debug.Print "  FAIL  " & name
+        Emit "  FAIL  " & name
+        NoteFailure name
     End If
 End Sub
 
 Private Sub Eq(ByVal name As String, ByVal actual As String, ByVal expected As String)
     If actual = expected Then
         mPass = mPass + 1
-        Debug.Print "  PASS  " & name
+        Emit "  PASS  " & name
     Else
         mFail = mFail + 1
-        Debug.Print "  FAIL  " & name
-        Debug.Print "          actual:   " & actual
-        Debug.Print "          expected: " & expected
+        Emit "  FAIL  " & name
+        Emit "          actual:   " & actual
+        Emit "          expected: " & expected
+        NoteFailure name
+    End If
+End Sub
+
+' The first few failure names, for the dialog. A long list in a MsgBox is
+' unreadable, and the document has the full detail anyway.
+Private Sub NoteFailure(ByVal name As String)
+    If mFail > 6 Then Exit Sub
+    If mFail = 6 Then
+        mFirstFails = mFirstFails & "  ... see the report for the rest" & vbCr
+    Else
+        mFirstFails = mFirstFails & "  " & name & vbCr
     End If
 End Sub
 
 Private Sub Section(ByVal title As String)
-    Debug.Print ""
-    Debug.Print title
+    Emit ""
+    Emit title
 End Sub
 
 
