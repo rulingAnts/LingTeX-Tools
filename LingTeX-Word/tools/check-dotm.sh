@@ -1,0 +1,193 @@
+#!/bin/sh
+# check-dotm.sh  --  LingTeX-Word
+#
+# THE DRIFT GUARD. Runs in CI, with no Word anywhere, because a .dotm is a zip.
+#
+# The template is a committed binary built by hand in Word, which means the usual
+# guarantee -- that what ships is what is in the repository -- does not hold for
+# free. There are two ways it can quietly stop holding:
+#
+#   * someone fixes a module in the VBA editor and never exports it back to src/,
+#     so the shipped template contains code that is nowhere in the repository;
+#   * someone edits src/customUI14.xml and does not re-run build-dotm.sh, so the
+#     reviewable ribbon is not the ribbon that ships.
+#
+# Neither shows up in a diff. Both show up here.
+#
+# Usage:  sh LingTeX-Word/tools/check-dotm.sh [path/to/file.dotm]
+# Exit:   0 all checks pass, 1 otherwise.
+
+here=$(cd "$(dirname "$0")" && pwd)
+root=$(cd "$here/.." && pwd)
+src="$root/src"
+
+dotm=${1:-$root/LingTeX-Word.dotm}
+ribbon="$src/customUI14.xml"
+manifest="$src/MANIFEST.sha256"
+PART="customUI/customUI14.xml"
+
+fails=0
+
+pass() { echo "  OK    $1"; }
+fail() { echo "  FAIL  $1"; fails=$((fails + 1)); }
+
+sha_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    else
+        shasum -a 256 "$1" | awk '{print $1}'
+    fi
+}
+
+echo "check-dotm: $dotm"
+
+#-- 0. it exists and is a zip -------------------------------------------------
+if [ ! -f "$dotm" ]; then
+    fail "the template does not exist (build it in Word, then run build-dotm.sh)"
+    echo ""
+    echo "1 problem(s)"
+    exit 1
+fi
+if unzip -tq "$dotm" >/dev/null 2>&1; then
+    pass "the template is a readable zip archive"
+else
+    fail "the template is not a readable zip archive"
+    echo ""
+    echo "$fails problem(s)"
+    exit 1
+fi
+
+work=$(mktemp -d 2>/dev/null || mktemp -d -t lingtexcheck)
+trap 'rm -rf "$work"' EXIT HUP INT TERM
+unzip -q "$dotm" -d "$work"
+
+#-- 1. the VBA project is in there, and is not a stub -------------------------
+# A .dotx saved by accident, or a template saved before the modules were imported,
+# both produce a file that looks fine and does nothing.
+if [ -f "$work/word/vbaProject.bin" ]; then
+    size=$(wc -c < "$work/word/vbaProject.bin" | tr -d ' ')
+    if [ "$size" -gt 8192 ]; then
+        pass "word/vbaProject.bin is present ($size bytes)"
+    else
+        fail "word/vbaProject.bin is only $size bytes -- too small to hold the modules"
+    fi
+else
+    fail "word/vbaProject.bin is missing -- saved as .dotx, or before importing?"
+fi
+
+#-- 2. the ribbon part matches src/ BYTE FOR BYTE ----------------------------
+if [ ! -f "$work/$PART" ]; then
+    fail "$PART is missing -- build-dotm.sh was not run after the last save"
+elif cmp -s "$work/$PART" "$ribbon"; then
+    pass "$PART is byte-identical to src/customUI14.xml"
+else
+    fail "$PART differs from src/customUI14.xml -- re-run build-dotm.sh"
+    echo "        embedded: $(sha_of "$work/$PART")"
+    echo "        src/:     $(sha_of "$ribbon")"
+fi
+
+#-- 3. the root relationship points at it, with the type the namespace needs --
+rels="$work/_rels/.rels"
+if [ ! -f "$rels" ]; then
+    fail "_rels/.rels is missing"
+else
+    if grep -q 'Target="customUI/customUI14.xml"' "$rels"; then
+        pass "_rels/.rels points at the ribbon part"
+    else
+        fail "_rels/.rels has no relationship to $PART -- Word will show no ribbon"
+    fi
+    # The namespace decides the type. A mismatch loads silently with no ribbon,
+    # which is the single most confusing way for this to be wrong.
+    if grep -q 'xmlns="http://schemas.microsoft.com/office/2009/07/customui"' "$ribbon"; then
+        want="2007/relationships/ui/extensibility"
+    else
+        want="2006/relationships/ui/extensibility"
+    fi
+    if grep -q "$want" "$rels"; then
+        pass "the relationship type matches the ribbon's namespace ($want)"
+    else
+        fail "the relationship type does not match the ribbon's namespace"
+        echo "        the ribbon needs: $want"
+    fi
+fi
+
+#-- 4. a content type covers the part ----------------------------------------
+ct="$work/[Content_Types].xml"
+if [ ! -f "$ct" ]; then
+    fail "[Content_Types].xml is missing -- the package is invalid"
+elif grep -q 'Extension="xml"' "$ct" || grep -q 'PartName="/customUI/customUI14.xml"' "$ct"; then
+    pass "[Content_Types].xml covers the ribbon part"
+else
+    fail "[Content_Types].xml does not cover $PART -- Word will reject the file"
+fi
+
+#-- 5. the ribbon is well-formed, and every onAction resolves ----------------
+if command -v xmllint >/dev/null 2>&1; then
+    if xmllint --noout "$ribbon" 2>/dev/null; then
+        pass "src/customUI14.xml is well-formed XML"
+    else
+        fail "src/customUI14.xml is not well-formed XML"
+    fi
+else
+    echo "  SKIP  xmllint not available; cannot check the ribbon is well-formed"
+fi
+
+missing=""
+for h in $(sed -n 's/.*onAction="\([A-Za-z_][A-Za-z0-9_]*\)".*/\1/p' "$ribbon" | sort -u); do
+    if ! grep -q "^\(Public \|Private \)\?Sub $h\b" "$src"/*.bas 2>/dev/null; then
+        missing="$missing $h"
+    fi
+done
+if [ -z "$missing" ]; then
+    pass "every ribbon onAction resolves to a Sub in src/"
+else
+    fail "ribbon onAction handlers with no Sub in src/:$missing"
+fi
+
+#-- 6. src/ matches what the template was built from -------------------------
+# The check that catches a fix made in the VBA editor and never exported.
+if [ ! -f "$manifest" ]; then
+    fail "src/MANIFEST.sha256 is missing -- run build-dotm.sh"
+else
+    drift=""
+    listed=0
+    while read -r want name; do
+        case "$want" in '#'*|'') continue ;; esac
+        listed=$((listed + 1))
+        if [ ! -f "$src/$name" ]; then
+            drift="$drift
+        $name is in the manifest but not in src/"
+            continue
+        fi
+        got=$(sha_of "$src/$name")
+        if [ "$got" != "$want" ]; then
+            drift="$drift
+        $name has changed since the template was built"
+        fi
+    done < "$manifest"
+
+    # And the other direction: a source added to src/ and never built in.
+    for f in $(ls "$src" | sort); do
+        case "$f" in *.bas|*.cls|customUI14.xml) ;; *) continue ;; esac
+        if ! grep -q "  $f\$" "$manifest"; then
+            drift="$drift
+        $f is in src/ but not in the manifest"
+        fi
+    done
+
+    if [ -z "$drift" ]; then
+        pass "all $listed sources match the manifest"
+    else
+        fail "src/ has drifted from the built template:$drift"
+        echo "        Export the modules out of Word (File > Export File) and"
+        echo "        re-run build-dotm.sh, so src/ and the template agree again."
+    fi
+fi
+
+echo ""
+if [ "$fails" -eq 0 ]; then
+    echo "ALL PASS"
+    exit 0
+fi
+echo "$fails problem(s)"
+exit 1

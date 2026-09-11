@@ -2,9 +2,13 @@
 <!--
   LingTeX-Word ribbon.
 
-  This part is injected into LingTeX-Word.dotm at packaging time (see
-  ..\tools\build-dotm.ps1).  It is tracked as a source file so the ribbon is
-  reviewable in the repository rather than buried inside a binary.
+  This part is injected into LingTeX-Word.dotm at packaging time by
+  ../tools/build-dotm.sh, because Word can save the VBA project into a template
+  but has no way to put a custom ribbon in one, the ribbon being a plain-XML part
+  its interface does not expose.  It is tracked as a source file so the ribbon is
+  reviewable in the repository rather than buried inside a binary, and
+  ../tools/check-dotm.sh asserts in CI that the copy inside the template is still
+  byte-identical to this one.
 
   Every onAction points at a Rbn* procedure in modLingTeX.bas.  Those take their
   control argument As Variant rather than As IRibbonControl, so the VBA project
