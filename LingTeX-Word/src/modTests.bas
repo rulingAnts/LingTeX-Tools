@@ -237,18 +237,26 @@ Public Sub DiagnoseWrap()
 
     On Error GoTo Crashed
 
-    stepNo = 1: Emit "step 1  build fixed-size arrays by hand"
-    fixedW(0) = 10: fixedW(1) = 10: fixedW(2) = 10
-    fixedF(0) = False: fixedF(1) = False: fixedF(2) = False
+    stepNo = 1
+    Emit "step 1  build fixed-size arrays by hand"
+    fixedW(0) = 10
+    fixedW(1) = 10
+    fixedW(2) = 10
+    fixedF(0) = False
+    fixedF(1) = False
+    fixedF(2) = False
 
-    stepNo = 2: Emit "step 2  call ComputeWrapLines with the hand-built arrays"
+    stepNo = 2
+    Emit "step 2  call ComputeWrapLines with the hand-built arrays"
     lineStarts = ComputeWrapLines(fixedW, fixedF, 30, 0, 0)
 
-    stepNo = 3: Emit "step 3  read its bounds"
+    stepNo = 3
+    Emit "step 3  read its bounds"
     Emit "        LBound=" & CStr(LBound(lineStarts)) & _
          "  UBound=" & CStr(UBound(lineStarts))
 
-    stepNo = 4: Emit "step 4  render the line starts"
+    stepNo = 4
+    Emit "step 4  render the line starts"
     s = ""
     For i = LBound(lineStarts) To UBound(lineStarts)
         If s <> "" Then s = s & ","
@@ -256,17 +264,20 @@ Public Sub DiagnoseWrap()
     Next i
     Emit "        result = " & s & "   (expected 0)"
 
-    stepNo = 5: Emit "step 5  Split the width string"
+    stepNo = 5
+    Emit "step 5  Split the width string"
     wParts = Split("10,10,10", ",")
     fParts = Split("0,0,0", ",")
     Emit "        UBound(wParts)=" & CStr(UBound(wParts)) & _
          "  UBound(fParts)=" & CStr(UBound(fParts))
 
-    stepNo = 6: Emit "step 6  ReDim the parsed arrays"
+    stepNo = 6
+    Emit "step 6  ReDim the parsed arrays"
     ReDim parsedW(0 To UBound(wParts))
     ReDim parsedF(0 To UBound(wParts))
 
-    stepNo = 7: Emit "step 7  parse each width with Val then CSng"
+    stepNo = 7
+    Emit "step 7  parse each width with Val then CSng"
     For i = 0 To UBound(wParts)
         Emit "        i=" & CStr(i) & " raw=[" & wParts(i) & "]"
         parsedW(i) = CSng(Val(Trim$(wParts(i))))
@@ -274,11 +285,13 @@ Public Sub DiagnoseWrap()
         If i <= UBound(fParts) Then parsedF(i) = (Trim$(fParts(i)) = "1")
     Next i
 
-    stepNo = 8: Emit "step 8  call ComputeWrapLines with the parsed arrays"
+    stepNo = 8
+    Emit "step 8  call ComputeWrapLines with the parsed arrays"
     lineStarts = ComputeWrapLines(parsedW, parsedF, 30, 0, 0)
     Emit "        ok, UBound=" & CStr(UBound(lineStarts))
 
-    stepNo = 9: Emit "step 9  call PlanStarts end to end"
+    stepNo = 9
+    Emit "step 9  call PlanStarts end to end"
     Emit "        result = " & PlanStarts("10,10,10", "0,0,0", 30)
 
     Emit ""
@@ -294,6 +307,101 @@ Crashed:
 Done:
     Debug.Print mRpt
     MsgBox mRpt, vbInformation, "LingTeX-Word wrap diagnostic"
+End Sub
+
+'-----------------------------------------------------------------------------
+' MicroDiagnose -- find which VBA primitive fails.
+'
+' DiagnoseWrap died on a line that merely assigns 10 to a Single array element,
+' which cannot overflow. Two possibilities remain and this separates them: either
+' the colon-separated statement form was mis-parsed (VBA reads a bare number
+' before a colon as an old-style line-number label), or something more basic is
+' wrong on this build.
+'
+' So: one statement per line, no colons anywhere, and a marker string set before
+' each step so the handler can name the exact step rather than a range of them.
+' It starts from the most trivial operation possible and works up.
+'-----------------------------------------------------------------------------
+Public Sub MicroDiagnose()
+    Dim marker As String
+    Dim s1 As Single
+    Dim n1 As Long
+    Dim fixedS(0 To 2) As Single
+    Dim fixedB(0 To 2) As Boolean
+    Dim dynS() As Single
+    Dim dynB() As Boolean
+    Dim starts() As Long
+
+    mRpt = ""
+    Emit "MicroDiagnose"
+    Emit "============="
+
+    On Error GoTo Crashed
+
+    marker = "A  assign a Long variable"
+    n1 = 10
+
+    marker = "B  assign a Single variable"
+    s1 = 10
+
+    marker = "C  assign a Single variable from a Long"
+    s1 = n1
+
+    marker = "D  assign element 0 of a fixed Single array"
+    fixedS(0) = 10
+
+    marker = "E  assign elements 1 and 2"
+    fixedS(1) = 10
+    fixedS(2) = 10
+
+    marker = "F  assign a fixed Boolean array"
+    fixedB(0) = False
+    fixedB(1) = False
+    fixedB(2) = False
+
+    marker = "G  ReDim a dynamic Single array and fill it"
+    ReDim dynS(0 To 2)
+    dynS(0) = 10
+    dynS(1) = 10
+    dynS(2) = 10
+
+    marker = "H  ReDim a dynamic Boolean array and fill it"
+    ReDim dynB(0 To 2)
+    dynB(0) = False
+    dynB(1) = False
+    dynB(2) = False
+
+    marker = "I  read UBound of the fixed arrays"
+    Emit "   UBound(fixedS)=" & CStr(UBound(fixedS))
+    Emit "   UBound(fixedB)=" & CStr(UBound(fixedB))
+
+    marker = "J  call ComputeWrapLines with the FIXED arrays"
+    starts = ComputeWrapLines(fixedS, fixedB, 30, 0, 0)
+
+    marker = "K  read the result bounds"
+    Emit "   LBound(starts)=" & CStr(LBound(starts))
+    Emit "   UBound(starts)=" & CStr(UBound(starts))
+
+    marker = "L  read element 0 of the result"
+    Emit "   starts(0)=" & CStr(starts(0))
+
+    marker = "M  call ComputeWrapLines with the DYNAMIC arrays"
+    starts = ComputeWrapLines(dynS, dynB, 30, 0, 0)
+    Emit "   UBound(starts)=" & CStr(UBound(starts))
+
+    Emit ""
+    Emit "ALL MICRO STEPS COMPLETED with no error."
+    GoTo Done
+
+Crashed:
+    Emit ""
+    Emit "CRASHED at step " & marker
+    Emit "   run-time error " & CStr(Err.Number) & ": " & Err.Description
+    Err.Clear
+
+Done:
+    Debug.Print mRpt
+    MsgBox mRpt, vbInformation, "LingTeX-Word micro diagnostic"
 End Sub
 
 '=============================================================================
