@@ -1152,7 +1152,10 @@ Private Sub CheckRowWidthsFit(tbl As Table, doc As Document)
     Dim worst As Double
     Dim bad As String
 
-    avail = AvailableTextWidth(doc.Content)
+    ' From outside the table. doc.Content starts at position 0, inside the table
+    ' just drawn there, and AvailableTextWidth inside a table answers with the
+    ' cell's width -- which would have compared every row against a few points.
+    avail = AvailableTextWidth(RangeAfterTable(tbl))
 
     For r = 1 To tbl.Rows.Count
         total = 0
