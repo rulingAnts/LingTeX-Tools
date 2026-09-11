@@ -310,6 +310,160 @@ Done:
 End Sub
 
 '-----------------------------------------------------------------------------
+' TypeCheck -- which numeric types actually work on this build?
+'
+' MicroDiagnose reported run-time error 6, Overflow, on "s1 = 10" where s1 is
+' declared As Single. That is not a logic error: assigning the literal 10 to a
+' Single cannot overflow on any correct implementation. Long assignment in the
+' step before it worked.
+'
+' So this tests each numeric type in isolation, each in its own trap, and reports
+' every result rather than stopping at the first failure. If Single is broken here
+' and Double is not, the engine should not be using Single -- and this says so
+' with evidence rather than assumption.
+'-----------------------------------------------------------------------------
+Public Sub TypeCheck()
+    mRpt = ""
+    Emit "TypeCheck -- numeric types on this build"
+    Emit "========================================"
+    Emit ""
+
+    Emit TryLong()
+    Emit TryInteger()
+    Emit TrySingle()
+    Emit TrySingleViaCSng()
+    Emit TryDouble()
+    Emit TryCurrency()
+    Emit TryVariant()
+    Emit TrySingleArray()
+    Emit TryDoubleArray()
+    Emit TrySingleArithmetic()
+    Emit TryDoubleArithmetic()
+
+    Emit ""
+    Emit "Send this whole report back."
+
+    Debug.Print mRpt
+    MsgBox mRpt, vbInformation, "LingTeX-Word type check"
+End Sub
+
+Private Function TryLong() As String
+    Dim v As Long
+    On Error GoTo E
+    v = 10
+    TryLong = "  Long             ok    (" & CStr(v) & ")"
+    Exit Function
+E:
+    TryLong = "  Long             FAIL  error " & CStr(Err.Number) & ": " & Err.Description
+End Function
+
+Private Function TryInteger() As String
+    Dim v As Integer
+    On Error GoTo E
+    v = 10
+    TryInteger = "  Integer          ok    (" & CStr(v) & ")"
+    Exit Function
+E:
+    TryInteger = "  Integer          FAIL  error " & CStr(Err.Number) & ": " & Err.Description
+End Function
+
+Private Function TrySingle() As String
+    Dim v As Single
+    On Error GoTo E
+    v = 10
+    TrySingle = "  Single           ok    (" & CStr(v) & ")"
+    Exit Function
+E:
+    TrySingle = "  Single           FAIL  error " & CStr(Err.Number) & ": " & Err.Description
+End Function
+
+Private Function TrySingleViaCSng() As String
+    Dim v As Single
+    On Error GoTo E
+    v = CSng(10)
+    TrySingleViaCSng = "  Single via CSng  ok    (" & CStr(v) & ")"
+    Exit Function
+E:
+    TrySingleViaCSng = "  Single via CSng  FAIL  error " & CStr(Err.Number) & ": " & Err.Description
+End Function
+
+Private Function TryDouble() As String
+    Dim v As Double
+    On Error GoTo E
+    v = 10
+    TryDouble = "  Double           ok    (" & CStr(v) & ")"
+    Exit Function
+E:
+    TryDouble = "  Double           FAIL  error " & CStr(Err.Number) & ": " & Err.Description
+End Function
+
+Private Function TryCurrency() As String
+    Dim v As Currency
+    On Error GoTo E
+    v = 10
+    TryCurrency = "  Currency         ok    (" & CStr(v) & ")"
+    Exit Function
+E:
+    TryCurrency = "  Currency         FAIL  error " & CStr(Err.Number) & ": " & Err.Description
+End Function
+
+Private Function TryVariant() As String
+    Dim v As Variant
+    On Error GoTo E
+    v = 10
+    TryVariant = "  Variant          ok    (" & CStr(v) & ")"
+    Exit Function
+E:
+    TryVariant = "  Variant          FAIL  error " & CStr(Err.Number) & ": " & Err.Description
+End Function
+
+Private Function TrySingleArray() As String
+    Dim v(0 To 2) As Single
+    On Error GoTo E
+    v(0) = 10
+    TrySingleArray = "  Single array     ok    (" & CStr(v(0)) & ")"
+    Exit Function
+E:
+    TrySingleArray = "  Single array     FAIL  error " & CStr(Err.Number) & ": " & Err.Description
+End Function
+
+Private Function TryDoubleArray() As String
+    Dim v(0 To 2) As Double
+    On Error GoTo E
+    v(0) = 10
+    TryDoubleArray = "  Double array     ok    (" & CStr(v(0)) & ")"
+    Exit Function
+E:
+    TryDoubleArray = "  Double array     FAIL  error " & CStr(Err.Number) & ": " & Err.Description
+End Function
+
+Private Function TrySingleArithmetic() As String
+    Dim a As Single
+    Dim b As Single
+    On Error GoTo E
+    a = 10
+    b = 20
+    a = a + b
+    TrySingleArithmetic = "  Single arithmetic ok   (" & CStr(a) & ")"
+    Exit Function
+E:
+    TrySingleArithmetic = "  Single arithmetic FAIL error " & CStr(Err.Number) & ": " & Err.Description
+End Function
+
+Private Function TryDoubleArithmetic() As String
+    Dim a As Double
+    Dim b As Double
+    On Error GoTo E
+    a = 10
+    b = 20
+    a = a + b
+    TryDoubleArithmetic = "  Double arithmetic ok   (" & CStr(a) & ")"
+    Exit Function
+E:
+    TryDoubleArithmetic = "  Double arithmetic FAIL error " & CStr(Err.Number) & ": " & Err.Description
+End Function
+
+'-----------------------------------------------------------------------------
 ' MicroDiagnose -- find which VBA primitive fails.
 '
 ' DiagnoseWrap died on a line that merely assigns 10 to a Single array element,
