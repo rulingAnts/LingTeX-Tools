@@ -20,8 +20,17 @@ chasing it. The probe answers them all in one run.
 1. VBA editor → **File → Import File…** → `tools/probe/modProbe.bas`
    (If your editor has no Import, use `build/paste/00-modProbe.txt` instead —
    see *If you have to paste* below.)
-2. In the Immediate window, type `ProbeWord` and press Return.
-3. Select the whole report, copy it, and send it back to me.
+2. Run `ProbeWord`, either from **Tools → Macro → Macros…** (Mac) / **Alt+F8**
+   (Windows), or by typing `ProbeWord` into the Immediate window.
+3. It opens a **new document containing the report** and shows a dialog saying so.
+   Select all of that document, copy, and send it back.
+
+**If nothing seems to happen:** `Debug.Print` output appears *only* in the VBA
+editor's Immediate window (**View → Immediate Window**), so with that window
+closed a run looks identical to no run at all. The probe now also delivers its
+report as a new document and a dialog, so if you see neither of those, the module
+genuinely did not run — check for a macro-security prompt, and use
+**Debug → Compile** to confirm it compiled.
 
 It creates one hidden document and three temporary styles and deletes all of them
 before finishing. Your own documents are never touched.
