@@ -37,6 +37,23 @@ The two findings that matter most:
   and build the template. If `BLOCKED`, it is thirteen File → Import File… picks
   instead — dull but completely reliable.
 
+### Also worth 60 seconds: the AppleScript bridge
+
+`tools/probe/Probe AppleScript Bridge.applescript` asks Word whether it exposes
+VBA to AppleScript. Double-click it — it opens in Script Editor as plain text —
+and press Run. It creates and changes nothing; it only asks.
+
+If Word answers yes, two things get better: building the template becomes fully
+scripted instead of thirteen manual imports, and the Mac installer can verify
+itself by running a macro after installing rather than copying a file and hoping.
+That second one matters, because the known silent failure is macOS quarantining a
+`.dotm` that arrived inside a downloaded zip — Word then refuses to load it and
+you see a successful install with no ribbon.
+
+Each candidate term is wrapped in `run script` so the file still compiles even
+when Word has never heard of the term; otherwise an unknown term would stop the
+script compiling and we would learn nothing.
+
 ---
 
 ## Step 1 — six modules, no document touched
