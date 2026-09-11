@@ -237,6 +237,28 @@ it.
 
 ---
 
+## Stage 1 must pass on BOTH platforms before stage 2
+
+Originally this said Mac was the stricter target, so passing there implied Windows
+was fine. That is no longer a safe assumption.
+
+`MicroDiagnose` on Word 16.112 for Mac produced run-time error 6, *Overflow*, on
+`s1 = 10` where `s1` is declared `As Single` — a primitive that cannot fail on a
+correct implementation. Whatever the explanation turns out to be, it is a
+**numeric type behaving differently**, not a logic error. And the wrap planner is
+nothing but arithmetic over two arrays: if `Single` and `Double` differ between
+builds, the same example could be measured into different column widths on each
+platform, and the failure would look like a layout bug rather than a type bug.
+
+So: run `RunAllTests` on Windows Word as well, and get `ALL PASS` on both, before
+any of the document-rendering work is built on top. A discrepancy found now is a
+type declaration; found later it is a mis-rendered table with no obvious cause.
+
+`tools/ImportModules.bas` makes the Windows side cheap — one paste imports all
+thirteen modules, and re-running re-syncs them after any pull.
+
+---
+
 ## What this does and does not prove
 
 Mac Word is the stricter target — no ActiveX, no `Scripting.Dictionary`, no
