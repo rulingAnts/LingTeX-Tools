@@ -214,16 +214,29 @@ Public Function IsGramGloss(ByVal seg As String) As Boolean
 
     ' Digit-initial: 3SG, 3sg, 1pl, 1s.  The lowercase spellings count -- the
     ' writer means the same category and wants the same small caps.
+    ' Matches the [0-9]\w+ branch, so the rest must be word characters.
     ch = Left$(core, 1)
     If ch >= "0" And ch <= "9" Then
+        For i = 2 To Len(core)
+            ch = Mid$(core, i, 1)
+            If Not (IsAlNum(ch) Or ch = "_") Then Exit Function
+        Next i
         IsGramGloss = True
         Exit Function
     End If
 
-    ' All-caps: no lowercase letter anywhere in the core.
+    ' All caps: EVERY character of the core must be an uppercase letter or a
+    ' digit.  Matches the [0-9A-Z]+ branch.
+    '
+    ' Testing merely for "contains no lowercase" is not the same thing, and gets
+    ' "P.N." wrong: stripping the outer dots leaves "P.N", which has no lowercase
+    ' but does have an interior dot, so the pattern does not match and the token
+    ' is a proper-noun abbreviation rather than a grammatical gloss.  The pattern
+    ' allows non-word characters only at the ENDS, which the stripping above has
+    ' already removed.
     For i = 1 To Len(core)
         ch = Mid$(core, i, 1)
-        If ch >= "a" And ch <= "z" Then Exit Function
+        If Not ((ch >= "A" And ch <= "Z") Or (ch >= "0" And ch <= "9")) Then Exit Function
     Next i
     IsGramGloss = True
 End Function

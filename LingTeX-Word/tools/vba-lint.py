@@ -304,6 +304,35 @@ def proc_names(text):
     return names
 
 
+def check_array_return_as_argument(files):
+    """VBA cannot pass a function's array return value into an array parameter.
+
+    An array parameter is ByRef, and a function result has nothing to refer to,
+    so `Starts(Plan(...))` compiles cleanly and then fails at RUN time. The array
+    has to land in a local variable first. Easy to write, hard to spot.
+    """
+    arr_fns = {}
+    for f in files:
+        for _, t in logical_lines(f.read_text(encoding="utf-8")):
+            m = re.match(r"^(?:Public |Private |Friend )?Function\s+(\w+)\s*\(.*\)\s*As\s+\w+\(\)\s*$",
+                         t, re.I)
+            if m:
+                arr_fns[m.group(1).lower()] = f.name
+    if not arr_fns:
+        return []
+
+    problems = []
+    for f in files:
+        for n, t in logical_lines(f.read_text(encoding="utf-8")):
+            for fn, owner in arr_fns.items():
+                for m in re.finditer(r"[(,]\s*(" + re.escape(fn) + r")\s*\(", t, re.I):
+                    problems.append(
+                        f"{f.name}:{n}: {m.group(1)}() returns an array and is being passed "
+                        f"as an argument; VBA needs it in a local variable first "
+                        f"(fails at run time, not compile time)")
+    return problems
+
+
 def check_stage1_independence(files):
     """Stage-1 modules must not reference anything only stage 2 defines."""
     engine = [f for f in files if f.name not in STANDALONE]
@@ -350,6 +379,15 @@ def main():
         print(f"  {mark}  {f.name}")
         for n, msg in sorted(problems):
             print(f"          {f.name}:{n}: {msg}")
+
+    arr = check_array_return_as_argument(files)
+    if arr:
+        total += len(arr)
+        print("  FAIL  array return passed as argument")
+        for msg in arr:
+            print("          " + msg)
+    else:
+        print("  OK    no array return passed as an argument")
 
     stage = check_stage1_independence(files)
     if stage:
