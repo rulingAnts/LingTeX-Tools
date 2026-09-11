@@ -1,0 +1,82 @@
+name: LingTeX-Word checks
+
+# Everything about LingTeX-Word that can be verified WITHOUT Word.
+#
+# Nothing in this project can compile or run VBA in CI -- there is no Word on a
+# GitHub runner, and no Office automation on Linux -- so the approach is to keep
+# the algorithms in a JavaScript reference implementation that CI can run, and to
+# check the VBA with a substitute compiler. These are the checks that gate a merge;
+# the in-Word suites (RunAllTests, RunDocTests) are run by hand on both platforms.
+
+on:
+  push:
+    paths:
+      - 'LingTeX-Word/**'
+      - 'docs/core.js'
+      - '.github/workflows/lingtex-word.yml'
+  pull_request:
+    paths:
+      - 'LingTeX-Word/**'
+      - 'docs/core.js'
+      - '.github/workflows/lingtex-word.yml'
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: VBA lint (the substitute compiler)
+        # Block balance, pure ASCII, Option Explicit, Windows-only APIs,
+        # non-short-circuit And/Or bounds guards, reserved words as identifiers,
+        # array returns passed as arguments, call arity, Not-equals precedence, and
+        # the stage-1 independence QUICKSTART.md promises.
+        run: python3 LingTeX-Word/tools/vba-lint.py
+
+      - name: Algorithm parity against docs/core.js
+        # 78 assertions over golden vectors derived from PROMPT.md at run time.
+        # The VBA in src/ is a hand port of the same algorithms, mirrored
+        # assertion for assertion in src/modTests.bas.
+        run: node LingTeX-Word/tools/parity-test.js
+
+      - name: Paste bundle generates cleanly
+        run: |
+          sh LingTeX-Word/tools/make-paste-bundle.sh
+          # No metadata may survive into a paste file, or it is a compile error the
+          # moment someone pastes it.
+          if grep -rlE '^(Attribute[ \t]|VERSION [0-9]|BEGIN[ \t]*$|END[ \t]*$)' \
+               LingTeX-Word/build/paste/ ; then
+            echo "::error::metadata leaked into the paste bundle"
+            exit 1
+          fi
+          echo "no metadata in any paste file"
+
+      - name: .dotm build and drift-guard scripts
+        # Tests build-dotm.sh and check-dotm.sh against a synthetic OOXML package,
+        # including the negative cases -- a drift guard that cannot fail is not a
+        # guard.
+        run: sh LingTeX-Word/tools/test-dotm-scripts.sh
+
+      - name: Template drift guard
+        # Only once the template is committed. It is built by hand in Word, so CI
+        # cannot produce it; what CI can do is notice when it stops matching src/.
+        run: |
+          if [ -f LingTeX-Word/LingTeX-Word.dotm ]; then
+            sh LingTeX-Word/tools/check-dotm.sh
+          else
+            echo "no LingTeX-Word.dotm committed yet; skipping the drift guard"
+          fi
+
+      - name: Working tree is unchanged
+        # Every check above must be read-only. A check that edits the tree would
+        # make the drift guard meaningless.
+        run: |
+          git status --porcelain -- . ':!LingTeX-Word/build' > /tmp/dirty
+          if [ -s /tmp/dirty ]; then
+            echo "::error::a check modified the working tree:"
+            cat /tmp/dirty
+            exit 1
+          fi
+          echo "clean"

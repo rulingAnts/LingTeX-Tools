@@ -262,6 +262,61 @@ machine, and turning it back off afterwards costs nothing.
 
 ---
 
+## Building `LingTeX-Word.dotm`
+
+Two steps, and the order matters. Word can save the VBA project into a template,
+but it has no way to put a **custom ribbon** in one — the ribbon is a plain-XML
+part its interface does not expose. So Word does the macros and a script does the
+ribbon.
+
+**1. In Word** — with all fourteen modules imported:
+
+```
+File → Save As → Word Macro-Enabled Template (.dotm)
+  to  LingTeX-Word/LingTeX-Word.dotm
+```
+
+Not `.dotx`, which silently drops the macros. Not under any `dist/`, which
+`.gitignore` matches at any depth. `SaveAsTemplate` in `tools/ImportModules.bas`
+does the same thing without the dialog.
+
+**2. Outside Word** — inject the ribbon and record what it was built from:
+
+```bash
+sh LingTeX-Word/tools/build-dotm.sh
+sh LingTeX-Word/tools/check-dotm.sh      # the same check CI runs
+```
+
+`build-dotm.sh` needs only `zip`, `unzip` and a SHA-256 tool — no Word, no
+PowerShell, no Python — so it runs on macOS, on Linux, and in CI. If you have no
+shell handy, push the `.dotm` and it can be injected for you; the macros work from
+the VBE either way, and only the seven ribbon buttons need this step.
+
+**Save from Word first, inject last.** Saving again from Word discards the injected
+part, so every re-save means re-running `build-dotm.sh`.
+
+### What the drift guard is for
+
+The template is a committed binary built by hand, so the usual guarantee — that
+what ships is what is in the repository — does not hold for free. Two ways it can
+quietly stop holding, neither of which shows up in a diff:
+
+- someone fixes a module in the VBA editor and never exports it back to `src/`, so
+  the shipped template contains code that is nowhere in the repository;
+- someone edits `src/customUI14.xml` and does not re-run `build-dotm.sh`, so the
+  reviewable ribbon is not the ribbon that ships.
+
+`check-dotm.sh` catches both, along with a `.dotx` saved by mistake, a template
+saved before the modules were imported, a missing ribbon relationship, and a
+relationship whose *type* does not match the ribbon's XML namespace — which is the
+most confusing failure of the lot, because Word then loads the template and shows
+no ribbon, with no error anywhere.
+
+Keep `src/` authoritative: any fix made in the VBA editor goes back out with
+**File → Export File** before `build-dotm.sh` runs.
+
+---
+
 ## Class modules are pasted, never imported
 
 `clsIgtWarning.cls` and `clsAppEvents.cls` are the two class modules, and they are
