@@ -463,21 +463,23 @@ End Function
 ' "renders those that have data" rule: an empty tier is not drawn at all.
 Public Sub DropEmptyTiers(ByRef ex As IgtExample)
     Dim keep() As Boolean, t As Long, c As Long, nKeep As Long
-    Dim any As Boolean
+    ' Not named "any": Any is a reserved word in VBA (it appears in Declare
+    ' statements as "As Any"), so Dim any As Boolean is a syntax error.
+    Dim hasData As Boolean
 
     If ex.TierCount = 0 Then Exit Sub
     ReDim keep(0 To ex.TierCount - 1)
 
     For t = 0 To ex.TierCount - 1
-        any = False
+        hasData = False
         For c = 0 To ex.ColCount - 1
             If ex.Cells(t, c) <> "" Then
-                any = True
+                hasData = True
                 Exit For
             End If
         Next c
-        keep(t) = any
-        If any Then nKeep = nKeep + 1
+        keep(t) = hasData
+        If hasData Then nKeep = nKeep + 1
     Next t
 
     If nKeep = ex.TierCount Then Exit Sub
