@@ -93,6 +93,13 @@ Private Function PlanExample(ex As IgtExample, target As Range, doc As Document,
     End If
 
     EnsureStyles doc
+    If gStyleError <> "" Then
+        ' A style name collided with a style of the wrong kind. Drawing now would
+        ' produce rows with no role on them, which read back as one giant wrap
+        ' line -- a confusing result from a nameable cause.
+        why = gStyleError
+        Exit Function
+    End If
 
     nInter = InterlinearTierList(ex, interTiers)
     If nInter = 0 Then
@@ -321,7 +328,8 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
                 cellRng.End = cellRng.End - 1      ' exclude end-of-cell marker
 
                 ApplyParaStyle cellRng, doc, role
-                WriteCellText cellRng, ex.Cells(interTiers(i), lineFirst + c), role, False
+                WriteCellText cellRng, ex.Cells(interTiers(i), lineFirst + c), _
+                              role, False, doc
 
                 On Error Resume Next
                 tbl.Cell(r, c + 1).SetWidth _
@@ -388,9 +396,12 @@ End Function
 ' Used by the renderer AND by modMeasure, so a measured width can never
 ' disagree with what is drawn.
 '-----------------------------------------------------------------------------
+' srcDoc is the document whose SETTINGS apply -- which is not always rng.Document.
+' When measuring, rng lives in the hidden scratch document while the settings
+' belong to the user's.
 Public Sub WriteCellText(rng As Range, ByVal text As String, _
-        ByVal role As String, ByVal directFormat As Boolean)
-    rng.Text = TransformedCellText(text, role)
+        ByVal role As String, ByVal directFormat As Boolean, srcDoc As Document)
+    rng.Text = TransformedCellText(text, role, srcDoc)
     ApplyGramGlossRuns rng, text, role, directFormat
 End Sub
 
@@ -406,14 +417,15 @@ End Sub
 ' A user who would rather keep their capitals as typed can turn this off in the
 ' settings; then the style still marks the runs but the text is untouched.
 '-----------------------------------------------------------------------------
-Public Function TransformedCellText(ByVal text As String, ByVal role As String) As String
+Public Function TransformedCellText(ByVal text As String, ByVal role As String, _
+        srcDoc As Document) As String
     Dim parts() As String, nParts As Long, i As Long, out As String
 
     If Not TierTakesSmallCaps(role) Then
         TransformedCellText = text
         Exit Function
     End If
-    If Not SettingLowercaseGramGloss() Then
+    If Not SettingLowercaseGramGloss(srcDoc) Then
         TransformedCellText = text
         Exit Function
     End If

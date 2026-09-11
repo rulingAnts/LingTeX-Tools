@@ -43,7 +43,7 @@ The two findings that matter most:
   nothing downstream will look right until it does.
 - **"14. VBProject access and Import"** decides how much manual work the rest of
   this costs. If it says `AVAILABLE`, one pasted bootstrap can import everything
-  and build the template. If `BLOCKED`, it is thirteen File → Import File… picks
+  and build the template. If `BLOCKED`, it is fourteen File → Import File… picks
   instead — dull but completely reliable.
 
 ### Also worth 60 seconds: the AppleScript bridge
@@ -53,7 +53,7 @@ VBA to AppleScript. Double-click it — it opens in Script Editor as plain text 
 and press Run. It creates and changes nothing; it only asks.
 
 If Word answers yes, two things get better: building the template becomes fully
-scripted instead of thirteen manual imports, and the Mac installer can verify
+scripted instead of fourteen manual imports, and the Mac installer can verify
 itself by running a macro after installing rather than copying a file and hoping.
 That second one matters, because the known silent failure is macOS quarantining a
 `.dotm` that arrived inside a downloaded zip — Word then refuses to load it and
@@ -101,19 +101,55 @@ two lines; that is usually enough.
 
 ---
 
-## Step 2 — the other seven, and the real thing
+## Step 2 — the other eight, and the second gate
 
 ```
 src/modStyles.bas         src/modReadBack.bas
 src/modSettings.bas       src/modLingTeX.bas
-src/modMeasure.bas        src/clsAppEvents.cls
-src/modRender.bas
+src/modMeasure.bas        src/modDocTests.bas
+src/modRender.bas         src/clsAppEvents.cls
 ```
 
-Run `AutoExec` once in the Immediate window to arm the save hook (or just restart
-Word).
+`clsAppEvents.cls` is a **class module** — paste it, do not import it. See *Class
+modules are pasted, never imported*.
 
-Then, in a new document, the three tests worth doing before any others:
+### The gate: `RunDocTests`
+
+```
+RunDocTests
+```
+
+Around 95 checks against Word's actual behaviour — styles, settings, text
+measurement, page geometry, and the scratch-document lifecycle. **Expect
+`ALL PASS`.** It works only in blank documents it creates and closes without
+saving, it touches nothing you have open, and it asserts at the end that it left
+the document count where it found it.
+
+Run this *before* the manual tests below. Almost every way the document layer can
+be wrong produces a wrong layout **silently** rather than an error — a font
+assignment that did not take, a style that was skipped, a measurement that
+returned zeros — and all of them look exactly like "the wrap algorithm is broken",
+which is the one part already proven. Looking at a rendered example cannot tell
+those apart. These checks can.
+
+Two of them are worth knowing by name:
+
+- **`widths are strictly increasing for i < iii < WWW`** — if measurement has
+  failed in any way, it returns zeros, and zeros are indistinguishable from empty
+  cells. This one assertion makes that whole class visible at once.
+- **`measured width of ERG matches the drawn width`** — measurement and drawing
+  are separate code paths that must produce the same glyphs. Nothing in the design
+  enforces that; only this comparison does.
+
+If a section reports `CRASH`, the run continues to the next one — send me the
+whole report. A crashed section is usually a VBA construct that compiles and then
+will not execute, which is precisely what no amount of reading finds.
+
+### Then arm the save hook
+
+Run `AutoExec` once in the Immediate window (or just restart Word).
+
+### Then, in a new document, the three tests worth doing before any others:
 
 ### 2a. Does an example appear at all?
 
@@ -202,7 +238,7 @@ path included. If the Window menu shows a stray blank document, type
 ## Shortcut if you are on Windows: import them automatically
 
 On Windows, VBA is allowed to rewrite its own project once one setting is on, and
-then a single pasted macro can import all thirteen modules and save the template.
+then a single pasted macro can import all fourteen modules and save the template.
 
 1. **File → Options → Trust Center → Trust Center Settings… → Macro Settings**,
    tick **"Trust access to the VBA project object model"**, restart Word.
@@ -336,7 +372,7 @@ any of the document-rendering work is built on top. A discrepancy found now is a
 type declaration; found later it is a mis-rendered table with no obvious cause.
 
 `tools/ImportModules.bas` makes the Windows side cheap — one paste imports all
-thirteen modules, and re-running re-syncs them after any pull.
+fourteen modules, and re-running re-syncs them after any pull.
 
 ---
 

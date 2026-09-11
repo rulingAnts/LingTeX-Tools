@@ -333,6 +333,175 @@ def check_array_return_as_argument(files):
     return problems
 
 
+def _params_of(sig):
+    """Parameter list of a procedure signature: (required, total, has_paramarray)."""
+    i = sig.find("(")
+    if i < 0:
+        return (0, 0, False)
+    depth = 0
+    for j in range(i, len(sig)):
+        if sig[j] == "(":
+            depth += 1
+        elif sig[j] == ")":
+            depth -= 1
+            if depth == 0:
+                break
+    inner = sig[i + 1:j]
+    if not inner.strip():
+        return (0, 0, False)
+    parts, depth, cur = [], 0, ""
+    for ch in inner:
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth -= 1
+        if ch == "," and depth == 0:
+            parts.append(cur); cur = ""
+        else:
+            cur += ch
+    parts.append(cur)
+    required = total = 0
+    pa = False
+    for part in parts:
+        s = part.strip()
+        if not s:
+            continue
+        total += 1
+        low = s.lower()
+        if low.startswith("paramarray"):
+            pa = True
+        elif not low.startswith("optional"):
+            required += 1
+    return (required, total, pa)
+
+
+def check_call_arity(files):
+    """Calls must pass a legal number of arguments for the declared signature.
+
+    VBA reports a wrong argument count at COMPILE time, so this only substitutes
+    for a compile the project cannot get here. It matters because a signature
+    change -- threading a Document through a transform, say -- leaves call sites
+    that look perfectly fine on their own. Those are the ones a reader misses and
+    the editor then surfaces one error at a time.
+
+    Scans each line once and looks identifiers up, rather than scanning every line
+    for every known procedure: the latter is O(procedures x lines) and takes
+    minutes on this project.
+
+    Deliberately conservative -- a false positive here would train someone to
+    ignore the output, which is worse than a miss. So: only procedures whose name
+    is declared exactly once project-wide, only call sites on one logical line,
+    and nothing with a ParamArray.
+    """
+    engine = [f for f in files if f.name not in STANDALONE]
+
+    DECL = re.compile(r"^(?:Public\s+|Private\s+|Friend\s+)?(?:Static\s+)?"
+                      r"(Sub|Function)\s+([A-Za-z_]\w*)\s*\(", re.I)
+    SKIP = re.compile(r"^(?:Public\s+|Private\s+|Friend\s+)?(?:Static\s+)?"
+                      r"(?:Sub|Function|Property|Declare|Attribute|Type|Enum)\b", re.I)
+
+    sigs, dupes = {}, set()
+    for f in engine:
+        for n, t_ in logical_lines(f.read_text(encoding="utf-8")):
+            m = DECL.match(t_)
+            if not m:
+                continue
+            name = m.group(2)
+            if name.lower() in sigs:
+                dupes.add(name.lower())
+            sigs[name.lower()] = (f.name, n, _params_of(t_), m.group(1).lower(), name)
+    for d in dupes:
+        sigs.pop(d, None)
+    # Drop anything with a ParamArray, and anything whose name collides with a
+    # UDT field or a local we might mistake for a call.
+    sigs = {k: v for k, v in sigs.items() if not v[2][2]}
+
+    def count_args(argtext):
+        if not argtext.strip():
+            return 0
+        depth, n, instr = 0, 1, False
+        for ch in argtext:
+            if ch == '"':
+                instr = not instr
+            if instr:
+                continue
+            if ch in "([":
+                depth += 1
+            elif ch in ")]":
+                depth -= 1
+            elif ch == "," and depth == 0:
+                n += 1
+        return n
+
+    def span_of(s, open_at):
+        depth, k = 1, open_at + 1
+        while k < len(s) and depth > 0:
+            if s[k] == "(":
+                depth += 1
+            elif s[k] == ")":
+                depth -= 1
+            k += 1
+        return k - 1 if depth == 0 else -1
+
+    CALL = re.compile(r"(?<![.\w])([A-Za-z_]\w*)\s*\(")
+    STMT = re.compile(r"^(?:Call\s+)?([A-Za-z_]\w*)(?:\s+(.*))?$", re.I)
+
+    problems = []
+    for f in engine:
+        for n, t_ in logical_lines(f.read_text(encoding="utf-8")):
+            if SKIP.match(t_):
+                continue
+
+            # Function-style:  Name(args)
+            for m in CALL.finditer(t_):
+                sig = sigs.get(m.group(1).lower())
+                if not sig:
+                    continue
+                owner, decl_line, (req, tot, _pa), kind, real = sig
+                close = span_of(t_, m.end() - 1)
+                if close < 0:
+                    continue
+                got = count_args(t_[m.end():close])
+                if got < req or got > tot:
+                    rng = str(req) if tot == req else f"{req}-{tot}"
+                    problems.append(
+                        f"{f.name}:{n}: {real} called with {got} argument(s); "
+                        f"{owner}:{decl_line} declares {rng} "
+                        f"(compile error in Word)")
+
+            # Statement-style:  Name arg1, arg2
+            m = STMT.match(t_)
+            if m:
+                sig = sigs.get(m.group(1).lower())
+                if sig and sig[3] == "sub":
+                    owner, decl_line, (req, tot, _pa), kind, real = sig
+                    got = count_args(m.group(2) or "")
+                    if got < req or got > tot:
+                        rng = str(req) if tot == req else f"{req}-{tot}"
+                        problems.append(
+                            f"{f.name}:{n}: {real} called with {got} argument(s); "
+                            f"{owner}:{decl_line} declares {rng} "
+                            f"(compile error in Word)")
+    return problems
+
+
+def check_not_equals_precedence(files):
+    """`If Not x = y` parses as `(Not x) = y`, which is almost never meant.
+
+    Legal VBA, so nothing complains, and for a Boolean x it often even gives the
+    right answer -- which is why it survives review. Written once in this project
+    by accident; worth a rule rather than a memory.
+    """
+    problems = []
+    for f in files:
+        for n, t in logical_lines(f.read_text(encoding="utf-8")):
+            if re.search(r"\bNot\s+[A-Za-z_][\w.()]*\s*(?:=|<>)", t, re.I):
+                problems.append(
+                    f"{f.name}:{n}: `Not x = y` parses as `(Not x) = y`; "
+                    f"write `Not (x = y)` or `x <> y`")
+    return problems
+
+
 def check_stage1_independence(files):
     """Stage-1 modules must not reference anything only stage 2 defines."""
     engine = [f for f in files if f.name not in STANDALONE]
@@ -388,6 +557,24 @@ def main():
             print("          " + msg)
     else:
         print("  OK    no array return passed as an argument")
+
+    arity = check_call_arity(files)
+    if arity:
+        total += len(arity)
+        print("  FAIL  call arity")
+        for msg in arity:
+            print("          " + msg)
+    else:
+        print("  OK    call arity")
+
+    prec = check_not_equals_precedence(files)
+    if prec:
+        total += len(prec)
+        print("  FAIL  Not-equals precedence")
+        for msg in prec:
+            print("          " + msg)
+    else:
+        print("  OK    no `Not x = y` precedence traps")
 
     stage = check_stage1_independence(files)
     if stage:

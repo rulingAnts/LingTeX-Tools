@@ -62,11 +62,21 @@ Public Function SettingSpaceReplacement(doc As Document) As String
     SettingSpaceReplacement = s
 End Function
 
-' Called from modRender without a document, because it is a presentation choice
-' that applies wherever text is being written.
-Public Function SettingLowercaseGramGloss() As Boolean
-    SettingLowercaseGramGloss = ReadBool(ActiveDocumentOrNothing(), _
-        "LowercaseGramGloss", DEF_LOWERCASE_GRAM)
+'-----------------------------------------------------------------------------
+' Lowercase grammatical glosses so small caps can draw them as small capitals?
+'
+' Takes the document explicitly, like every other getter. It used to read
+' ActiveDocument instead, on the grounds that this is "a presentation choice that
+' applies wherever text is being written" -- but it is stored per document, so
+' rendering into a document that is not the active one read the WRONG document's
+' answer. Measurement made that worse: the width cache keys on this, so a cached
+' width could be taken under one document's setting and served under another's.
+'
+' doc may be Nothing, in which case the default applies.
+'-----------------------------------------------------------------------------
+Public Function SettingLowercaseGramGloss(doc As Document) As Boolean
+    SettingLowercaseGramGloss = ReadBool(doc, "LowercaseGramGloss", _
+                                         DEF_LOWERCASE_GRAM)
 End Function
 
 Public Function SettingRewrapOnSave(doc As Document) As Boolean
