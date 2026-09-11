@@ -223,8 +223,8 @@ End Sub
 '-----------------------------------------------------------------------------
 Public Sub DiagnoseWrap()
     Dim wParts() As String, fParts() As String
-    Dim parsedW() As Single, parsedF() As Boolean
-    Dim fixedW(0 To 2) As Single
+    Dim parsedW() As Double, parsedF() As Boolean
+    Dim fixedW(0 To 2) As Double
     Dim fixedF(0 To 2) As Boolean
     Dim lineStarts() As Long
     Dim i As Long
@@ -280,7 +280,7 @@ Public Sub DiagnoseWrap()
     Emit "step 7  parse each width with Val then CSng"
     For i = 0 To UBound(wParts)
         Emit "        i=" & CStr(i) & " raw=[" & wParts(i) & "]"
-        parsedW(i) = CSng(Val(Trim$(wParts(i))))
+        parsedW(i) = CDbl(Val(Trim$(wParts(i))))
         parsedF(i) = False
         If i <= UBound(fParts) Then parsedF(i) = (Trim$(fParts(i)) = "1")
     Next i
@@ -321,6 +321,16 @@ End Sub
 ' every result rather than stopping at the first failure. If Single is broken here
 ' and Double is not, the engine should not be using Single -- and this says so
 ' with evidence rather than assumption.
+'
+' WHAT CAME OF IT.  Every type passed here, Single included -- each in a one-line
+' function of its own.  Then stage 2's first run died the same way: error 6 at a
+' call passing the literal 0 into a "ByVal ... As Single" parameter, in a different
+' module, before any arithmetic.  Two occurrences, same shape, same Mac build, and
+' both in procedures with more on the stack than these have.  So the conversion
+' of an integer into a Single fails on this build depending on the frame it runs
+' in, which is exactly why a per-type check in tiny functions could not see it.
+' THE ENGINE NOW USES Double EVERYWHERE.  The Single here, and in MicroDiagnose
+' below, is kept deliberately: it is the reproduction.
 '-----------------------------------------------------------------------------
 Public Sub TypeCheck()
     mRpt = ""
@@ -966,9 +976,9 @@ End Sub
 ' Returns the error text instead of raising, so one bad case cannot hide the rest.
 '-----------------------------------------------------------------------------
 Private Function WrapOf(widthsV As Variant, flagsV As Variant, _
-        ByVal avail As Single) As String
+        ByVal avail As Double) As String
 
-    Dim widths() As Single
+    Dim widths() As Double
     Dim flags() As Boolean
     Dim starts() As Long
     Dim i As Long
@@ -979,7 +989,7 @@ Private Function WrapOf(widthsV As Variant, flagsV As Variant, _
     ReDim widths(0 To UBound(widthsV))
     ReDim flags(0 To UBound(widthsV))
     For i = 0 To UBound(widthsV)
-        widths(i) = CSng(widthsV(i))
+        widths(i) = CDbl(widthsV(i))
         flags(i) = (CLng(flagsV(i)) <> 0)
     Next i
 

@@ -22,12 +22,12 @@ Private Const VAR_PREFIX As String = "LingTeX_"
 '-- Defaults ------------------------------------------------------------------
 ' Horizontal air between alignment columns, in points.  Enough to read the
 ' columns as separate without the example sprawling.
-Private Const DEF_GAP As Single = 6
+Private Const DEF_GAP As Double = 6
 ' Vertical air between wrap lines, in points.
-Private Const DEF_LINE_GAP As Single = 6
+Private Const DEF_LINE_GAP As Double = 6
 ' Indent applied to every wrap line after the first, in points.  Zero by default:
 ' a flush-left continuation keeps the columns of long examples comparable.
-Private Const DEF_CONT_INDENT As Single = 0
+Private Const DEF_CONT_INDENT As Double = 0
 ' What replaces a space found inside an interlinear cell.
 Private Const DEF_SPACE_REPL As String = "."
 ' Lowercase grammatical glosses so Word's small caps can render them.
@@ -43,16 +43,16 @@ Private Const DEF_REWRAP_ON_SELECTION As Boolean = False
 ' -- TYPED GETTERS ----------------------------------------------------------
 '=============================================================================
 
-Public Function SettingGap(doc As Document) As Single
-    SettingGap = ReadSingle(doc, "Gap", DEF_GAP)
+Public Function SettingGap(doc As Document) As Double
+    SettingGap = ReadDouble(doc, "Gap", DEF_GAP)
 End Function
 
-Public Function SettingLineGap(doc As Document) As Single
-    SettingLineGap = ReadSingle(doc, "LineGap", DEF_LINE_GAP)
+Public Function SettingLineGap(doc As Document) As Double
+    SettingLineGap = ReadDouble(doc, "LineGap", DEF_LINE_GAP)
 End Function
 
-Public Function SettingContIndent(doc As Document) As Single
-    SettingContIndent = ReadSingle(doc, "ContIndent", DEF_CONT_INDENT)
+Public Function SettingContIndent(doc As Document) As Double
+    SettingContIndent = ReadDouble(doc, "ContIndent", DEF_CONT_INDENT)
 End Function
 
 Public Function SettingSpaceReplacement(doc As Document) As String
@@ -101,15 +101,15 @@ End Function
 ' -- TYPED SETTERS ----------------------------------------------------------
 '=============================================================================
 
-Public Sub SetSettingGap(doc As Document, ByVal v As Single)
+Public Sub SetSettingGap(doc As Document, ByVal v As Double)
     WriteVar doc, "Gap", CStr(v)
 End Sub
 
-Public Sub SetSettingLineGap(doc As Document, ByVal v As Single)
+Public Sub SetSettingLineGap(doc As Document, ByVal v As Double)
     WriteVar doc, "LineGap", CStr(v)
 End Sub
 
-Public Sub SetSettingContIndent(doc As Document, ByVal v As Single)
+Public Sub SetSettingContIndent(doc As Document, ByVal v As Double)
     WriteVar doc, "ContIndent", CStr(v)
 End Sub
 
@@ -157,18 +157,18 @@ Private Function ReadString(doc As Document, ByVal nm As String, _
     On Error GoTo 0
 End Function
 
-Private Function ReadSingle(doc As Document, ByVal nm As String, _
-        ByVal dflt As Single) As Single
+Private Function ReadDouble(doc As Document, ByVal nm As String, _
+        ByVal dflt As Double) As Double
     Dim s As String
-    ReadSingle = dflt
+    ReadDouble = dflt
     s = ReadString(doc, nm, "")
     If s = "" Then Exit Function
     On Error Resume Next
-    ReadSingle = CSng(s)
-    If Err.Number <> 0 Then ReadSingle = dflt
+    ReadDouble = CDbl(s)
+    If Err.Number <> 0 Then ReadDouble = dflt
     Err.Clear
     On Error GoTo 0
-    If ReadSingle < 0 Then ReadSingle = 0
+    If ReadDouble < 0 Then ReadDouble = 0
 End Function
 
 Private Function ReadBool(doc As Document, ByVal nm As String, _

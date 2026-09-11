@@ -47,7 +47,7 @@ Public gRenderError As String
 '-----------------------------------------------------------------------------
 Public Function RenderExample(ex As IgtExample, target As Range) As Table
     Dim doc As Document
-    Dim colW() As Single
+    Dim colW() As Double
     Dim lineStarts() As Long
     Dim interTiers() As Long, nInter As Long
     Dim nLines As Long, maxCols As Long
@@ -78,13 +78,13 @@ End Function
 '-----------------------------------------------------------------------------
 Private Function PlanExample(ex As IgtExample, target As Range, doc As Document, _
         ByRef interTiers() As Long, ByRef nInter As Long, _
-        ByRef colW() As Single, ByRef lineStarts() As Long, _
+        ByRef colW() As Double, ByRef lineStarts() As Long, _
         ByRef nLines As Long, ByRef maxCols As Long, _
         ByRef why As String) As Boolean
 
-    Dim cellWidths() As Single
+    Dim cellWidths() As Double
     Dim flags() As Boolean
-    Dim avail As Single, gap As Single, contIndent As Single
+    Dim avail As Double, gap As Double, contIndent As Double
 
     why = ""
     If ex.TierCount = 0 Or ex.ColCount = 0 Then
@@ -149,7 +149,7 @@ End Function
 '-----------------------------------------------------------------------------
 Private Function DrawExample(ex As IgtExample, target As Range, doc As Document, _
         interTiers() As Long, ByVal nInter As Long, _
-        colW() As Single, lineStarts() As Long, _
+        colW() As Double, lineStarts() As Long, _
         ByVal nLines As Long, ByVal maxCols As Long) As Table
 
     Dim tbl As Table
@@ -190,7 +190,7 @@ Public Function RewrapTable(tbl As Table) As Table
     Dim doc As Document
     Dim anchor As Range
     Dim startPos As Long
-    Dim colW() As Single
+    Dim colW() As Double
     Dim lineStarts() As Long
     Dim interTiers() As Long, nInter As Long
     Dim nLines As Long, maxCols As Long
@@ -293,7 +293,7 @@ End Sub
 ' because Word shifts the remaining cells left each time.
 '-----------------------------------------------------------------------------
 Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
-        ByVal nInter As Long, lineStarts() As Long, colW() As Single, doc As Document)
+        ByVal nInter As Long, lineStarts() As Long, colW() As Double, doc As Document)
 
     Dim g As Long, i As Long, c As Long, r As Long
     Dim lineFirst As Long, lineLast As Long, lineCols As Long
@@ -301,7 +301,7 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
     Dim surplus As Long, k As Long
     Dim role As String
     Dim cellRng As Range
-    Dim lineGap As Single
+    Dim lineGap As Double
 
     nLines = UBound(lineStarts) - LBound(lineStarts) + 1
     maxCols = MaxColumnsPerLine(lineStarts, ex.ColCount)

@@ -471,27 +471,32 @@ fourteen modules, and re-running re-syncs them after any pull.
 
 ---
 
-## An unexplained failure, worth knowing about
+## The `Single` failure, now explained
 
 During stage 1 a `Dim s1 As Single` / `s1 = 10` assignment raised run-time error
 6, *Overflow* — in one procedure, while the identical assignment in a smaller
-procedure in the same module worked, and `TypeCheck` confirmed every numeric type
-including `Single` behaves correctly on this build.
+procedure worked, and `TypeCheck` confirmed every numeric type including `Single`
+behaved correctly on this build. Splitting the code into smaller procedures made
+it go away, which was recorded here as a workaround rather than a diagnosis.
 
-Restructuring the failing code into smaller procedures resolved it. **But that is
-not a diagnosis.** The obvious theory — "large procedures with many array locals
-fail" — does not survive contact with the evidence: `ModelFromBlock` is one of the
-largest procedures in the project, declares several arrays, and passes. The
-modules had also been removed and re-imported many times by that point, so a
-corrupted project state is at least as plausible an explanation as anything in the
-code.
+Stage 2's first run supplied the diagnosis. `RunDocTests` compiled and then died
+in its first section with the same error 6, at a call passing the literal `0`
+into a `ByVal … As Single` parameter — a different module, no arithmetic anywhere
+near it. Two occurrences of one shape on the same Mac build: **converting an
+integer into a `Single` fails on this build, depending on the stack frame it
+happens in.** That is why `TypeCheck` could not see it — it tests each type in a
+one-line function, the one kind of frame where it never fails — and why "make
+the procedure smaller" appeared to fix it.
 
-Why it matters for stage 2: several engine procedures are large and declare
-multiple array locals — `RenderExample`, `MeasureExample`, `MeasureTexts`,
-`FillTable`. If one of them fails with an inexplicable run-time error, **try
-splitting it into smaller procedures before assuming the logic is wrong**, and
-try a clean re-import of the module first. Do not spend an afternoon on the
-arithmetic.
+**The engine no longer uses `Single` anywhere. Every width, size, gap and
+position is a `Double`** — VBA's native floating type, and what the JavaScript
+reference implementation has used all along. Two proven modules changed with it,
+`modWrap` and `modTests`, which is why `RunAllTests` has to be run again after this
+change: its 79 checks re-prove them. The `Single` in `TypeCheck` and
+`MicroDiagnose` is kept on purpose, as the reproduction.
+
+If error 6 ever appears again with no arithmetic in sight, look for a `Single`
+first.
 
 ---
 

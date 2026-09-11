@@ -113,7 +113,7 @@ End Function
 ' broken a style.
 '-----------------------------------------------------------------------------
 Public Sub EnsureStyles(doc As Document, Optional ByVal force As Boolean = False)
-    Dim bodyFont As String, bodySize As Single
+    Dim bodyFont As String, bodySize As Double
     Dim createdAny As Boolean
 
     If Not force Then
@@ -167,8 +167,8 @@ End Sub
 
 
 Private Sub EnsureParaStyle(doc As Document, ByVal role As String, _
-        ByVal fontName As String, ByVal fontSize As Single, _
-        ByVal italic As Boolean, ByVal spaceAfter As Single)
+        ByVal fontName As String, ByVal fontSize As Double, _
+        ByVal italic As Boolean, ByVal spaceAfter As Double)
 
     Dim nm As String
     Dim st As Style
@@ -401,8 +401,8 @@ Public Function BodyFontName(doc As Document) As String
     BodyFontName = fn
 End Function
 
-Public Function BodyFontSize(doc As Document) As Single
-    Dim sz As Single
+Public Function BodyFontSize(doc As Document) As Double
+    Dim sz As Double
     On Error Resume Next
     sz = doc.Styles(wdStyleNormal).Font.Size
     Err.Clear
