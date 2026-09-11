@@ -40,7 +40,22 @@ Option Explicit
 '   2. Insert > Module, paste this file in (without its first line, which the
 '      importer reads and which is a compile error if typed), name it modImport.
 '   3. Run  ImportLingTeXModules  from the Immediate window.
-'   4. Optionally run  SaveAsTemplate  to write LingTeX-Word.dotm.
+'   4. Run  VerifyLingTeXModules   -- confirms all fourteen are there and the two
+'      class modules really are classes. Do this before running any tests.
+'   5. Optionally run  SaveAsTemplate  to write LingTeX-Word.dotm.
+'
+' THE TWELVE STANDARD MODULES AND THE TWO CLASS MODULES ARE NOT THE SAME JOB.
+'
+' The .bas files import cleanly and always have. The .cls files are the part that
+' goes wrong: VBComponents.Import decides a file's component type by parsing its
+' header, and when it misreads the .cls preamble it creates a STANDARD module with
+' those lines left in the code as syntax errors -- which reads as a bug in the
+' module, not as a bad import.
+'
+' So Import is never called on a .cls here. The classes are created explicitly
+' instead, and if that does not work on your machine the report names the two files
+' to paste and the four steps, rather than failing and leaving you to work it out.
+' Set IMPORT_CLASS_MODULES to False to skip the attempt and go straight to pasting.
 '
 ' Re-running is safe: a module that is already present is replaced, so this is
 ' also how to pick up changes to src/ without rebuilding by hand.
@@ -60,14 +75,33 @@ Private Const SRC_FOLDER As String = ""
 '   i.e. the LingTeX-Word folder, which is where the repository expects it.
 Private Const DOTM_PATH As String = ""
 
-' Every module, in a deterministic order. VBA resolves names across the whole
-' project, so the order does not affect compilation; it only makes the log
+' The twelve standard modules, in a deterministic order. VBA resolves names across
+' the whole project, so the order does not affect compilation; it only makes the log
 ' readable and keeps stage 1 together at the top.
 Private Const MODULE_LIST As String = _
     "modFlexParse.bas|modIgtModel.bas|modLeipzig.bas|modWrap.bas|" & _
-    "clsIgtWarning.cls|modTests.bas|" & _
+    "modTests.bas|" & _
     "modStyles.bas|modSettings.bas|modMeasure.bas|modRender.bas|" & _
-    "modReadBack.bas|modLingTeX.bas|modDocTests.bas|clsAppEvents.cls"
+    "modReadBack.bas|modLingTeX.bas|modDocTests.bas"
+
+' The two class modules, kept separate because they are the part that goes wrong.
+Private Const CLASS_LIST As String = "clsIgtWarning.cls|clsAppEvents.cls"
+
+'-- Try to create the class modules from code, or leave them to you? ----------
+'
+' Importing a .cls is the one unreliable step here. VBComponents.Import decides what
+' kind of component to create by parsing the file header, and when it misreads the
+' preamble it makes a STANDARD module with those lines sitting in the code as syntax
+' errors -- which then reads as a bug in the module rather than a bad import.
+'
+' So this macro never calls Import on a .cls. With this True it creates the
+' component explicitly instead (VBComponents.Add, set the name, install the source),
+' which has nothing left to guess at. With it False it skips them entirely and tells
+' you which two files to paste into hand-made Class Modules.
+'
+' Either way the twelve standard modules come in the easy way, and the report at the
+' end says exactly what is left to do.
+Private Const IMPORT_CLASS_MODULES As Boolean = True
 
 
 '=============================================================================
@@ -76,13 +110,10 @@ Private Const MODULE_LIST As String = _
 
 Public Sub ImportLingTeXModules()
     Dim vbp As Object
-    Dim names() As String
-    Dim i As Long
-    Dim leaf As String, fullPath As String
-    Dim compName As String
-    Dim note As String
     Dim log As String
-    Dim okCount As Long, failCount As Long
+    Dim okCount As Long, failCount As Long, todoCount As Long
+    Dim todo As String
+    Dim msg As String
 
     If SRC_FOLDER = "" Then
         MsgBox "Set SRC_FOLDER at the top of modImport to the full path of the " & _
@@ -94,8 +125,53 @@ Public Sub ImportLingTeXModules()
     Set vbp = GetProject()
     If vbp Is Nothing Then Exit Sub              ' GetProject explains why
 
-    names = Split(MODULE_LIST, "|")
+    '-- the twelve standard modules: Import, which is reliable for these ------
+    ImportGroup vbp, MODULE_LIST, False, log, okCount, failCount, todo, todoCount
 
+    '-- the two class modules: explicitly created, or left to you -------------
+    If IMPORT_CLASS_MODULES Then
+        ImportGroup vbp, CLASS_LIST, True, log, okCount, failCount, todo, todoCount
+    Else
+        log = log & "  skipped  clsIgtWarning.cls   (paste by hand)" & vbCr
+        log = log & "  skipped  clsAppEvents.cls    (paste by hand)" & vbCr
+        todo = todo & PasteInstructions("clsIgtWarning", "05") & _
+               PasteInstructions("clsAppEvents", "14")
+        todoCount = todoCount + 2
+    End If
+
+    msg = "Imported " & CStr(okCount) & " of " & CStr(TotalModuleCount()) & _
+          " modules"
+    If failCount > 0 Then msg = msg & ", " & CStr(failCount) & " FAILED"
+    msg = msg & "." & vbCr & vbCr & log
+
+    If todoCount > 0 Then
+        msg = msg & vbCr & "STILL TO DO -- " & CStr(todoCount) & _
+              " module(s) you have to add by hand:" & vbCr & todo & vbCr & _
+              "Run  sh LingTeX-Word/tools/make-paste-bundle.sh  first if you have " & _
+              "not already; it writes the stripped, paste-ready copies." & vbCr
+    End If
+
+    msg = msg & vbCr & "Then:  VerifyLingTeXModules" & vbCr & _
+          "It confirms all fourteen are present and the two classes really are " & _
+          "classes, before you run anything."
+
+    Report msg, (failCount = 0 And todoCount = 0)
+End Sub
+
+'-----------------------------------------------------------------------------
+' Bring in one group of files, accumulating the log and the counts.
+'-----------------------------------------------------------------------------
+Private Sub ImportGroup(vbp As Object, ByVal fileList As String, _
+        ByVal asClass As Boolean, ByRef log As String, _
+        ByRef okCount As Long, ByRef failCount As Long, _
+        ByRef todo As String, ByRef todoCount As Long)
+
+    Dim names() As String
+    Dim i As Long
+    Dim leaf As String, fullPath As String, compName As String
+    Dim note As String
+
+    names = Split(fileList, "|")
     For i = 0 To UBound(names)
         leaf = names(i)
         fullPath = JoinPath(SRC_FOLDER, leaf)
@@ -108,24 +184,139 @@ Public Sub ImportLingTeXModules()
             ' Replace rather than duplicate, so re-running picks up edits.
             RemoveComponent vbp, compName
 
-            note = ImportOne(vbp, fullPath, compName, IsClassFile(leaf))
+            note = ImportOne(vbp, fullPath, compName, asClass)
             If note = "" Then
                 log = log & "  ok       " & leaf & _
-                      IIf(IsClassFile(leaf), "   (class module)", "") & vbCr
+                      IIf(asClass, "   (class module, created explicitly)", "") & vbCr
                 okCount = okCount + 1
+            ElseIf asClass Then
+                ' A class that could not be created from code is not a failure to
+                ' argue with -- it is two minutes of pasting. Say which file.
+                log = log & "  by hand  " & leaf & "  (" & note & ")" & vbCr
+                todo = todo & PasteInstructions(compName, _
+                           IIf(compName = "clsIgtWarning", "05", "14"))
+                todoCount = todoCount + 1
             Else
                 log = log & "  FAILED   " & leaf & "  (" & note & ")" & vbCr
                 failCount = failCount + 1
             End If
         End If
     Next i
-
-    Report "Imported " & CStr(okCount) & " of " & CStr(UBound(names) + 1) & _
-           " modules" & IIf(failCount > 0, ", " & CStr(failCount) & " FAILED", "") & _
-           "." & vbCr & vbCr & log & vbCr & _
-           "Next: run RunAllTests, then RunDocTests, then AutoExec.", _
-           (failCount = 0)
 End Sub
+
+Private Function TotalModuleCount() As Long
+    TotalModuleCount = UBound(Split(MODULE_LIST, "|")) + 1 + _
+                       UBound(Split(CLASS_LIST, "|")) + 1
+End Function
+
+Private Function PasteInstructions(ByVal compName As String, _
+        ByVal num As String) As String
+
+    PasteInstructions = _
+        "  " & compName & vbCr & _
+        "    1. Insert > Class Module   (NOT Insert > Module)" & vbCr & _
+        "    2. Open  LingTeX-Word/build/paste/" & num & "-" & compName & ".txt" & _
+        vbCr & _
+        "       and paste the whole thing in" & vbCr & _
+        "    3. Properties pane, (Name) row:  " & compName & vbCr & _
+        "    4. Instancing should read  1 - Private  (the default; check it)" & vbCr
+End Function
+
+'-----------------------------------------------------------------------------
+' IS THE PROJECT ACTUALLY COMPLETE?
+'
+' Run this after importing, before running any tests. It is here because the ways
+' this goes wrong are all quiet: a class that came in as a standard module compiles
+' nowhere and the error names a line in the middle of it; a module that failed to
+' import leaves the whole project failing to compile on a name that is simply
+' absent; and a missing module looks exactly like a bug in the module that calls it.
+'
+' It reads the component TYPE out of the VBA project, which is the authoritative
+' answer. It deliberately does NOT do "Set o = New clsIgtWarning" as a second
+' opinion, however tempting: this module is pasted on its own into a bare project,
+' so a reference to clsIgtWarning would stop the project compiling until the classes
+' were present -- and the macro whose job is to bring them in would not run. The
+' linter has a rule for that now.
+'
+' Type it yourself in the Immediate window once everything is in, if you want the
+' second opinion:
+'
+'     ?TypeName(New clsIgtWarning)
+'
+' which prints clsIgtWarning if it is really a class and errors if it is not.
+' RunDocTests checks both classes this way too.
+'
+' Needs the Trust Center setting, like the import itself.
+'-----------------------------------------------------------------------------
+Public Sub VerifyLingTeXModules()
+    Dim vbp As Object
+    Dim names() As String
+    Dim i As Long
+    Dim compName As String
+    Dim log As String
+    Dim problems As Long
+    Dim kind As Long
+
+    Set vbp = GetProject()
+    If vbp Is Nothing Then Exit Sub
+
+    names = Split(MODULE_LIST & "|" & CLASS_LIST, "|")
+    For i = 0 To UBound(names)
+        compName = BaseName(names(i))
+        kind = ComponentKind(vbp, compName)
+
+        Select Case kind
+            Case 0
+                log = log & "  MISSING       " & compName & vbCr
+                problems = problems + 1
+            Case 1                                  ' vbext_ct_StdModule
+                If IsClassFile(names(i)) Then
+                    log = log & "  WRONG KIND    " & compName & _
+                          "  -- it is a standard module and must be a CLASS" & vbCr
+                    problems = problems + 1
+                Else
+                    log = log & "  ok            " & compName & vbCr
+                End If
+            Case 2                                  ' vbext_ct_ClassModule
+                If IsClassFile(names(i)) Then
+                    log = log & "  ok  (class)   " & compName & vbCr
+                Else
+                    log = log & "  WRONG KIND    " & compName & _
+                          "  -- it is a class and must be a standard module" & vbCr
+                    problems = problems + 1
+                End If
+            Case Else
+                log = log & "  ODD KIND      " & compName & _
+                      "  (component type " & CStr(kind) & ")" & vbCr
+                problems = problems + 1
+        End Select
+    Next i
+
+    If problems = 0 Then
+        Report "All " & CStr(UBound(names) + 1) & " modules present and of the " & _
+               "right kind." & vbCr & vbCr & log & vbCr & _
+               "Next:  RunAllTests    (expect ALL PASS, 79 checks)" & vbCr & _
+               "then:  RunDocTests    (expect ALL PASS, about 250 checks)" & vbCr & _
+               "then:  AutoExec       (arms the save hook)", True
+    Else
+        Report CStr(problems) & " problem(s) with the project:" & vbCr & vbCr & log & _
+               vbCr & "A class module that came in as a standard module is the " & _
+               "usual one. Delete it and redo it with Insert > Class Module and " & _
+               "the matching file in LingTeX-Word/build/paste/.", False
+    End If
+End Sub
+
+' 0 = not present, otherwise the VBComponent Type (1 standard, 2 class, 3 form).
+Private Function ComponentKind(vbp As Object, ByVal compName As String) As Long
+    Dim c As Object
+    On Error Resume Next
+    Set c = vbp.VBComponents(compName)
+    If Err.Number = 0 Then
+        If Not c Is Nothing Then ComponentKind = c.Type
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Function
 
 '-----------------------------------------------------------------------------
 ' Save the active document as the macro-enabled template.

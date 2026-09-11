@@ -2022,8 +2022,14 @@ Private Sub TestEvents()
     Dim doc As Document
     Dim savedQuiet As Boolean
 
+    ' New compiles only against a class module, so these two assertions are the
+    ' definitive answer to "did the class modules come in as classes" -- the failure
+    ' that is most likely of all, because importing a .cls is unreliable. They live
+    ' here rather than in modImport, which is pasted alone into a bare project and so
+    ' cannot name a class at all.
     Set ev = New clsAppEvents
     Ok "clsAppEvents really is a class module", (TypeName(ev) = "clsAppEvents")
+    Ok "clsIgtWarning really is a class module too", WarningClassIsAClass()
 
     Set doc = NewBlankDoc()
     If doc Is Nothing Then
@@ -2061,6 +2067,16 @@ Private Sub TestEvents()
     gQuiet = savedQuiet
     CloseNoSave doc
 End Sub
+
+Private Function WarningClassIsAClass() As Boolean
+    Dim w As clsIgtWarning
+    On Error Resume Next
+    Set w = New clsIgtWarning
+    Err.Clear
+    On Error GoTo 0
+    If w Is Nothing Then Exit Function
+    WarningClassIsAClass = (TypeName(w) = "clsIgtWarning")
+End Function
 
 ' The handler must not act while a command is in flight. Word has no
 ' Application.EnableEvents, so gBusy is the only thing preventing an edit made by a

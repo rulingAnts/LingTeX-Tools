@@ -375,6 +375,27 @@ def _params_of(sig):
     return (required, total, pa)
 
 
+def mask_strings(s):
+    """Blank out string literal CONTENTS, keeping length so offsets still line up.
+
+    Every rule that looks for identifiers needs this. A procedure name mentioned
+    inside a string -- a test asserting on "LingTeXRewrapAll (empty)", or a message
+    saying "Next: RunAllTests" -- is text, not code. Both rules below produced false
+    positives on exactly that before this existed, and a check that cries wolf is
+    worse than a missing check: it teaches whoever sees the output to ignore it.
+    """
+    out, instr = [], False
+    for ch in s:
+        if ch == '"':
+            instr = not instr
+            out.append(ch)
+        elif instr:
+            out.append(" ")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
 def check_call_arity(files):
     """Calls must pass a legal number of arguments for the declared signature.
 
@@ -446,25 +467,6 @@ def check_call_arity(files):
     CALL = re.compile(r"(?<![.\w])([A-Za-z_]\w*)\s*\(")
     STMT = re.compile(r"^(?:Call\s+)?([A-Za-z_]\w*)(?:\s+(.*))?$", re.I)
 
-    def mask_strings(s):
-        """Blank out string literal CONTENTS, keeping length so offsets still line up.
-
-        Without this, a procedure name mentioned inside a string -- a test asserting
-        on "LingTeXRewrapAll (empty)", say -- reads as a call with one argument. That
-        false positive is worse than a miss: it teaches whoever sees it that this
-        check cries wolf.
-        """
-        out, instr = [], False
-        for ch in s:
-            if ch == '"':
-                instr = not instr
-                out.append(ch)
-            elif instr:
-                out.append(" ")
-            else:
-                out.append(ch)
-        return "".join(out)
-
     problems = []
     for f in engine:
         for n, t_raw in logical_lines(f.read_text(encoding="utf-8")):
@@ -519,6 +521,127 @@ def check_not_equals_precedence(files):
                 problems.append(
                     f"{f.name}:{n}: `Not x = y` parses as `(Not x) = y`; "
                     f"write `Not (x = y)` or `x <> y`")
+    return problems
+
+
+def check_module_lists(files):
+    """Every module in src/ must appear in both install paths, and vice versa.
+
+    THREE places list the modules: src/ itself, MODULE_LIST + CLASS_LIST in
+    ImportModules.bas, and STAGE1 + STAGE2 in make-paste-bundle.sh. Add a module and
+    forget one of them, and the user installs all but that one -- after which the
+    project fails to compile on a name that is simply absent, which reads as a bug in
+    whichever module calls it rather than as a missing file.
+
+    Also checks the .bas/.cls split: ImportModules must not try to Import a class.
+    """
+    root = SRC_DIRS[0].parent
+    src_dir = SRC_DIRS[0]
+    on_disk = {f.name for f in src_dir.glob("*.bas")} | \
+              {f.name for f in src_dir.glob("*.cls")}
+    if not on_disk:
+        return []
+
+    problems = []
+
+    imp = root / "tools" / "ImportModules.bas"
+    if imp.exists():
+        text = imp.read_text(encoding="utf-8")
+        mods, classes = set(), set()
+        for const, into in (("MODULE_LIST", mods), ("CLASS_LIST", classes)):
+            # The constant's value runs to the first blank line or comment line.
+            pat = const + r"\s+As String\s*=\s*_?(.*?)\n\s*(?:\n|')"
+            m = re.search(pat, text, re.S)
+            if not m:
+                problems.append(f"ImportModules.bas: no {const} found")
+                continue
+            joined = "".join(re.findall(r'"([^"]*)"', m.group(1)))
+            into.update(x for x in joined.split("|") if x)
+        listed = mods | classes
+        missing = on_disk - listed
+        extra = listed - on_disk
+        for n in sorted(missing):
+            problems.append(f"ImportModules.bas: {n} is in src/ but in neither "
+                            f"MODULE_LIST nor CLASS_LIST")
+        for n in sorted(extra):
+            problems.append(f"ImportModules.bas: {n} is listed but not in src/")
+        for n in sorted(x for x in mods if x.endswith(".cls")):
+            problems.append(f"ImportModules.bas: {n} is in MODULE_LIST, which is "
+                            f"imported -- a .cls must be in CLASS_LIST")
+        for n in sorted(x for x in classes if x.endswith(".bas")):
+            problems.append(f"ImportModules.bas: {n} is in CLASS_LIST, which creates "
+                            f"class modules -- a .bas must be in MODULE_LIST")
+
+    bundle = root / "tools" / "make-paste-bundle.sh"
+    if bundle.exists():
+        text = bundle.read_text(encoding="utf-8")
+        names = set()
+        for const in ("STAGE1", "STAGE2"):
+            m = re.search(const + r'="([^"]*)"', text)
+            if not m:
+                problems.append(f"make-paste-bundle.sh: no {const} found")
+                continue
+            names.update(m.group(1).split())
+        # the bundle lists bare names, so compare without extensions
+        on_disk_bare = {n.rsplit(".", 1)[0] for n in on_disk}
+        for n in sorted(on_disk_bare - names):
+            problems.append(f"make-paste-bundle.sh: {n} is in src/ but in neither "
+                            f"STAGE1 nor STAGE2")
+        for n in sorted(names - on_disk_bare):
+            problems.append(f"make-paste-bundle.sh: {n} is listed but not in src/")
+
+    return problems
+
+
+def check_standalone_independence(files):
+    """Standalone modules must not reference anything the engine defines.
+
+    modProbe.bas and ImportModules.bas are each pasted ALONE into a bare project --
+    the probe before any engine module exists, the importer in order to bring them
+    in. VBA compiles the whole project at once, so a single reference to engine code
+    makes the project fail to compile, and the macro whose job is to fix that cannot
+    run. A chicken-and-egg failure with a confusing error.
+
+    The mirror of check_stage1_independence, and written because I put
+    "Set o = New clsIgtWarning" into ImportModules.bas as a second opinion on
+    whether the class had imported correctly. It would not have compiled until the
+    class was there.
+    """
+    standalone = [f for f in files if f.name in STANDALONE]
+    engine = [f for f in files if f.name not in STANDALONE]
+    if not standalone:
+        return []
+
+    engine_defs = {}
+    for f in engine:
+        for nm in proc_names(f.read_text(encoding="utf-8")):
+            engine_defs.setdefault(nm, f.name)
+    # Class and Type names too: "New clsIgtWarning" names no procedure.
+    for f in engine:
+        for n, t in logical_lines(f.read_text(encoding="utf-8")):
+            m = re.match(r"^Attribute VB_Name = \"([A-Za-z_]\w*)\"", t)
+            if m:
+                engine_defs.setdefault(m.group(1), f.name)
+            m = re.match(r"^(?:Public\s+|Private\s+)?Type\s+([A-Za-z_]\w*)", t, re.I)
+            if m:
+                engine_defs.setdefault(m.group(1), f.name)
+
+    own = set()
+    for f in standalone:
+        own |= proc_names(f.read_text(encoding="utf-8"))
+
+    problems = []
+    for f in standalone:
+        for n, t_raw in logical_lines(f.read_text(encoding="utf-8")):
+            t = mask_strings(t_raw)
+            for nm, owner in engine_defs.items():
+                if nm in own:
+                    continue
+                if re.search(r"(?<![.\w])" + re.escape(nm) + r"(?![\w])", t):
+                    problems.append(
+                        f"{f.name}:{n}: references {nm}, which {owner} defines -- "
+                        f"but this module is pasted alone into a bare project, so "
+                        f"the project would not compile")
     return problems
 
 
@@ -595,6 +718,24 @@ def main():
             print("          " + msg)
     else:
         print("  OK    no `Not x = y` precedence traps")
+
+    lists = check_module_lists(files)
+    if lists:
+        total += len(lists)
+        print("  FAIL  module lists")
+        for msg in lists:
+            print("          " + msg)
+    else:
+        print("  OK    both install paths list every module in src/")
+
+    alone = check_standalone_independence(files)
+    if alone:
+        total += len(alone)
+        print("  FAIL  standalone independence")
+        for msg in alone:
+            print("          " + msg)
+    else:
+        print("  OK    standalone modules reference no engine code")
 
     stage = check_stage1_independence(files)
     if stage:
