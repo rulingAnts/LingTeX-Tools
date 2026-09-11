@@ -52,6 +52,26 @@ Public Const STYLE_PREFIX As String = "LingTeX "
 '-- Character style for grammatical gloss runs.
 Public Const STYLE_GRAM As String = "LingTeX Gram Gloss"
 
+' Module-level state lives HERE, above the first procedure, or it does not exist:
+' VBA's declarations section ends at the first Sub/Function, and a variable or
+' Const placed after that is a compile error. vba-lint.py checks this now.
+
+' A style name collided with a style of the wrong kind. Empty after a clean run.
+Public gStyleError As String
+
+' Remembered for the session. A document object identity check is enough to skip
+' the common case of many examples in one document.
+Private mStyledDoc As Document
+
+' Set by the Ensure*Style helpers when they actually add a style.
+Private mCreatedStyle As Boolean
+' Whether this document has already been through EnsureStyles, recorded where the
+' settings live so it survives save and reopen. Versioned, so a future change to
+' the style set re-runs rather than trusting a stale mark.
+Private Const STYLES_MADE_VAR As String = "LingTeX_StylesMade"
+Private Const STYLES_VERSION As String = "1"
+
+
 '-- Last-resort font when the document reports only a theme placeholder.
 '   Charis SIL is the usual choice for fieldwork documents; change it to suit
 '   your template.
@@ -92,9 +112,6 @@ End Function
 ' Passing force:=True redoes the work regardless, for a test that has deliberately
 ' broken a style.
 '-----------------------------------------------------------------------------
-' A style name collided with a style of the wrong kind. Empty after a clean run.
-Public gStyleError As String
-
 Public Sub EnsureStyles(doc As Document, Optional ByVal force As Boolean = False)
     Dim bodyFont As String, bodySize As Single
     Dim createdAny As Boolean
@@ -148,12 +165,6 @@ Public Sub EnsureStyles(doc As Document, Optional ByVal force As Boolean = False
     End If
 End Sub
 
-' Remembered for the session. A document object identity check is enough to skip
-' the common case of many examples in one document.
-Private mStyledDoc As Document
-
-' Set by the Ensure*Style helpers when they actually add a style.
-Private mCreatedStyle As Boolean
 
 Private Sub EnsureParaStyle(doc As Document, ByVal role As String, _
         ByVal fontName As String, ByVal fontSize As Single, _
@@ -295,12 +306,6 @@ Private Sub EnsureTableStyle(doc As Document)
     Err.Clear
     On Error GoTo 0
 End Sub
-
-' Whether this document has already been through EnsureStyles, recorded where the
-' settings live so it survives save and reopen. Versioned, so a future change to
-' the style set re-runs rather than trusting a stale mark.
-Private Const STYLES_MADE_VAR As String = "LingTeX_StylesMade"
-Private Const STYLES_VERSION As String = "1"
 
 Private Function StylesAlreadyMade(doc As Document) As Boolean
     Dim v As String

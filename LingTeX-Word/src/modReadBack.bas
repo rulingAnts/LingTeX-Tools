@@ -38,6 +38,15 @@ Private Const WD_UNDEFINED As Long = 9999999
 ' Why the last read gave up. Empty after a clean one.
 Public gReadBackError As String
 
+' Module-level state lives HERE, above the first procedure, or it does not exist:
+' VBA's declarations section ends at the first Sub/Function, and a variable or
+' Const placed after that is a compile error. vba-lint.py checks this now.
+
+' Set by modDocTests to force the slow, definitely-correct path, so the two can be
+' compared on a real table. Never set in normal use.
+Public gForceSlowRestore As Boolean
+
+
 
 '=============================================================================
 ' -- FINDING OUR TABLES -----------------------------------------------------
@@ -262,10 +271,6 @@ End Function
 '                          character, which is the only way to tell which run is
 '                          which.
 '-----------------------------------------------------------------------------
-' Set by modDocTests to force the slow, definitely-correct path, so the two can be
-' compared on a real table. Never set in normal use.
-Public gForceSlowRestore As Boolean
-
 Public Function CellTextRestored(tbl As Table, ByVal r As Long, ByVal c As Long) As String
     Dim rng As Range
     Dim raw As String
