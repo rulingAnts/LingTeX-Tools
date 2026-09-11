@@ -105,10 +105,27 @@ Private Const CLASS_LIST As String = "clsIgtWarning.cls|clsAppEvents.cls"
 ' end says exactly what is left to do.
 Private Const IMPORT_CLASS_MODULES As Boolean = True
 
+' Set by ImportLingTeXModulesQuiet: reports go to a file beside the document
+' instead of a dialog, so a script can drive this. Same convention as the test
+' suites (see modTests.ReportFolderPath); duplicated here because this module is
+' pasted alone and may reference nothing in the engine.
+Private mQuiet As Boolean
+Private Const REPORT_FOLDER As String = "LingTeX-Word-reports"
+
 
 '=============================================================================
 ' -- IMPORT -----------------------------------------------------------------
 '=============================================================================
+
+' Import, then verify, with every report appended to
+' <document folder>/LingTeX-Word-reports/ImportModules.txt and no dialogs.
+' For tools/run-in-word.sh and tools/run-in-word.ps1.
+Public Sub ImportLingTeXModulesQuiet()
+    mQuiet = True
+    ImportLingTeXModules
+    VerifyLingTeXModules
+    mQuiet = False
+End Sub
 
 Public Sub ImportLingTeXModules()
     Dim vbp As Object
@@ -609,5 +626,44 @@ End Function
 ' alone is invisible unless the Immediate window happens to be open.
 Private Sub Report(ByVal msg As String, ByVal good As Boolean)
     Debug.Print msg
+    If mQuiet Then
+        If AppendReport(IIf(good, "OK", "PROBLEM") & vbCr & msg) Then Exit Sub
+    End If
     MsgBox msg, IIf(good, vbInformation, vbExclamation), "LingTeX-Word import"
 End Sub
+
+' Append one report to ImportModules.txt beside the document. True on success; a
+' failure falls back to the dialog rather than raising.
+Private Function AppendReport(ByVal text As String) As Boolean
+    Dim folder As String, path As String, sep As String
+    Dim fn As Integer
+
+    On Error Resume Next
+    folder = ThisDocument.Path
+    sep = Application.PathSeparator
+    Err.Clear
+    On Error GoTo 0
+    If folder = "" Then Exit Function
+    If Right$(folder, 1) = sep Then folder = Left$(folder, Len(folder) - 1)
+    folder = folder & sep & REPORT_FOLDER
+
+    On Error Resume Next
+    If Dir(folder, vbDirectory) = "" Then MkDir folder
+    Err.Clear
+    On Error GoTo 0
+
+    path = folder & sep & "ImportModules.txt"
+    On Error GoTo Failed
+    fn = FreeFile
+    Open path For Append As #fn
+    Print #fn, text
+    Print #fn, ""
+    Close #fn
+    AppendReport = True
+    Exit Function
+
+Failed:
+    On Error Resume Next
+    Close #fn
+    Err.Clear
+End Function

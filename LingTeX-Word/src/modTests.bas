@@ -32,9 +32,29 @@ Private mFail As Long
 Private mRpt  As String
 Private mFirstFails As String
 
+' Set by RunAllTestsToFile: the report goes to a file and no dialog is shown, so a
+' script can drive the suite (tools/run-in-word.sh, tools/run-in-word.ps1) without
+' someone having to click OK. Off in normal use.
+Private mQuietRun As Boolean
+
+' Where the quiet runners leave their reports: a folder beside the document that
+' holds the project, which is the one place both the macro and the script driving
+' it can find without being told. Word for Mac cannot pass an argument through
+' "run VB macro", so this has to be a convention rather than a parameter.
+Public Const REPORT_FOLDER As String = "LingTeX-Word-reports"
+
 '=============================================================================
 ' -- RUNNER -----------------------------------------------------------------
 '=============================================================================
+
+' The same suite, for a script: report to <document folder>/LingTeX-Word-reports/
+' RunAllTests.txt, no dialog, no report document.  Falls back to the normal
+' delivery if the file cannot be written, so a sandbox refusal still shows a result.
+Public Sub RunAllTestsToFile()
+    mQuietRun = True
+    RunAllTests
+    mQuietRun = False
+End Sub
 
 Public Sub RunAllTests()
     mPass = 0
@@ -130,6 +150,11 @@ Private Sub DeliverResults()
     Dim d As Document
     Dim placed As Boolean
     Dim msg As String
+
+    If mQuietRun Then
+        If WriteReportFile("RunAllTests.txt", mRpt) Then Exit Sub
+        ' Could not write: fall through and deliver the ordinary way.
+    End If
 
     On Error Resume Next
     Set d = Documents.Add
@@ -1030,4 +1055,54 @@ Private Function CountTrue(flags() As Boolean) As Long
         If flags(i) Then n = n + 1
     Next i
     CountTrue = n
+End Function
+
+
+'=============================================================================
+' -- REPORT FILES (for the scripted runners) --------------------------------
+'=============================================================================
+
+' The folder the quiet runners write to, created on demand.  Beside the document
+' that holds the VBA project -- ThisDocument -- because that path is known to the
+' script that opened it.  Empty if there is no such path (an unsaved document).
+Public Function ReportFolderPath() As String
+    Dim base As String, sep As String
+    On Error Resume Next
+    base = ThisDocument.Path
+    sep = Application.PathSeparator
+    Err.Clear
+    On Error GoTo 0
+    If base = "" Then Exit Function
+    If Right$(base, 1) = sep Then base = Left$(base, Len(base) - 1)
+    ReportFolderPath = base & sep & REPORT_FOLDER
+End Function
+
+' Write one report.  True on success.  Shared by modDocTests, which is why it is
+' Public; a failure is never raised, only returned, so the caller can fall back to
+' showing the report the ordinary way.
+Public Function WriteReportFile(ByVal leaf As String, ByVal text As String) As Boolean
+    Dim folder As String, path As String
+    Dim fn As Integer
+
+    folder = ReportFolderPath()
+    If folder = "" Then Exit Function
+
+    On Error Resume Next
+    If Dir(folder, vbDirectory) = "" Then MkDir folder
+    Err.Clear
+    On Error GoTo 0
+
+    path = folder & Application.PathSeparator & leaf
+    On Error GoTo Failed
+    fn = FreeFile
+    Open path For Output As #fn
+    Print #fn, text
+    Close #fn
+    WriteReportFile = True
+    Exit Function
+
+Failed:
+    On Error Resume Next
+    Close #fn
+    Err.Clear
 End Function

@@ -44,10 +44,21 @@ Private mRpt  As String
 Private mFirstFails As String
 Private mDocsAtStart As Long
 
+' Set by RunDocTestsToFile: report to a file, no dialog. See modTests.
+Private mQuietRun As Boolean
+
 
 '=============================================================================
 ' -- RUNNER -----------------------------------------------------------------
 '=============================================================================
+
+' The same suite, for a script: report to <document folder>/LingTeX-Word-reports/
+' RunDocTests.txt, no dialog, no report document.
+Public Sub RunDocTestsToFile()
+    mQuietRun = True
+    RunDocTests
+    mQuietRun = False
+End Sub
 
 Public Sub RunDocTests()
     mPass = 0
@@ -2246,6 +2257,10 @@ Private Sub DeliverResults()
     Dim d As Document
     Dim placed As Boolean
     Dim msg As String
+
+    If mQuietRun Then
+        If WriteReportFile("RunDocTests.txt", mRpt) Then Exit Sub
+    End If
 
     On Error Resume Next
     Set d = Documents.Add

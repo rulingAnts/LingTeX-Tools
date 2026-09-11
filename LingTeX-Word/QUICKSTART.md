@@ -294,6 +294,43 @@ machine, and turning it back off afterwards costs nothing.
 
 ---
 
+## One command: `run-in-word.sh`
+
+Once the project is in a document and `modImport` is pasted, the whole
+pull → import → `RunAllTests` → `RunDocTests` → read-the-report loop is:
+
+```bash
+sh LingTeX-Word/tools/run-in-word.sh ~/path/to/LingTeX.docm    # first time
+sh LingTeX-Word/tools/run-in-word.sh                            # after that
+```
+
+It drives Word through AppleScript's `run VB macro` (the one VBA bridge the probe
+found on Mac), so it can only run macros that already exist — and each of the
+three it runs has a **quiet twin** that writes its report to a file instead of
+showing a dialog, because a dialog would block the script until someone clicked
+OK: `ImportLingTeXModulesQuiet`, `RunAllTestsToFile`, `RunDocTestsToFile`. The
+reports land in `LingTeX-Word-reports/` beside the document, and the script prints
+them and exits non-zero on any `FAIL`, `CRASH` or import problem, so its output can
+be pasted straight back.
+
+**One-time setup:** `modImport` is pasted by hand, so it has to be re-pasted once
+from `tools/ImportModules.bas` to pick up `ImportLingTeXModulesQuiet`. Set
+`SRC_FOLDER` again when you do.
+
+`--no-pull`, `--no-import`, and `--tests all` / `--tests doc` do what they say.
+
+**Its one hole.** A *compile* error is a modal dialog inside the VBA editor, and no
+macro can suppress it — so if a module does not compile, the script waits and Word
+sits there with the dialog open. Switch to Word and read it. Every compile-error
+class that reaches you becomes a `vba-lint.py` rule, so this should get rarer.
+
+`tools/run-in-word.ps1` is the Windows twin, for Parallels. Driving Word over COM
+with the editor hidden, a compile error comes back as an *exception naming the
+module* rather than a dialog — which makes it the better tool on the day a module
+will not compile. Untested so far; written from the COM contract.
+
+---
+
 ## Building `LingTeX-Word.dotm`
 
 Two steps, and the order matters. Word can save the VBA project into a template,
