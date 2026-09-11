@@ -20,14 +20,16 @@ Option Explicit
 '             > Macro Settings > tick "Trust access to the VBA project object
 '             model".  Then restart Word.
 '
-'   MAC:      there is no equivalent setting in Word's interface, and the probe
-'             (tools/probe/modProbe.bas section 14) found the access blocked on
-'             Word 16.112 with no way to grant it.  On Mac, import the files by
-'             hand instead -- see QUICKSTART.md.
+'   MAC:      Word > Preferences > Security & Privacy > tick the SAME setting,
+'             "Trust access to the VBA project object model".  Then restart Word.
 '
-' So in practice this is the Windows path. That is fine: the .dotm it produces is
-' cross-platform, so you can build on Windows and test on Mac. Nothing about the
-' template is Windows-specific.
+' It works on both. An earlier version of this comment said there was no such
+' setting on Mac and that the access was blocked there with no way to grant it --
+' because the probe (tools/probe/modProbe.bas section 14) reported BLOCKED on a Mac
+' where the setting had not been ticked yet, and that one measurement got written
+' down as a fact about the platform. Confirmed since on Mac Word 16.112: both
+' ImportLingTeXModules and VerifyLingTeXModules, all fourteen modules, both
+' classes as classes. There is no build-on-Windows, test-on-Mac split to make.
 '
 ' NOTE ON SECURITY.  That setting exists for a good reason -- it lets code rewrite
 ' code. This add-in never asks an end user to enable it, and its installer does
@@ -536,14 +538,14 @@ Private Function GetProject() As Object
 
     If Err.Number = 6068 Then
         Err.Clear
-        MsgBox "VBA is not allowed to see its own project on this machine, so " & _
-               "the modules cannot be imported automatically." & vbCr & vbCr & _
+        MsgBox "VBA is not allowed to see its own project on this machine yet, " & _
+               "so the modules cannot be imported automatically." & vbCr & vbCr & _
+               "Tick ""Trust access to the VBA project object model"", restart " & _
+               "Word, and run this again. It lives at:" & vbCr & vbCr & _
                "WINDOWS: File > Options > Trust Center > Trust Center " & _
-               "Settings... > Macro Settings, and tick ""Trust access to the " & _
-               "VBA project object model"". Restart Word, then run this again." & _
-               vbCr & vbCr & _
-               "MAC: there is no equivalent setting. Import the files by hand " & _
-               "with File > Import File... -- see QUICKSTART.md.", _
+               "Settings... > Macro Settings" & vbCr & _
+               "MAC:     Word > Preferences > Security & Privacy" & vbCr & vbCr & _
+               "Same label on both.", _
                vbExclamation, "LingTeX-Word import"
     Else
         MsgBox "Could not reach the VBA project: " & CStr(Err.Number) & ": " & _

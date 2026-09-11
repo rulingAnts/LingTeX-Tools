@@ -270,6 +270,14 @@ Two more that bite:
 These were assumptions until `tools/probe/modProbe.bas` was run on **Word 16.112
 for Mac**. Two of them were wrong.
 
+**Read every verdict as a fact about the machine that ran it, in the state it was
+in — not about the platform.** This table once said the VBA project was "blocked on
+Mac, with no setting to grant it": the probe had reported `BLOCKED` accurately on a
+Mac where the trust setting was not yet ticked, and that one measurement got written
+up as a capability. It cost a Mac user fourteen manual imports before anyone
+checked. A `BLOCKED` is a reason to look at the machine's settings; it is never a
+reason to write "cannot".
+
 | Assumption | Result |
 |---|---|
 | Hidden `Documents.Add(Visible:=False)`, 22-inch page | **Works.** `Windows.Count` 0, page reads back 1584 pt |
@@ -284,7 +292,7 @@ for Mac**. Two of them were wrong.
 | `Document.Variables` round trip | **Works** |
 | `Application.UndoRecord` | **Present on Mac.** The `#If Mac Then` guard was needless and is gone, so Mac gets single-step undo too |
 | VBA file write and read | **Works**, but redirected into Word's sandbox container rather than the real temp directory |
-| `VBProject.VBComponents.Import` | **Blocked on Mac**, error 6068, with no setting to grant it. On **Windows** the same error is what you get until "Trust access to the VBA project object model" is ticked in the Trust Center, after which `tools/ImportModules.bas` imports all fourteen modules from one paste. The template is cross-platform, so building on Windows and testing on Mac is a fine split |
+| `VBProject.VBComponents.Import` | **Available on both platforms** once "Trust access to the VBA project object model" is ticked — Trust Center on Windows, Word → Preferences → Security & Privacy on Mac; the label is identical. Until it is, both raise error 6068. After it, `tools/ImportModules.bas` imports all fourteen modules from one paste, and `VerifyLingTeXModules` confirms them. **This row used to say "blocked on Mac, with no setting to grant it."** The probe reported `BLOCKED` accurately, on a Mac where the setting had not been ticked yet, and that one measurement was written up here as a platform fact — see the note above this table. Confirmed working on Mac Word 16.112 |
 | `Application.FileDialog` | **Absent** on Mac, error 5948. No folder picker for the add-in or any bootstrap — relevant to the Phase 2 form |
 
 A second probe, `tools/probe/Probe AppleScript Bridge.applescript`, asked what
