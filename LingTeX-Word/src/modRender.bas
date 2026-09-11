@@ -162,6 +162,7 @@ Private Function DrawExample(ex As IgtExample, target As Range, doc As Document,
                              NumRows:=nLines * nInter, NumColumns:=maxCols)
     StyleTable tbl, doc
 
+    gRenderError = ""
     FillTable tbl, ex, interTiers, nInter, lineStarts, colW, doc
 
     '-- free translations, after the table ----------------------------------
@@ -316,12 +317,27 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
             role = ex.Tiers(interTiers(i))
 
             ' Trim this row down to the columns this wrap line actually holds.
+            ' Deleting from the left-most surplus position repeatedly works because
+            ' Word shifts the remaining cells left each time.
             surplus = maxCols - lineCols
             For k = 1 To surplus
                 On Error Resume Next
                 tbl.Rows(r).Cells(lineCols + 1).Delete
+                Err.Clear
                 On Error GoTo 0
             Next k
+
+            ' Verified, because the deletions above were swallowed one at a time:
+            ' a row that kept its surplus cells gets text and an explicit width on
+            ' only the first lineCols of them, and Word distributes the rest as it
+            ' sees fit -- so the row is wider than the plan and the example runs
+            ' past the margin. Recorded rather than raised, so the rest of the
+            ' example still draws and the reason is reportable.
+            If Not RowHasCells(tbl, r, lineCols) Then
+                gRenderError = "could not trim row " & CStr(r) & " to " & _
+                               CStr(lineCols) & " cells; the wrap line may run " & _
+                               "past the right margin"
+            End If
 
             For c = 0 To lineCols - 1
                 Set cellRng = tbl.Cell(r, c + 1).Range
@@ -331,9 +347,21 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
                 WriteCellText cellRng, ex.Cells(interTiers(i), lineFirst + c), _
                               role, False, doc
 
+                ' The explicit per-cell width IS the layout -- there is no
+                ' autofit to fall back on, AllowAutoFit being off. A swallowed
+                ' failure here leaves the cell at whatever width Word chose, which
+                ' breaks the one invariant the design rests on: that every row of a
+                ' wrap line reports the same width for the same column, so each
+                ' form sits directly above its gloss.
                 On Error Resume Next
                 tbl.Cell(r, c + 1).SetWidth _
                     ColumnWidth:=colW(lineFirst + c), RulerStyle:=wdAdjustNone
+                If Err.Number <> 0 Then
+                    gRenderError = "could not set the width of row " & CStr(r) & _
+                                   " column " & CStr(c + 1) & " (" & _
+                                   CStr(Err.Number) & ": " & Err.Description & ")"
+                    Err.Clear
+                End If
                 On Error GoTo 0
             Next c
 
@@ -364,6 +392,21 @@ End Sub
 ' as a split example, and keepLast is what prevents it. With nothing after the
 ' table the last row must NOT keep, or it drags the following body paragraph along.
 '-----------------------------------------------------------------------------
+' Does a row have exactly this many cells?  Rows in an interlinear table are
+' deliberately RAGGED -- a short wrap line is a row with fewer cells, not a row
+' with empty ones -- so this is how the trimming above is confirmed.
+Private Function RowHasCells(tbl As Table, ByVal r As Long, _
+        ByVal want As Long) As Boolean
+
+    Dim got As Long
+    got = -1
+    On Error Resume Next
+    got = tbl.Rows(r).Cells.Count
+    Err.Clear
+    On Error GoTo 0
+    RowHasCells = (got = want)
+End Function
+
 Private Sub SetRowKeeps(tbl As Table, ByVal keepLast As Boolean)
     Dim r As Long, last As Long
     On Error Resume Next
@@ -618,7 +661,11 @@ End Sub
 ' Document.Paragraphs to find it is O(n), and doing that inside a loop over
 ' every example in the document is O(n squared) -- slow enough to notice on a
 ' long grammar.
-Private Function ParagraphAfterTable(tbl As Table) As Paragraph
+' These five walk and read the paragraphs that follow a table -- the free
+' translations. Public rather than Private so modDocTests can assert on THESE
+' rather than on a copy of them: a test that reimplements the logic it is checking
+' verifies the copy and nothing else.
+Public Function ParagraphAfterTable(tbl As Table) As Paragraph
     Dim doc As Document
     Dim endPos As Long
     On Error Resume Next
@@ -630,14 +677,14 @@ Private Function ParagraphAfterTable(tbl As Table) As Paragraph
     On Error GoTo 0
 End Function
 
-Private Function NextParagraph(para As Paragraph) As Paragraph
+Public Function NextParagraph(para As Paragraph) As Paragraph
     On Error Resume Next
     Set NextParagraph = para.Next
     Err.Clear
     On Error GoTo 0
 End Function
 
-Private Function IsFreeParagraph(para As Paragraph) As Boolean
+Public Function IsFreeParagraph(para As Paragraph) As Boolean
     Dim nm As String
     On Error Resume Next
     If para.Range.Information(wdWithInTable) Then Exit Function
@@ -646,7 +693,7 @@ Private Function IsFreeParagraph(para As Paragraph) As Boolean
     IsFreeParagraph = (nm = ParaStyleName(ROLE_FREE))
 End Function
 
-Private Function ParaText(para As Paragraph) As String
+Public Function ParaText(para As Paragraph) As String
     Dim s As String
     s = para.Range.Text
     ' Drop the trailing paragraph mark.
@@ -660,7 +707,7 @@ Private Function ParaText(para As Paragraph) As String
     ParaText = s
 End Function
 
-Private Function StripQuotes(ByVal s As String) As String
+Public Function StripQuotes(ByVal s As String) As String
     s = Trim$(s)
     If Len(s) >= 2 Then
         If Left$(s, 1) = LeftSingleQuote And Right$(s, 1) = RightSingleQuote Then
