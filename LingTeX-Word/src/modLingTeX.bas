@@ -645,15 +645,20 @@ End Sub
 ' -- UNDO -------------------------------------------------------------------
 '=============================================================================
 ' Application.UndoRecord collapses a whole operation into ONE undo step, which
-' matters because re-wrapping rebuilds a table from scratch.  It exists only on
-' Windows Word, so Mac falls back to Word's own multi-step undo rather than
-' failing to compile.  Late-bound through Object so the Mac build does not need
-' the type to exist.
+' matters because re-wrapping deletes and rebuilds a table: without it, undoing
+' one re-wrap takes an unknown number of presses.
+'
+' There is deliberately NO "#If Mac Then" guard here.  An earlier version assumed
+' UndoRecord was Windows-only and compiled it out on Mac, which silently gave Mac
+' users multi-step undo for no reason -- the probe
+' (tools/probe/modProbe.bas section 12) found it present on Word 16.112 for Mac.
+'
+' It is reached late-bound through Object and every call is error-guarded, so a
+' build that genuinely lacks it degrades to Word's own undo stack instead of
+' failing to compile.  That is what makes the guard unnecessary: there is nothing
+' to compile out.
 
 Private Sub BeginUndo(ByVal label As String)
-#If Mac Then
-    ' No custom undo records on Mac Word; nothing to do.
-#Else
     Dim ur As Object
     On Error Resume Next
     Set ur = Application.UndoRecord
@@ -663,13 +668,9 @@ Private Sub BeginUndo(ByVal label As String)
     End If
     Err.Clear
     On Error GoTo 0
-#End If
 End Sub
 
 Private Sub EndUndo()
-#If Mac Then
-    ' Nothing to do.
-#Else
     Dim ur As Object
     On Error Resume Next
     Set ur = Application.UndoRecord
@@ -678,7 +679,6 @@ Private Sub EndUndo()
     End If
     Err.Clear
     On Error GoTo 0
-#End If
 End Sub
 
 

@@ -151,16 +151,15 @@ Then `TESTING.md` section 3 at whatever depth is useful.
 ## When something goes wrong
 
 **Columns are obviously the wrong width, or all the same width.**
-This is the known risk. Open `modMeasure.bas` and change
+This was the known risk, and the probe settled it. Measurement reads
+`Range.Information` positions, verified working on Word 16.112 for Mac. The
+autofit method it used to prefer has been **deleted**: on that build
+`AutoFitBehavior wdAutoFitContent` returned four identical widths that summed to
+the page width — it had divided the page equally and never consulted the content.
 
-```vba
-Private Const USE_AUTOFIT As Boolean = True
-```
-
-to `False`. That switches from reading autofitted cell widths to reading
-`Range.Information` positions — a second method that is already written and
-tested in the same code path. Re-run. **Try this before debugging anything
-else**, and tell me which setting worked, because it decides the shipped default.
+So there is no constant to flip any more. If widths still come out wrong, run
+`ProbeWord` again and send me section 5, which is the measurement everything now
+depends on.
 
 **"Compile error: User-defined type not defined"**
 A module is missing. VBA compiles the whole project at once, so stage 1 works only
@@ -214,10 +213,14 @@ it.
 ## What this does and does not prove
 
 Mac Word is the stricter target — no ActiveX, no `Scripting.Dictionary`, no
-`Application.UndoRecord`, sandboxed file I/O — so passing here means Windows Word
-is very likely fine. Two things it cannot cover, for one pass on Windows later:
+folder picker, no programmatic VBA-project access, sandboxed file I/O — so passing
+here means Windows Word is very likely fine. Two things it cannot cover, for one
+pass on Windows later:
 
 - The **NSIS installer**, which does not exist yet and is Windows-only.
-- The **single-step undo** path. `Application.UndoRecord` is Windows-only and
-  compiled out by `#If Mac Then`, so on Mac undo is multi-step by design. Repeated
-  ⌘Z undoing an insert is correct behaviour here, not a bug.
+- Whether custom **ribbon XML** in a STARTUP `.dotm` loads.
+
+Single-step undo is no longer on that list. An earlier version assumed
+`Application.UndoRecord` was Windows-only and compiled it out on Mac; the probe
+found it present, so one ⌘Z should now undo a whole insert or re-wrap on either
+platform. If it takes several presses, that is worth reporting.

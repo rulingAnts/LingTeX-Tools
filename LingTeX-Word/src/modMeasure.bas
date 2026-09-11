@@ -9,24 +9,40 @@ Option Explicit
 ' Word exposes no text-measurement function, so the width has to be obtained by
 ' laying the text out and reading the result back.  Doing that in the user's own
 ' document would be both slow and visible, and a table wider than the page gets
-' CLAMPED by autofit, which silently corrupts the measurement.  So measurement
-' happens in a scratch document with a 22-inch page -- Word's maximum -- and zero
-' margins, where nothing can clamp.
+' wider than the page, so measurement happens in a scratch document with a
+' 22-inch page -- Word's maximum -- and zero margins.
 '
-' Two methods are implemented behind one signature:
+' THE METHOD: one paragraph per string, then read
+' Range.Information(wdHorizontalPositionRelativeToTextBoundary) at the end of the
+' text.  The horizontal position where a line of text ends IS its width.
 '
-'   Primary (USE_AUTOFIT = True).  One table row per tier, one cell per column,
-'   AutoFitBehavior wdAutoFitContent, then read Cell(1, c).Width.  This is ONE
-'   Word round trip per tier rather than one per cell, which matters a lot on Mac
-'   where each call into the object model is slow.
+' ---------------------------------------------------------------------------
+' WHY NOT AUTOFIT, WHICH WOULD BE FEWER ROUND TRIPS
 '
-'   Fallback (USE_AUTOFIT = False).  One paragraph per cell, read
-'   Range.Information(wdHorizontalPositionRelativeToTextBoundary) at the end of
-'   the text.  Exact and immune to clamping, but O(columns x tiers) calls.
+' The obvious approach is a single-row table, one cell per string, then
+' AutoFitBehavior wdAutoFitContent and read Cell(1, c).Width back -- one Word
+' round trip per tier instead of one per string.  It was implemented first and
+' then deleted, because it does not work on Mac Word.  Measured on Word 16.112
+' (tools/probe/modProbe.bas section 3), on a 1584 pt page:
 '
-' If the autofit read turns out to misbehave on Mac Word, flip the constant; the
-' rest of the add-in does not change.  Both are cached, so a re-wrap of text that
-' has not been edited costs nothing.
+'     width of "i"         394.7 pt
+'     width of "iii"       394.7 pt
+'     width of "WWW"       394.7 pt
+'     width of "Ozivela"   394.7 pt
+'
+' Four identical widths, and 394.7 x 4 = 1578.8, i.e. the page width divided
+' equally.  wdAutoFitContent behaved like autofit-to-WINDOW and never consulted
+' the content.  It fails silently: every column comes out the same width and
+' nothing downstream can be right.
+'
+' Do not reintroduce it.  If you want the round trips back, re-run the probe on
+' the Word builds you care about first -- and note that it also has to be
+' reconciled with Columns(i).Width, which raises error 5991 on mixed widths on
+' Windows but returned a value with no error on Mac precisely because the widths
+' were not mixed.
+' ---------------------------------------------------------------------------
+'
+' Results are cached, so re-wrapping text that has not been edited costs nothing.
 '
 ' IMPORTANT: the text is measured with the SAME runs the renderer will draw,
 ' including small caps on grammatical glosses, by calling the renderer's own
@@ -38,22 +54,8 @@ Option Explicit
 ' Pure ASCII on purpose -- see the header of modFlexParse.bas.
 '=============================================================================
 
-'-----------------------------------------------------------------------------
-' IF COLUMNS COME OUT THE WRONG WIDTH, CHANGE THIS TO False AND RE-RUN.
-'
-' That switches from reading autofitted cell widths to reading
-' Range.Information positions -- a complete second implementation of the same
-' measurement, below.  It is the first thing to try before debugging anything
-' else, because every column width flows from here: if the autofit read does not
-' work on a given Word build, nothing downstream can look right.
-'
-' tools/probe/modProbe.bas reports which method works on a given install
-' (section 3 for this one, section 5 for the fallback).  See QUICKSTART.md.
-'-----------------------------------------------------------------------------
-Private Const USE_AUTOFIT As Boolean = True
-
-' Word's maximum page dimension is 22 inches.  Nothing an interlinear example
-' contains comes close, so autofit never clamps at this width.
+' Word's maximum page dimension is 22 inches.  Wide enough that a single word
+' never wraps, which is all the method requires.
 Private Const SCRATCH_PAGE_WIDTH_IN As Single = 22
 
 Private mScratch As Document
@@ -244,11 +246,7 @@ Public Function MeasureTexts(texts() As String, tf As TierFont, _
 
     If nMiss > 0 Then
         ReDim Preserve missText(0 To nMiss - 1)
-        If USE_AUTOFIT Then
-            fresh = MeasureByAutofit(missText, tf, role)
-        Else
-            fresh = MeasureByPosition(missText, tf, role)
-        End If
+        fresh = MeasureByPosition(missText, tf, role)
         For i = 0 To nMiss - 1
             out(missIdx(i)) = fresh(i)
             CacheStore FontKey(tf) & "|" & missText(i), fresh(i)
@@ -259,135 +257,101 @@ Public Function MeasureTexts(texts() As String, tf As TierFont, _
 End Function
 
 '-----------------------------------------------------------------------------
-' Primary method: a one-row table, autofitted to its contents, read back cell by
-' cell.  One round trip per call instead of one per string.
+' Measure a batch of strings: one paragraph each, then read where each one ends.
 '
-' The clamp guard matters: if the row somehow totals more than the scratch page
-' can hold, Word shrinks the columns and every width is wrong.  Rather than trust
-' a 22-inch page blindly, detect the condition and split the batch.
-'-----------------------------------------------------------------------------
-Private Function MeasureByAutofit(texts() As String, tf As TierFont, _
-        ByVal role As String) As Single()
-
-    Dim out() As Single
-    Dim doc As Document
-    Dim tbl As Table
-    Dim rng As Range
-    Dim i As Long, n As Long
-    Dim total As Single, limit As Single
-    Dim halfA() As String, halfB() As String
-    Dim resA() As Single, resB() As Single
-    Dim mid As Long
-
-    n = UBound(texts) - LBound(texts) + 1
-    ReDim out(0 To n - 1)
-    If n = 0 Then
-        MeasureByAutofit = out
-        Exit Function
-    End If
-
-    Set doc = EnsureScratch()
-    Set rng = doc.Content
-    rng.Delete
-
-    Set tbl = doc.Tables.Add(Range:=doc.Content, NumRows:=1, NumColumns:=n)
-    ZeroTablePadding tbl
-    tbl.Borders.InsideLineStyle = wdLineStyleNone
-    tbl.Borders.OutsideLineStyle = wdLineStyleNone
-
-    For i = 0 To n - 1
-        Set rng = tbl.Cell(1, i + 1).Range
-        rng.End = rng.End - 1                  ' exclude the end-of-cell marker
-        WriteMeasuredText rng, texts(i), tf, role
-    Next i
-
-    tbl.AllowAutoFit = True
-    tbl.PreferredWidthType = wdPreferredWidthAuto
-    tbl.AutoFitBehavior wdAutoFitContent
-
-    total = 0
-    For i = 0 To n - 1
-        ' Read CELLS, never Columns(i).Width: the latter raises error 5991 as
-        ' soon as a table has mixed cell widths, which this one always does.
-        out(i) = tbl.Cell(1, i + 1).Width
-        total = total + out(i)
-    Next i
-
-    limit = ScratchTextWidth(doc)
-    tbl.Delete
-
-    ' Clamped: the batch did not fit even on a 22-inch page.  Halve and recurse.
-    If n > 1 And total >= limit - 1 Then
-        mid = n \ 2
-        ReDim halfA(0 To mid - 1)
-        ReDim halfB(0 To n - mid - 1)
-        For i = 0 To mid - 1
-            halfA(i) = texts(i)
-        Next i
-        For i = mid To n - 1
-            halfB(i - mid) = texts(i)
-        Next i
-        resA = MeasureByAutofit(halfA, tf, role)
-        resB = MeasureByAutofit(halfB, tf, role)
-        For i = 0 To mid - 1
-            out(i) = resA(i)
-        Next i
-        For i = mid To n - 1
-            out(i) = resB(i - mid)
-        Next i
-    End If
-
-    MeasureByAutofit = out
-End Function
-
-'-----------------------------------------------------------------------------
-' Fallback method: the horizontal position at the end of a non-wrapping
-' paragraph is the width of the text on it.  Immune to clamping, but one Word
-' round trip per string.
+' The document is built ONCE for the whole batch rather than once per string.
+' The obvious loop -- clear the document, insert one string, measure, repeat --
+' costs a full document rebuild per string, and on Mac Word every call into the
+' object model is slow enough for that to be felt on a long example.
+'
+' The left edge is read once.  Every paragraph has LeftIndent, RightIndent and
+' FirstLineIndent forced to zero, so they all start at the same x; reading it per
+' paragraph would double the position calls for an answer that cannot differ.
 '-----------------------------------------------------------------------------
 Private Function MeasureByPosition(texts() As String, tf As TierFont, _
         ByVal role As String) As Single()
 
     Dim out() As Single
     Dim doc As Document
-    Dim rng As Range
+    Dim rng As Range, para As Range
     Dim i As Long, n As Long
-    Dim startPos As Single
+    Dim baseX As Single, endX As Single
+    Dim joined As String
 
     n = UBound(texts) - LBound(texts) + 1
     ReDim out(0 To n - 1)
+    If n = 0 Then
+        MeasureByPosition = out
+        Exit Function
+    End If
+
     Set doc = EnsureScratch()
+    If doc Is Nothing Then
+        MeasureByPosition = out
+        Exit Function
+    End If
 
-    For i = 0 To n - 1
-        doc.Content.Delete
-        Set rng = doc.Content
-        rng.ParagraphFormat.LeftIndent = 0
-        rng.ParagraphFormat.RightIndent = 0
-        rng.ParagraphFormat.FirstLineIndent = 0
-        WriteMeasuredText rng, texts(i), tf, role
-
-        Set rng = doc.Content
-        startPos = doc.Paragraphs(1).Range.Characters(1) _
-                      .Information(wdHorizontalPositionRelativeToTextBoundary)
-        rng.Collapse wdCollapseEnd
-        out(i) = rng.Information(wdHorizontalPositionRelativeToTextBoundary) - startPos
-        If out(i) < 0 Then out(i) = 0
+    ' One paragraph per string, in a single insertion.
+    joined = texts(LBound(texts))
+    For i = LBound(texts) + 1 To UBound(texts)
+        joined = joined & vbCr & texts(i)
     Next i
 
+    On Error GoTo Bail
+    doc.Content.Delete
+    Set rng = doc.Content
+    rng.Text = joined
+    With rng.ParagraphFormat
+        .LeftIndent = 0
+        .RightIndent = 0
+        .FirstLineIndent = 0
+        .SpaceBefore = 0
+        .SpaceAfter = 0
+        .Alignment = wdAlignParagraphLeft
+    End With
+
+    ' Format each paragraph as the renderer will draw it, small caps included.
+    For i = 0 To n - 1
+        Set para = ParagraphBody(doc, i + 1)
+        If Not para Is Nothing Then
+            ApplyTierFont para, tf
+            ApplyGramGlossRuns para, texts(i), role, True
+        End If
+    Next i
+
+    baseX = doc.Paragraphs(1).Range.Characters(1) _
+               .Information(wdHorizontalPositionRelativeToTextBoundary)
+
+    For i = 0 To n - 1
+        Set para = ParagraphBody(doc, i + 1)
+        If para Is Nothing Then
+            out(i) = 0
+        Else
+            para.Collapse wdCollapseEnd
+            endX = para.Information(wdHorizontalPositionRelativeToTextBoundary)
+            out(i) = endX - baseX
+            If out(i) < 0 Then out(i) = 0
+        End If
+    Next i
+
+Bail:
     MeasureByPosition = out
 End Function
 
-'-----------------------------------------------------------------------------
-' Put text into a measurement range exactly as the renderer will draw it.
-'
-' Direct formatting is used rather than the LingTeX paragraph styles, so the
-' scratch document needs no styles of its own; the appearance has already been
-' resolved from the target document by ResolveTierFont.  The per-run small caps
-' still come from the renderer's own routine, so the two cannot diverge.
-'-----------------------------------------------------------------------------
-Private Sub WriteMeasuredText(rng As Range, ByVal text As String, _
-        tf As TierFont, ByVal role As String)
-    rng.Text = text
+' A paragraph's range without its paragraph mark, which would otherwise be
+' measured as part of the text and is not drawn.
+Private Function ParagraphBody(doc As Document, ByVal idx As Long) As Range
+    Dim r As Range
+    On Error Resume Next
+    If idx < 1 Or idx > doc.Paragraphs.Count Then Exit Function
+    Set r = doc.Paragraphs(idx).Range.Duplicate
+    If r.End > r.Start Then r.MoveEnd wdCharacter, -1
+    Set ParagraphBody = r
+    Err.Clear
+End Function
+
+Private Sub ApplyTierFont(rng As Range, tf As TierFont)
+    On Error Resume Next
     With rng.Font
         .Name = tf.Name
         .Size = tf.Size
@@ -395,10 +359,8 @@ Private Sub WriteMeasuredText(rng As Range, ByVal text As String, _
         .Italic = tf.Italic
         .SmallCaps = tf.SmallCaps
     End With
-    ' Small caps on the grammatical segments, by the same rule the renderer uses.
-    ApplyGramGlossRuns rng, text, role, True
+    Err.Clear
 End Sub
-
 
 '=============================================================================
 ' -- SCRATCH DOCUMENT -------------------------------------------------------
@@ -450,14 +412,6 @@ Private Function EnsureScratch() As Document
 
     Set mScratch = doc
     Set EnsureScratch = doc
-End Function
-
-Private Function ScratchTextWidth(doc As Document) As Single
-    On Error Resume Next
-    ScratchTextWidth = doc.PageSetup.PageWidth _
-                     - doc.PageSetup.LeftMargin - doc.PageSetup.RightMargin
-    On Error GoTo 0
-    If ScratchTextWidth <= 0 Then ScratchTextWidth = InchesToPoints(SCRATCH_PAGE_WIDTH_IN)
 End Function
 
 ' Cell padding is zeroed on both the measurement table and the rendered table, so
