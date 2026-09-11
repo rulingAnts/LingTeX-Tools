@@ -110,6 +110,7 @@ Private Sub EnsureParaStyle(doc As Document, ByVal role As String, _
 
     On Error Resume Next
     Set st = doc.Styles.Add(Name:=nm, Type:=wdStyleTypeParagraph)
+    Err.Clear
     On Error GoTo 0
     If st Is Nothing Then Exit Sub
 
@@ -133,6 +134,7 @@ Private Sub EnsureParaStyle(doc As Document, ByVal role As String, _
         End With
         .NoSpaceBetweenParagraphsOfSameStyle = True
     End With
+    Err.Clear
     On Error GoTo 0
 End Sub
 
@@ -152,11 +154,13 @@ Private Sub EnsureGramStyle(doc As Document, ByVal fontName As String)
 
     On Error Resume Next
     Set st = doc.Styles.Add(Name:=STYLE_GRAM, Type:=wdStyleTypeCharacter)
+    Err.Clear
     On Error GoTo 0
     If st Is Nothing Then Exit Sub
 
     On Error Resume Next
     st.Font.SmallCaps = True
+    Err.Clear
     On Error GoTo 0
 End Sub
 
@@ -174,12 +178,23 @@ End Sub
 ' Do not "simplify" by removing the per-table border setting in modRender on the
 ' grounds that the style handles it -- on Mac the style does not.
 '-----------------------------------------------------------------------------
+' NOTE ON Err.Clear, throughout this module.
+'
+' Every "On Error Resume Next" block here is followed by Err.Clear before
+' "On Error GoTo 0", and that is load-bearing rather than tidiness: On Error
+' GoTo 0 disables the handler but does NOT reset Err. EnsureTableStyle below
+' raises 4198 on Mac by design -- Style.Table.Borders is not settable there -- so
+' without the clear, Err stayed set with 4198 all the way out of EnsureStyles, and
+' a caller that tested Err.Number to decide whether its own work had succeeded
+' concluded that it had not. RewrapDocument did exactly that, and reported
+' "Re-wrapped 0 interlinear examples" for a run that had just re-wrapped them all.
 Private Sub EnsureTableStyle(doc As Document)
     Dim st As Style
     If StyleExists(doc, STYLE_TABLE) Then Exit Sub
 
     On Error Resume Next
     Set st = doc.Styles.Add(Name:=STYLE_TABLE, Type:=wdStyleTypeTable)
+    Err.Clear
     On Error GoTo 0
     If st Is Nothing Then Exit Sub
 
@@ -197,6 +212,7 @@ Private Sub EnsureTableStyle(doc As Document)
         .BottomPadding = 0
         .Spacing = 0
     End With
+    Err.Clear
     On Error GoTo 0
 End Sub
 
@@ -218,10 +234,12 @@ Public Function BodyFontName(doc As Document) As String
     Dim fn As String
     On Error Resume Next
     fn = doc.Styles(wdStyleNormal).Font.Name
+    Err.Clear
     On Error GoTo 0
     If fn = "" Or Left$(fn, 1) = "+" Then
         On Error Resume Next
         fn = doc.Styles(wdStyleDefaultParagraphFont).Font.Name
+        Err.Clear
         On Error GoTo 0
     End If
     If fn = "" Or Left$(fn, 1) = "+" Then fn = FALLBACK_FONT
@@ -232,6 +250,7 @@ Public Function BodyFontSize(doc As Document) As Single
     Dim sz As Single
     On Error Resume Next
     sz = doc.Styles(wdStyleNormal).Font.Size
+    Err.Clear
     On Error GoTo 0
     If sz <= 0 Then sz = 12
     BodyFontSize = sz

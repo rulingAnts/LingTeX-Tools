@@ -58,8 +58,48 @@ Option Explicit
 ' never wraps, which is all the method requires.
 Private Const SCRATCH_PAGE_WIDTH_IN As Single = 22
 
+' Word's "mixed value" sentinel, returned by a font property read over a range
+' whose runs disagree.
+Private Const WD_UNDEFINED_SIZE As Single = 9999999
+
 Private mScratch As Document
 Private mCache   As Collection
+
+'-----------------------------------------------------------------------------
+' DID THE MEASUREMENT ACTUALLY WORK?
+'
+' A width of 0 is a legitimate answer -- an empty cell is 0 points wide -- so
+' until this existed a total failure was indistinguishable from a row of empty
+' cells, and nothing downstream could tell. That matters more than it sounds,
+' because zeros do not fail loudly: ColumnWidths turns each one into bare gap,
+' ComputeWrapLines then fits roughly 78 columns on a 468-point line, and
+' Tables.Add is asked for more columns than Word's 63-column maximum. In
+' RewrapTable the old table is already deleted by that point, so the raise lands
+' after the user's example is gone.
+'
+' So failure gets its own channel. Cleared at the top of MeasureTexts, set on
+' every path that gives up, and checked by RenderExample before it draws
+' anything. A caller that ignores it still behaves as before; one that checks it
+' cannot mistake a failure for a measurement.
+'-----------------------------------------------------------------------------
+Public gMeasureFailed As Boolean
+Public gMeasureError  As String
+
+Private Sub MeasureFail(ByVal what As String)
+    gMeasureFailed = True
+    If gMeasureError <> "" Then gMeasureError = gMeasureError & "; "
+    gMeasureError = gMeasureError & what
+    If Err.Number <> 0 Then
+        gMeasureError = gMeasureError & " (" & CStr(Err.Number) & ": " & _
+                        Err.Description & ")"
+    End If
+End Sub
+
+' Called by MeasureExample and by any caller measuring a batch of its own.
+Public Sub ClearMeasureFailure()
+    gMeasureFailed = False
+    gMeasureError = ""
+End Sub
 
 '-- Resolved appearance of one tier, used as part of the cache key ------------
 Public Type TierFont
@@ -185,8 +225,14 @@ Public Sub MeasureExample(ex As IgtExample, doc As Document, ByRef widths() As S
     Dim texts() As String
     Dim rowWidths() As Single
 
+    ClearMeasureFailure
+
+    ' ReDim BEFORE the guard, not after. widths() is a ByRef contract: a caller
+    ' that is handed back an unallocated array raises error 9 on its first
+    ' subscript, which is a confusing way to learn that the example was empty.
+    ReDim widths(0 To IIf(ex.TierCount > 0, ex.TierCount - 1, 0), _
+                 0 To IIf(ex.ColCount > 0, ex.ColCount - 1, 0))
     If ex.TierCount = 0 Or ex.ColCount = 0 Then Exit Sub
-    ReDim widths(0 To ex.TierCount - 1, 0 To ex.ColCount - 1)
 
     For t = 0 To ex.TierCount - 1
         If Not IsInterlinearTier(ex.Tiers(t)) Then GoTo NextTier
@@ -219,12 +265,19 @@ Public Function MeasureTexts(texts() As String, tf As TierFont, _
     Dim key As String, w As Single
     Dim fresh() As Single
 
-    n = UBound(texts) - LBound(texts) + 1
-    ReDim out(0 To n - 1)
-    If n = 0 Then
+    ' An unallocated texts() raises error 9 on UBound, which is the case that
+    ' actually happens -- an allocated array always has at least one element, so
+    ' the old "If n = 0" guard could never fire and sat after the ReDim it was
+    ' meant to protect anyway.
+    If Not IsArrayAllocated(texts) Then
+        ReDim out(0 To 0)
+        MeasureFail "MeasureTexts was given an unallocated array"
         MeasureTexts = out
         Exit Function
     End If
+
+    n = UBound(texts) - LBound(texts) + 1
+    ReDim out(0 To n - 1)
 
     EnsureCache
 
@@ -278,15 +331,19 @@ Private Function MeasureByPosition(texts() As String, tf As TierFont, _
     Dim baseX As Single, endX As Single
     Dim joined As String
 
-    n = UBound(texts) - LBound(texts) + 1
-    ReDim out(0 To n - 1)
-    If n = 0 Then
+    If Not IsArrayAllocated(texts) Then
+        ReDim out(0 To 0)
+        MeasureFail "MeasureByPosition was given an unallocated array"
         MeasureByPosition = out
         Exit Function
     End If
 
+    n = UBound(texts) - LBound(texts) + 1
+    ReDim out(0 To n - 1)
+
     Set doc = EnsureScratch()
     If doc Is Nothing Then
+        MeasureFail "no scratch document"
         MeasureByPosition = out
         Exit Function
     End If
@@ -334,7 +391,13 @@ Private Function MeasureByPosition(texts() As String, tf As TierFont, _
         End If
     Next i
 
+    MeasureByPosition = out
+    Exit Function
+
 Bail:
+    ' Whatever is in out() at this point is partial at best. Say so rather than
+    ' returning it as though it were measured.
+    MeasureFail "position measurement stopped early"
     MeasureByPosition = out
 End Function
 
@@ -342,15 +405,46 @@ End Function
 ' measured as part of the text and is not drawn.
 Private Function ParagraphBody(doc As Document, ByVal idx As Long) As Range
     Dim r As Range
+    Dim wanted As Long
+
     On Error Resume Next
     If idx < 1 Or idx > doc.Paragraphs.Count Then Exit Function
     Set r = doc.Paragraphs(idx).Range.Duplicate
-    If r.End > r.Start Then r.MoveEnd wdCharacter, -1
+    If r Is Nothing Then
+        MeasureFail "could not take paragraph " & CStr(idx)
+        Err.Clear
+        Exit Function
+    End If
+
+    ' Drop the paragraph mark, which is not drawn and would be measured.
+    ' A failure here is NOT harmless: the returned range would still contain the
+    ' mark, the end position would land at the start of the next paragraph, and
+    ' the width would come back as 0 -- a failed range adjustment reported as
+    ' "this text is zero points wide". So it is checked rather than cleared.
+    If r.End > r.Start Then
+        wanted = r.End - 1
+        r.MoveEnd wdCharacter, -1
+        If r.End <> wanted Then
+            MeasureFail "could not exclude the paragraph mark of paragraph " & CStr(idx)
+            Err.Clear
+            Exit Function
+        End If
+    End If
+
     Set ParagraphBody = r
     Err.Clear
 End Function
 
+'-----------------------------------------------------------------------------
+' Put the tier's appearance on the range.
+'
+' Verified afterwards, not assumed. If the size does not take, measurement runs
+' at the scratch document's default size while the renderer draws at the real one,
+' and every column comes out wrong with nothing raised anywhere.
+'-----------------------------------------------------------------------------
 Private Sub ApplyTierFont(rng As Range, tf As TierFont)
+    Dim gotSize As Single
+
     On Error Resume Next
     With rng.Font
         .Name = tf.Name
@@ -359,8 +453,36 @@ Private Sub ApplyTierFont(rng As Range, tf As TierFont)
         .Italic = tf.Italic
         .SmallCaps = tf.SmallCaps
     End With
+    gotSize = rng.Font.Size
+    If Err.Number <> 0 Then
+        MeasureFail "could not set the measuring font"
+        Err.Clear
+        On Error GoTo 0
+        Exit Sub
+    End If
     Err.Clear
+    On Error GoTo 0
+
+    ' wdUndefined (9999999) means mixed, which cannot happen on a range we just
+    ' set wholesale; anything else that is not the requested size means the
+    ' assignment did not take.
+    If gotSize <> tf.Size And gotSize <> WD_UNDEFINED_SIZE Then
+        MeasureFail "measuring font size is " & CStr(gotSize) & _
+                    ", asked for " & CStr(tf.Size)
+    End If
 End Sub
+
+' True only for an array that has been allocated. UBound on an unallocated
+' dynamic array raises error 9 rather than returning anything.
+Private Function IsArrayAllocated(arr() As String) As Boolean
+    On Error Resume Next
+    IsArrayAllocated = (UBound(arr) >= LBound(arr))
+    If Err.Number <> 0 Then
+        IsArrayAllocated = False
+        Err.Clear
+    End If
+    On Error GoTo 0
+End Function
 
 '=============================================================================
 ' -- SCRATCH DOCUMENT -------------------------------------------------------

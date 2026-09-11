@@ -33,6 +33,45 @@ Public gBusy As Boolean
 ' Set by AutoExec.  Module-level so the events object outlives the procedure.
 Private mEvents As clsAppEvents
 
+'-----------------------------------------------------------------------------
+' EVERY message to the user goes through Report or Confirm, never MsgBox.
+'
+' Not a style rule -- it is what makes the commands testable. A MsgBox blocks on a
+' modal dialog, so a test that runs a command waits forever for a person to click
+' OK, and modDocTests could not drive any of the seven commands at all. With this
+' indirection a test sets gQuiet, runs the command, and asserts on gLastMessage:
+' "the right thing was reported" becomes a comparison instead of a thing someone
+' watched happen.
+'
+' gLastMessage is set whether or not a dialog is shown, so it is also the record
+' of what the user was last told.
+'-----------------------------------------------------------------------------
+' The only two MsgBox calls in the module are in Report and Confirm below, and
+' the title is a constant rather than a literal at each one: a bulk edit over this
+' file can no longer silently take it off them.
+Private Const DIALOG_TITLE As String = "LingTeX-Word"
+
+Public gQuiet As Boolean            ' suppress dialogs (tests set this)
+Public gQuietAnswer As Boolean      ' what Confirm returns while quiet
+Public gLastMessage As String       ' the last thing reported, dialog or not
+
+Public Sub Report(ByVal msg As String, ByVal kind As Long)
+    gLastMessage = msg
+    If gQuiet Then Exit Sub
+    MsgBox msg, kind, DIALOG_TITLE
+End Sub
+
+' A yes/no question.  Same contract: while quiet it answers gQuietAnswer rather
+' than asking, so a test can exercise both the accept and the decline path.
+Public Function Confirm(ByVal msg As String) As Boolean
+    gLastMessage = msg
+    If gQuiet Then
+        Confirm = gQuietAnswer
+        Exit Function
+    End If
+    Confirm = (MsgBox(msg, vbYesNo + vbQuestion, DIALOG_TITLE) = vbYes)
+End Function
+
 
 '=============================================================================
 ' -- STARTUP ----------------------------------------------------------------
@@ -80,10 +119,10 @@ Public Sub LingTeXInsertInterlinear()
         raw = ClipboardText()
         fromClipboard = True
         If Trim$(raw) = "" Then
-            MsgBox "Nothing to insert." & vbCr & vbCr & _
+            Report "Nothing to insert." & vbCr & vbCr & _
                    "Copy an interlinear selection in FLEx first, or paste the " & _
                    "text into the document and select it before running this.", _
-                   vbInformation, "LingTeX-Word"
+                   vbInformation
             Exit Sub
         End If
         Set target = Selection.Range.Duplicate
@@ -94,10 +133,10 @@ Public Sub LingTeXInsertInterlinear()
 
     ex = ModelFromText(raw, SettingGranularity(doc))
     If ex.TierCount = 0 Or ex.ColCount = 0 Then
-        MsgBox "That text could not be read as interlinear data." & vbCr & vbCr & _
+        Report "That text could not be read as interlinear data." & vbCr & vbCr & _
                "Expected FLEx interlinear text (tab-separated, with tier labels " & _
                "such as Morphemes and Lex. Gloss), or a plain tab-separated " & _
-               "table with one row per tier.", vbExclamation, "LingTeX-Word"
+               "table with one row per tier.", vbExclamation
         Exit Sub
     End If
 
@@ -117,7 +156,9 @@ Public Sub LingTeXInsertInterlinear()
     ReleaseScratch
 
     If tbl Is Nothing Then
-        MsgBox "The example could not be drawn.", vbExclamation, "LingTeX-Word"
+        Report "The example could not be drawn." & _
+               IIf(gRenderError = "", "", vbCr & vbCr & gRenderError), _
+               vbExclamation
         Exit Sub
     End If
 
@@ -131,7 +172,7 @@ Fail:
     EndUndo
     gBusy = False
     ReleaseScratch
-    MsgBox "Error " & Err.Number & ": " & Err.Description, vbCritical, "LingTeX-Word"
+    Report "Error " & Err.Number & ": " & Err.Description, vbCritical
 End Sub
 
 '-----------------------------------------------------------------------------
@@ -149,8 +190,8 @@ Public Sub LingTeXConvertTableToIgt()
     On Error GoTo Fail
 
     If Not Selection.Information(wdWithInTable) Then
-        MsgBox "Put the cursor inside the table you want to convert.", _
-               vbInformation, "LingTeX-Word"
+        Report "Put the cursor inside the table you want to convert.", _
+               vbInformation
         Exit Sub
     End If
 
@@ -158,8 +199,8 @@ Public Sub LingTeXConvertTableToIgt()
     Set doc = ActiveDocument
 
     If IsInterlinearTable(tbl) Then
-        MsgBox "That table is already an interlinear example.", _
-               vbInformation, "LingTeX-Word"
+        Report "That table is already an interlinear example.", _
+               vbInformation
         Exit Sub
     End If
 
@@ -176,8 +217,8 @@ Public Sub LingTeXConvertTableToIgt()
 
     ex = ModelFromTsv(tsv)
     If ex.TierCount = 0 Then
-        MsgBox "That table could not be read as interlinear data.", _
-               vbExclamation, "LingTeX-Word"
+        Report "That table could not be read as interlinear data.", _
+               vbExclamation
         Exit Sub
     End If
 
@@ -203,7 +244,7 @@ Fail:
     EndUndo
     gBusy = False
     ReleaseScratch
-    MsgBox "Error " & Err.Number & ": " & Err.Description, vbCritical, "LingTeX-Word"
+    Report "Error " & Err.Number & ": " & Err.Description, vbCritical
 End Sub
 
 
@@ -219,8 +260,8 @@ Public Sub LingTeXRewrapCurrent()
 
     Set tbl = FindExampleAt(Selection.Range)
     If tbl Is Nothing Then
-        MsgBox "Put the cursor inside an interlinear example first.", _
-               vbInformation, "LingTeX-Word"
+        Report "Put the cursor inside an interlinear example first.", _
+               vbInformation
         Exit Sub
     End If
 
@@ -239,7 +280,7 @@ Fail:
     EndUndo
     gBusy = False
     ReleaseScratch
-    MsgBox "Error " & Err.Number & ": " & Err.Description, vbCritical, "LingTeX-Word"
+    Report "Error " & Err.Number & ": " & Err.Description, vbCritical
 End Sub
 
 ' Re-wrap every example in the active document.
@@ -256,7 +297,9 @@ End Sub
 '-----------------------------------------------------------------------------
 Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
     Dim tables As Collection
-    Dim i As Long, n As Long
+    Dim i As Long, n As Long, nFailed As Long
+    Dim done As Table
+    Dim firstWhy As String
     Dim savedStart As Long, savedEnd As Long
     Dim restore As Boolean
 
@@ -267,8 +310,8 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
     Set tables = AllInterlinearTables(doc)
     If tables.Count = 0 Then
         If showResult Then
-            MsgBox "This document contains no interlinear examples.", _
-                   vbInformation, "LingTeX-Word"
+            Report "This document contains no interlinear examples.", _
+                   vbInformation
         End If
         Exit Sub
     End If
@@ -286,11 +329,27 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
     BeginUndo "Re-wrap all interlinear examples"
     Application.ScreenUpdating = False
 
+    ' Count what actually came back, not what Err happens to hold.
+    '
+    ' This used to read "If Err.Number = 0 Then n = n + 1", which is wrong twice
+    ' over. On Error Resume Next leaves Err set by anything that raised and was
+    ' swallowed anywhere inside the render -- and EnsureTableStyle raises 4198 on
+    ' Mac by design, on its six Style.Table.Borders lines, the first time an
+    ' example is drawn in a fresh document. On Error GoTo 0 does not clear Err. So
+    ' the first successful re-wrap in a new document reported as a failure, and
+    ' "Re-wrapped 0 interlinear examples" was the message for a run that had just
+    ' worked.
     n = 0
+    nFailed = 0
     For i = tables.Count To 1 Step -1
         On Error Resume Next
-        RewrapTable tables(i)
-        If Err.Number = 0 Then n = n + 1
+        Set done = RewrapTable(tables(i))
+        If done Is Nothing Then
+            nFailed = nFailed + 1
+            If firstWhy = "" Then firstWhy = gRenderError
+        Else
+            n = n + 1
+        End If
         Err.Clear
         On Error GoTo Fail
     Next i
@@ -309,9 +368,20 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
     gBusy = False
     ReleaseScratch
 
-    If showResult Then
-        MsgBox "Re-wrapped " & CStr(n) & " interlinear example" & _
-               IIf(n = 1, "", "s") & ".", vbInformation, "LingTeX-Word"
+    If showResult Or nFailed > 0 Then
+        If nFailed = 0 Then
+            Report "Re-wrapped " & CStr(n) & " interlinear example" & _
+                   IIf(n = 1, "", "s") & ".", vbInformation
+        Else
+            ' Reported even when showResult is False -- an automatic re-wrap that
+            ' skipped an example must not do so silently.
+            Report "Re-wrapped " & CStr(n) & " interlinear example" & _
+                   IIf(n = 1, "", "s") & ", and could not re-wrap " & _
+                   CStr(nFailed) & "." & _
+                   IIf(firstWhy = "", "", vbCr & vbCr & "First problem: " & firstWhy) & _
+                   vbCr & vbCr & "The examples that could not be re-wrapped were " & _
+                   "left exactly as they were.", vbExclamation
+        End If
     End If
     Exit Sub
 
@@ -321,7 +391,7 @@ Fail:
     gBusy = False
     ReleaseScratch
     If showResult Then
-        MsgBox "Error " & Err.Number & ": " & Err.Description, vbCritical, "LingTeX-Word"
+        Report "Error " & Err.Number & ": " & Err.Description, vbCritical
     End If
 End Sub
 
@@ -350,15 +420,15 @@ Public Sub LingTeXSplitColumn()
 
     Set tbl = FindExampleAt(Selection.Range)
     If tbl Is Nothing Then
-        MsgBox "Put the cursor in the column you want to split.", _
-               vbInformation, "LingTeX-Word"
+        Report "Put the cursor in the column you want to split.", _
+               vbInformation
         Exit Sub
     End If
 
     flatCol = FlatColumnAt(tbl, Selection.Cells(1).RowIndex, _
                                 Selection.Cells(1).ColumnIndex)
     If flatCol < 0 Then
-        MsgBox "That column could not be located.", vbExclamation, "LingTeX-Word"
+        Report "That column could not be located.", vbExclamation
         Exit Sub
     End If
 
@@ -378,10 +448,10 @@ Public Sub LingTeXSplitColumn()
     If Not okAll Then
         ' Exactly the Leipzig rule 2 problem: the form has a morpheme break its
         ' gloss does not.  Guessing would rewrite the analysis, so say so instead.
-        MsgBox "No morpheme break was found in: " & shortTiers & vbCr & vbCr & _
+        Report "No morpheme break was found in: " & shortTiers & vbCr & vbCr & _
                "Those cells were left whole and the new column is empty for " & _
                "them. Add the matching break, or undo with Ctrl+Z.", _
-               vbExclamation, "LingTeX-Word"
+               vbExclamation
     End If
     Exit Sub
 
@@ -390,7 +460,7 @@ Fail:
     EndUndo
     gBusy = False
     ReleaseScratch
-    MsgBox "Error " & Err.Number & ": " & Err.Description, vbCritical, "LingTeX-Word"
+    Report "Error " & Err.Number & ": " & Err.Description, vbCritical
 End Sub
 
 '-----------------------------------------------------------------------------
@@ -409,7 +479,7 @@ Public Sub LingTeXMergeColumns()
 
     Set tbl = FindExampleAt(Selection.Range)
     If tbl Is Nothing Then
-        MsgBox "Select the columns you want to merge.", vbInformation, "LingTeX-Word"
+        Report "Select the columns you want to merge.", vbInformation
         Exit Sub
     End If
 
@@ -417,7 +487,7 @@ Public Sub LingTeXMergeColumns()
     firstCol = FlatColumnAt(tbl, Selection.Cells(1).RowIndex, _
                                  Selection.Cells(1).ColumnIndex)
     If firstCol < 0 Then
-        MsgBox "Those columns could not be located.", vbExclamation, "LingTeX-Word"
+        Report "Those columns could not be located.", vbExclamation
         Exit Sub
     End If
 
@@ -428,8 +498,8 @@ Public Sub LingTeXMergeColumns()
         lastCol = firstCol + 1
     End If
     If lastCol <= firstCol Then
-        MsgBox "There is no following column to merge with.", _
-               vbInformation, "LingTeX-Word"
+        Report "There is no following column to merge with.", _
+               vbInformation
         Exit Sub
     End If
 
@@ -437,7 +507,7 @@ Public Sub LingTeXMergeColumns()
     AbsorbFreeParagraphs ex, tbl
     If lastCol > ex.ColCount - 1 Then lastCol = ex.ColCount - 1
     If Not MergeColumns(ex, firstCol, lastCol) Then
-        MsgBox "Those columns could not be merged.", vbExclamation, "LingTeX-Word"
+        Report "Those columns could not be merged.", vbExclamation
         Exit Sub
     End If
 
@@ -456,7 +526,7 @@ Fail:
     EndUndo
     gBusy = False
     ReleaseScratch
-    MsgBox "Error " & Err.Number & ": " & Err.Description, vbCritical, "LingTeX-Word"
+    Report "Error " & Err.Number & ": " & Err.Description, vbCritical
 End Sub
 
 
@@ -479,8 +549,8 @@ Public Sub LingTeXCheckExample()
 
     Set tbl = FindExampleAt(Selection.Range)
     If tbl Is Nothing Then
-        MsgBox "Put the cursor inside an interlinear example first.", _
-               vbInformation, "LingTeX-Word"
+        Report "Put the cursor inside an interlinear example first.", _
+               vbInformation
         Exit Sub
     End If
 
@@ -489,7 +559,7 @@ Public Sub LingTeXCheckExample()
     Set warnings = CheckExample(ex)
 
     If warnings.Count = 0 Then
-        MsgBox "No problems found.", vbInformation, "LingTeX-Word"
+        Report "No problems found.", vbInformation
         Exit Sub
     End If
 
@@ -499,9 +569,9 @@ Public Sub LingTeXCheckExample()
         Exit Sub
     End If
 
-    If MsgBox(WarningText(warnings) & vbCr & vbCr & _
-              CStr(nFixable) & " of these can be fixed automatically. Fix them now?", _
-              vbYesNo + vbQuestion, "LingTeX-Word") <> vbYes Then Exit Sub
+    If Not Confirm(WarningText(warnings) & vbCr & vbCr & _
+              CStr(nFixable) & " of these can be fixed automatically. " & _
+              "Fix them now?") Then Exit Sub
 
     FixWhatWeCan ex, SettingSpaceReplacement(ActiveDocument)
 
@@ -523,7 +593,7 @@ Fail:
     EndUndo
     gBusy = False
     ReleaseScratch
-    MsgBox "Error " & Err.Number & ": " & Err.Description, vbCritical, "LingTeX-Word"
+    Report "Error " & Err.Number & ": " & Err.Description, vbCritical
 End Sub
 
 
@@ -633,11 +703,11 @@ Private Sub ReportWarnings(warnings As Collection, ByVal alsoWhenEmpty As Boolea
     If warnings Is Nothing Then Exit Sub
     If warnings.Count = 0 Then
         If alsoWhenEmpty Then
-            MsgBox "No problems found.", vbInformation, "LingTeX-Word"
+            Report "No problems found.", vbInformation
         End If
         Exit Sub
     End If
-    MsgBox WarningText(warnings), vbExclamation, "LingTeX-Word"
+    Report WarningText(warnings), vbExclamation
 End Sub
 
 
