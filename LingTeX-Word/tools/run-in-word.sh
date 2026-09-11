@@ -83,10 +83,60 @@ case "$tests" in
     both) macros="$macros RunAllTestsToFile RunDocTestsToFile" ;;
 esac
 
+#-- Dialogs -----------------------------------------------------------------
+# A compile error, a run-time error outside every trap, or the macro-security
+# prompt all appear as a modal dialog in Word, and "run VB macro" blocks until it
+# is dismissed. So each macro runs in the background while this polls Word's
+# windows through System Events: any dialog is READ (its text is the error), then
+# DISMISSED with whichever button it has. That turns the one thing no macro can
+# suppress into text on this terminal -- and lets a script, or a local Claude
+# Code session, iterate without a person in the loop.
+#
+# Needs Accessibility permission for the terminal you run this from
+# (System Settings > Privacy & Security > Accessibility). Without it dialogs are
+# neither read nor dismissed, and the script says so once.
+catch_dialog() {
+    osascript 2>/dev/null <<'AS'
+tell application "System Events"
+    if not (exists process "Microsoft Word") then return ""
+    tell process "Microsoft Word"
+        repeat with w in windows
+            set txt to ""
+            try
+                repeat with st in (every static text of w)
+                    try
+                        set txt to txt & (value of st) & linefeed
+                    end try
+                end repeat
+            end try
+            if txt contains "Compile error" or txt contains "Run-time error" or txt contains "Microsoft Visual Basic" or txt contains "macro" or txt contains "Macro" then
+                set pressed to ""
+                repeat with bname in {"OK", "End", "Enable Macros", "Run Anyway", "Open", "Yes", "Continue", "Trust"}
+                    try
+                        click button bname of w
+                        set pressed to bname
+                        exit repeat
+                    end try
+                end repeat
+                return "[dialog] " & txt & "(dismissed with: " & pressed & ")"
+            end if
+        end repeat
+    end tell
+end tell
+return ""
+AS
+}
+
+if ! osascript -e 'tell application "System Events" to count processes' >/dev/null 2>&1; then
+    echo "   note: System Events is not reachable, so dialogs will not be read or"
+    echo "         dismissed. Grant Accessibility permission to this terminal in"
+    echo "         System Settings > Privacy & Security > Accessibility."
+fi
+
 echo "== Word: $(basename "$doc")"
 for m in $macros; do
     echo "   running $m ..."
-    if ! osascript - "$doc" "$m" <<'AS' 2>&1; then
+    osascript - "$doc" "$m" <<'AS' > "$reports/.osascript.$m" 2>&1 &
 on run argv
     set docPath to item 1 of argv
     set macroName to item 2 of argv
@@ -99,10 +149,32 @@ on run argv
     end tell
 end run
 AS
+    pid=$!
+    caught=""
+    while kill -0 "$pid" 2>/dev/null; do
+        sleep 2
+        d=$(catch_dialog)
+        if [ -n "$d" ]; then
+            caught="$caught$d
+"
+            echo "$d" | sed 's/^/   /'
+        fi
+    done
+    wait "$pid"; rc=$?
+    if [ -s "$reports/.osascript.$m" ]; then sed 's/^/   /' "$reports/.osascript.$m"; fi
+    rm -f "$reports/.osascript.$m"
+
+    case "$caught" in
+        *"Compile error"*|*"Run-time error"*)
+            echo ""
+            echo "   $m stopped on the dialog above. Word has left the VBA editor on the"
+            echo "   offending statement; the message text is the error, the highlighted"
+            echo "   line is where. Nothing after this macro was run."
+            exit 1 ;;
+    esac
+    if [ "$rc" -ne 0 ]; then
         echo ""
-        echo "   $m did not return cleanly. If Word is showing a dialog, that is why:"
-        echo "   a COMPILE error (the one thing no macro can suppress), or the"
-        echo "   macro-security prompt. Switch to Word, read it, dismiss it."
+        echo "   $m did not return cleanly (see the osascript output above)."
         exit 1
     fi
 done

@@ -86,3 +86,7 @@ LingTeX-Word/build/
 # ── Misc ──────────────────────────────────────────────────────────────────────
 *.log
 *.tmp
+
+# LingTeX-Word: the developer's working document and the runner's reports
+LingTeX-Word/*.docm
+LingTeX-Word/LingTeX-Word-reports/

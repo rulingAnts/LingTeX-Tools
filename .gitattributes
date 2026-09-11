@@ -27,6 +27,7 @@
 # Word templates are zip archives.
 *.dotm          binary
 *.docx          binary
+*.docm          binary
 
 # Shell scripts and AppleScript must stay LF even on Windows clones.
 *.sh            text eol=lf
