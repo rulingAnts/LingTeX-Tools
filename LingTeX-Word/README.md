@@ -265,20 +265,30 @@ Two more that bite:
   still evaluates `a(i)` and raises *subscript out of range*. The guard must be a
   separate, nested `If`. `vba-lint.py` checks for this.
 
-### To verify on real Word during implementation
+### Verified on real Word
 
-Each of these has a documented fallback already in the code, but none has been
-confirmed on a Mac:
+These were assumptions until `tools/probe/modProbe.bas` was run on **Word 16.112
+for Mac**. Two of them were wrong.
 
-- Does `Cell(r, c).Width` read back correctly after
-  `AutoFitBehavior wdAutoFitContent`? (Fallback: set `USE_AUTOFIT = False` in
-  `modMeasure.bas` to use `Range.Information` instead.)
-- Is `Information(wdHorizontalPositionRelativeToTextBoundary)` available?
-- Do `Table.LeftPadding` / `RightPadding` / `Spacing` exist? (If not, both the
-  measurement table and the rendered table keep Word's default padding, so the
-  measurement stays consistent with the drawing.)
-- Does custom ribbon XML in a STARTUP `.dotm` load?
-- Is `Documents.Add(Visible:=False)` genuinely invisible?
+| Assumption | Result |
+|---|---|
+| Hidden `Documents.Add(Visible:=False)`, 22-inch page | **Works.** `Windows.Count` 0, page reads back 1584 pt |
+| Autofit cell widths size to content | **FAILS.** Four different strings all returned 394.7 pt, which sums to the page width — it divided the page equally and never consulted the content. The autofit path is deleted; the header of `modMeasure.bas` records the numbers so nobody reinvents it |
+| `Range.Information` position as a width | **Works**, and is now the only method: `i` 3.0 pt, `WWWWW` 53.3 pt |
+| Rows may hold different cell counts | **Works** — 2 and 3 cells in one table, so one table per example is sound |
+| `Cell.SetWidth RulerStyle:=wdAdjustNone` | **Works** — 72 pt set, 72 pt read back |
+| `Table.LeftPadding` / `RightPadding` / `Spacing` | **All settable** |
+| `Styles.Add` for table and character styles | **Works** — the tagging scheme holds |
+| Borders on a *table style* | **FAILS** on Mac, error 4198. `modRender` switches borders off per table, which on Mac is the only thing doing it |
+| `Font.SmallCaps` reports `wdUndefined` on a mixed range | **Works** — 9999999, as `modReadBack` assumes |
+| `Document.Variables` round trip | **Works** |
+| `Application.UndoRecord` | **Present on Mac.** The `#If Mac Then` guard was needless and is gone, so Mac gets single-step undo too |
+| VBA file write and read | **Works**, but redirected into Word's sandbox container rather than the real temp directory |
+| `VBProject.VBComponents.Import` | **Blocked**, error 6068. No automated module import: the `.dotm` is built by manual File → Import File |
+| `Application.FileDialog` | **Absent** on Mac, error 5948. No folder picker for the add-in or any bootstrap — relevant to the Phase 2 form |
+
+Still unverified because Mac cannot cover them, for one pass on Windows: the NSIS
+installer, and whether custom ribbon XML in a STARTUP `.dotm` loads.
 
 ---
 

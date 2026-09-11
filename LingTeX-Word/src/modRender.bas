@@ -145,6 +145,10 @@ Private Sub StyleTable(tbl As Table, doc As Document)
     ' Explicit widths only: autofit would undo the plan the moment Word
     ' recalculated the layout.
     tbl.AllowAutoFit = False
+    ' Borders are switched off HERE, per table, not left to the table style.
+    ' Setting borders on a table style fails on Mac Word with error 4198, so on
+    ' Mac these two lines are the only thing making the example borderless.
+    ' See the table-style comment in modStyles.bas.
     tbl.Borders.InsideLineStyle = wdLineStyleNone
     tbl.Borders.OutsideLineStyle = wdLineStyleNone
     tbl.Range.Cells.VerticalAlignment = wdCellAlignVerticalTop

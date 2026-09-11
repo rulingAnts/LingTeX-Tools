@@ -161,11 +161,18 @@ Private Sub EnsureGramStyle(doc As Document, ByVal fontName As String)
 End Sub
 
 '-----------------------------------------------------------------------------
-' The table style: the tag, and the borderless look.
+' The table style.  Its real job is to be THE TAG: a table carrying this style is
+' an auto-wrapping interlinear example, and one that does not is left alone.
+' Creating it works on both platforms (probe section 9).
 '
-' Borders are switched off here rather than on each table so that a user who
-' wants to see the grid while editing can turn them on once, centrally, without
-' the renderer putting them back.
+' It also tries to carry the borderless look, so a user who wants to see the grid
+' while editing could switch it on centrally. That part is best-effort only:
+' setting Style.Table.Borders fails on Mac Word with error 4198, "Command
+' failed" (probe section 9 again). So modRender.StyleTable ALSO switches borders
+' off on each table it draws, and on Mac that is the only thing actually doing it.
+'
+' Do not "simplify" by removing the per-table border setting in modRender on the
+' grounds that the style handles it -- on Mac the style does not.
 '-----------------------------------------------------------------------------
 Private Sub EnsureTableStyle(doc As Document)
     Dim st As Style
