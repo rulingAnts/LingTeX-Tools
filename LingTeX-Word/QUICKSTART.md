@@ -384,10 +384,18 @@ Confirm it worked, in the Immediate window:
 
 That prints `clsIgtWarning`. If it errors, the module is still a standard module.
 
-`tools/ImportModules.bas` handles this correctly on its own — it creates class
-components explicitly with `VBComponents.Add` and never calls `Import` on a
-`.cls`. So if the Windows shortcut below is available to you, it is the path with
-the fewest steps *and* the fewest ways to go wrong.
+`tools/ImportModules.bas` splits the job the same way. The twelve `.bas` files go
+through `Import`, which is reliable for those and names them for you. The two
+`.cls` files it never imports: it creates the components explicitly with
+`VBComponents.Add`, and if that does not work on your machine it **names the two
+files to paste and the four steps** rather than failing and leaving you to work it
+out. So the worst case is still "twelve automatic, two by hand", never fourteen by
+hand.
+
+Then run `VerifyLingTeXModules`. It reads each component's *type* out of the VBA
+project and reports anything missing or of the wrong kind — which is the check
+worth having before you run the tests, because a class that came in as a standard
+module makes the project fail to compile on a line in the middle of it.
 
 ---
 
