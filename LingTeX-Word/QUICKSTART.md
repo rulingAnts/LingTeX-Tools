@@ -237,6 +237,20 @@ it.
 
 ---
 
+## Status
+
+**Stage 1 passes on Word 16.112 for Mac: `ALL PASS -- 79 passed`.** Every
+parsing, projection, routing, column-editing, Leipzig-check, gloss-detection and
+wrap-planning assertion, inside real Word VBA. Windows is still to do — see below.
+
+Getting there found four real bugs that the JavaScript harness structurally could
+not: `any` used as a variable name (reserved in VBA), `IsGramGloss` accepting
+`P.N.`, a function's array return passed into a `ByRef` array parameter, and a
+run-time Overflow whose cause is still not understood (see *An unexplained
+failure* below).
+
+---
+
 ## Stage 1 must pass on BOTH platforms before stage 2
 
 Originally this said Mac was the stricter target, so passing there implied Windows
@@ -256,6 +270,30 @@ type declaration; found later it is a mis-rendered table with no obvious cause.
 
 `tools/ImportModules.bas` makes the Windows side cheap — one paste imports all
 thirteen modules, and re-running re-syncs them after any pull.
+
+---
+
+## An unexplained failure, worth knowing about
+
+During stage 1 a `Dim s1 As Single` / `s1 = 10` assignment raised run-time error
+6, *Overflow* — in one procedure, while the identical assignment in a smaller
+procedure in the same module worked, and `TypeCheck` confirmed every numeric type
+including `Single` behaves correctly on this build.
+
+Restructuring the failing code into smaller procedures resolved it. **But that is
+not a diagnosis.** The obvious theory — "large procedures with many array locals
+fail" — does not survive contact with the evidence: `ModelFromBlock` is one of the
+largest procedures in the project, declares several arrays, and passes. The
+modules had also been removed and re-imported many times by that point, so a
+corrupted project state is at least as plausible an explanation as anything in the
+code.
+
+Why it matters for stage 2: several engine procedures are large and declare
+multiple array locals — `RenderExample`, `MeasureExample`, `MeasureTexts`,
+`FillTable`. If one of them fails with an inexplicable run-time error, **try
+splitting it into smaller procedures before assuming the logic is wrong**, and
+try a clean re-import of the module first. Do not spend an afternoon on the
+arithmetic.
 
 ---
 
