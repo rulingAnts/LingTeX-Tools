@@ -7,6 +7,10 @@ Part of [LingTeX Tools](../README.md), but a self-contained sub-project: it
 shares no build step with the web app, the browser extensions or the desktop app,
 and ships as its own two downloads.
 
+> **Setting it up for the first time? Start with
+> [`QUICKSTART.md`](QUICKSTART.md).** It runs the probe, then the modules in two
+> stages, and lists what to do for each way it can fail.
+
 ---
 
 ## What it does
@@ -75,38 +79,50 @@ correct and is not flagged.
 
 ## Installing
 
-### Phase 1 — import the modules
+Not packaged yet — see *Status*. **Start with [`QUICKSTART.md`](QUICKSTART.md)**,
+which walks the first run in order and says what to do when something breaks.
+The short version:
 
-Packaging is Phase 3 (see *Status* below). For now:
+### Step 0 — run the probe
 
-1. In Word, open the VBA editor: **Alt+F11** (Windows) or **Tools → Macro →
-   Visual Basic Editor** (Mac).
-2. **File → Import File…** and import every file in `src/`:
-   `modFlexParse.bas`, `modIgtModel.bas`, `modLeipzig.bas`, `modWrap.bas`,
-   `modMeasure.bas`, `modStyles.bas`, `modRender.bas`, `modReadBack.bas`,
-   `modSettings.bas`, `modLingTeX.bas`, `modTests.bas`, `clsIgtWarning.cls`,
-   `clsAppEvents.cls`.
-   Import the `.bas` and `.cls` files — do **not** paste their contents into a new
-   module, because the `Attribute VB_Name` line at the top of each is read by the
-   importer and is a compile error if typed into the editor.
-3. Run `AutoExec` once (or restart Word) to arm the save hook.
-4. Run the commands from **Alt+F8**: `LingTeXInsertInterlinear`,
-   `LingTeXRewrapCurrent`, `LingTeXRewrapAll`, `LingTeXSplitColumn`,
-   `LingTeXMergeColumns`, `LingTeXCheckExample`, `LingTeXConvertTableToIgt`.
+Five things this add-in does with Word's object model are assumptions that have
+never been observed on a real install. `tools/probe/modProbe.bas` is a
+self-contained module that checks all of them, prints a report, and cleans up
+after itself. Import it, run `ProbeWord` in the Immediate window, and read the two
+verdicts that matter: *autofit cell widths* decides how columns are sized, and
+*VBProject access* decides whether the rest can be automated.
+
+### Step 1 — six modules, no document touched
+
+`modFlexParse`, `modIgtModel`, `modLeipzig`, `modWrap`, `clsIgtWarning`,
+`modTests` reference nothing defined in the other seven, so they compile and run
+alone. Import them and run `RunAllTests` in the Immediate window — every line must
+read `PASS`.
+
+That isolates the two risks that would otherwise be tangled: whether the VBA port
+computes correctly, and whether Word's object model behaves as assumed. Pass this
+and anything later is the second, not the first.
+
+### Step 2 — the remaining seven
+
+`modStyles`, `modSettings`, `modMeasure`, `modRender`, `modReadBack`,
+`modLingTeX`, `clsAppEvents`. Then run `AutoExec` once, or restart Word, to arm the
+save hook.
+
+Import the `.bas` and `.cls` files via **File → Import File…** — do **not** paste
+them, because the `Attribute VB_Name` line at the top of each is read by the
+importer and is a compile error if typed in. If your editor has no Import, run
+`sh tools/make-paste-bundle.sh` to generate stripped, paste-ready copies in
+`build/paste/`, each headed with the module name to set and whether it is a
+standard module or a *Class Module*.
+
+Commands run from **Alt+F8** (Windows) or **Tools → Macro → Macros** (Mac):
+`LingTeXInsertInterlinear`, `LingTeXRewrapCurrent`, `LingTeXRewrapAll`,
+`LingTeXSplitColumn`, `LingTeXMergeColumns`, `LingTeXCheckExample`,
+`LingTeXConvertTableToIgt`.
 
 `src/customUI14.xml` is the ribbon; it only takes effect once the modules are
-packaged into `LingTeX-Word.dotm`, which is Phase 3.
-
-### Verify the install
-
-In the VBA editor, open the Immediate window (**Ctrl+G**) and run:
-
-```
-RunAllTests
-```
-
-Every line must read `PASS`. This runs identically on Windows and Mac and is the
-gate before trying anything in a real document.
+packaged into `LingTeX-Word.dotm`.
 
 ---
 
@@ -340,10 +356,27 @@ when it arrives: the form will build an `IgtExample` and hand it to
   past Gatekeeper with no Developer ID and no notarisation.
 
 A VBA project is a binary stream that cannot be authored without Word, and
-GitHub's runners have no Word installed, so CI cannot build the `.dotm`.
-`src/*.bas` stays the source of truth; `tools/build-dotm.ps1` builds the template
-on a Windows machine with Word, `tools/export-modules.ps1` exports back out so
-the binary cannot silently drift, and CI builds only the installers.
+GitHub's runners have no Word installed, so **CI can never build the `.dotm`**.
+`src/` stays the source of truth: the template is built once in Mac Word (import
+the modules, Save As a macro-enabled template), then `tools/build-dotm.sh` — bash,
+no Word — injects the ribbon XML and writes a SHA-256 manifest of every source
+file. CI verifies rather than builds: it unzips the `.dotm`, diffs the embedded
+ribbon against `src/customUI14.xml`, and checks the manifest, so a template that
+has drifted from the sources fails the release.
+
+**Later — PowerPoint.** The same problem exists in slides, and the architecture
+already anticipates it. Four modules are pure computation with no Word objects at
+all — `modFlexParse`, `modIgtModel`, `modLeipzig`, `modWrap` — and port verbatim.
+Four are platform-specific and would need PowerPoint counterparts: `modMeasure`,
+`modRender`, `modReadBack`, `modStyles`.
+
+Two differences to design around when that happens. PowerPoint has **no named
+styles**, so the self-describing-document trick does not carry over — but shapes
+have a `Tags` collection, which is a better tag than a style name ever was.
+And measuring text is *easier* there, not harder: `TextFrame2.TextRange.BoundWidth`
+reports rendered width directly, with none of the hidden-scratch-document
+machinery `modMeasure` needs to work around Word. Word is the priority; this is
+recorded so the module boundaries are not lost.
 
 ---
 
