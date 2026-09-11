@@ -209,20 +209,28 @@ End Function
 ' a role, which means two rows sharing a paragraph style and the tier distinction
 ' gone for good on the next render.
 '
+' THE FIRST TWO ARE NOT ARBITRARY, and the order below is load-bearing for a reason
+' that is easy to miss. A hand-built or style-stripped table is usually two rows,
+' form over gloss, and TierTakesSmallCaps says Vernacular and Morphemes take no
+' small capitals while Gloss does. So index 1 must be ROLE_GLOSS: putting
+' ROLE_MORPHEMES there -- which looks perfectly reasonable, and which I did while
+' fixing the collision above -- silently stops the grammatical glosses of every
+' converted two-row table being drawn in small capitals. The fix for the collision
+' is only in indices three and up, where nothing used to be distinct anyway.
+'
 ' There are only six roles, so a table with more than six tiers still has to repeat
-' one. Six covers every real example -- FLEx offers about five tiers -- and the
-' floor is at least explicit rather than starting at three.
+' one. Six covers every real example -- FLEx offers about five tiers.
 '-----------------------------------------------------------------------------
-Private Function RoleOrDefault(ByVal role As String, ByVal idx As Long) As String
+Public Function RoleOrDefault(ByVal role As String, ByVal idx As Long) As String
     If role <> "" Then
         RoleOrDefault = role
         Exit Function
     End If
     Select Case idx
         Case 0: RoleOrDefault = ROLE_VERNACULAR
-        Case 1: RoleOrDefault = ROLE_MORPHEMES
-        Case 2: RoleOrDefault = ROLE_GLOSS
-        Case 3: RoleOrDefault = ROLE_WORDGLOSS
+        Case 1: RoleOrDefault = ROLE_GLOSS
+        Case 2: RoleOrDefault = ROLE_WORDGLOSS
+        Case 3: RoleOrDefault = ROLE_MORPHEMES
         Case 4: RoleOrDefault = ROLE_CATEGORY
         Case 5: RoleOrDefault = ROLE_FREE
         Case Else: RoleOrDefault = ROLE_CATEGORY

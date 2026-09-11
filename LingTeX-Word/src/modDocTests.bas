@@ -1380,6 +1380,7 @@ Private Sub TestRoundTrip()
     CheckRestoreFastPathAgrees doc
     CheckEscapeHatch doc
     CheckReadBackIsReadOnly doc
+    CheckDefaultRoles
 
     CloseNoSave doc
 End Sub
@@ -1655,6 +1656,42 @@ Private Function ChangeTableStyle(tbl As Table, doc As Document) As Boolean
     On Error GoTo 0
     ChangeTableStyle = (Not TableStyleIs(tbl, STYLE_TABLE))
 End Function
+
+' The fallback roles for a table whose paragraph styles told us nothing. A pure
+' function, and two separate properties that pull in different directions.
+Private Sub CheckDefaultRoles()
+    Dim i As Long, j As Long
+    Dim dup As String
+
+    ' 1. DISTINCT. All six indices used to collapse to ROLE_CATEGORY from three up,
+    '    so a five-tier table recovered with two tiers sharing a role -- and
+    '    therefore a paragraph style, losing the distinction permanently.
+    For i = 0 To 5
+        For j = i + 1 To 5
+            If RoleOrDefault("", i) = RoleOrDefault("", j) Then
+                dup = dup & " " & CStr(i) & "=" & CStr(j) & " both " & _
+                      RoleOrDefault("", i) & ";"
+            End If
+        Next j
+    Next i
+    Ok "the six fallback roles are all different", (dup = "")
+    If dup <> "" Then Emit "        " & dup
+
+    ' 2. AND THE COMMON CASE STILL WORKS. A hand-built table is usually two rows,
+    '    form over gloss, and only Gloss takes small capitals. Index 1 being
+    '    ROLE_MORPHEMES would look reasonable and silently stop every converted
+    '    two-row table drawing its grammatical glosses in small caps.
+    Eq "fallback role 0 is Vernacular", RoleOrDefault("", 0), ROLE_VERNACULAR
+    Eq "fallback role 1 is Gloss", RoleOrDefault("", 1), ROLE_GLOSS
+    Ok "so a two-row table's second row takes small capitals", _
+        TierTakesSmallCaps(RoleOrDefault("", 1))
+    Ok "and its first row does not", _
+        (Not TierTakesSmallCaps(RoleOrDefault("", 0)))
+
+    ' 3. A real role is never overridden.
+    Eq "a known role is passed through", _
+        RoleOrDefault(ROLE_CATEGORY, 0), ROLE_CATEGORY
+End Sub
 
 ' Reading must not change anything. A read that edits the document would make
 ' idempotence meaningless.
