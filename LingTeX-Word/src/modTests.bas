@@ -532,22 +532,22 @@ Private Sub TestWrapPlanner()
     Section "Wrap planner"
 
     Eq "exact fit stays on one line", _
-       Starts(Plan("10,10,10", "0,0,0", 30)), "0"
+       PlanStarts("10,10,10", "0,0,0", 30), "0"
     Eq "one column over the budget wraps", _
-       Starts(Plan("10,10,10", "0,0,0", 25)), "0,2"
+       PlanStarts("10,10,10", "0,0,0", 25), "0,2"
     Eq "three wrap lines", _
-       Starts(Plan("10,10,10,10,10,10", "0,0,0,0,0,0", 25)), "0,2,4"
+       PlanStarts("10,10,10,10,10,10", "0,0,0,0,0,0", 25), "0,2,4"
     Eq "an over-wide single column gets its own line and overflows", _
-       Starts(Plan("10,100,10", "0,0,0", 25)), "0,1,2"
+       PlanStarts("10,100,10", "0,0,0", 25), "0,1,2"
     Eq "widening pulls columns back up (same input, bigger budget)", _
-       Starts(Plan("10,10,10,10", "0,0,0,0", 100)), "0"
+       PlanStarts("10,10,10,10", "0,0,0,0", 100), "0"
 
     ' A leading-boundary column must never start a line, so the break moves back
     ' and "zomu" stays with "-xa".
     Eq "a wrap line never starts on a continuation column", _
-       Starts(Plan("10,10,10", "0,0,1", 25)), "0,1"
+       PlanStarts("10,10,10", "0,0,1", 25), "0,1"
     Eq "backing up is abandoned rather than emptying a line", _
-       Starts(Plan("10,10", "0,1", 15)), "0,1"
+       PlanStarts("10,10", "0,1", 15), "0,1"
 
     ' The same flags derived from real data rather than written by hand.
     Dim ex As IgtExample
@@ -557,6 +557,22 @@ Private Sub TestWrapPlanner()
     Ok "NoBreakFlags never flags the first column", (flags(0) = False)
     Ok "NoBreakFlags flags the enclitic columns of example 2", (CountTrue(flags) > 0)
 End Sub
+
+'-----------------------------------------------------------------------------
+' Plan a wrap and render the line starts, in one call.
+'
+' These are deliberately not composed as Starts(Plan(...)).  VBA will not pass a
+' function's array return value straight into an array parameter -- Starts takes
+' "lineStarts() As Long", which is ByRef, and a function result has nothing to
+' refer to.  It fails at run time, not compile time, so the nesting looks fine
+' until it does not.  The array has to land in a local variable first.
+'-----------------------------------------------------------------------------
+Private Function PlanStarts(ByVal widthCsv As String, ByVal flagCsv As String, _
+        ByVal avail As Single) As String
+    Dim lineStarts() As Long
+    lineStarts = Plan(widthCsv, flagCsv, avail)
+    PlanStarts = Starts(lineStarts)
+End Function
 
 ' Run the planner over comma-separated widths and flags.
 Private Function Plan(ByVal widthCsv As String, ByVal flagCsv As String, _
