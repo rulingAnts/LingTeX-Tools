@@ -21,12 +21,24 @@ Option Explicit
 '      or      Insert > Module, then paste everything below
 '              EXCEPT the first line ("Attribute VB_Name = ...") -- that line is
 '              read by the importer and is a compile error if typed in by hand.
-'   3. Show the Immediate window:  View > Immediate Window  (Ctrl+G / Cmd+G)
-'   4. Click into the Immediate window, type    ProbeWord    and press Return.
-'   5. Select all the output, copy it, and send it back.
+'   3. Run it, either way:
+'        * Tools > Macro > Macros... (Mac) or Alt+F8 (Windows), pick ProbeWord,
+'          then Run;  or
+'        * open View > Immediate Window, type  ProbeWord  and press Return.
+'   4. When it finishes it opens a NEW DOCUMENT containing the report, and shows
+'      a dialog saying so.  Select all of that document, copy, and send it back.
 '
-' It creates one hidden document and two temporary styles, and deletes all of
-' them before it finishes.  Your own documents are never touched.
+' If you see no dialog and no new document, the module did not run at all -- check
+' for a macro-security prompt, and that the module compiled (Debug > Compile).
+'
+' The report also goes to the VBA editor's Immediate window.  That window is the
+' ONLY place Debug.Print output appears, and if it is closed the output is
+' invisible, which looks just like nothing having happened -- which is why the
+' report is delivered as a document too.
+'
+' It creates one hidden document and three temporary styles and deletes all of
+' them before it finishes.  Your own documents are never touched; the report
+' document is new and unsaved, and you can close it without saving.
 ' ---------------------------------------------------------------------------
 '
 ' Pure ASCII on purpose: a .bas is imported in the system ANSI code page, not
@@ -79,10 +91,61 @@ Public Sub ProbeWord()
     CleanUp
 
     Say "==================================================================="
-    Say " End of report.  Select all of this, copy it, and send it back."
+    Say " End of report."
     Say "==================================================================="
 
+    DeliverReport
+End Sub
+
+'-----------------------------------------------------------------------------
+' Get the report in front of the user.
+'
+' Debug.Print writes ONLY to the Immediate window, and if that window is closed
+' the output is invisible -- which looks exactly like the macro having done
+' nothing at all.  So the report also goes into a new Word document, which cannot
+' be missed and is trivial to select and copy, and a dialog confirms the run
+' finished and says where to look.
+'-----------------------------------------------------------------------------
+Private Sub DeliverReport()
+    Dim d As Document
+    Dim placed As Boolean
+
+    ' Still print it, for anyone who does have the Immediate window open.
+    On Error Resume Next
     Debug.Print mRpt
+    Err.Clear
+
+    Set d = Documents.Add
+    If Err.Number = 0 Then
+        If Not d Is Nothing Then
+            d.Content.Text = mRpt
+            ' Monospaced so the columns in the report line up.
+            d.Content.Font.Name = "Courier New"
+            d.Content.Font.Size = 9
+            d.Content.ParagraphFormat.SpaceAfter = 0
+            placed = (Err.Number = 0)
+        End If
+    End If
+    Err.Clear
+    On Error GoTo 0
+
+    If placed Then
+        MsgBox "Probe finished." & vbCr & vbCr & _
+               "The report is in the new document that just opened." & vbCr & _
+               "Select all of it (Cmd+A, or Ctrl+A on Windows), copy, and send " & _
+               "it back." & vbCr & vbCr & _
+               "It is also in the VBA editor's Immediate window, if you have " & _
+               "that open (View > Immediate Window).", _
+               vbInformation, "LingTeX-Word probe"
+    Else
+        MsgBox "Probe finished, but a new document could not be created to hold " & _
+               "the report." & vbCr & vbCr & _
+               "Open the VBA editor's Immediate window instead " & _
+               "(View > Immediate Window) -- the report is there." & vbCr & vbCr & _
+               "That a document could not be created is itself a finding worth " & _
+               "reporting.", _
+               vbExclamation, "LingTeX-Word probe"
+    End If
 End Sub
 
 
