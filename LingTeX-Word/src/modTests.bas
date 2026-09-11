@@ -559,51 +559,49 @@ Private Sub TestWrapPlanner()
 End Sub
 
 '-----------------------------------------------------------------------------
-' Plan a wrap and render the line starts, in one call.
+' Plan a wrap from comma-separated widths and flags, and render the resulting
+' line starts as "0,2,4".
 '
-' These are deliberately not composed as Starts(Plan(...)).  VBA will not pass a
-' function's array return value straight into an array parameter -- Starts takes
-' "lineStarts() As Long", which is ByRef, and a function result has nothing to
-' refer to.  It fails at run time, not compile time, so the nesting looks fine
-' until it does not.  The array has to land in a local variable first.
+' Deliberately ONE function with ONE local array, rather than a Plan() that
+' returns an array and a Starts() that takes one. VBA is awkward about arrays
+' crossing function boundaries -- a function's array return cannot be passed
+' straight into an array parameter, because that parameter is ByRef and a result
+' has nothing to refer to -- and every boundary is somewhere for that to go
+' wrong at RUN time rather than compile time. The only array here is local, and
+' the only call out is to ComputeWrapLines itself, which is the thing under test.
+'
+' Val() rather than CSng(): Val always reads "." as the decimal separator, while
+' CSng follows the machine's locale. This is a tool for fieldwork linguists, who
+' are not reliably on an English-locale machine.
 '-----------------------------------------------------------------------------
 Private Function PlanStarts(ByVal widthCsv As String, ByVal flagCsv As String, _
         ByVal avail As Single) As String
-    Dim lineStarts() As Long
-    lineStarts = Plan(widthCsv, flagCsv, avail)
-    PlanStarts = Starts(lineStarts)
-End Function
 
-' Run the planner over comma-separated widths and flags.
-Private Function Plan(ByVal widthCsv As String, ByVal flagCsv As String, _
-        ByVal avail As Single) As Long()
     Dim wParts() As String, fParts() As String
     Dim widths() As Single, flags() As Boolean
-    Dim i As Long
+    Dim lineStarts() As Long
+    Dim i As Long, s As String
 
     wParts = Split(widthCsv, ",")
     fParts = Split(flagCsv, ",")
     ReDim widths(0 To UBound(wParts))
     ReDim flags(0 To UBound(wParts))
+
     For i = 0 To UBound(wParts)
-        widths(i) = CSng(wParts(i))
-        ' VBA's And does NOT short-circuit, so the bounds test must be a separate
-        ' statement -- written as one condition, fParts(i) would still be
-        ' evaluated and would raise subscript out of range.
+        widths(i) = CSng(Val(Trim$(wParts(i))))
+        ' VBA's And does NOT short-circuit, so the bounds test has to be its own
+        ' statement; as one condition, fParts(i) would still be evaluated.
         flags(i) = False
-        If i <= UBound(fParts) Then flags(i) = (fParts(i) = "1")
+        If i <= UBound(fParts) Then flags(i) = (Trim$(fParts(i)) = "1")
     Next i
 
-    Plan = ComputeWrapLines(widths, flags, avail, 0, 0)
-End Function
+    lineStarts = ComputeWrapLines(widths, flags, avail, 0, 0)
 
-Private Function Starts(lineStarts() As Long) As String
-    Dim i As Long, s As String
     For i = LBound(lineStarts) To UBound(lineStarts)
         If s <> "" Then s = s & ","
         s = s & CStr(lineStarts(i))
     Next i
-    Starts = s
+    PlanStarts = s
 End Function
 
 Private Function CountTrue(flags() As Boolean) As Long
