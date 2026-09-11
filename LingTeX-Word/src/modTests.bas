@@ -46,13 +46,15 @@ Public Sub RunAllTests()
     Emit "LingTeX-Word self-tests"
     Emit "======================="
 
-    TestGoldenVectors
-    TestProjections
-    TestRouting
-    TestColumnEditing
-    TestLeipzigChecks
-    TestGramGlossDetection
-    TestWrapPlanner
+    ' Each section runs behind its own error trap, so a run-time error reports
+    ' which section died and the run CONTINUES to the next one.
+    RunSection "golden"
+    RunSection "projections"
+    RunSection "routing"
+    RunSection "columns"
+    RunSection "leipzig"
+    RunSection "gramgloss"
+    RunSection "wrap"
 
     Emit ""
     If mFail = 0 Then
@@ -62,6 +64,43 @@ Public Sub RunAllTests()
     End If
 
     DeliverResults
+End Sub
+
+'-----------------------------------------------------------------------------
+' Run one section behind its own error trap.
+'
+' VBA's try/catch is On Error GoTo <label>: execution jumps to the label, Err
+' holds the number and description, and Resume or falling through carries on.
+'
+' A run-time error inside a test is itself a finding -- usually a VBA construct
+' that compiles and then will not execute, which is exactly the class of problem
+' this suite exists to surface and exactly what the JavaScript harness cannot
+' find. Trapping per section means one run reports EVERY such failure with its
+' error number, instead of stopping at the first and hiding the rest.
+'-----------------------------------------------------------------------------
+Private Sub RunSection(ByVal which As String)
+    On Error GoTo Crashed
+
+    Select Case which
+        Case "golden":      TestGoldenVectors
+        Case "projections": TestProjections
+        Case "routing":     TestRouting
+        Case "columns":     TestColumnEditing
+        Case "leipzig":     TestLeipzigChecks
+        Case "gramgloss":   TestGramGlossDetection
+        Case "wrap":        TestWrapPlanner
+    End Select
+    Exit Sub
+
+Crashed:
+    mFail = mFail + 1
+    Emit ""
+    Emit "  CRASH  section " & which & " stopped with run-time error " & _
+         CStr(Err.Number) & ": " & Err.Description
+    Emit "         (everything printed above in this section did run)"
+    NoteFailure "section " & which & " crashed: error " & CStr(Err.Number) & _
+                " " & Err.Description
+    Err.Clear
 End Sub
 
 '-----------------------------------------------------------------------------
