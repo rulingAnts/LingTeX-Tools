@@ -372,7 +372,10 @@ byte-for-byte, which the tests assert.
 
 **Phase 1 — the engine — is what is here.** Parsing, the column model, the
 invariant checks, measurement, the wrap planner, the renderer, read-back, and the
-commands. Driven from the document selection or the clipboard.
+commands. Driven from the document selection or the clipboard. Proven inside Word
+16.112 for Mac on 2026-09-12: `RunAllTests` 79/79 and `RunDocTests` 218/218, by
+the one-command runner; the same two runs on Windows are the next gate
+(QUICKSTART.md, *Status*).
 
 **Phase 2 — the form.** A dialog with an editable data table: paste FLEx or TSV,
 fix it up in a grid, split and merge columns from column headers, see the check
