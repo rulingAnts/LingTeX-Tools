@@ -125,6 +125,14 @@ Private Function PlanExample(ex As IgtExample, target As Range, doc As Document,
     lineStarts = ComputeWrapLines(colW, flags, avail, 0, contIndent)
 
     nLines = UBound(lineStarts) - LBound(lineStarts) + 1
+
+    ' An over-wide column. The planner's contract is to give it a wrap line of
+    ' its own and let it overflow; the drawing's is not to run off the page.
+    ' Capped at the room its line has, the cell wraps its text inside itself
+    ' instead (found by hand, 2026-09-12: a 60-character form ran past the margin
+    ' and off the page, because SetWidth was given the full measured width).
+    CapColumnWidths colW, lineStarts, nLines, ex.ColCount, avail, contIndent
+
     maxCols = MaxColumnsPerLine(lineStarts, ex.ColCount)
     If maxCols < 1 Then
         why = "the wrap planner produced no columns"
@@ -147,6 +155,43 @@ End Function
 '-----------------------------------------------------------------------------
 ' Draw the planned layout.  Everything here mutates the document.
 '-----------------------------------------------------------------------------
+' No column may be wider than the line it sits on. Only an over-wide column
+' alone on its line can be, so this changes nothing for a normal example.
+Private Sub CapColumnWidths(ByRef colW() As Double, lineStarts() As Long, _
+        ByVal nLines As Long, ByVal nCols As Long, _
+        ByVal avail As Double, ByVal contIndent As Double)
+
+    Dim g As Long, c As Long
+    Dim lineFirst As Long, lineLast As Long
+    Dim room As Double
+
+    For g = 0 To nLines - 1
+        lineFirst = lineStarts(g)
+        lineLast = WrapLineEnd(lineStarts, g, nCols)
+        room = avail
+        If g > 0 Then room = avail - contIndent
+        If room < 36 Then room = 36
+        For c = lineFirst To lineLast
+            If colW(c) > room Then colW(c) = room
+        Next c
+    Next g
+End Sub
+
+' Measure an example that is already on the page, so its widths are in the
+' cache before an undo record opens (see modLingTeX.BeginUndo). Failure is
+' silent: the re-wrap that follows measures again and reports its own.
+Public Sub WarmMeasureCache(tbl As Table)
+    Dim ex As IgtExample
+    Dim widths() As Double
+    On Error Resume Next
+    ex = ReadExampleFromTable(tbl)
+    If ex.TierCount > 0 And ex.ColCount > 0 Then
+        MeasureExample ex, tbl.Range.Document, widths
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
 Private Function DrawExample(ex As IgtExample, target As Range, doc As Document, _
         interTiers() As Long, ByVal nInter As Long, _
         colW() As Double, lineStarts() As Long, _
@@ -156,6 +201,7 @@ Private Function DrawExample(ex As IgtExample, target As Range, doc As Document,
     Dim anchor As Range
 
     Set anchor = target.Duplicate
+    StartPendingUndo                       ' the first change to the document
     anchor.Text = ""                       ' clear whatever we are replacing
 
     Set tbl = doc.Tables.Add(Range:=anchor, _
@@ -230,6 +276,7 @@ Public Function RewrapTable(tbl As Table) As Table
     End If
 
     startPos = tbl.Range.Start
+    StartPendingUndo                       ' the first change to the document
     DeleteTableAndFreeLines tbl
 
     Set anchor = doc.Range(startPos, startPos)
@@ -472,6 +519,7 @@ End Sub
 Public Function TransformedCellText(ByVal text As String, ByVal role As String, _
         srcDoc As Document) As String
     Dim parts() As String, nParts As Long, i As Long, out As String
+    Dim initialCap As Boolean
 
     If Not TierTakesSmallCaps(role) Then
         TransformedCellText = text
@@ -482,15 +530,37 @@ Public Function TransformedCellText(ByVal text As String, ByVal role As String, 
         Exit Function
     End If
 
+    initialCap = SettingGramGlossInitialCap(srcDoc)
     nParts = SplitGlossSegments(text, parts)
     For i = 0 To nParts - 1
         If IsGramGloss(parts(i)) Then
-            out = out & LCase$(parts(i))
+            out = out & SmallCapsForm(parts(i), initialCap)
         Else
             out = out & parts(i)
         End If
     Next i
     TransformedCellText = out
+End Function
+
+' The text stored for a grammatical gloss the small-caps style will draw. All
+' lowercase, so the style renders every letter as a small capital; with
+' initialCap the first LETTER stays full-size -- the first letter, not the first
+' character, so 3SG becomes 3Sg and ERG becomes Erg. Length is preserved either
+' way, which ApplyGramGlossRuns relies on. Read-back upper-cases the whole run,
+' so both forms restore to ERG.
+Private Function SmallCapsForm(ByVal part As String, ByVal initialCap As Boolean) As String
+    Dim s As String, i As Long, ch As String
+    s = LCase$(part)
+    If initialCap Then
+        For i = 1 To Len(s)
+            ch = Mid$(s, i, 1)
+            If LCase$(ch) <> UCase$(ch) Then
+                s = Left$(s, i - 1) & UCase$(ch) & Mid$(s, i + 1)
+                Exit For
+            End If
+        Next i
+    End If
+    SmallCapsForm = s
 End Function
 
 '-----------------------------------------------------------------------------

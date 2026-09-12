@@ -54,7 +54,7 @@ text** (Ctrl+Shift+V / Paste Special → Unformatted Text) so the tabs survive,
 or copy the equivalent selection out of FLEx.
 
 ```
-Morphemes	zel	vimo			rixu			=xo	xu	=zevi	Ozivela	ze	:	zel	vimo			rixu			=xo	Vo	vu	=ve	levo			=zi	zo	z	zuvo	=ve	=zi
+Morphemes	zel	vimo			rixu			=xo	xu	=zevi	Ozivela	ze	ː	zel	vimo			rixu			=xo	Vo	vu	=ve	levo			=zi	zo	z	zuvo	=ve	=zi
 	Lex. Gloss	yam		pick	.CMP		stack	.CMP	SEQ	3SG	all	P.N.	ACMP		yam		pick	.CMP		stack	.CMP	SEQ	P.N.	fox	ERG		follow	.CMP	REL	FOC	1SG	dream	ABL	REL
 Free Eng (When) she picked her yams early.
 ```
@@ -67,10 +67,10 @@ Free Eng (When) she picked her yams early.
 | Paste the text in, select it, run the same command → the selection is **replaced**, no stray paragraph left behind | ☐ | ☐ |
 | Columns line up: each form sits directly above its gloss | ☐ | ☐ |
 | No table borders visible | ☐ | ☐ |
-| Grammatical glosses (`SEQ`, `ERG`, `FOC`, `3SG`) render as **small capitals**; lexical glosses (`yam`, `pick`, `stack`) do not | ☐ | ☐ |
+| Grammatical glosses (`SEQ`, `ERG`, `FOC`, `3SG`) render as **small capitals**, each with a full-size first letter (`Erg`, `3Sg`; `LingTeXToggleGramGlossInitialCap` switches to uniform small caps); lexical glosses (`yam`, `pick`, `stack`) do not | ☐ | ☐ |
 | The object-language row is italic and is **not** small-capped, even where a form is capitalised (`Ozivela`, `Vo`) | ☐ | ☐ |
 | Free translation appears below the table in `LingTeX Free`, in single quotes, upright | ☐ | ☐ |
-| `ze:` — the colon is attached to the preceding form, not given its own column | ☐ | ☐ |
+| `zeː` — the length mark is attached to the preceding form, not given its own column | ☐ | ☐ |
 | `zuvo=ve=zi` — double enclitics stay in one column, gloss `dream=ABL=REL` | ☐ | ☐ |
 | Run it with nothing on the clipboard and nothing selected → a clear message, no error dialog | ☐ | ☐ |
 | Run it on prose that is not interlinear → a clear message explaining what was expected | ☐ | ☐ |
@@ -86,7 +86,7 @@ Free Eng (When) she picked her yams early.
 | Vertical gap between wrap lines matches `LingTeX_LineGap` (default 6 pt) | ☐ | ☐ |
 | **Narrow the margins**, run `LingTeXRewrapCurrent` → columns push down onto an extra wrap line | ☐ | ☐ |
 | **Widen them back**, re-wrap → columns are **pulled back up** and the extra line disappears | ☐ | ☐ |
-| Increase the body font size → re-wrap adds lines; decrease → re-wrap removes them | ☐ | ☐ |
+| Increase the **Normal style's** font size (the LingTeX styles inherit it) → re-wrap adds lines; decrease → re-wrap removes them. Direct formatting on cells is not part of the example and does not survive a re-wrap | ☐ | ☐ |
 | Flip the page to landscape → re-wrap reflows; back to portrait → reflows back | ☐ | ☐ |
 | Set the section to two text columns → re-wrap fits the column, not the page | ☐ | ☐ |
 | Delete several columns, re-wrap → lines collapse correctly | ☐ | ☐ |
@@ -99,7 +99,7 @@ Free Eng (When) she picked her yams early.
 
 | Check | Windows | Mac |
 |---|---|---|
-| `SetSettingGranularity ActiveDocument, igtMorphemeAligned`, insert again → one column per morpheme | ☐ | ☐ |
+| Run `LingTeXAlignByMorpheme`, insert again → one column per morpheme | ☐ | ☐ |
 | The morpheme-aligned version **wraps at word boundaries**: no wrap line begins with `=xo`, `=zevi`, `=ve` or `=zi` | ☐ | ☐ |
 | Every enclitic column carries the `=` on **both** the form and the gloss row | ☐ | ☐ |
 | On a word-aligned example, put the cursor in `rixu=xo` and run `LingTeXSplitColumn` → two columns, `rixu` / `stack.CMP` and `=xo` / `=SEQ` | ☐ | ☐ |
@@ -122,6 +122,7 @@ Free Eng (When) she picked her yams early.
 | `rixu=xo` over `stack-CMP=SEQ` → rule-2 warning | ☐ | ☐ |
 | An invented abbreviation such as `SUPEREL` gets small capitals and is **not** flagged as unknown | ☐ | ☐ |
 | A clean example reports "No problems found." | ☐ | ☐ |
+| Click into an interlinear cell and type `erg` at its start → Word does **not** capitalise it (AutoCorrect's sentence and table-cell capitalisation are off while the cursor is inside an example, and back on outside) | ☐ | ☐ |
 
 ### 3e. Round trip and persistence
 
@@ -129,7 +130,7 @@ Free Eng (When) she picked her yams early.
 |---|---|---|
 | **Save** the document → every example re-wraps automatically, with no visible cursor jump or flicker | ☐ | ☐ |
 | The cursor is where it was before the save | ☐ | ☐ |
-| `SetSettingRewrapOnSave ActiveDocument, False` → saving no longer re-wraps | ☐ | ☐ |
+| Run `LingTeXToggleRewrapOnSave` → saving no longer re-wraps; run it again to turn it back on | ☐ | ☐ |
 | Close and reopen the document, run `LingTeXRewrapAll` → examples are still recognised (the style tagging survived) | ☐ | ☐ |
 | Small caps round-trip: re-wrap an example and confirm `ERG` is still `ERG`, not `erg` | ☐ | ☐ |
 | Copy an example, paste it elsewhere in the document, re-wrap → both work independently | ☐ | ☐ |
@@ -151,7 +152,7 @@ Free Eng (When) she picked her yams early.
 | Each command run with the cursor **outside** any example → a clear message, no error | ☐ | ☐ |
 | After any command, `Application.ScreenUpdating` is back on (the screen is not frozen) | ☐ | ☐ |
 | No hidden scratch document is left open — check the Window menu | ☐ | ☐ |
-| `SetSettingRewrapOnSelectionChange ActiveDocument, True`, then click in and out of an example → it re-wraps, does not recurse, and typing stays responsive | ☐ | ☐ |
+| Run `LingTeXToggleRewrapOnSelectionChange`, then click in and out of an example → it re-wraps, does not recurse, and typing stays responsive | ☐ | ☐ |
 
 ---
 

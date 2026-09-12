@@ -193,8 +193,15 @@ Private Sub EnsureParaStyle(doc As Document, ByVal role As String, _
 
     On Error Resume Next
     With st
+        ' Based on Normal, with the SIZE inherited, so a document whose body
+        ' text grows or shrinks takes its examples with it on the next re-wrap
+        ' (by hand, 2026-09-12: sizing the cells directly was lost on re-wrap,
+        ' as any direct formatting is -- the styles are the description). The
+        ' font NAME is pinned at creation, from the body font: what the
+        ' measurer reads back from a style must be a name the scratch document
+        ' can apply, and a theme placeholder ("+Body") is not.
+        .BaseStyle = doc.Styles(wdStyleNormal)
         .Font.Name = fontName
-        .Font.Size = fontSize
         .Font.Italic = italic
         ' Tight, unjustified, unhyphenated: a cell holds one alignment slot and
         ' must not be re-laid-out by Word behind the planner's back.

@@ -833,11 +833,18 @@ End Function
 ' ApplyGramGlossRuns relies on to line its offsets up with the text in the range.
 Private Sub CheckTransform(doc As Document)
     SetSettingLowercaseGramGloss doc, True
+    SetSettingGramGlossInitialCap doc, True
 
-    Eq "transform: follow.CMP on a gloss row", _
-        TransformedCellText("follow.CMP", ROLE_GLOSS, doc), "follow.cmp"
+    Eq "transform: follow.CMP on a gloss row keeps a full-size first capital", _
+        TransformedCellText("follow.CMP", ROLE_GLOSS, doc), "follow.Cmp"
     Eq "transform: ERG on a gloss row", _
-        TransformedCellText("ERG", ROLE_GLOSS, doc), "erg"
+        TransformedCellText("ERG", ROLE_GLOSS, doc), "Erg"
+    Eq "transform: the capital is the first LETTER, so 3SG is 3Sg", _
+        TransformedCellText("3SG", ROLE_GLOSS, doc), "3Sg"
+    SetSettingGramGlossInitialCap doc, False
+    Eq "transform: without the initial capital, uniform small caps", _
+        TransformedCellText("follow.CMP=REL", ROLE_GLOSS, doc), "follow.cmp=rel"
+    SetSettingGramGlossInitialCap doc, True
     Eq "transform: Ozivela on a vernacular row is untouched", _
         TransformedCellText("Ozivela", ROLE_VERNACULAR, doc), "Ozivela"
     Eq "transform: an all-caps vernacular word is untouched", _
@@ -1041,8 +1048,49 @@ Private Sub TestRendering()
     CheckRowRoles tbl, ex
     CheckSmallCapsRuns tbl
     CheckFreeParagraphs tbl, ex, doc
+    CheckOverWideColumn doc
 
     CloseNoSave doc
+End Sub
+
+' A form wider than the whole text area. The planner gives it a wrap line of its
+' own and lets it overflow; the drawing must cap the cell at the text area so
+' Word wraps the text inside it, rather than run it off the page -- which is
+' what it did (by hand, 2026-09-12).
+Private Sub CheckOverWideColumn(doc As Document)
+    Dim ex As IgtExample
+    Dim tbl As Table
+    Dim r As Long, c As Long
+    Dim total As Double, worst As Double, avail As Double
+    Dim where As Range
+
+    ex = NewExample(2, 3)
+    ex.Tiers(0) = ROLE_VERNACULAR
+    ex.Tiers(1) = ROLE_GLOSS
+    SetCell ex, 0, 0, "vu=ve"
+    SetCell ex, 0, 1, String$(70, "w")
+    SetCell ex, 0, 2, "zuvo"
+    SetCell ex, 1, 0, "fox=ERG"
+    SetCell ex, 1, 1, "long"
+    SetCell ex, 1, 2, "dream"
+
+    Set where = doc.Content
+    where.Collapse wdCollapseEnd
+    Set tbl = RenderExample(ex, where)
+    Ok "an example with an over-wide form still draws", (Not tbl Is Nothing)
+    If tbl Is Nothing Then Exit Sub
+
+    avail = AvailableTextWidth(RangeAfterTable(tbl))
+    For r = 1 To tbl.Rows.Count
+        total = 0
+        For c = 1 To tbl.Rows(r).Cells.Count
+            total = total + CellWidthOf(tbl, r, c)
+        Next c
+        If total > worst Then worst = total
+    Next r
+    Ok "and no row of it is wider than the text area (the cell wraps inside itself)", _
+        (worst <= avail + 1)
+    Emit "         widest row " & CStr(worst) & "pt, text area " & CStr(avail) & "pt"
 End Sub
 
 Private Sub CheckTableShape(tbl As Table, ex As IgtExample, doc As Document)
@@ -1231,16 +1279,16 @@ Private Sub CheckSmallCapsRuns(tbl As Table)
 
     ' The example's gloss cell is "follow.CMP=REL" -- word-aligned, so the
     ' grammatical parts share the cell with the lexical part and with each
-    ' other. Drawn, it must read "follow.cmp=rel" with the gram-gloss style on
+    ' other. Drawn, it must read "follow.Cmp=Rel" with the gram-gloss style on
     ' exactly the two abbreviations: character 8 is the c of cmp, 12 the r of
     ' rel, 1 the f of follow. (An earlier version looked for a cell that was
     ' exactly "follow.cmp", found none, and skipped -- a silent pass.)
     For r = 1 To tbl.Rows.Count
         For c = 1 To tbl.Rows(r).Cells.Count
             txt = CleanText(CellTextOf(tbl, r, c))
-            If Left$(txt, 10) = "follow.cmp" Then
+            If LCase$(Left$(txt, 10)) = "follow.cmp" Then
                 found = True
-                Eq "follow.CMP=REL is drawn lower-cased for small caps", txt, "follow.cmp=rel"
+                Eq "follow.CMP=REL is drawn in small-caps case", txt, "follow.Cmp=Rel"
                 Ok "the lexical part carries no gram-gloss style", _
                     (Not CharHasGramStyle(tbl, r, c, 1))
                 Ok "the first grammatical part carries the gram-gloss style", _

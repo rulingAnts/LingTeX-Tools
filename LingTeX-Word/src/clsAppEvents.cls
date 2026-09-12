@@ -50,6 +50,13 @@ Private mLastDocName    As String
 ' Automatic re-wrapping fires on every cursor move out of an example, so a failure
 ' must be said ONCE rather than on every keystroke afterwards.
 Private mWarnedThisDoc  As Boolean
+' Word's AutoCorrect capitalises the first letter of a table cell and of a
+' sentence, which turns "zel" into "Zel" the moment a cell is edited. Both are
+' switched off while the selection is inside an interlinear example and put
+' back on the way out; these hold what they were.
+Private mAcSaved As Boolean
+Private mAcSentence As Boolean
+Private mAcCells As Boolean
 
 ' How many times the handlers have actually done work. Not used by the add-in --
 ' modDocTests reads it to prove that a re-wrap triggered from a handler does not
@@ -66,7 +73,42 @@ Public Sub Attach()
 End Sub
 
 Public Sub Detach()
+    RestoreAutoCorrect
     Set mApp = Nothing
+End Sub
+
+' Off inside an example, back to the user's own settings outside one. Late-bound
+' (As Object) so a build whose AutoCorrect lacks one of the two properties fails
+' at run time under the trap rather than at compile time -- see wdStyleTableGrid.
+Private Sub SuppressAutoCorrect()
+    Dim ac As Object
+    If mAcSaved Then Exit Sub
+    On Error Resume Next
+    Set ac = Application.AutoCorrect
+    If ac Is Nothing Then Exit Sub
+    mAcSentence = ac.CorrectSentenceCaps
+    mAcCells = ac.CorrectTableCells
+    If Err.Number <> 0 Then
+        Err.Clear
+        Exit Sub
+    End If
+    ac.CorrectSentenceCaps = False
+    ac.CorrectTableCells = False
+    Err.Clear
+    mAcSaved = True
+End Sub
+
+Private Sub RestoreAutoCorrect()
+    Dim ac As Object
+    If Not mAcSaved Then Exit Sub
+    On Error Resume Next
+    Set ac = Application.AutoCorrect
+    If Not ac Is Nothing Then
+        ac.CorrectSentenceCaps = mAcSentence
+        ac.CorrectTableCells = mAcCells
+    End If
+    Err.Clear
+    mAcSaved = False
 End Sub
 
 '-----------------------------------------------------------------------------
@@ -110,8 +152,10 @@ Private Sub mApp_WindowSelectionChange(ByVal Sel As Selection)
     Set tbl = FindExampleAt(Sel.Range)
     If tbl Is Nothing Then
         nowStart = -1
+        RestoreAutoCorrect
     Else
         nowStart = tbl.Range.Start
+        SuppressAutoCorrect
     End If
 
     ' A different document, so the once-per-document warning starts again.
