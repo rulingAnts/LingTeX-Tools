@@ -46,10 +46,16 @@ Private mRibbon As Object
 ' Keyboard shortcuts, letter=command, installed by LingTeXInstallShortcuts and
 ' by the first run. The modifiers are per platform (ShortcutModifiers): on
 ' Windows Ctrl+Alt+Shift, which Word leaves free, where Ctrl+Alt alone is
-' Print Preview, Insert Comment, AutoFormat and more; on Mac what Word's VBA
-' will take, found by LingTeXProbeShortcuts (every code with the Option bit,
-' 1024, is refused there with 5853). A key that is already bound to anything,
+' Print Preview, Insert Comment, AutoFormat and more; on Mac Control+Option,
+' the same chord, free of Word's and of macOS's own keys (Command+Option has
+' Hide Others, Minimise, Close All). A key that is already bound to anything,
 ' built in or the user's own, is never taken (Seth): it is skipped and named.
+'
+' MAC WORD'S MODIFIER BITS ARE NOT WINDOWS'S. Found by LingTeXProbeShortcuts,
+' asking Word to name what it had bound (2026-09-12): Command 256, Shift 512,
+' Option 2048, Control 4096. The Windows values (Shift 256, Ctrl 512, Alt
+' 1024) are Command, Shift and "Invalid parameter" there, which is why every
+' Cmd+Option attempt failed with 5853 and BuildKeyCode raised on it.
 Private Const SHORTCUT_TABLE As String = _
     "I=LingTeXInsertInterlinear|R=LingTeXRewrapCurrent|A=LingTeXRewrapAll|" & _
     "S=LingTeXSplitColumn|M=LingTeXMergeColumns|K=LingTeXCheckExample|" & _
@@ -57,7 +63,7 @@ Private Const SHORTCUT_TABLE As String = _
     "H=LingTeXShowSettings|N=LingTeXToggleExampleNumbers|" & _
     "G=LingTeXIndentExample|L=LingTeXOutdentExample"
 Private Const MODS_WINDOWS As Long = 512 + 1024 + 256      ' Ctrl+Alt+Shift
-Private Const MODS_MAC As Long = 512 + 256                 ' Cmd+Shift, until the probe says better
+Private Const MODS_MAC As Long = 4096 + 2048               ' Control+Option
 
 ' How far Indent and Outdent move an example: half an inch, Word's own tab.
 Private Const INDENT_STEP As Double = 36
@@ -1553,9 +1559,10 @@ Private Function KeyName(ByVal letter As String) As String
     Dim m As Long, s As String
     m = ShortcutModifiers()
     If Application.PathSeparator = "/" Then
-        If (m And 512) <> 0 Then s = s & "Cmd+"
-        If (m And 1024) <> 0 Then s = s & "Option+"
-        If (m And 256) <> 0 Then s = s & "Shift+"
+        If (m And 4096) <> 0 Then s = s & "Control+"
+        If (m And 2048) <> 0 Then s = s & "Option+"
+        If (m And 512) <> 0 Then s = s & "Shift+"
+        If (m And 256) <> 0 Then s = s & "Command+"
     Else
         If (m And 512) <> 0 Then s = s & "Ctrl+"
         If (m And 1024) <> 0 Then s = s & "Alt+"
@@ -1578,12 +1585,13 @@ Private Function ProjectName() As String
 End Function
 
 Public Sub LingTeXRemoveShortcuts()
-    Dim pairs() As String, kv() As String
     Dim i As Long, n As Long, h As Long
     Dim kb As Object
     Dim app As Object
     Dim homes(1) As Object, nHomes As Long
 
+    ' Every binding that runs one of our macros, on whatever key, in either
+    ' home -- so a set installed under an earlier key scheme goes as well.
     On Error Resume Next
     Set app = Application
     Set homes(0) = app.NormalTemplate
@@ -1592,21 +1600,16 @@ Public Sub LingTeXRemoveShortcuts()
         Set homes(1) = ThisDocument
         nHomes = 2
     End If
-    pairs = Split(SHORTCUT_TABLE, "|")
     For h = 0 To nHomes - 1
         app.CustomizationContext = homes(h)
         If Err.Number <> 0 Then
             Err.Clear
         Else
-            For i = 0 To UBound(pairs)
-                kv = Split(pairs(i), "=")
-                Set kb = Nothing
-                Set kb = app.FindKey(KeyCodeFor(app, kv(0)))
-                If Not kb Is Nothing Then
-                    If InStr(1, kb.Command, kv(1), vbTextCompare) > 0 Then
-                        kb.Clear
-                        n = n + 1
-                    End If
+            For i = app.KeyBindings.Count To 1 Step -1
+                Set kb = app.KeyBindings(i)
+                If InStr(1, kb.Command, "LingTeX", vbTextCompare) > 0 Then
+                    kb.Clear
+                    n = n + 1
                 End If
                 Err.Clear
             Next i
