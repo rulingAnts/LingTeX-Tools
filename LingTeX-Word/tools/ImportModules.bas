@@ -523,9 +523,19 @@ Public Sub VerifyLingTeXModules()
                     log = log & "  ok            " & compName & vbCr
                 End If
             Case 2                                  ' vbext_ct_ClassModule
-                If IsClassFile(names(i)) Then
-                    log = log & "  ok  (class)   " & compName & vbCr
+                If Not IsClassFile(names(i)) Then
+                    log = log & "  WRONG KIND    " & compName & _
+                          "  -- it is a class and must be a standard module" & vbCr
+                    problems = problems + 1
+                ElseIf LineCount(vbp, compName) < 10 Then
+                    log = log & "  EMPTY         " & compName & "  (" & _
+                          CStr(LineCount(vbp, compName)) & " lines; the class " & _
+                          "exists but has no code)" & vbCr
+                    problems = problems + 1
                 Else
+                    log = log & "  ok  (class)   " & compName & vbCr
+                End If
+                If False Then
                     log = log & "  WRONG KIND    " & compName & _
                           "  -- it is a class and must be a standard module" & vbCr
                     problems = problems + 1
@@ -551,6 +561,15 @@ Public Sub VerifyLingTeXModules()
     End If
     If Not mBatch Then CloseEngine False
 End Sub
+
+' Lines of code in a component, 0 if it cannot be read.
+Private Function LineCount(vbp As Object, ByVal compName As String) As Long
+    On Error Resume Next
+    LineCount = vbp.VBComponents(compName).CodeModule.CountOfLines
+    If Err.Number <> 0 Then LineCount = 0
+    Err.Clear
+    On Error GoTo 0
+End Function
 
 ' 0 = not present, otherwise the VBComponent Type (1 standard, 2 class, 3 form).
 Private Function ComponentKind(vbp As Object, ByVal compName As String) As Long
@@ -695,6 +714,11 @@ Private Function ImportOne(vbp As Object, ByVal fullPath As String, _
         ImportOne = "could not add the code (" & CStr(Err.Number) & ": " & _
                     Err.Description & ")"
         Err.Clear
+    ElseIf comp.CodeModule.CountOfLines < 10 Then
+        ' Created, named, and nothing in it: exactly the failure that is
+        ' invisible to a check of the component's TYPE alone.
+        ImportOne = "the class came out with only " & _
+                    CStr(comp.CodeModule.CountOfLines) & " line(s) of code"
     End If
     On Error GoTo 0
 End Function
@@ -754,7 +778,14 @@ Private Function StripVbaMetadata(ByVal code As String) As String
     Dim inPre As Boolean, started As Boolean
     Dim out As String
 
-    lines = Split(code, vbCrLf)
+    ' Whatever newline the text arrived with. ReadTextFile ends lines with the
+    ' platform's (CR on Mac); splitting on CRLF here turned a Mac class file
+    ' into ONE line beginning "VERSION 1.0 CLASS", which this then skipped
+    ' whole -- and both classes were created empty and reported ok
+    ' (2026-09-12). Lines are joined back with the platform's newline.
+    code = Replace(code, vbCrLf, vbLf)
+    code = Replace(code, vbCr, vbLf)
+    lines = Split(code, vbLf)
     For i = 0 To UBound(lines)
         ln = lines(i)
         t = Trim$(ln)
@@ -776,7 +807,7 @@ Private Function StripVbaMetadata(ByVal code As String) As String
             If out = "" Then
                 out = ln
             Else
-                out = out & vbCrLf & ln
+                out = out & vbNewLine & ln
             End If
         End If
     Next i
