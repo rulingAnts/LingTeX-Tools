@@ -161,15 +161,17 @@ Both input paths, in one pass.
    `LingTeX Free`, wrapped in curly single quotes: `'(When) she took her dogs
    hunting.'` If it is missing, stop and say so — that is the one you flagged
    earlier, and it would be a real bug.
-4. **The number.** A number line `(1)` sits above the table: an empty
-   paragraph in the `LingTeX Example` style carrying Word list numbering. The
-   table and the translation are indented to its text position; no cell has
-   a number. Insert the sample again below → `(2)`. Delete the first example
-   (select its number line, table and translation, Delete) → the remaining
-   one reads `(1)`. Drag the number line's indent wider, or put it on a
-   bullet or an outline level, and re-wrap → the line is untouched and the
-   table follows it. `LingTeXToggleExampleNumbers` → the next insert has no
-   number line. Per-chapter restarts are a list-style setting: `TESTING.md`.
+4. **The number.** `(1)` sits in a first column of the table, on the
+   vernacular line: that cell's paragraph is in the `LingTeX Example` style
+   and carries Word list numbering; the translation is indented past the
+   column; no word cell has a number. Insert the sample again below → `(2)`.
+   Delete the first example (select its table and translation, Delete) → the
+   remaining one reads `(1)`. Drag the table's left edge wider on the ruler
+   and re-wrap → the indent is kept and the translation follows it.
+   `LingTeXToggleExampleNumbers` → the next insert has no number column. An
+   example from an earlier build, with its number on a line above the table,
+   gets the number moved into the table by its next re-wrap. Per-chapter
+   restarts are a list-style setting: `TESTING.md`.
 5. **Fonts.** Cursor in a cell, look at the font name box. It must be the
    document's body font, not Cambria Math and not Times New Roman.
 6. **Selection path.** ⌘Z back to nothing. Paste the sample as plain text —

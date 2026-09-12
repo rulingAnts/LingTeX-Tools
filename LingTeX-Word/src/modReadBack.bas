@@ -63,34 +63,37 @@ Public Function IsInterlinearTable(tbl As Table) As Boolean
     IsInterlinearTable = (nm = STYLE_TABLE)
 End Function
 
+' Does the example carry its number in a first column? Recognised, like
+' everything else, purely by a paragraph style: the first row's first cell
+' holds the LingTeX Example paragraph, which is what the list numbering is
+' linked to. Every reader here skips that column; nothing in it is content.
+Public Function HasNumberColumn(tbl As Table) As Boolean
+    Dim nm As String
+    If tbl Is Nothing Then Exit Function
+    On Error Resume Next
+    nm = tbl.Cell(1, 1).Range.Paragraphs(1).Style
+    Err.Clear
+    On Error GoTo 0
+    HasNumberColumn = (nm = STYLE_EXAMPLE)
+End Function
+
+' How many cells at the start of every row are not content: 1 with a number
+' column, else 0. Computed once per read and passed down, because each call is
+' a trip through the object model.
+Public Function NumberColumns(tbl As Table) As Long
+    If HasNumberColumn(tbl) Then NumberColumns = 1
+End Function
+
 '-----------------------------------------------------------------------------
 ' The interlinear table containing a range, or Nothing.
-' Uses the innermost table, so a nested example is still found.
+' Uses the innermost table, so a nested example is still found. The number
+' cell is in the table, so the cursor on the number is inside the example.
 '-----------------------------------------------------------------------------
 Public Function FindExampleAt(rng As Range) As Table
     Dim tbl As Table
-    Dim para As Paragraph, nxt As Paragraph
     If rng Is Nothing Then Exit Function
     On Error Resume Next
-    If rng.Information(wdWithInTable) Then
-        Set tbl = rng.Tables(1)
-    Else
-        ' The number line above an example is part of the example: a paragraph
-        ' in the LingTeX Example style whose next paragraph is in a table. A
-        ' command run with the cursor there -- which is where the cursor lands
-        ' after an insert or a conversion -- acts on that example.
-        Set para = rng.Paragraphs(1)
-        If Not para Is Nothing Then
-            If para.Style = STYLE_EXAMPLE Then
-                Set nxt = para.Next
-                If Not nxt Is Nothing Then
-                    If nxt.Range.Information(wdWithInTable) Then
-                        Set tbl = nxt.Range.Tables(1)
-                    End If
-                End If
-            End If
-        End If
-    End If
+    If rng.Information(wdWithInTable) Then Set tbl = rng.Tables(1)
     Err.Clear
     On Error GoTo 0
     If tbl Is Nothing Then Exit Function
@@ -125,6 +128,7 @@ Public Function ReadExampleFromTable(tbl As Table) As IgtExample
     Dim groupSize As Long, nGroups As Long
     Dim lineCols() As Long, totalCols As Long, outCol As Long
     Dim r As Long
+    Dim nNum As Long
 
     gReadBackError = ""
     If tbl Is Nothing Then Exit Function
@@ -132,11 +136,12 @@ Public Function ReadExampleFromTable(tbl As Table) As IgtExample
 
     nRows = tbl.Rows.Count
     If nRows = 0 Then Exit Function
+    nNum = NumberColumns(tbl)
 
-    '-- tier role per row, from the paragraph style of its first cell --------
+    '-- tier role per row, from the paragraph style of its first content cell -
     ReDim roles(1 To nRows)
     For i = 1 To nRows
-        roles(i) = RowRole(tbl, i)
+        roles(i) = RowRole(tbl, i, nNum)
     Next i
 
     '-- how many rows make one wrap line ------------------------------------
@@ -149,10 +154,10 @@ Public Function ReadExampleFromTable(tbl As Table) As IgtExample
     ReDim lineCols(0 To nGroups - 1)
     totalCols = 0
     For g = 0 To nGroups - 1
-        lineCols(g) = RowCellCount(tbl, g * groupSize + 1)
+        lineCols(g) = RowCellCount(tbl, g * groupSize + 1) - nNum
         totalCols = totalCols + lineCols(g)
     Next g
-    If totalCols = 0 Then Exit Function
+    If totalCols <= 0 Then Exit Function
 
     '-- assemble, group by group, which restores the original column order --
     ex = NewExample(groupSize, totalCols)
@@ -165,8 +170,8 @@ Public Function ReadExampleFromTable(tbl As Table) As IgtExample
         For c = 1 To lineCols(g)
             For t = 0 To groupSize - 1
                 r = g * groupSize + t + 1
-                If r <= nRows And c <= RowCellCount(tbl, r) Then
-                    ex.Cells(t, outCol + c - 1) = CellTextRestored(tbl, r, c)
+                If r <= nRows And c + nNum <= RowCellCount(tbl, r) Then
+                    ex.Cells(t, outCol + c - 1) = CellTextRestored(tbl, r, c + nNum)
                 End If
             Next t
         Next c
@@ -217,10 +222,12 @@ Private Function DetectGroupSize(roles() As String, ByVal nRows As Long) As Long
     DetectGroupSize = nRows
 End Function
 
-Private Function RowRole(tbl As Table, ByVal r As Long) As String
+' The role of a row, from the paragraph style of its first CONTENT cell --
+' the cell after the number column when there is one.
+Private Function RowRole(tbl As Table, ByVal r As Long, ByVal nNum As Long) As String
     Dim nm As String
     On Error Resume Next
-    nm = tbl.Cell(r, 1).Range.Paragraphs(1).Style
+    nm = tbl.Cell(r, 1 + nNum).Range.Paragraphs(1).Style
     Err.Clear
     On Error GoTo 0
     RowRole = RoleFromParaStyle(nm)
@@ -402,7 +409,8 @@ End Function
 '
 ' Needed because a wrapped example draws column 12 as, say, row group 2 cell 3:
 ' the user clicks a cell, and the model has to be told which alignment slot that
-' is.  Returns -1 when the position cannot be resolved.
+' is.  Returns -1 when the position cannot be resolved, and for the number
+' cell, which is no alignment slot at all.
 '-----------------------------------------------------------------------------
 Public Function FlatColumnAt(tbl As Table, ByVal rowIdx As Long, _
         ByVal cellIdx As Long) As Long
@@ -411,6 +419,7 @@ Public Function FlatColumnAt(tbl As Table, ByVal rowIdx As Long, _
     Dim roles() As String
     Dim groupSize As Long, nGroups As Long
     Dim acc As Long
+    Dim nNum As Long
 
     FlatColumnAt = -1
     If tbl Is Nothing Then Exit Function
@@ -418,10 +427,12 @@ Public Function FlatColumnAt(tbl As Table, ByVal rowIdx As Long, _
 
     nRows = tbl.Rows.Count
     If nRows = 0 Or rowIdx < 1 Or rowIdx > nRows Then Exit Function
+    nNum = NumberColumns(tbl)
+    If cellIdx <= nNum Then Exit Function
 
     ReDim roles(1 To nRows)
     For i = 1 To nRows
-        roles(i) = RowRole(tbl, i)
+        roles(i) = RowRole(tbl, i, nNum)
     Next i
 
     groupSize = DetectGroupSize(roles, nRows)
@@ -436,11 +447,11 @@ Public Function FlatColumnAt(tbl As Table, ByVal rowIdx As Long, _
     ' Columns on every earlier wrap line come first in the flat list.
     acc = 0
     For i = 0 To g - 1
-        acc = acc + RowCellCount(tbl, i * groupSize + 1)
+        acc = acc + RowCellCount(tbl, i * groupSize + 1) - nNum
     Next i
 
-    If cellIdx < 1 Or cellIdx > RowCellCount(tbl, rowIdx) Then Exit Function
-    FlatColumnAt = acc + cellIdx - 1
+    If cellIdx > RowCellCount(tbl, rowIdx) Then Exit Function
+    FlatColumnAt = acc + (cellIdx - nNum) - 1
 
 Done:
 End Function
@@ -450,16 +461,18 @@ Public Function TableColumnCount(tbl As Table) As Long
     Dim nRows As Long, i As Long, g As Long
     Dim roles() As String
     Dim groupSize As Long, nGroups As Long
+    Dim nNum As Long
 
     If tbl Is Nothing Then Exit Function
     On Error GoTo Done
 
     nRows = tbl.Rows.Count
     If nRows = 0 Then Exit Function
+    nNum = NumberColumns(tbl)
 
     ReDim roles(1 To nRows)
     For i = 1 To nRows
-        roles(i) = RowRole(tbl, i)
+        roles(i) = RowRole(tbl, i, nNum)
     Next i
 
     groupSize = DetectGroupSize(roles, nRows)
@@ -468,7 +481,7 @@ Public Function TableColumnCount(tbl As Table) As Long
     If nGroups < 1 Then nGroups = 1
 
     For g = 0 To nGroups - 1
-        TableColumnCount = TableColumnCount + RowCellCount(tbl, g * groupSize + 1)
+        TableColumnCount = TableColumnCount + RowCellCount(tbl, g * groupSize + 1) - nNum
     Next g
 
 Done:

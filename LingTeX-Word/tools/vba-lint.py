@@ -818,6 +818,7 @@ WD_CONSTANTS = {
     "wdStyleTypeTable",
     "wdStyleTypeList",
     "wdTrailingTab",
+    "wdTrailingNone",
     "wdUndefined",
     "wdWithInTable",
 }

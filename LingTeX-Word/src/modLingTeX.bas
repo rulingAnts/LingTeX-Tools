@@ -665,6 +665,11 @@ Public Sub LingTeXSplitColumn()
         Exit Sub
     End If
 
+    If Selection.Cells(1).ColumnIndex <= NumberColumns(tbl) Then
+        Report "Put the cursor in one of the example's word cells; the number " & _
+               "is not a column.", vbInformation
+        Exit Sub
+    End If
     flatCol = FlatColumnAt(tbl, Selection.Cells(1).RowIndex, _
                                 Selection.Cells(1).ColumnIndex)
     If flatCol < 0 Then
@@ -737,6 +742,11 @@ Public Sub LingTeXMergeColumns()
     End If
 
     nCells = Selection.Cells.Count
+    If Selection.Cells(1).ColumnIndex <= NumberColumns(tbl) Then
+        Report "Select the example's word cells; the number is not a column.", _
+               vbInformation
+        Exit Sub
+    End If
     firstCol = FlatColumnAt(tbl, Selection.Cells(1).RowIndex, _
                                  Selection.Cells(1).ColumnIndex)
     If firstCol < 0 Then
@@ -1168,8 +1178,8 @@ Public Sub LingTeXToggleExampleNumbers()
     SetSettingNumberExamples doc, v
     RefreshRibbon
     Report "New examples in this document are " & IIf(v, "NUMBERED: (1), (2)... " & _
-           "with Word's own list numbering, continuing through the document.", _
-           "NOT numbered.") & vbCr & vbCr & _
+           "in a first column, with Word's own list numbering, continuing " & _
+           "through the document.", "NOT numbered.") & vbCr & vbCr & _
            "Examples already on the page keep whatever they have; a re-wrap " & _
            "keeps a number an example carries.", vbInformation
 End Sub
@@ -1227,7 +1237,7 @@ Public Sub LingTeXShowSettings()
     msg = msg & "  with a full-size first capital: " & _
                 IIf(SettingGramGlossInitialCap(doc), "on", "off") & vbCr
     msg = msg & "Number new examples: " & IIf(SettingNumberExamples(doc), "on", "off") & _
-                " (hang " & CStr(SettingNumberHang(doc)) & " pt, list level " & _
+                " (number column " & CStr(SettingNumberHang(doc)) & " pt, list level " & _
                 CStr(SettingNumberLevel(doc)) & ")" & vbCr
     msg = msg & "Re-wrap on save: " & IIf(SettingRewrapOnSave(doc), "on", "off") & vbCr
     msg = msg & "Re-wrap when the cursor leaves an example: " & _
@@ -1235,7 +1245,7 @@ Public Sub LingTeXShowSettings()
     msg = msg & "Commands: LingTeXAlignByWord, LingTeXAlignByMorpheme, " & _
                 "LingTeXToggleRewrapOnSave, LingTeXToggleRewrapOnSelectionChange, " & _
                 "LingTeXToggleGramGlossInitialCap, LingTeXToggleExampleNumbers. " & _
-                "The gaps, the indent, the number hang and level are set from " & _
+                "The gaps, the indent, the number column and level are set from " & _
                 "the Immediate window for now: SetSettingLineGap ActiveDocument, 8"
     Report msg, vbInformation
 End Sub

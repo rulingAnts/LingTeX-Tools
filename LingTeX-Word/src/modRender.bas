@@ -32,6 +32,20 @@ Public gRenderError As String
 '
 ' Free translations are written as paragraphs AFTER the table, never as a row, so
 ' they never take part in wrapping and are exempt from the column invariants.
+'
+' THE NUMBER is a first column. When the document numbers its examples, every
+' row gets one extra cell in front, as wide as the number hang; the first row's
+' holds an empty paragraph in the LingTeX Example style, which is linked to the
+' LingTeX Example Number list style, so it shows "(1)" by Word's own numbering
+' -- on the vernacular line, where a linguist expects it, and travelling with
+' the example when it is moved. The other rows' number cells are empty; on
+' later wrap lines they are widened by the continuation indent. Nothing in that
+' column is content: modReadBack skips it (NumberColumns), and the translation
+' is indented past it.
+'
+' THE EXAMPLE'S INDENT is its rows' left indent (ExampleIndent), which a re-wrap
+' reads and reproduces and the indent commands step. A fresh example takes the
+' indent of the paragraph it is inserted into.
 ' ---------------------------------------------------------------------------
 '
 ' Pure ASCII on purpose -- see the header of modFlexParse.bas.
@@ -52,49 +66,38 @@ Public Function RenderExample(ex As IgtExample, target As Range) As Table
     Dim interTiers() As Long, nInter As Long
     Dim nLines As Long, maxCols As Long
     Dim why As String
-    Dim hang As Double, level As Long
-    Dim lt As Object
-    Dim numberIt As Boolean
+    Dim indent As Double, numW As Double, level As Long
 
     Set doc = target.Document
-    ' A fresh example is numbered if the document says so; the number's hanging
-    ' indent is part of the plan, because the first column has to hold it. The
-    ' indent is the LIST STYLE's own text position for the level in use, so a
-    ' user who changes the style's indent changes every example on its next
-    ' re-wrap; the NumberHang setting only seeds the style when it is created.
-    hang = 0
+    ' A fresh example is numbered if the document says so: a number column as
+    ' wide as the NumberHang setting. It sits where the paragraph it replaces
+    ' sat, so an example inserted in an indented paragraph is indented too.
+    indent = ParagraphIndentAt(target)
     level = SettingNumberLevel(doc)
-    numberIt = SettingNumberExamples(doc)
-    If numberIt Then
+    numW = 0
+    If SettingNumberExamples(doc) Then
         EnsureStyles doc
-        On Error Resume Next
-        Set lt = doc.Styles(STYLE_NUMBER).ListTemplate
-        Err.Clear
-        On Error GoTo 0
-        hang = HangFromTemplate(lt, level, SettingNumberHang(doc))
+        numW = SettingNumberHang(doc)
     End If
     If Not PlanExample(ex, target, doc, interTiers, nInter, colW, _
-                       lineStarts, nLines, maxCols, why, hang) Then
+                       lineStarts, nLines, maxCols, why, indent + numW) Then
         gRenderError = why
         Exit Function
     End If
 
     Set RenderExample = DrawExample(ex, target, doc, interTiers, nInter, _
                                     colW, lineStarts, nLines, maxCols, _
-                                    hang, numberIt, level)
+                                    indent, numW, level, "")
 End Function
 
-' The text position of a list level: where the text starts after the number,
-' which is the indent everything after the number lines up to. dflt when the
-' template cannot say (missing, or a level it has not got).
-Private Function HangFromTemplate(lt As Object, ByVal level As Long, _
-        ByVal dflt As Double) As Double
+' The left indent of the paragraph an example is being inserted into; 0 inside
+' a table cell, where the cell is the container.
+Private Function ParagraphIndentAt(target As Range) As Double
     Dim v As Double
-    HangFromTemplate = dflt
-    If lt Is Nothing Then Exit Function
     On Error Resume Next
-    v = lt.ListLevels(level).TextPosition
-    If Err.Number = 0 And v >= 6 Then HangFromTemplate = v
+    If target.Information(wdWithInTable) Then Exit Function
+    v = target.Paragraphs(1).LeftIndent
+    If Err.Number = 0 And v > 0 Then ParagraphIndentAt = v
     Err.Clear
     On Error GoTo 0
 End Function
@@ -144,7 +147,11 @@ Private Function PlanExample(ex As IgtExample, target As Range, doc As Document,
 
     gap = SettingGap(doc)
     contIndent = SettingContIndent(doc)
-    avail = AvailableTextWidth(target)
+    ' The full text width: the example's own indent and number column are hang,
+    ' subtracted below, and the anchor paragraph's indent must not be subtracted
+    ' as well -- on a re-wrap the anchor is the translation, whose indent is
+    ' hang, which used to come off twice.
+    avail = AvailableTextWidth(target, True)
 
     MeasureExample ex, doc, cellWidths
     If gMeasureFailed Then
@@ -156,8 +163,8 @@ Private Function PlanExample(ex As IgtExample, target As Range, doc As Document,
     End If
 
     colW = ColumnWidths(ex, cellWidths, gap)
-    ' Numbering: the example is the body of a numbered paragraph above it, so
-    ' every wrap line is indented to that paragraph's text position (hang).
+    ' hang is the example's indent plus its number column: where the content of
+    ' every wrap line starts.
     flags = NoBreakFlags(ex)
     lineStarts = ComputeWrapLines(colW, flags, avail, hang, contIndent + hang)
 
@@ -233,74 +240,83 @@ Private Function DrawExample(ex As IgtExample, target As Range, doc As Document,
         interTiers() As Long, ByVal nInter As Long, _
         colW() As Double, lineStarts() As Long, _
         ByVal nLines As Long, ByVal maxCols As Long, _
-        ByVal hang As Double, ByVal numberIt As Boolean, ByVal level As Long) As Table
+        ByVal indent As Double, ByVal numW As Double, ByVal level As Long, _
+        ByVal numText As String) As Table
 
     Dim tbl As Table
     Dim anchor As Range
+    Dim nNum As Long
+
+    If numW > 0 Then nNum = 1
 
     Set anchor = target.Duplicate
     StartPendingUndo                       ' the first change to the document
     anchor.Text = ""                       ' clear whatever we are replacing
 
-    '-- the number line, above the table, when this is a new example ---------
-    ' A re-wrap keeps the number line it already has (RedrawExampleAt passes
-    ' numberIt False and the line's own indent as hang).
-    If numberIt Then InsertNumberLine anchor, doc, level
-
     Set tbl = doc.Tables.Add(Range:=anchor, _
-                             NumRows:=nLines * nInter, NumColumns:=maxCols)
+                             NumRows:=nLines * nInter, NumColumns:=maxCols + nNum)
     StyleTable tbl, doc
 
     gRenderError = ""
-    FillTable tbl, ex, interTiers, nInter, lineStarts, colW, doc, hang
+    FillTable tbl, ex, interTiers, nInter, lineStarts, colW, doc, indent, numW
+    If nNum = 1 Then NumberFirstCell tbl, doc, level, numText
 
     '-- free translations, after the table ----------------------------------
     ' Written BEFORE the row keeps, so SetRowKeeps can see the first translation
     ' paragraph and keep the last row of the table with it. Done the other way
     ' round, a page break can fall between an example and its translation.
-    WriteFreeLines ex, tbl, doc, hang
+    WriteFreeLines ex, tbl, doc, indent + numW
     SetRowKeeps tbl, (ex.FreeCount > 0)
 
-    ' Numbering never belongs in a cell; a paragraph that carried list
+    ' Numbering never belongs in a content cell; a paragraph that carried list
     ' formatting can leak it into the first one when the table is added there.
-    StripStrayNumber tbl
+    StripStrayNumber tbl, 1 + nNum
 
     Set DrawExample = tbl
 End Function
 
 '-----------------------------------------------------------------------------
-' Put the number line in: an empty paragraph in the LingTeX Example style, which
-' carries the list numbering, immediately before where the table will go. The
-' anchor comes back collapsed after it. Text before the anchor in its
-' paragraph keeps its own paragraph, so an example inserted mid-paragraph does
-' not swallow the words before the cursor into the number line.
+' Number the example: the first row's first cell gets the LingTeX Example
+' paragraph, numbered by the list style it is linked to (or by the template
+' applied directly when the link could not be made), at the list level asked
+' for. Whatever numbering leaked into the cell from the paragraph the table
+' was added in goes first. The paragraph's own indents are zeroed, because a
+' list level's indents (a text position of 36pt in a 36pt cell) would push
+' the number onto a second line. Text a user had typed after the number
+' (numText, read back before a re-wrap) is written back.
 '-----------------------------------------------------------------------------
-Private Sub InsertNumberLine(ByRef anchor As Range, doc As Document, ByVal level As Long)
-    Dim p As Long
-    Dim q As Range
-    Dim numPara As Paragraph
-
-    p = anchor.Start
-    Set q = doc.Range(p, p).Paragraphs(1).Range
-    If p > q.Start Then
-        doc.Range(p, p).InsertBefore vbCr
-        p = p + 1
-    End If
-    doc.Range(p, p).InsertBefore vbCr
-    Set numPara = doc.Range(p, p).Paragraphs(1)
+Private Sub NumberFirstCell(tbl As Table, doc As Document, ByVal level As Long, _
+        ByVal numText As String)
+    Dim rng As Range
+    Dim para As Paragraph
 
     On Error Resume Next
-    numPara.Style = doc.Styles(STYLE_EXAMPLE)
+    Set rng = tbl.Cell(1, 1).Range
+    rng.End = rng.End - 1
+    rng.ListFormat.RemoveNumbers
+    rng.Style = doc.Styles(STYLE_EXAMPLE)
+    Set para = rng.Paragraphs(1)
     Err.Clear
     On Error GoTo 0
-    ApplyNumberToParagraph numPara, doc, level
+    If para Is Nothing Then Exit Sub
 
-    Set anchor = doc.Range(p + 1, p + 1)
+    ApplyNumberToParagraph para, doc, level
+
+    On Error Resume Next
+    With para.Format
+        .LeftIndent = 0
+        .FirstLineIndent = 0
+        .SpaceBefore = 0
+        .SpaceAfter = 0
+    End With
+    If numText <> "" Then rng.Text = numText
+    Err.Clear
+    On Error GoTo 0
 End Sub
 
-' Make sure the number line is numbered: the style's link does it when the
-' link could be made; otherwise the list template is applied here, continuing
-' the previous example's list. A level above 1 is set on the paragraph.
+' Make sure the paragraph is numbered: the style's link does it when the link
+' could be made; otherwise the list template is applied here, continuing the
+' previous example's list. A level above 1 is set on the paragraph.
 Private Sub ApplyNumberToParagraph(para As Paragraph, doc As Document, ByVal level As Long)
     Dim tpl As Object
     On Error Resume Next
@@ -323,9 +339,20 @@ Private Sub ApplyNumberToParagraph(para As Paragraph, doc As Document, ByVal lev
     On Error GoTo 0
 End Sub
 
-' The number line of an example: the paragraph immediately before its table,
-' if it is in the LingTeX Example style. Nothing otherwise.
+' The number-cell paragraph of a numbered example, or Nothing.
 Public Function NumberParagraphOf(tbl As Table) As Paragraph
+    On Error Resume Next
+    If Not HasNumberColumn(tbl) Then Exit Function
+    Set NumberParagraphOf = tbl.Cell(1, 1).Range.Paragraphs(1)
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+' The number line of the EARLIER design: a paragraph in the LingTeX Example
+' style immediately above the table. Still recognised so that an example drawn
+' before the number moved into the table is migrated by its next re-wrap
+' (RedrawExampleAt) instead of being numbered twice.
+Public Function LegacyNumberLineOf(tbl As Table) As Paragraph
     Dim doc As Document
     Dim para As Paragraph
     Dim startPos As Long
@@ -337,17 +364,17 @@ Public Function NumberParagraphOf(tbl As Table) As Paragraph
     Set para = doc.Range(startPos - 1, startPos - 1).Paragraphs(1)
     If para Is Nothing Then Exit Function
     If para.Range.Information(wdWithInTable) Then Exit Function
-    If para.Style = STYLE_EXAMPLE Then Set NumberParagraphOf = para
+    If para.Style = STYLE_EXAMPLE Then Set LegacyNumberLineOf = para
     Err.Clear
     On Error GoTo 0
 End Function
 
-' The number an example shows, e.g. "(3)"; empty when it has no number line
-' or the line carries no numbering.
+' The number an example shows, e.g. "(3)"; empty when it is not numbered.
 Public Function ExampleNumberString(tbl As Table) As String
     Dim para As Paragraph
     On Error Resume Next
     Set para = NumberParagraphOf(tbl)
+    If para Is Nothing Then Set para = LegacyNumberLineOf(tbl)
     If para Is Nothing Then Exit Function
     If para.Range.ListFormat.ListType <> wdListNoNumbering Then
         ExampleNumberString = para.Range.ListFormat.ListString
@@ -356,22 +383,36 @@ Public Function ExampleNumberString(tbl As Table) As String
     On Error GoTo 0
 End Function
 
-' Where a number line's text starts: its left indent, which for a list
-' paragraph is the level's text position. Whatever the user has made it.
-Private Function HangOfParagraph(para As Paragraph) As Double
-    Dim v As Double
+' The list level a numbered paragraph is on, or dflt when it is not numbered.
+Private Function ListLevelOf(para As Paragraph, ByVal dflt As Long) As Long
+    Dim v As Long
+    ListLevelOf = dflt
+    If para Is Nothing Then Exit Function
     On Error Resume Next
-    v = para.LeftIndent
-    If Err.Number = 0 And v > 0 Then HangOfParagraph = v
+    If para.Range.ListFormat.ListType <> wdListNoNumbering Then
+        v = para.Range.ListFormat.ListLevelNumber
+        If Err.Number = 0 And v >= 1 And v <= 9 Then ListLevelOf = v
+    End If
     Err.Clear
     On Error GoTo 0
 End Function
 
-' Remove an example whole: number line, table, translations.
+' Where an example starts: its first row's left indent. What the indent
+' commands step and a re-wrap keeps.
+Public Function ExampleIndent(tbl As Table) As Double
+    Dim v As Double
+    On Error Resume Next
+    v = tbl.Rows(1).LeftIndent
+    If Err.Number = 0 And v > 0 Then ExampleIndent = v
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+' Remove an example whole: table, translations, and a legacy number line.
 Public Sub DeleteExample(tbl As Table)
     Dim numPara As Paragraph
     If tbl Is Nothing Then Exit Sub
-    Set numPara = NumberParagraphOf(tbl)
+    Set numPara = LegacyNumberLineOf(tbl)
     DeleteTableAndFreeLines tbl
     On Error Resume Next
     If Not numPara Is Nothing Then numPara.Range.Delete
@@ -379,13 +420,14 @@ Public Sub DeleteExample(tbl As Table)
     On Error GoTo 0
 End Sub
 
-' Numbering never belongs in a cell: a paragraph that carried list numbering
-' can leak it into the first cell when the table is added there. Take it off.
-Private Sub StripStrayNumber(tbl As Table)
+' Numbering never belongs in a content cell: a paragraph that carried list
+' numbering can leak it into the first cell when the table is added there.
+' Take it off the first content cell (the cell after the number column).
+Private Sub StripStrayNumber(tbl As Table, ByVal firstContent As Long)
     Dim rng As Range
     On Error Resume Next
-    If tbl.Cell(1, 1).Range.ListFormat.ListType <> wdListNoNumbering Then
-        Set rng = tbl.Cell(1, 1).Range
+    If tbl.Cell(1, firstContent).Range.ListFormat.ListType <> wdListNoNumbering Then
+        Set rng = tbl.Cell(1, firstContent).Range
         rng.End = rng.End - 1
         rng.ListFormat.RemoveNumbers
     End If
@@ -450,30 +492,60 @@ Public Function RedrawExampleAt(tbl As Table, ex As IgtExample) As Table
     Dim interTiers() As Long, nInter As Long
     Dim nLines As Long, maxCols As Long
     Dim why As String
-    Dim hang As Double
-    Dim numPara As Paragraph
+    Dim indent As Double, numW As Double, level As Long
+    Dim numText As String
+    Dim numPara As Paragraph, legacy As Paragraph
 
     gRenderError = ""
     If tbl Is Nothing Then Exit Function
     Set doc = tbl.Range.Document
 
-    ' The number line stays exactly as it is -- its numbering, bullet or
-    ' outline level, its indent, anything typed after the number. The re-wrap
-    ' lays the table and the translation out to its text position, whatever
-    ' the user has made that.
-    hang = 0
+    ' What the example is, before anything is touched: numbered or not (and on
+    ' which list level, with what typed after the number), and how far it is
+    ' indented. A numbered example keeps its number; the column's width comes
+    ' from the setting, so changing NumberHang reaches every example on its
+    ' next re-wrap.
+    indent = ExampleIndent(tbl)
+    level = SettingNumberLevel(doc)
+    numW = 0
     Set numPara = NumberParagraphOf(tbl)
-    If Not numPara Is Nothing Then hang = HangOfParagraph(numPara)
+    If Not numPara Is Nothing Then
+        numW = SettingNumberHang(doc)
+        level = ListLevelOf(numPara, level)
+        numText = Trim$(ParaText(numPara))
+    Else
+        ' The earlier design, a number line above the table: the number moves
+        ' into the table, the line goes, and the example's indent is where the
+        ' line's number stood (its left indent less the hanging part).
+        Set legacy = LegacyNumberLineOf(tbl)
+        If Not legacy Is Nothing Then
+            numW = SettingNumberHang(doc)
+            level = ListLevelOf(legacy, level)
+            numText = Trim$(ParaText(legacy))
+            On Error Resume Next
+            indent = legacy.LeftIndent + legacy.FirstLineIndent
+            Err.Clear
+            On Error GoTo 0
+            If indent < 0 Then indent = 0
+        End If
+    End If
 
     If Not PlanExample(ex, RangeAfterTable(tbl), doc, interTiers, nInter, colW, _
-                       lineStarts, nLines, maxCols, why, hang) Then
+                       lineStarts, nLines, maxCols, why, indent + numW) Then
         gRenderError = why
         Exit Function                      ' table untouched
     End If
 
     startPos = tbl.Range.Start
+    If Not legacy Is Nothing Then startPos = legacy.Range.Start
     StartPendingUndo                       ' the first change to the document
     DeleteTableAndFreeLines tbl
+    If Not legacy Is Nothing Then
+        On Error Resume Next
+        legacy.Range.Delete
+        Err.Clear
+        On Error GoTo 0
+    End If
 
     Set anchor = doc.Range(startPos, startPos)
 
@@ -482,7 +554,7 @@ Public Function RedrawExampleAt(tbl As Table, ex As IgtExample) As Table
     On Error GoTo DrawFailed
     Set RedrawExampleAt = DrawExample(ex, anchor, doc, interTiers, nInter, _
                                       colW, lineStarts, nLines, maxCols, _
-                                      hang, False, 1)
+                                      indent, numW, level, numText)
     Exit Function
 
 DrawFailed:
@@ -545,7 +617,7 @@ End Sub
 '-----------------------------------------------------------------------------
 Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
         ByVal nInter As Long, lineStarts() As Long, colW() As Double, doc As Document, _
-        ByVal hang As Double)
+        ByVal indent As Double, ByVal numW As Double)
 
     Dim g As Long, i As Long, c As Long, r As Long
     Dim lineFirst As Long, lineLast As Long, lineCols As Long
@@ -555,11 +627,14 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
     Dim cellRng As Range
     Dim lineGap As Double
     Dim contIndent As Double
+    Dim nNum As Long
+    Dim numCellW As Double
 
     nLines = UBound(lineStarts) - LBound(lineStarts) + 1
     maxCols = MaxColumnsPerLine(lineStarts, ex.ColCount)
     lineGap = SettingLineGap(doc)
     contIndent = SettingContIndent(doc)
+    If numW > 0 Then nNum = 1
 
     For g = 0 To nLines - 1
         lineFirst = lineStarts(g)
@@ -578,7 +653,7 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
                 On Error Resume Next
                 ' The shift is named, not defaulted: an unspecified ShiftCells is the
                 ' one path by which this could raise a "Delete Cells" question.
-                tbl.Rows(r).Cells(lineCols + 1).Delete ShiftCells:=wdDeleteCellsShiftLeft
+                tbl.Rows(r).Cells(lineCols + nNum + 1).Delete ShiftCells:=wdDeleteCellsShiftLeft
                 Err.Clear
                 On Error GoTo 0
             Next k
@@ -589,14 +664,36 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
             ' sees fit -- so the row is wider than the plan and the example runs
             ' past the margin. Recorded rather than raised, so the rest of the
             ' example still draws and the reason is reportable.
-            If Not RowHasCells(tbl, r, lineCols) Then
+            If Not RowHasCells(tbl, r, lineCols + nNum) Then
                 gRenderError = "could not trim row " & CStr(r) & " to " & _
                                CStr(lineCols) & " cells; the wrap line may run " & _
                                "past the right margin"
             End If
 
+            ' The number cell: empty, as wide as the hang, widened by the
+            ' continuation indent on later wrap lines so their content starts
+            ' further in with the table's left edge kept straight. It takes the
+            ' tier's paragraph style so it adds no height to the row; the first
+            ' row's is restyled and numbered afterwards (NumberFirstCell).
+            If nNum = 1 Then
+                numCellW = numW
+                If g > 0 Then numCellW = numW + contIndent
+                On Error Resume Next
+                Set cellRng = tbl.Cell(r, 1).Range
+                cellRng.End = cellRng.End - 1
+                ApplyParaStyle cellRng, doc, role
+                tbl.Cell(r, 1).SetWidth ColumnWidth:=numCellW, RulerStyle:=wdAdjustNone
+                If Err.Number <> 0 Then
+                    gRenderError = "could not set the width of the number cell in row " & _
+                                   CStr(r) & " (" & CStr(Err.Number) & ": " & _
+                                   Err.Description & ")"
+                    Err.Clear
+                End If
+                On Error GoTo 0
+            End If
+
             For c = 0 To lineCols - 1
-                Set cellRng = tbl.Cell(r, c + 1).Range
+                Set cellRng = tbl.Cell(r, c + 1 + nNum).Range
                 cellRng.End = cellRng.End - 1      ' exclude end-of-cell marker
 
                 ApplyParaStyle cellRng, doc, role
@@ -610,26 +707,25 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
                 ' wrap line reports the same width for the same column, so each
                 ' form sits directly above its gloss.
                 On Error Resume Next
-                tbl.Cell(r, c + 1).SetWidth _
+                tbl.Cell(r, c + 1 + nNum).SetWidth _
                     ColumnWidth:=colW(lineFirst + c), RulerStyle:=wdAdjustNone
                 If Err.Number <> 0 Then
                     gRenderError = "could not set the width of row " & CStr(r) & _
-                                   " column " & CStr(c + 1) & " (" & _
+                                   " column " & CStr(c + 1 + nNum) & " (" & _
                                    CStr(Err.Number) & ": " & Err.Description & ")"
                     Err.Clear
                 End If
                 On Error GoTo 0
             Next c
 
-            ' Where the row starts: at the number line's text position (hang,
-            ' 0 for an unnumbered example), and later wrap lines further in by
-            ' the continuation indent -- which the plan budgeted for and which,
-            ' before numbering, nothing drew.
+            ' Where the row starts: at the example's indent. Without a number
+            ' column, later wrap lines go further in by the continuation indent
+            ' (with one, the number cell carries it, above).
             On Error Resume Next
-            If g = 0 Then
-                tbl.Rows(r).LeftIndent = hang
+            If g = 0 Or nNum = 1 Then
+                tbl.Rows(r).LeftIndent = indent
             Else
-                tbl.Rows(r).LeftIndent = hang + contIndent
+                tbl.Rows(r).LeftIndent = indent + contIndent
             End If
             Err.Clear
             On Error GoTo 0
@@ -891,8 +987,8 @@ Private Sub WriteFreeLines(ex As IgtExample, tbl As Table, doc As Document, _
     ' InsertBefore grows the range over what it inserted, so this styles exactly
     ' the paragraphs just added and nothing else.
     ApplyParaStyle after, doc, ROLE_FREE
-    ' Under a numbered example the translation lines up with the text, not
-    ' with the number.
+    ' The translation lines up with the example's text: past its indent and,
+    ' when it is numbered, past the number column.
     If hang > 0 Then
         On Error Resume Next
         after.ParagraphFormat.LeftIndent = hang
