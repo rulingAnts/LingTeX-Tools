@@ -112,6 +112,11 @@ requests.
   by-hand pass from 3c/3e/3f. Then `SaveAsTemplate` + `tools/build-dotm.sh` +
   `tools/check-dotm.sh`, then packaging.
 - Later, wanted by Seth: a settings interface (gaps, styles) -- Phase 2 form.
+- Later, wanted by Seth: every spacing a user might set (before/after an
+  example, between tiers, rows-to-translation, plus the three existing gaps)
+  behind one interface; and inserting every example of a multi-block FLEx
+  paste (the parser already returns them all; the insert takes the first).
+  Both in README, *Later*.
 - Later, wanted by Seth: re-wrap an example automatically when it is edited.
   Plan (README, *Later*): make the selection-change hook change-aware via a
   text fingerprint taken on entering, so it fires once on leaving an edited

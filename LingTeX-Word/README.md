@@ -414,6 +414,22 @@ file. CI verifies rather than builds: it unzips the `.dotm`, diffs the embedded
 ribbon against `src/customUI14.xml`, and checks the manifest, so a template that
 has drifted from the sources fails the release.
 
+**Later — every space a user might want to set.** Today three are document
+settings (column gap, wrap-line gap, continuation indent) and the rest are
+paragraph spacing on styles the user already owns: space before an example is
+`Space Before` on the first tier's style, between tiers `Space After` on each
+tier's style, between the last row and the translation `Space Before` on
+`LingTeX Free`, after an example `Space After` on it. The finishing step is one
+interface over all of them — the Phase 2 settings dialog — with the style-borne
+ones written back to the styles rather than to document variables, so a
+document restyled by hand and one set from the dialog stay the same document.
+
+**Later — several examples in one paste.** A FLEx text copied whole arrives as
+several interlinear blocks and the parser already returns all of them
+(`ModelsFromText`); `LingTeXInsertInterlinear` takes the first. The finishing
+step is to draw them all, one after another with a paragraph between, in one
+undo record.
+
 **Later — re-wrap on edit.** Word has no "content changed" event, so this is
 built on the selection-change hook that already exists (`clsAppEvents`,
 `LingTeXToggleRewrapOnSelectionChange`), made change-aware: fingerprint the
