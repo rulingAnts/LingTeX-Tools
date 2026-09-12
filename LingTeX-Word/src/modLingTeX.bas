@@ -1421,9 +1421,11 @@ Private Function InstallShortcuts() As String
     Dim names(1) As String
     Dim h As Long, k As Long
     Dim why As String, refused As String, taken As String, usedHome As String
+    Dim installed As String
     Dim code As Long
     Dim bound As Boolean
     Dim owner As String
+    Dim kb As Object
 
     ' Where a binding may live, in order of preference: this template when the
     ' code is in one (so the shortcuts ship with it), else Normal; and Normal
@@ -1455,8 +1457,7 @@ Private Function InstallShortcuts() As String
         ' or a binding the user made -- unless it is already ours.
         owner = KeyOwner(app, homes(0), code)
         If owner <> "" And InStr(1, owner, "LingTeX", vbTextCompare) = 0 Then
-            taken = taken & "  " & KeyName(kv(0)) & " is " & owner & _
-                    ", so " & kv(1) & " has no shortcut" & vbCr
+            taken = taken & IIf(taken = "", "", ", ") & KeyName(kv(0)) & " (" & owner & ")"
         Else
             ' The bare macro name, then the qualified one Word sometimes insists
             ' on for a macro that lives in another template.
@@ -1469,11 +1470,19 @@ Private Function InstallShortcuts() As String
                     If why = "" Then
                         bound = True
                         If usedHome = "" Then usedHome = homeNames(h)
+                        ' The name Word gives the key, which is the truth about
+                        ' what the modifier bits mean on this platform.
+                        Set kb = Nothing
+                        Set kb = app.FindKey(code)
+                        If kb Is Nothing Then
+                            installed = installed & "  " & KeyName(kv(0)) & "  " & ShortName(kv(1)) & vbCr
+                        Else
+                            installed = installed & "  " & kb.KeyString & "  " & ShortName(kv(1)) & vbCr
+                        End If
                         Exit For
                     End If
                     If refused = "" Then
-                        refused = "  in " & homeNames(h) & ", " & names(k) & _
-                                  ": " & why & vbCr
+                        refused = names(k) & " in " & homeNames(h) & ": " & why
                     End If
                 Next k
                 If bound Then Exit For
@@ -1484,20 +1493,21 @@ Private Function InstallShortcuts() As String
 
     If n = 0 Then
         InstallShortcuts = "No keyboard shortcuts could be installed." & vbCr
-        If refused <> "" Then InstallShortcuts = InstallShortcuts & "Word said:" & vbCr & refused
+        If refused <> "" Then InstallShortcuts = InstallShortcuts & "Word said: " & refused
     Else
-        InstallShortcuts = CStr(n) & " of " & CStr(total) & " keyboard shortcuts " & _
-                           "installed in " & usedHome & ":" & vbCr & ShortcutList() & vbCr
+        InstallShortcuts = CStr(n) & " of " & CStr(total) & " shortcuts installed, in " & _
+                           usedHome & ":" & vbCr & installed & vbCr
         If refused <> "" Then
-            InstallShortcuts = InstallShortcuts & "Word refused one with:" & vbCr & refused
+            InstallShortcuts = InstallShortcuts & "Word refused one: " & refused & vbCr
         End If
     End If
     If taken <> "" Then
-        InstallShortcuts = InstallShortcuts & "Left alone, already in use:" & vbCr & taken
+        InstallShortcuts = InstallShortcuts & "Left alone, already in use: " & taken & vbCr
     End If
-    InstallShortcuts = InstallShortcuts & "Any of them can be changed by hand: " & _
-                       "Tools > Customize Keyboard..., category Macros. " & _
-                       "LingTeXRemoveShortcuts takes ours out."
+    InstallShortcuts = InstallShortcuts & vbCr & "Change any by hand: Tools > Customize " & _
+                       "Keyboard, category Macros. LingTeXRemoveShortcuts takes ours out."
+    ' A dialog shows 1024 characters and garbage after that.
+    If Len(InstallShortcuts) > 1000 Then InstallShortcuts = Left$(InstallShortcuts, 997) & "..."
 End Function
 
 ' What a key does now, as Word describes it, or "" when it is free.
@@ -1529,7 +1539,16 @@ Private Function ShortcutModifiers() As Long
     End If
 End Function
 
-' A shortcut as a person reads it.
+' A command name without its prefix: "LingTeXSplitColumn" is "SplitColumn".
+Private Function ShortName(ByVal cmd As String) As String
+    If Left$(cmd, 7) = "LingTeX" Then
+        ShortName = Mid$(cmd, 8)
+    Else
+        ShortName = cmd
+    End If
+End Function
+
+' A shortcut as a person reads it, from the bits; what Word shows is KeyString.
 Private Function KeyName(ByVal letter As String) As String
     Dim m As Long, s As String
     m = ShortcutModifiers()
@@ -1610,48 +1629,47 @@ End Sub
 Public Sub LingTeXProbeShortcuts()
     Dim app As Object
     Dim msg As String
-    Dim bits As Variant, i As Long, v As Long
 
     On Error Resume Next
     Set app = Application
     app.CustomizationContext = app.NormalTemplate
-    msg = "Round 2: which bit is Option? Each modifier bit with I, then with Cmd+I; " & _
-          "KeyString is what Word says it bound." & vbCr
-    bits = Array(256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
-    For i = 0 To UBound(bits)
-        msg = msg & Probe(app, CStr(bits(i)) & "+I", 2, "LingTeXInsertInterlinear", bits(i) + 73)
-    Next i
-    For i = 0 To UBound(bits)
-        If bits(i) <> 512 Then
-            msg = msg & Probe(app, "Cmd+" & CStr(bits(i)) & "+I", 2, "LingTeXInsertInterlinear", _
-                              512 + bits(i) + 73)
-        End If
-    Next i
-    Err.Clear
-    v = app.BuildKeyCode(512, 256, 73)
-    msg = msg & "BuildKeyCode(Cmd, Shift, I) = " & IIf(Err.Number = 0, CStr(v), "error " & _
-                CStr(Err.Number)) & vbCr
-    Err.Clear
-    v = app.BuildKeyCode(512, 1024, 73)
-    msg = msg & "BuildKeyCode(Cmd, 1024, I) = " & IIf(Err.Number = 0, CStr(v), "error " & _
-                CStr(Err.Number) & " " & Err.Description) & vbCr
+    msg = "Round 3: what Word calls each key. 2048 and 4096 took in round 2." & vbCr
+    msg = msg & Probe(app, "256+I", 2, "LingTeXInsertInterlinear", 256 + 73)
+    msg = msg & Probe(app, "512+I", 2, "LingTeXInsertInterlinear", 512 + 73)
+    msg = msg & Probe(app, "2048+I", 2, "LingTeXInsertInterlinear", 2048 + 73)
+    msg = msg & Probe(app, "4096+I", 2, "LingTeXInsertInterlinear", 4096 + 73)
+    msg = msg & Probe(app, "512+2048+I", 2, "LingTeXInsertInterlinear", 512 + 2048 + 73)
+    msg = msg & Probe(app, "512+4096+I", 2, "LingTeXInsertInterlinear", 512 + 4096 + 73)
+    msg = msg & Probe(app, "2048+4096+I", 2, "LingTeXInsertInterlinear", 2048 + 4096 + 73)
+    msg = msg & Probe(app, "512+4096+R", 2, "LingTeXRewrapCurrent", 512 + 4096 + 82)
+    msg = msg & Probe(app, "512+4096+S", 2, "LingTeXSplitColumn", 512 + 4096 + 83)
     Err.Clear
     On Error GoTo 0
     Report msg, vbInformation
 End Sub
 
-' One binding: added, then cleared again if it took.
+' One binding: what the key did before, then added and cleared again if it
+' took, reporting the name Word gives the key.
 Private Function Probe(app As Object, ByVal what As String, ByVal category As Long, _
         ByVal cmd As String, ByVal code As Long) As String
     Dim kb As Object
+    Dim before As String, ks As String
     On Error Resume Next
+    Set kb = app.FindKey(code)
+    If Not kb Is Nothing Then before = kb.Command
     Err.Clear
     app.KeyBindings.Add category, cmd, code
     If Err.Number = 0 Then
-        Probe = "  " & what & ": OK" & vbCr
         Err.Clear
+        Set kb = Nothing
         Set kb = app.FindKey(code)
-        If Not kb Is Nothing Then kb.Clear
+        ks = "?"
+        If Not kb Is Nothing Then
+            ks = kb.KeyString
+            If InStr(1, kb.Command, "LingTeX", vbTextCompare) > 0 Then kb.Clear
+        End If
+        Probe = "  " & what & ": OK, Word calls it " & ks & _
+                IIf(before = "", "", ", was " & before) & vbCr
     Else
         Probe = "  " & what & ": " & CStr(Err.Number) & " " & Err.Description & vbCr
     End If
