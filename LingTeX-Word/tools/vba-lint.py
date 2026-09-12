@@ -805,9 +805,6 @@ WD_CONSTANTS = {
     "wdDeleteCellsShiftLeft",
     "wdDoNotSaveChanges",
     "wdHorizontalPositionRelativeToTextBoundary",
-    "wdKeyAlt",
-    "wdKeyCategoryMacro",
-    "wdKeyControl",
     "wdLineSpaceSingle",
     "wdLineStyleNone",
     "wdListNoNumbering",
@@ -821,7 +818,6 @@ WD_CONSTANTS = {
     "wdStyleTypeTable",
     "wdStyleTypeList",
     "wdTrailingTab",
-    "wdTypeTemplate",
     "wdUndefined",
     "wdWithInTable",
 }

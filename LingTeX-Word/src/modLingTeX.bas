@@ -37,8 +37,8 @@ Private mEvents As clsAppEvents
 Private mPendingUndoLabel As String
 
 ' Keyboard shortcuts, letter=command. Installed by LingTeXInstallShortcuts as
-' Ctrl+Alt+letter on Windows, which is Cmd+Option+letter on Mac (wdKeyControl
-' is the Command key there). Letters chosen to stay clear of Word's own
+' Ctrl+Alt+letter on Windows, which is Cmd+Option+letter on Mac (the Control
+' key code, 512, is the Command key there). Letters chosen to stay clear of Word's own
 ' Ctrl+Alt / Cmd+Option bindings and of macOS system shortcuts.
 Private Const SHORTCUT_TABLE As String = _
     "I=LingTeXInsertInterlinear|R=LingTeXRewrapCurrent|A=LingTeXRewrapAll|" & _
@@ -497,8 +497,8 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
         ' A document of twenty examples takes a few seconds and shows the busy
         ' cursor meanwhile; VBA has no thread to keep the window live, so the
         ' status bar says how far along it is.
-        Application.StatusBar = "LingTeX: re-wrapping example " & _
-                                CStr(tables.Count - i + 1) & " of " & CStr(tables.Count)
+        StatusLine "LingTeX: re-wrapping example " & _
+                   CStr(tables.Count - i + 1) & " of " & CStr(tables.Count)
         Set done = RewrapTable(tables(i))
         If done Is Nothing Then
             nFailed = nFailed + 1
@@ -517,9 +517,7 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
         On Error GoTo Fail
     Next i
 
-    On Error Resume Next
-    Application.StatusBar = ""
-    On Error GoTo Fail
+    StatusLine ""
 
     If restore Then
         On Error Resume Next
@@ -1179,25 +1177,34 @@ End Sub
 '=============================================================================
 ' -- KEYBOARD SHORTCUTS -----------------------------------------------------
 '=============================================================================
-' Installed into the Normal template, so they work in every document, and
-' removable the same way. Word resolves a macro key binding by name when the
-' key is pressed, so the macros can live in LingTeX.docm (or the template) and
-' the binding in Normal. Added because Tools > Macro > Macros... for every one
-' of sixty-six checks was making the by-hand pass take far longer than it
-' needed to (Seth, 2026-09-12).
+' Installed into this template (or Normal), so they work in every document,
+' and removable the same way. Word resolves a macro key binding by name when
+' the key is pressed. Added because Tools > Macro > Macros... for every one of
+' sixty-six checks was making the by-hand pass take far longer than it needed
+' to (Seth, 2026-09-12).
+'
+' EVERYTHING HERE IS LATE-BOUND. KeyBindings, FindKey, BuildKeyCode,
+' CustomizationContext and NormalTemplate are reached through an Object, and
+' the key constants are their numbers (macro category 2, Control 512, Alt
+' 1024), because a member missing from Mac Word's type library is a COMPILE
+' error for this whole module -- and in a template loaded as an add-in that
+' means every load, unload and command raises "Compile error in hidden
+' module: modLingTeX", endlessly (2026-09-12). Late-bound, a missing member
+' is a run-time error inside the trap below, and nothing else suffers.
 
 Public Sub LingTeXInstallShortcuts()
     Dim pairs() As String, kv() As String
     Dim i As Long, n As Long
     Dim errNum As Long, errDesc As String
 
+    Dim app As Object
     On Error GoTo Fail
-    Application.CustomizationContext = ShortcutHome()
+    Set app = Application
+    app.CustomizationContext = ShortcutHome()
     pairs = Split(SHORTCUT_TABLE, "|")
     For i = 0 To UBound(pairs)
         kv = Split(pairs(i), "=")
-        KeyBindings.Add KeyCategory:=wdKeyCategoryMacro, Command:=kv(1), _
-                        KeyCode:=BuildKeyCode(wdKeyControl, wdKeyAlt, Asc(kv(0)))
+        app.KeyBindings.Add 2, kv(1), app.BuildKeyCode(512, 1024, Asc(kv(0)))
         n = n + 1
     Next i
     Report CStr(n) & " keyboard shortcuts installed in " & ShortcutHomeName() & ":" & _
@@ -1215,13 +1222,15 @@ Public Sub LingTeXRemoveShortcuts()
     Dim pairs() As String, kv() As String
     Dim i As Long, n As Long
     Dim kb As Object
+    Dim app As Object
 
     On Error Resume Next
-    Application.CustomizationContext = ShortcutHome()
+    Set app = Application
+    app.CustomizationContext = ShortcutHome()
     pairs = Split(SHORTCUT_TABLE, "|")
     For i = 0 To UBound(pairs)
         kv = Split(pairs(i), "=")
-        Set kb = FindKey(BuildKeyCode(wdKeyControl, wdKeyAlt, Asc(kv(0))))
+        Set kb = app.FindKey(app.BuildKeyCode(512, 1024, Asc(kv(0))))
         If Not kb Is Nothing Then
             If kb.Command = kv(1) Then
                 kb.Clear
@@ -1238,11 +1247,13 @@ End Sub
 ' Where the shortcuts are stored: in this template when the code lives in one
 ' (so they ship with it and apply everywhere it is loaded), else in Normal.
 Private Function ShortcutHome() As Object
+    Dim app As Object
     On Error Resume Next
-    If ThisDocument.Type = wdTypeTemplate Then
+    Set app = Application
+    If ThisDocument.Type = 1 Then          ' 1 = a template
         Set ShortcutHome = ThisDocument
     Else
-        Set ShortcutHome = NormalTemplate
+        Set ShortcutHome = app.NormalTemplate
     End If
     Err.Clear
     On Error GoTo 0
@@ -1250,7 +1261,7 @@ End Function
 
 Private Function ShortcutHomeName() As String
     On Error Resume Next
-    If ThisDocument.Type = wdTypeTemplate Then
+    If ThisDocument.Type = 1 Then          ' 1 = a template
         ShortcutHomeName = "the template " & ThisDocument.Name
     Else
         ShortcutHomeName = "the Normal template"
@@ -1258,6 +1269,16 @@ Private Function ShortcutHomeName() As String
     Err.Clear
     On Error GoTo 0
 End Function
+
+' The status bar, late-bound: a progress line while a long command runs.
+Private Sub StatusLine(ByVal s As String)
+    Dim app As Object
+    On Error Resume Next
+    Set app = Application
+    app.StatusBar = s
+    Err.Clear
+    On Error GoTo 0
+End Sub
 
 Public Sub LingTeXShowShortcuts()
     Report "LingTeX-Word keyboard shortcuts (once LingTeXInstallShortcuts has " & _

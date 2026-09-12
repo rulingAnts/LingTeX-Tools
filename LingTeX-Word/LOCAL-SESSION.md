@@ -85,6 +85,15 @@ requests.
 
 ## State of play
 
+- **Fourth run: "Compile error in hidden module: modLingTeX", endlessly.** The
+  two-template import WORKED (it wrote modules into the engine and reloaded
+  it), and what it imported had never been compiled by Word: the shortcuts
+  code (KeyBindings, FindKey, BuildKeyCode, CustomizationContext,
+  NormalTemplate, the WdKey constants) or StatusBar -- one of them is not in
+  Mac Word's type library. All late-bound now, constants numeric, so the
+  worst case is a run-time error in the shortcut command. RULE: anything not
+  already proven on Mac goes through an Object, because an add-in's module
+  compiles whole at load and a compile error there repeats on every event.
 - **Third template run: 50289 again -- from the STALE copy.** The old
   LingTeX.dotm was still in the startup folder beside LingTeX-Dev.dotm, so
   Word loaded both and `run VB macro` found the old modImport first. Renamed
