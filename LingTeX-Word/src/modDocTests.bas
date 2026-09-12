@@ -2305,15 +2305,18 @@ End Sub
 '=============================================================================
 ' -- NUMBERING --------------------------------------------------------------
 '=============================================================================
-' Word list numbering on the first cell, from the LingTeX Example Number list
-' style, continuing through the document. Not in the cell's text (so read-back
-' never sees it), renumbered by Word when an example goes, carried through a
-' re-wrap, and the hanging indent it needs applied to everything after it.
+' The example is the body of a numbered paragraph above it: an empty line in
+' the LingTeX Example style, numbered by the LingTeX Example Number list style,
+' Word's own numbering. The table and the translation are indented to that
+' line's text position; a re-wrap keeps the line untouched and lays the
+' example out to its indent, whatever it has become; deleting an example
+' renumbers the rest. Numbering never appears in a cell.
 Private Sub TestNumbering()
     Dim doc As Document
     Dim ex As IgtExample, back As IgtExample
     Dim where As Range
     Dim t1 As Table, t2 As Table
+    Dim numPara As Paragraph
     Dim hang As Double
     Dim indent As Double
     Dim savedQuiet As Boolean
@@ -2336,6 +2339,8 @@ Private Sub TestNumbering()
     EnsureStyles doc, True
     Ok STYLE_NUMBER & " exists as a LIST style", _
         StyleExistsOfType(doc, STYLE_NUMBER, wdStyleTypeList)
+    Ok STYLE_EXAMPLE & " exists as a PARAGRAPH style", _
+        StyleExistsOfType(doc, STYLE_EXAMPLE, wdStyleTypeParagraph)
 
     ex = ThreeTierExample()
     Set t1 = RenderExample(ex, doc.Content)
@@ -2349,25 +2354,26 @@ Private Sub TestNumbering()
     Ok "and nothing was reported about the numbering", (gRenderError = "")
     If gRenderError <> "" Then Emit "         " & gRenderError
 
-    Ok "the first cell carries list numbering", CellIsNumbered(t1)
-    Eq "and shows (1)", ExampleNumberString(t1), "(1)"
-    Ok "the second cell of the first row does not", _
-        (t1.Cell(1, 2).Range.ListFormat.ListType = wdListNoNumbering)
-    Ok "nor does the gloss cell under the number", _
-        (t1.Cell(2, 1).Range.ListFormat.ListType = wdListNoNumbering)
-
-    indent = t1.Cell(2, 1).Range.ParagraphFormat.LeftIndent
-    Ok "the gloss cell under the number is indented to the text position", _
+    Set numPara = NumberParagraphOf(t1)
+    Ok "a number line precedes the table", (Not numPara Is Nothing)
+    If Not numPara Is Nothing Then
+        Ok "in the " & STYLE_EXAMPLE & " style", (numPara.Style = STYLE_EXAMPLE)
+        Ok "carrying Word list numbering", _
+            (numPara.Range.ListFormat.ListType <> wdListNoNumbering)
+        Eq "and showing (1)", ExampleNumberString(t1), "(1)"
+        Ok "with nothing typed on it", (Len(ParaText(numPara)) = 0)
+    End If
+    Ok "no cell carries numbering", _
+        (t1.Cell(1, 1).Range.ListFormat.ListType = wdListNoNumbering)
+    indent = t1.Rows(1).LeftIndent
+    Ok "the table is indented to the number line's text position", _
         (Abs(indent - hang) <= 0.5)
-    indent = t1.Cell(1, 1).Range.ParagraphFormat.LeftIndent
-    Ok "the numbered cell hangs its number in the same indent", _
-        (Abs(indent - hang) <= 0.5)
+    Emit "         row indent " & CStr(indent) & "pt, text position " & CStr(hang) & "pt"
     indent = ParagraphAfterTable(t1).Format.LeftIndent
-    Ok "the translation is indented to the text position too", _
-        (Abs(indent - hang) <= 0.5)
+    Ok "the translation is indented to it too", (Abs(indent - hang) <= 0.5)
 
     back = ReadExampleFromTable(t1)
-    Eq "the number is not part of the cell's text", back.Cells(0, 0), "di=de"
+    Eq "the first cell's text is just the form", back.Cells(0, 0), "di=de"
 
     Set where = doc.Content
     where.Collapse wdCollapseEnd
@@ -2382,29 +2388,43 @@ Private Sub TestNumbering()
     If doc.Tables.Count = 2 Then
         Eq "re-wrap keeps (1) on the first", ExampleNumberString(doc.Tables(1)), "(1)"
         Eq "and (2) on the second", ExampleNumberString(doc.Tables(2)), "(2)"
+        Ok "and did not add number lines", (CountParagraphsInStyle(doc, STYLE_EXAMPLE) = 2)
 
-        DeleteTableAndFreeLines doc.Tables(1)
+        ' An indent change on the number line re-wraps through.
+        Set numPara = NumberParagraphOf(doc.Tables(1))
+        If Not numPara Is Nothing Then
+            numPara.LeftIndent = 72
+            RewrapDocument doc, False
+            indent = doc.Tables(1).Rows(1).LeftIndent
+            Ok "a wider indent on the number line moves the table on re-wrap", _
+                (Abs(indent - 72) <= 0.5)
+            indent = ParagraphAfterTable(doc.Tables(1)).Format.LeftIndent
+            Ok "and the translation with it", (Abs(indent - 72) <= 0.5)
+        End If
+
+        DeleteExample doc.Tables(1)
         Ok "deleting the first example leaves one table", (doc.Tables.Count = 1)
+        Ok "and one number line", (CountParagraphsInStyle(doc, STYLE_EXAMPLE) = 1)
         If doc.Tables.Count = 1 Then
             Eq "and Word renumbers it (1)", ExampleNumberString(doc.Tables(1)), "(1)"
         End If
     End If
 
-    '-- turned off, a new example is not numbered ---------------------------
+    '-- turned off, a new example has no number line ---------------------------
     SetSettingNumberExamples doc, False
     Set where = doc.Content
     where.Collapse wdCollapseEnd
     Set t2 = RenderExample(ex, where)
     Ok "with numbering off, a new example draws", (Not t2 Is Nothing)
     If Not t2 Is Nothing Then
-        Ok "and carries no number", (Not CellIsNumbered(t2))
-        indent = t2.Cell(2, 1).Range.ParagraphFormat.LeftIndent
-        Ok "and its cells are not indented", (Abs(indent) <= 0.5)
+        Ok "and has no number line", (NumberParagraphOf(t2) Is Nothing)
+        indent = t2.Rows(1).LeftIndent
+        Ok "and is not indented", (Abs(indent) <= 0.5)
     End If
     SetSettingNumberExamples doc, True
     CloseNoSave doc
 
-    '-- a wrapped example: later wrap lines move over by the hang -------------
+    '-- a wrapped example: every wrap line is indented ------------------------
     Set doc = NewBlankDoc()
     If doc Is Nothing Then
         gQuiet = savedQuiet
@@ -2417,16 +2437,28 @@ Private Sub TestNumbering()
     If Not t1 Is Nothing Then
         Ok "and it did wrap", (t1.Rows.Count > 2)
         If t1.Rows.Count > 2 Then
-            indent = t1.Rows(3).LeftIndent
-            Ok "a later wrap line is indented by the hang", (Abs(indent - hang) <= 0.5)
             indent = t1.Rows(1).LeftIndent
-            Ok "and the first is not", (Abs(indent) <= 0.5)
+            Ok "the first wrap line is indented by the text position", _
+                (Abs(indent - hang) <= 0.5)
+            indent = t1.Rows(3).LeftIndent
+            Ok "and so is a later one", (Abs(indent - hang) <= 0.5)
         End If
     End If
     CloseNoSave doc
     gQuiet = savedQuiet
 End Sub
 
+Private Function CountParagraphsInStyle(doc As Document, ByVal nm As String) As Long
+    Dim para As Paragraph
+    Dim n As Long
+    On Error Resume Next
+    For Each para In doc.Paragraphs
+        If para.Style = nm Then n = n + 1
+    Next para
+    Err.Clear
+    On Error GoTo 0
+    CountParagraphsInStyle = n
+End Function
 
 '=============================================================================
 ' -- DOCUMENT HOUSEKEEPING --------------------------------------------------

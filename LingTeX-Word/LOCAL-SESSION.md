@@ -114,10 +114,14 @@ requests.
     empty paragraph ends an example (`IsTranslationParagraph`), no deletion
     removes a paragraph mark that precedes a table, and LingTeX Free's next
     paragraph style is Normal. Doc-test section `adjacent` proves both layouts.
-- **Numbering is built** (2026-09-12): list numbering on the first cell from
-  the LingTeX Example Number list style, hang 36 pt applied to the cells
-  under it, later wrap lines and the translation; re-wrap carries a number
-  across; doc-test section `numbering`. Unproven in Word until the next run.
+- **Numbering is built** (2026-09-12, reworked to Seth's second call): the
+  example is the body of a numbered paragraph ABOVE the table -- an empty line
+  in the LingTeX Example style, numbered by the LingTeX Example Number list
+  style (Word's own numbering, never in a cell). Table and translation are
+  indented to that line's text position; re-wrap leaves the line alone and
+  lays the example out to its current indent, bullets and outline levels
+  included; DeleteExample removes all three parts. Doc-test section
+  `numbering`. Unproven in Word until the next run.
 - Next: Seth re-runs both runners (expect 79 and about 231), then continues the
   by-hand pass from 3c/3e/3f. Then `SaveAsTemplate` + `tools/build-dotm.sh` +
   `tools/check-dotm.sh`, then packaging.

@@ -139,25 +139,25 @@ packaged into `LingTeX-Word.dotm`.
 
 ### Numbering
 
-Every new example is numbered `(1)`, `(2)`… The number is Word's own list
-numbering on the first cell of the table, from a list style called
-`LingTeX Example Number`, continuing the previous example's list — so deleting
-or moving an example renumbers the rest, and a cross-reference can point at
-one. It sits in a hanging indent inside that cell; the gloss under it, every
-later wrap line and the translation are indented to the same text position, so
-everything after the number lines up. Re-wrap keeps whatever list an example
-carries — ours, a bullet, an outline level you chose — and lays the example out
-to that list level's own text indent, so changing the indent in the list style
-changes every example on its next re-wrap. `LingTeXToggleExampleNumbers`
-decides only whether *new* examples get a number; the `NumberHang` setting
-(36 pt) only seeds the list style when it is first created.
+Every new example is the body of a numbered paragraph: an otherwise empty line
+in the `LingTeX Example` style sits above the table, numbered `(1)`, `(2)`… by
+Word's own list numbering (a list style called `LingTeX Example Number`,
+continuing from the previous example), and the table and the translation are
+indented to that line's text position. The number never touches a cell. Because
+it is an ordinary numbered paragraph, everything Word does with numbering
+applies: deleting or moving an example renumbers the rest, a cross-reference
+can point at it, and you can put that paragraph on a bullet, on a level of your
+outline numbering, or change its indent — re-wrap leaves the line exactly as it
+is and lays the example out to whatever its indent has become. A short heading
+or caption can be typed after the number on that line. `LingTeXToggleExampleNumbers`
+decides only whether *new* examples get a number line; the `NumberHang` setting
+(36 pt) only seeds the list style's indent when it is first created.
 
 **Per-chapter numbering.** Modify the list style (Format → Style →
 `LingTeX Example Number`): link its level 1 to Heading 1 with no number text,
 put `(%2)` on level 2, then `SetSettingNumberLevel ActiveDocument, 2`. New
-examples are then numbered on level 2, which Word restarts after every
-Heading 1. Any multilevel scheme Word can express works the same way; the
-add-in only ever applies a level of that style.
+examples then sit on level 2, which Word restarts after every Heading 1. Any
+multilevel scheme Word can express works the same way.
 
 ### Settings
 

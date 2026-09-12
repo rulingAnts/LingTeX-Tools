@@ -74,8 +74,9 @@ Free Eng (When) she took her dogs hunting.
 | `bujo=de=di` — double enclitics stay in one column, gloss `speak=ABL=REL` | ☐ | ☐ |
 | Run it with nothing on the clipboard and nothing selected → a clear message, no error dialog | ☐ | ☐ |
 | Run it on prose that is not interlinear → a clear message explaining what was expected | ☐ | ☐ |
-| The example is numbered `(1)` in the left margin of its first line, with the rest of the example and the translation indented to the text position; a second example is `(2)`; deleting the first renumbers the second to `(1)` | ☐ | ☐ |
-| `LingTeXToggleExampleNumbers` → the next example inserted carries no number and no indent; existing ones keep theirs | ☐ | ☐ |
+| A number line `(1)` (an empty paragraph in the `LingTeX Example` style, Word list numbering) sits above the table, and the table and translation are indented to its text position; a second example is `(2)`; deleting the first (number line, table, translation) renumbers the second to `(1)`; the number is not in any cell | ☐ | ☐ |
+| Change the number line's indent, or put it on a bullet or an outline level, then re-wrap → the line is untouched and the table and translation follow its new indent | ☐ | ☐ |
+| `LingTeXToggleExampleNumbers` → the next example inserted has no number line and no indent; existing ones keep theirs | ☐ | ☐ |
 | Fonts come from the document, not Cambria Math or Times New Roman | ☐ | ☐ |
 | **No file is written to disk at any point** (the Mac sandbox check) | ☐ | ☐ |
 
