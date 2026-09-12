@@ -196,7 +196,7 @@ SetSettingSpaceReplacement ActiveDocument, "_"   ' "." or "_" (default ".")
 SetSettingGranularity ActiveDocument, igtMorphemeAligned   ' default igtWordAligned
 SetSettingLowercaseGramGloss ActiveDocument, False   ' keep capitals as typed
 SetSettingRewrapOnSave ActiveDocument, False
-SetSettingRewrapOnSelectionChange ActiveDocument, True   ' off by default
+SetSettingRewrapOnSelectionChange ActiveDocument, False  ' on by default
 ```
 
 ### Spelling
