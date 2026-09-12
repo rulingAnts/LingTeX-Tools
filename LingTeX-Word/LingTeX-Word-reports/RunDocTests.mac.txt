@@ -1,7 +1,7 @@
 
 LingTeX-Word document tests
 ===========================
-Open documents at start: 1
+Open documents at start: 2
 
 -- styles ----------------------------------------------------
   PASS   EnsureStyles leaves Err.Number at 0
@@ -366,7 +366,8 @@ Open documents at start: 1
          rows 2 before, 6 after; cursor 1 from the end both times
   PASS   Detach does not raise
   PASS   Detach twice does not raise
-  PASS   no documents leaked
+  FAIL   no documents leaked
+         open now: 1, was 2
 
-ALL PASS -- 314 passed
+FAILURES -- 313 passed, 1 FAILED
 
