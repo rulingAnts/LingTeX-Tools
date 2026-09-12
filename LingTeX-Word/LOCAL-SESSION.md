@@ -85,6 +85,13 @@ requests.
 
 ## State of play
 
+- **First template run wrote nothing to the repo** (2026-09-12 17:00): SetDevRoot
+  had not been run, so the bootstrap looked for src beside the template,
+  imported 0 of 14, and the (old) tests wrote their reports beside the template;
+  the runner then committed the deletion of the old Mac reports (guarded now:
+  no report, no commit). tools/install-dev-template.sh sets the variable in
+  settings.xml with Word quit, injects the ribbon and points the runner --
+  the whole step is one command; Seth has still to run it.
 - **The ribbon loads on Mac** (2026-09-12, screenshot): LingTeX.dotm in the
   startup folder, injected with add-ribbon.sh, shows the full LingTeX tab over
   a new document -- Interlinear, Layout, Alignment, Settings, Setup, Keys,

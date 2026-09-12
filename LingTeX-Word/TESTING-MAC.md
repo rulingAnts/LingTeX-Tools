@@ -22,17 +22,17 @@ no automated suite can reach: what the thing actually looks like on the page.
    - File → Save As → **Word Macro-Enabled Template**, name `LingTeX.dotm`,
      into Word's startup folder (the one Word → Settings → File Locations →
      Startup shows; on this Mac it is `~/Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/Word` — create it if it is missing).
-   - Still in that template: Tools → Macro → Macros… → **`SetDevRoot`**, give
-     it the clone's `LingTeX-Word` folder (the default it offers is right if
-     you saved from the repo), then ⌘S and close it.
-   - With Word quit, put the ribbon in it:
-     `sh LingTeX-Word/tools/add-ribbon.sh "<that folder>/LingTeX.dotm"`.
+   - Quit Word, then one command puts the ribbon in the template, tells it
+     where the clone is, and points the runner at it:
+     `sh LingTeX-Word/tools/install-dev-template.sh "<that folder>/LingTeX.dotm"`
+     (`SetDevRoot`, run inside Word, does the middle part by hand if you
+     prefer; the import log's `from` line shows which folder it is reading.)
    - Start Word: the template loads, `AutoExec` runs, and a **LingTeX** tab is on
      every document's ribbon. Then run the test runner once with that path;
      it imports the current modules into the loaded template, tests, saves
      the template and arms the hooks:
-     `sh LingTeX-Word/tools/run-in-word.sh "<that folder>/LingTeX.dotm"`.
-     (The path is remembered after the first time.)
+     `sh LingTeX-Word/tools/run-in-word.sh` (the install step already told it
+     the path).
 
 2. **Make the test document.** ⌘N for a blank one, then save it somewhere
    ordinary — `~/Desktop/lingtex-test.docx`. It has to be saved before the
