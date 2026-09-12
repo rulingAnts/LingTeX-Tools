@@ -85,6 +85,15 @@ requests.
 
 ## State of play
 
+- **FOUND IT (Debug > Compile in the open): both class modules were EMPTY.**
+  ReadTextFile ends lines with vbNewLine (CR on Mac) since the double-spacing
+  fix; StripVbaMetadata still split on vbCrLf, so a Mac class file was one
+  line starting VERSION 1.0 CLASS and was skipped whole. Classes were created
+  empty and reported ok, and modLingTeX's mEvents.Attach then failed to
+  compile -- as "Compile error in hidden module" in the add-in. Stripper
+  normalises newlines now; ImportOne and Verify report an empty class.
+  Needs the dev template re-pasted (modImport). The chain of dialogs today
+  was all this one bug plus the stale startup copy.
 - **The engine loads at Word start only when marked good** (build/engine-ok,
   removed by the runner before a run, written after a clean one; dev
   AutoExec checks it). A broken import can no longer be loaded twice, and
