@@ -1430,26 +1430,31 @@ End Sub
 Public Sub LingTeXProbeShortcuts()
     Dim app As Object
     Dim msg As String
+    Dim bits As Variant, i As Long, v As Long
 
     On Error Resume Next
     Set app = Application
     app.CustomizationContext = app.NormalTemplate
-    msg = "KeyBindings.Add, in the Normal template, one thing changed at a time:" & vbCr
-    msg = msg & Probe(app, "built-in FileSave, Cmd+Opt+I", 1, "FileSave", 512 + 1024 + 73)
-    msg = msg & Probe(app, "built-in FileSave, Cmd+Shift+I", 1, "FileSave", 512 + 256 + 73)
-    msg = msg & Probe(app, "macro, Cmd+Opt+I", 2, "LingTeXInsertInterlinear", 512 + 1024 + 73)
-    msg = msg & Probe(app, "macro, Cmd+Shift+I", 2, "LingTeXInsertInterlinear", 512 + 256 + 73)
-    msg = msg & Probe(app, "macro, Cmd+I", 2, "LingTeXInsertInterlinear", 512 + 73)
-    msg = msg & Probe(app, "macro, Opt+Shift+I", 2, "LingTeXInsertInterlinear", 1024 + 256 + 73)
-    msg = msg & Probe(app, "macro, F7", 2, "LingTeXInsertInterlinear", 118)
-    msg = msg & Probe(app, "macro, BuildKeyCode(Cmd, Opt, I)", 2, "LingTeXInsertInterlinear", _
-                      app.BuildKeyCode(512, 1024, 73))
-    msg = msg & Probe(app, "module-qualified macro, Cmd+Opt+I", 2, _
-                      "modLingTeX.LingTeXInsertInterlinear", 512 + 1024 + 73)
-    msg = msg & Probe(app, "macro RunAllTests (this module), Cmd+Opt+I", 2, "RunAllTests", _
-                      512 + 1024 + 73)
-    msg = msg & "BuildKeyCode(512, 1024, 73) = " & CStr(app.BuildKeyCode(512, 1024, 73)) & vbCr
-    msg = msg & "KeyBindings.Count = " & CStr(app.KeyBindings.Count) & vbCr
+    msg = "Round 2: which bit is Option? Each modifier bit with I, then with Cmd+I; " & _
+          "KeyString is what Word says it bound." & vbCr
+    bits = Array(256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
+    For i = 0 To UBound(bits)
+        msg = msg & Probe(app, CStr(bits(i)) & "+I", 2, "LingTeXInsertInterlinear", bits(i) + 73)
+    Next i
+    For i = 0 To UBound(bits)
+        If bits(i) <> 512 Then
+            msg = msg & Probe(app, "Cmd+" & CStr(bits(i)) & "+I", 2, "LingTeXInsertInterlinear", _
+                              512 + bits(i) + 73)
+        End If
+    Next i
+    Err.Clear
+    v = app.BuildKeyCode(512, 256, 73)
+    msg = msg & "BuildKeyCode(Cmd, Shift, I) = " & IIf(Err.Number = 0, CStr(v), "error " & _
+                CStr(Err.Number)) & vbCr
+    Err.Clear
+    v = app.BuildKeyCode(512, 1024, 73)
+    msg = msg & "BuildKeyCode(Cmd, 1024, I) = " & IIf(Err.Number = 0, CStr(v), "error " & _
+                CStr(Err.Number) & " " & Err.Description) & vbCr
     Err.Clear
     On Error GoTo 0
     Report msg, vbInformation
