@@ -92,11 +92,18 @@ requests.
 - Icons: our own PNGs in src/icons (tools/make-icons.py, Pillow + macOS
   fonts), embedded by build-dotm.sh with a part-level .rels; check-dotm.sh
   guards them. Unproven on Mac (embedded ribbon images from STARTUP).
+- **The number is a first column now** (2026-09-12, late): Seth wanted it on
+  the vernacular line, not on a line above the table. Every row of a numbered
+  example has a number cell as wide as NumberHang; row 1's paragraph is in
+  LingTeX Example (linked to the list style); modReadBack.NumberColumns is
+  what every reader offsets by. The example's indent is its rows' LeftIndent
+  (ExampleIndent), kept by re-wrap; a fresh example takes its paragraph's.
+  Legacy number lines migrate on re-wrap (LegacyNumberLineOf). Unproven in
+  Word: the numbering doc-test section was rewritten for it (expect a few
+  more than 280).
 - **The two-template loop works end to end** (2026-09-12 evening): import
   14/14 into the engine as a document, saved, loaded as a global add-in, 79
-  and 271/272 -- every numbering check green. The one failure: after
-  convert-table the cursor sits on the new number line, which FindExampleAt
-  did not count as the example; it does now.
+  and 271/272 -- every numbering check green.
 - **FOUND IT (Debug > Compile in the open): both class modules were EMPTY.**
   ReadTextFile ends lines with vbNewLine (CR on Mac) since the double-spacing
   fix; StripVbaMetadata still split on vbCrLf, so a Mac class file was one

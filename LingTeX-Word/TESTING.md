@@ -74,9 +74,9 @@ Free Eng (When) she picked her yams early.
 | `zuvo=ve=zi` — double enclitics stay in one column, gloss `dream=ABL=REL` | ☐ | ☐ |
 | Run it with nothing on the clipboard and nothing selected → a clear message, no error dialog | ☐ | ☐ |
 | Run it on prose that is not interlinear → a clear message explaining what was expected | ☐ | ☐ |
-| A number line `(1)` (an empty paragraph in the `LingTeX Example` style, Word list numbering) sits above the table, and the table and translation are indented to its text position; a second example is `(2)`; deleting the first (number line, table, translation) renumbers the second to `(1)`; the number is not in any cell | ☐ | ☐ |
-| Change the number line's indent, or put it on a bullet or an outline level, then re-wrap → the line is untouched and the table and translation follow its new indent | ☐ | ☐ |
-| `LingTeXToggleExampleNumbers` → the next example inserted has no number line and no indent; existing ones keep theirs | ☐ | ☐ |
+| The number `(1)` sits in a first column of the table, on the vernacular line (its cell is in the `LingTeX Example` style, Word list numbering); the translation is indented past it; a second example is `(2)`; deleting the first (table and translation) renumbers the second to `(1)`; no word cell carries numbering | ☐ | ☐ |
+| Drag the table's left edge (the example's indent) wider, then re-wrap → the indent is kept, the number stays, and the translation follows | ☐ | ☐ |
+| `LingTeXToggleExampleNumbers` → the next example inserted has no number column; existing ones keep theirs | ☐ | ☐ |
 | Fonts come from the document, not Cambria Math or Times New Roman | ☐ | ☐ |
 | **No file is written to disk at any point** (the Mac sandbox check) | ☐ | ☐ |
 
@@ -142,7 +142,7 @@ Free Eng (When) she picked her yams early.
 | Restyle the `LingTeX Gloss` paragraph style → **every** example in the document updates | ☐ | ☐ |
 | Two examples with one empty paragraph between them, and two with only the translation between → `LingTeXRewrapAll` re-wraps both and deletes nothing | ☐ | ☐ |
 | Re-wrap keeps an example's number; in a document with outline-numbered headings the example numbers are unaffected by the heading numbering and vice versa | ☐ | ☐ |
-| Per-chapter restart: Format → Style → `LingTeX Example Number` → Modify, link level 1 to Heading 1 with no number text, put `(%2)` on level 2; `SetSettingNumberLevel ActiveDocument, 2`; new examples restart at each Heading 1 | ☐ | ☐ |
+| Per-chapter restart: Format → Style → `LingTeX Example Number` → Modify, link level 1 to Heading 1 with no number text, put `(%2)` on level 2 (no trailing character, text position 0); `SetSettingNumberLevel ActiveDocument, 2`; new examples restart at each Heading 1 | ☐ | ☐ |
 | `LingTeXConvertTableToIgt` on a plain two-row table → becomes an auto-wrapping example. A row merged into a single cell is taken as the free translation; with none, the command says so and how to add one | ☐ | ☐ |
 | Our own TSV, copied out of a rendered example and pasted back in, reproduces the same grid | ☐ | ☐ |
 

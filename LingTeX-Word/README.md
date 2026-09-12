@@ -150,26 +150,35 @@ and Word must be restarted for the ribbon to reconnect.
 
 ### Numbering
 
-Every new example is the body of a numbered paragraph: an otherwise empty line
-in the `LingTeX Example` style sits above the table, numbered `(1)`, `(2)`… by
+Every new example carries its number in a **first column**: a cell as wide as
+the `NumberHang` setting (36 pt) at the start of every row, whose first-row
+paragraph is in the `LingTeX Example` style and so is numbered `(1)`, `(2)`… by
 Word's own list numbering (a list style called `LingTeX Example Number`,
-continuing from the previous example), and the table and the translation are
-indented to that line's text position. The number never touches a cell. Because
-it is an ordinary numbered paragraph, everything Word does with numbering
-applies: deleting or moving an example renumbers the rest, a cross-reference
-can point at it, and you can put that paragraph on a bullet, on a level of your
-outline numbering, or change its indent — re-wrap leaves the line exactly as it
-is and lays the example out to whatever its indent has become. A short heading
-or caption can be typed after the number on that line, and every command
-treats the cursor on that line as being inside the example. `LingTeXToggleExampleNumbers`
-decides only whether *new* examples get a number line; the `NumberHang` setting
-(36 pt) only seeds the list style's indent when it is first created.
+continuing from the previous example). The number therefore sits on the
+vernacular line, where a linguist expects it, and travels with the example
+when the example is moved or copied; the translation is indented past it.
+Because it is an ordinary numbered paragraph, everything Word does with
+numbering applies: deleting or moving an example renumbers the rest, a
+cross-reference can point at it, and the list style decides its format. The
+number cell is not content: the read-back skips it, split and merge refuse the
+cursor in it, and a re-wrap rebuilds it from the setting, so changing
+`NumberHang` reaches every example on its next re-wrap. `LingTeXToggleExampleNumbers`
+decides only whether *new* examples get a number; an example keeps its number
+through every re-wrap. An example drawn by an earlier build, with its number on
+a line above the table, is migrated by its next re-wrap: the number moves into
+the table and the line goes.
+
+**The example's indent** is its rows' left indent: drag the table's left edge
+on the ruler (or set `Rows.LeftIndent`), and a re-wrap keeps it and lays the
+translation out past the indent and the number. A fresh example takes the
+indent of the paragraph it is inserted into.
 
 **Per-chapter numbering.** Modify the list style (Format → Style →
 `LingTeX Example Number`): link its level 1 to Heading 1 with no number text,
-put `(%2)` on level 2, then `SetSettingNumberLevel ActiveDocument, 2`. New
-examples then sit on level 2, which Word restarts after every Heading 1. Any
-multilevel scheme Word can express works the same way.
+put `(%2)` on level 2 with no trailing character and a text position of 0 (the
+number sits alone in its cell), then `SetSettingNumberLevel ActiveDocument, 2`.
+New examples then sit on level 2, which Word restarts after every Heading 1.
+Any multilevel scheme Word can express works the same way.
 
 ### Settings
 

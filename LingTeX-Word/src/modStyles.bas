@@ -56,11 +56,10 @@ Public Const STYLE_GRAM As String = "LingTeX Gram Gloss"
 ' example is deleted or moved, cross-references can point at it, and linking
 ' its level 1 to Heading 1 (then NumberLevel 2) restarts it per chapter.
 Public Const STYLE_NUMBER As String = "LingTeX Example Number"
-' The paragraph ABOVE an example's table: the numbered item the example is the
-' body of. Its style carries the list numbering (linked to STYLE_NUMBER), keeps
-' with the table, and is where the example's number lives -- never in a cell.
-' The table and the translation are indented to its text position. A heading
-' or a short caption can be typed after the number on that line.
+' The paragraph in an example's NUMBER CELL: the first cell of the first row,
+' in the number column. Its style is linked to STYLE_NUMBER, so applying it
+' numbers the paragraph, and modReadBack.HasNumberColumn recognises a numbered
+' example by it. Never on a content cell.
 Public Const STYLE_EXAMPLE As String = "LingTeX Example"
 
 ' Module-level state lives HERE, above the first procedure, or it does not exist:
@@ -80,7 +79,7 @@ Private mCreatedStyle As Boolean
 ' settings live so it survives save and reopen. Versioned, so a future change to
 ' the style set re-runs rather than trusting a stale mark.
 Private Const STYLES_MADE_VAR As String = "LingTeX_StylesMade"
-Private Const STYLES_VERSION As String = "1-num2"
+Private Const STYLES_VERSION As String = "1-num3"
 
 
 '-- Last-resort font when the document reports only a theme placeholder.
@@ -335,12 +334,10 @@ End Sub
 ' ApplyExampleNumber says so in gRenderError; it never blocks a render.
 Private Sub EnsureNumberListStyle(doc As Document)
     Dim st As Style
-    Dim hang As Double
 
     If StyleExistsOfType(doc, STYLE_NUMBER, wdStyleTypeList) Then Exit Sub
     If StyleExists(doc, STYLE_NUMBER) Then Exit Sub    ' wrong kind; drawn unnumbered
 
-    hang = SettingNumberHang(doc)
     On Error Resume Next
     Set st = doc.Styles.Add(Name:=STYLE_NUMBER, Type:=wdStyleTypeList)
     If Not st Is Nothing Then mCreatedStyle = True
@@ -348,23 +345,27 @@ Private Sub EnsureNumberListStyle(doc As Document)
     On Error GoTo 0
     If st Is Nothing Then Exit Sub
 
+    ' The number sits alone in a cell as wide as the hang, so the level puts
+    ' it at the cell's left edge with nothing after it: a trailing tab or a
+    ' text position would push it onto a second line inside the cell.
     On Error Resume Next
     With st.ListTemplate.ListLevels(1)
         .NumberFormat = "(%1)"
         .NumberStyle = wdListNumberStyleArabic
-        .TrailingCharacter = wdTrailingTab
+        .TrailingCharacter = wdTrailingNone
         .NumberPosition = 0
-        .TextPosition = hang
-        .TabPosition = hang
+        .TextPosition = 0
+        .TabPosition = 0
     End With
     Err.Clear
     On Error GoTo 0
 End Sub
 
-' The number-line paragraph style. Based on Normal, keeps with the table that
-' follows it, no space after (the table is its body), and linked to the
-' example-number list style so applying it numbers the paragraph. If the link
-' cannot be made the number is applied to each paragraph directly instead.
+' The number-cell paragraph style. Based on Normal so the number matches the
+' body text in size, no space around it (it shares a row with the vernacular
+' line, and space would push it down), and linked to the example-number list
+' style so applying it numbers the paragraph. If the link cannot be made the
+' number is applied to each paragraph directly instead.
 Private Sub EnsureExampleParaStyle(doc As Document)
     Dim st As Style
     If StyleExistsOfType(doc, STYLE_EXAMPLE, wdStyleTypeParagraph) Then Exit Sub
@@ -382,7 +383,7 @@ Private Sub EnsureExampleParaStyle(doc As Document)
         .BaseStyle = doc.Styles(wdStyleNormal)
         With .ParagraphFormat
             .KeepWithNext = True
-            .SpaceBefore = 6
+            .SpaceBefore = 0
             .SpaceAfter = 0
             .WidowControl = False
         End With

@@ -139,7 +139,11 @@ End Sub
 ' after the fact, which is exactly why re-wrapping has to recompute instead of
 ' remembering.
 '-----------------------------------------------------------------------------
-Public Function AvailableTextWidth(rng As Range) As Double
+' ignoreParagraphIndent: the planner passes True, because it subtracts the
+' example's own indent itself and the anchor paragraph on a re-wrap is the
+' translation, indented by exactly that.
+Public Function AvailableTextWidth(rng As Range, _
+        Optional ByVal ignoreParagraphIndent As Boolean = False) As Double
     Dim w As Double
     gAvailWidthFellBack = False
     Dim ps As PageSetup
@@ -170,8 +174,10 @@ Public Function AvailableTextWidth(rng As Range) As Double
     If ps.TextColumns.Count > 1 Then w = ps.TextColumns(1).Width
     On Error GoTo Fallback
 
-    Set para = rng.Paragraphs(1)
-    w = w - para.LeftIndent - para.RightIndent
+    If Not ignoreParagraphIndent Then
+        Set para = rng.Paragraphs(1)
+        w = w - para.LeftIndent - para.RightIndent
+    End If
 
     If w < MIN_TEXT_WIDTH Then w = MIN_TEXT_WIDTH   ' never an unusable budget
     AvailableTextWidth = w

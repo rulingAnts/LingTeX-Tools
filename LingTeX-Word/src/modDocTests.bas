@@ -1211,10 +1211,12 @@ Private Sub CheckRowWidthsFit(tbl As Table, doc As Document)
     ' From outside the table. doc.Content starts at position 0, inside the table
     ' just drawn there, and AvailableTextWidth inside a table answers with the
     ' cell's width -- which would have compared every row against a few points.
-    avail = AvailableTextWidth(RangeAfterTable(tbl))
+    ' The full width, against the row's indent plus every cell, number cell
+    ' included: what actually reaches the margin.
+    avail = AvailableTextWidth(RangeAfterTable(tbl), True)
 
     For r = 1 To tbl.Rows.Count
-        total = 0
+        total = tbl.Rows(r).LeftIndent
         For c = 1 To tbl.Rows(r).Cells.Count
             total = total + CellWidthOf(tbl, r, c)
         Next c
@@ -1266,9 +1268,10 @@ Private Sub CheckRowRoles(tbl As Table, ex As IgtExample)
     If bad <> "" Then Emit "        " & bad
 End Sub
 
+' The first CONTENT cell: past the number column when the example has one.
 Private Function FirstCellParaStyle(tbl As Table, ByVal r As Long) As String
     On Error Resume Next
-    FirstCellParaStyle = tbl.Cell(r, 1).Range.Paragraphs(1).Style
+    FirstCellParaStyle = tbl.Cell(r, 1 + NumberColumns(tbl)).Range.Paragraphs(1).Style
     Err.Clear
     On Error GoTo 0
 End Function
@@ -1975,9 +1978,9 @@ Private Sub CheckSplitThenMerge(doc As Document)
     End If
     before = TsvOfTable(tbl)
 
-    ' Cell (1,1) holds vu=ve / fox=ERG, which has a break to split on.
+    ' The first content cell holds vu=ve / fox=ERG, which has a break to split on.
     On Error Resume Next
-    tbl.Cell(1, 1).Range.Select
+    tbl.Cell(1, 1 + NumberColumns(tbl)).Range.Select
     Err.Clear
     On Error GoTo 0
 
@@ -1997,7 +2000,7 @@ Private Sub CheckSplitThenMerge(doc As Document)
 
     ' Put it back.
     On Error Resume Next
-    tbl.Cell(1, 1).Range.Select
+    tbl.Cell(1, 1 + NumberColumns(tbl)).Range.Select
     Err.Clear
     On Error GoTo 0
 
@@ -2371,9 +2374,9 @@ Private Sub TestNumbering()
     Dim ex As IgtExample, back As IgtExample
     Dim where As Range
     Dim t1 As Table, t2 As Table
-    Dim numPara As Paragraph
+    Dim numPara As Paragraph, numLine As Paragraph
     Dim hang As Double
-    Dim indent As Double
+    Dim indent As Double, w As Double
     Dim savedQuiet As Boolean
 
     savedQuiet = gQuiet
@@ -2409,26 +2412,35 @@ Private Sub TestNumbering()
     Ok "and nothing was reported about the numbering", (gRenderError = "")
     If gRenderError <> "" Then Emit "         " & gRenderError
 
+    '-- the number is a first column ------------------------------------------
+    Ok "the example has a number column", HasNumberColumn(t1)
     Set numPara = NumberParagraphOf(t1)
-    Ok "a number line precedes the table", (Not numPara Is Nothing)
+    Ok "its first cell holds the number paragraph", (Not numPara Is Nothing)
     If Not numPara Is Nothing Then
         Ok "in the " & STYLE_EXAMPLE & " style", (numPara.Style = STYLE_EXAMPLE)
         Ok "carrying Word list numbering", _
             (numPara.Range.ListFormat.ListType <> wdListNoNumbering)
         Eq "and showing (1)", ExampleNumberString(t1), "(1)"
-        Ok "with nothing typed on it", (Len(ParaText(numPara)) = 0)
+        Ok "with nothing typed in it", (Len(ParaText(numPara)) = 0)
+        Ok "and no indent of its own", _
+            (Abs(numPara.LeftIndent) <= 0.5 And Abs(numPara.FirstLineIndent) <= 0.5)
     End If
-    Ok "no cell carries numbering", _
-        (t1.Cell(1, 1).Range.ListFormat.ListType = wdListNoNumbering)
-    indent = t1.Rows(1).LeftIndent
-    Ok "the table is indented to the number line's text position", _
-        (Abs(indent - hang) <= 0.5)
-    Emit "         row indent " & CStr(indent) & "pt, text position " & CStr(hang) & "pt"
+    Ok "no content cell carries numbering", _
+        (t1.Cell(1, 2).Range.ListFormat.ListType = wdListNoNumbering)
+    w = CellWidthOf(t1, 1, 1)
+    Ok "the number cell is as wide as the hang", (Abs(w - hang) <= 0.5)
+    Emit "         number cell " & CStr(w) & "pt, hang " & CStr(hang) & "pt"
+    Ok "every row has one", NumberCellsAre(t1, hang)
+    Ok "the rows themselves are not indented", (Abs(ExampleIndent(t1)) <= 0.5)
     indent = ParagraphAfterTable(t1).Format.LeftIndent
-    Ok "the translation is indented to it too", (Abs(indent - hang) <= 0.5)
+    Ok "the translation is indented past the number column", (Abs(indent - hang) <= 0.5)
+    Ok "the cursor on the number is inside the example", _
+        (Not FindExampleAt(t1.Cell(1, 1).Range) Is Nothing)
 
     back = ReadExampleFromTable(t1)
     Eq "the first cell's text is just the form", back.Cells(0, 0), "vu=ve"
+    Ok "and the read-back counts no number column", (back.ColCount = ex.ColCount)
+    Ok "nor does TableColumnCount", (TableColumnCount(t1) = ex.ColCount)
 
     Set where = doc.Content
     where.Collapse wdCollapseEnd
@@ -2443,43 +2455,46 @@ Private Sub TestNumbering()
     If doc.Tables.Count = 2 Then
         Eq "re-wrap keeps (1) on the first", ExampleNumberString(doc.Tables(1)), "(1)"
         Eq "and (2) on the second", ExampleNumberString(doc.Tables(2)), "(2)"
-        Ok "and did not add number lines", (CountParagraphsInStyle(doc, STYLE_EXAMPLE) = 2)
+        Ok "and each still has exactly one number paragraph", _
+            (CountParagraphsInStyle(doc, STYLE_EXAMPLE) = 2)
 
-        ' An indent change on the number line re-wraps through.
-        Set numPara = NumberParagraphOf(doc.Tables(1))
-        If Not numPara Is Nothing Then
-            numPara.LeftIndent = 72
-            RewrapDocument doc, False
-            indent = doc.Tables(1).Rows(1).LeftIndent
-            Ok "a wider indent on the number line moves the table on re-wrap", _
-                (Abs(indent - 72) <= 0.5)
-            indent = ParagraphAfterTable(doc.Tables(1)).Format.LeftIndent
-            Ok "and the translation with it", (Abs(indent - 72) <= 0.5)
-        End If
+        '-- the example's indent is its rows' indent, and a re-wrap keeps it --
+        On Error Resume Next
+        doc.Tables(1).Rows.LeftIndent = 72
+        Err.Clear
+        On Error GoTo 0
+        RewrapDocument doc, False
+        indent = ExampleIndent(doc.Tables(1))
+        Ok "an indent on the rows survives a re-wrap", (Abs(indent - 72) <= 0.5)
+        Emit "         rows at " & CStr(indent) & "pt"
+        indent = ParagraphAfterTable(doc.Tables(1)).Format.LeftIndent
+        Ok "and the translation sits past the indent and the number", _
+            (Abs(indent - 72 - hang) <= 0.5)
+        Eq "and the number is still (1)", ExampleNumberString(doc.Tables(1)), "(1)"
 
         DeleteExample doc.Tables(1)
         Ok "deleting the first example leaves one table", (doc.Tables.Count = 1)
-        Ok "and one number line", (CountParagraphsInStyle(doc, STYLE_EXAMPLE) = 1)
+        Ok "and one number paragraph", (CountParagraphsInStyle(doc, STYLE_EXAMPLE) = 1)
         If doc.Tables.Count = 1 Then
             Eq "and Word renumbers it (1)", ExampleNumberString(doc.Tables(1)), "(1)"
         End If
     End If
 
-    '-- turned off, a new example has no number line ---------------------------
+    '-- turned off, a new example has no number column ------------------------
     SetSettingNumberExamples doc, False
     Set where = doc.Content
     where.Collapse wdCollapseEnd
     Set t2 = RenderExample(ex, where)
     Ok "with numbering off, a new example draws", (Not t2 Is Nothing)
     If Not t2 Is Nothing Then
-        Ok "and has no number line", (NumberParagraphOf(t2) Is Nothing)
-        indent = t2.Rows(1).LeftIndent
-        Ok "and is not indented", (Abs(indent) <= 0.5)
+        Ok "and has no number column", (Not HasNumberColumn(t2))
+        Ok "and is not indented", (Abs(ExampleIndent(t2)) <= 0.5)
+        Ok "and its first cell is content", (TableColumnCount(t2) = ex.ColCount)
     End If
     SetSettingNumberExamples doc, True
     CloseNoSave doc
 
-    '-- a wrapped example: every wrap line is indented ------------------------
+    '-- a wrapped example: every wrap line starts past the number column ------
     Set doc = NewBlankDoc()
     If doc Is Nothing Then
         gQuiet = savedQuiet
@@ -2492,16 +2507,67 @@ Private Sub TestNumbering()
     If Not t1 Is Nothing Then
         Ok "and it did wrap", (t1.Rows.Count > 2)
         If t1.Rows.Count > 2 Then
-            indent = t1.Rows(1).LeftIndent
-            Ok "the first wrap line is indented by the text position", _
-                (Abs(indent - hang) <= 0.5)
-            indent = t1.Rows(3).LeftIndent
-            Ok "and so is a later one", (Abs(indent - hang) <= 0.5)
+            Ok "the first wrap line has the number cell", _
+                (Abs(CellWidthOf(t1, 1, 1) - hang) <= 0.5)
+            Ok "and so does a later one, empty", _
+                (Abs(CellWidthOf(t1, 3, 1) - hang) <= 0.5 And _
+                 Len(CleanText(CellTextOf(t1, 3, 1))) = 0)
+            Eq "and the number is (1)", ExampleNumberString(t1), "(1)"
+        End If
+    End If
+    CloseNoSave doc
+
+    '-- the earlier design migrates: a number line above the table -----------
+    ' Examples drawn before the number moved into the table have a numbered
+    ' LingTeX Example paragraph above them. A re-wrap must move the number in
+    ' and take the line away, not number them twice.
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        gQuiet = savedQuiet
+        Exit Sub
+    End If
+    EnsureStyles doc, True
+    SetSettingNumberExamples doc, False
+    On Error Resume Next
+    doc.Content.InsertParagraphAfter                 ' two empty paragraphs
+    Err.Clear
+    On Error GoTo 0
+    Set t1 = RenderExample(ex, doc.Range(1, 1))       ' the table in the second
+    SetSettingNumberExamples doc, True
+    Ok "legacy: an unnumbered example drew after a paragraph", _
+        (Not t1 Is Nothing) And (Not HasNumberColumn(t1))
+    If Not t1 Is Nothing Then
+        On Error Resume Next
+        Set numLine = doc.Paragraphs(1)
+        numLine.Style = doc.Styles(STYLE_EXAMPLE)     ' as the old design drew it
+        numLine.LeftIndent = hang
+        numLine.FirstLineIndent = -hang
+        Err.Clear
+        On Error GoTo 0
+        Ok "legacy: the number line is recognised", _
+            (Not LegacyNumberLineOf(t1) Is Nothing)
+        Set t2 = RewrapTable(t1)
+        Ok "re-wrapping moves the number into the table", _
+            (Not t2 Is Nothing) And HasNumberColumn(t2)
+        If Not t2 Is Nothing Then
+            Eq "and it reads (1)", ExampleNumberString(t2), "(1)"
+            Ok "and the number line is gone", _
+                (CountParagraphsInStyle(doc, STYLE_EXAMPLE) = 1)
+            Ok "and the example is not indented", (Abs(ExampleIndent(t2)) <= 0.5)
         End If
     End If
     CloseNoSave doc
     gQuiet = savedQuiet
 End Sub
+
+' Every row's first cell is the number cell: as wide as the hang.
+Private Function NumberCellsAre(tbl As Table, ByVal hang As Double) As Boolean
+    Dim r As Long
+    For r = 1 To tbl.Rows.Count
+        If Abs(CellWidthOf(tbl, r, 1) - hang) > 0.5 Then Exit Function
+    Next r
+    NumberCellsAre = True
+End Function
 
 Private Function CountParagraphsInStyle(doc As Document, ByVal nm As String) As Long
     Dim para As Paragraph
