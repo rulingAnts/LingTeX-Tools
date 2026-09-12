@@ -112,6 +112,9 @@ requests.
   by-hand pass from 3c/3e/3f. Then `SaveAsTemplate` + `tools/build-dotm.sh` +
   `tools/check-dotm.sh`, then packaging.
 - Later, wanted by Seth: a settings interface (gaps, styles) -- Phase 2 form.
+- Later, per Seth: revisit the source-agnostic input model for Toolbox/SFM,
+  Excel/Numbers pastes and the Phase 2 hand-typed data sheet -- the FLEx-shaped
+  assumptions are listed in README, *Later*. FieldWorks data first.
 - Later, wanted by Seth: every spacing a user might set (before/after an
   example, between tiers, rows-to-translation, plus the three existing gaps)
   behind one interface; and inserting every example of a multi-block FLEx
