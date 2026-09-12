@@ -85,31 +85,20 @@ requests.
 
 ## State of play
 
-- `RunAllTests`: **79/79** on Mac Word 16.112, with `SettleDebugPrint` in `Emit`.
-- `RunDocTests`: runs. With the `Debug.Print` fix the sections styles, stylecollide,
-  settings, measure, agreement, rendering, geometry, scratch and roundtrip were
-  seen passing in the Immediate window (no report file yet, see next). It then
-  stopped on *Compile error: Variable not defined* at `wdStyleTableGrid` in
-  `ChangeTableStyle` (commands section) — fixed by name. Everything after that
-  point (rest of commands, events, the leak check) is unproven.
-- A crashed section used to close `Documents(Documents.Count)`, which on Mac
-  was the document holding the code — the run ended silently with no report.
-  `CloseAllScratchDocs` now closes only documents that were not open at the
-  start and never `ThisDocument`. Leaked blank `DocumentNN` windows from earlier
-  crashed runs can simply be closed.
-- Seth's observations on the rendered example (from an earlier run's leak): no
-  free-translation row appeared below the table, and nothing exercises wrapping
-  yet. Check both against the RunDocTests report once it is green.
-- Each phase is also run on Windows (Parallels) by Seth with `run-in-word.ps1`
-  before moving on; Claude does not drive the VM.
-- Then: the by-hand checks in `TESTING.md`, `SaveAsTemplate` +
-  `tools/build-dotm.sh` + `tools/check-dotm.sh`, then packaging (the plan is
-  summarised in QUICKSTART's *Status* and README's *Roadmap*).
-- Health pass done (2026-09-12): `TypeCheck`, `DiagnoseWrap` and `MicroDiagnose`
-  are gone from `modTests`; `DebugPrintDiagnose` is the one diagnostic left.
-- The `.docm` is NEVER committed (it was once, by force): each machine's copy
-  carries its own `SRC_FOLDER`, and the Mac one pulled onto Windows pointed the
-  Windows import at a stale clone, which is what an untagged report name means.
-- Reports are committed, one file per platform (`RunDocTests.mac.txt`,
-  `RunDocTests.win.txt`); both runners commit and push their own platform's
-  files after a run, so `git pull` and read them -- no pasting.
+- **Stage 1 and stage 2 pass on both platforms** (2026-09-12): `RunAllTests`
+  79/79 and `RunDocTests` 224/224 on Mac Word 16.112 and on Word for Windows.
+  The reports are in `LingTeX-Word-reports/*.mac.txt` and `*.win.txt`.
+- Next gate: the by-hand checklist, `TESTING.md` section 3, on both platforms.
+  Seth walks it; anything that fails there is the next thing to fix. Seth's two
+  earlier observations to check there: whether the free-translation row appears
+  under an inserted example (the suite says one styled paragraph per free
+  translation, but look), and the wrapping of the long sample.
+- Then `SaveAsTemplate` + `tools/build-dotm.sh` + `tools/check-dotm.sh`, then
+  packaging (QUICKSTART *Status*, README *Status*).
+- The `.docm` is NEVER committed (it was once, by force): each machine keeps its
+  own. `modImport` now reads `src/` from beside the document, so a freshly pasted
+  copy needs no path; the import log's `from` line says where it read from.
+- Reports are committed, one file per platform; both runners commit and push
+  their own platform's files after a run, so `git pull` and read them.
+- Health pass done: `TypeCheck`, `DiagnoseWrap`, `MicroDiagnose` are gone from
+  `modTests`; `DebugPrintDiagnose` is the one diagnostic left.

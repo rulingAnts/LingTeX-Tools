@@ -484,14 +484,15 @@ it.
 
 ## Status
 
-**Both suites pass on Word 16.112 for Mac: `RunAllTests` 79/79 and `RunDocTests`
-218/218** (2026-09-12) — every parsing, projection, routing, column-editing,
+**Both suites pass on BOTH platforms: `RunAllTests` 79/79 and `RunDocTests`
+224/224**, on Word 16.112 for Mac and on Word for Windows (2026-09-12) — every parsing, projection, routing, column-editing,
 Leipzig-check, gloss-detection and wrap-planning assertion, and then styles,
 settings, measurement, render/measure agreement, rendering, page geometry, the
 scratch document, the round trip (including re-wrapping down to six rows on a
 narrow page and back up to two), the commands and the save/selection events, all
-inside real Word. The one-command runner (`tools/run-in-word.sh`) proves it
-without a person in the loop. The same run on Windows is the next gate.
+inside real Word. The one-command runners (`tools/run-in-word.sh`, `.ps1`) prove
+it without a person in the loop and commit each platform's reports to
+`LingTeX-Word-reports/`.
 
 Getting there found real bugs that the JavaScript harness structurally could not:
 `any` used as a variable name (reserved in VBA), `IsGramGloss` accepting `P.N.`,
@@ -503,8 +504,8 @@ bootstrap installs double-spaced on Mac, and the Overflow that was blamed on
 `Single` and turned out to be `Debug.Print` — see *The `Single` failure* below.
 Each has a linter rule now.
 
-Still to do, in order: the same two suites on Windows; the by-hand checks in
-`TESTING.md`; `SaveAsTemplate` with `tools/build-dotm.sh` and
+Still to do, in order: the by-hand checks in `TESTING.md` section 3, on both
+platforms; `SaveAsTemplate` with `tools/build-dotm.sh` and
 `tools/check-dotm.sh`; then packaging.
 
 ---
