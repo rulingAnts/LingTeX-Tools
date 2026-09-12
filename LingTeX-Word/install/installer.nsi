@@ -7,7 +7,7 @@
 ; "downloaded from the internet" mark, so Word does not block its macros.
 ;
 ; Built in CI with makensis (.github/workflows/lingtex-word-release.yml):
-;   makensis -DVERSION=0.1.0-beta.1 -DDOTM=/path/to/LingTeX-Word.dotm installer.nsi
+;   makensis -DVERSION=0.1.0-beta.1 -DDOTM=/path/to/LingTeX-Word.dotm -DOUT=/path/to/Setup.exe installer.nsi
 
 !ifndef VERSION
   !define VERSION "0.0.0"
@@ -15,11 +15,14 @@
 !ifndef DOTM
   !define DOTM "..\LingTeX-Word.dotm"
 !endif
+!ifndef OUT
+  !define OUT "LingTeX-Word-Setup.exe"
+!endif
 
 !include "MUI2.nsh"
 
 Name "LingTeX-Word"
-OutFile "LingTeX-Word-Setup.exe"
+OutFile "${OUT}"
 Unicode true
 RequestExecutionLevel user
 InstallDir "$APPDATA\Microsoft\Word\STARTUP"

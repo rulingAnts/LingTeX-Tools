@@ -57,7 +57,7 @@ jobs:
           mkdir -p out
           makensis -V2 -DVERSION="$VERSION" \
             -DDOTM="$PWD/LingTeX-Word/LingTeX-Word.dotm" \
-            -XOutFile "$PWD/out/LingTeX-Word-Setup.exe" \
+            -DOUT="$PWD/out/LingTeX-Word-Setup.exe" \
             LingTeX-Word/install/installer.nsi
           ls -la out
 
