@@ -19,6 +19,11 @@
 #           --open / --no-open   open the file as a document first, or not; the
 #                         default is not for a .dotm (loaded from STARTUP) and
 #                         yes for a .docm
+#           --fresh       restart Word with the engine NOT loaded, then import:
+#                         quits Word (it asks about unsaved documents), hides the
+#                         engine file while Word starts, puts it back, and the
+#                         import goes into an engine opened as a document. The
+#                         way out when a loaded engine will not compile.
 #
 # REPORTS ARE COMMITTED.  Each platform writes its own files (RunAllTests.mac.txt
 # here, RunAllTests.win.txt from the PowerShell twin), so they never overwrite
@@ -66,7 +71,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
 conf="$root/build/runner.conf"
 
-pull=1; import=1; tests=both; doc=""; extra=""; want=""; commit=1
+pull=1; import=1; tests=both; doc=""; extra=""; want=""; commit=1; fresh=0
 for a in "$@"; do
     if [ "$want" = macro ]; then extra="$extra $a"; want=""; continue; fi
     case "$a" in
@@ -75,6 +80,7 @@ for a in "$@"; do
         --no-import) import=0 ;;
         --no-commit) commit=0 ;;
         --open|--no-open) ;;
+        --fresh)     fresh=1 ;;
         --tests)     tests=NEXT ;;
         all|doc|both) if [ "$tests" = NEXT ] || [ "$tests" = both ]; then tests=$a; fi ;;
         -h|--help)   sed -n '2,30p' "$0"; exit 0 ;;
@@ -195,6 +201,28 @@ if ! osascript -e 'tell application "System Events" to count processes' >/dev/nu
     echo "   note: System Events is not reachable, so dialogs will not be read or"
     echo "         dismissed. Grant Accessibility permission to this terminal in"
     echo "         System Settings > Privacy & Security > Accessibility."
+fi
+
+if [ "$fresh" = 1 ]; then
+    echo "== fresh start: quitting Word (answer its save prompts if any)"
+    osascript -e 'tell application "Microsoft Word" to quit' >/dev/null 2>&1
+    n=0
+    while pgrep -x "Microsoft Word" >/dev/null 2>&1; do
+        sleep 1; n=$((n+1))
+        [ "$n" -ge 90 ] && { echo "   Word did not quit; quit it yourself and run this again." >&2; exit 1; }
+    done
+    if [ -f "$doc" ]; then
+        mv "$doc" "$doc.hold"
+        echo "   engine hidden while Word starts"
+    fi
+    open -a "Microsoft Word"
+    n=0
+    until osascript -e 'tell application "Microsoft Word" to count documents' >/dev/null 2>&1; do
+        sleep 1; n=$((n+1))
+        [ "$n" -ge 90 ] && break
+    done
+    sleep 2
+    [ -f "$doc.hold" ] && mv "$doc.hold" "$doc" && echo "   engine back in place; the import will open it as a document"
 fi
 
 echo "== Word: $(basename "$doc")"

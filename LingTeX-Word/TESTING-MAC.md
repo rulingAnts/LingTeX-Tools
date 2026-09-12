@@ -337,6 +337,23 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
 
 ---
 
+## If the engine will not compile at Word start
+
+"Compile error in hidden module: modLingTeX" (or another module) at every
+Word start, load, unload and command means the engine on disk holds a module
+Word cannot compile, and Word cannot be got past the dialog to repair it.
+Save your documents, then:
+
+```bash
+sh LingTeX-Word/tools/run-in-word.sh --fresh
+```
+
+It quits Word, hides the engine while Word starts so nothing loads, puts it
+back, and imports the current `src/` into it as a document, where nothing
+compiles until it has been replaced; then loads it and runs the suites. With
+the dev template's current `AutoExec` this cannot recur: the engine is only
+loaded at Word start when the last run was green (`build/engine-ok`).
+
 ## Known, and accepted for now
 
 - **Re-wrap All over twenty examples takes a few seconds with the busy
