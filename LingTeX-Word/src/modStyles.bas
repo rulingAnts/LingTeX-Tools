@@ -56,6 +56,12 @@ Public Const STYLE_GRAM As String = "LingTeX Gram Gloss"
 ' example is deleted or moved, cross-references can point at it, and linking
 ' its level 1 to Heading 1 (then NumberLevel 2) restarts it per chapter.
 Public Const STYLE_NUMBER As String = "LingTeX Example Number"
+' The paragraph ABOVE an example's table: the numbered item the example is the
+' body of. Its style carries the list numbering (linked to STYLE_NUMBER), keeps
+' with the table, and is where the example's number lives -- never in a cell.
+' The table and the translation are indented to its text position. A heading
+' or a short caption can be typed after the number on that line.
+Public Const STYLE_EXAMPLE As String = "LingTeX Example"
 
 ' Module-level state lives HERE, above the first procedure, or it does not exist:
 ' VBA's declarations section ends at the first Sub/Function, and a variable or
@@ -74,7 +80,7 @@ Private mCreatedStyle As Boolean
 ' settings live so it survives save and reopen. Versioned, so a future change to
 ' the style set re-runs rather than trusting a stale mark.
 Private Const STYLES_MADE_VAR As String = "LingTeX_StylesMade"
-Private Const STYLES_VERSION As String = "1-num"
+Private Const STYLES_VERSION As String = "1-num2"
 
 
 '-- Last-resort font when the document reports only a theme placeholder.
@@ -152,6 +158,7 @@ Public Sub EnsureStyles(doc As Document, Optional ByVal force As Boolean = False
     EnsureGramStyle doc, bodyFont
     EnsureTableStyle doc
     EnsureNumberListStyle doc
+    EnsureExampleParaStyle doc
 
     createdAny = mCreatedStyle
 
@@ -349,6 +356,41 @@ Private Sub EnsureNumberListStyle(doc As Document)
         .NumberPosition = 0
         .TextPosition = hang
         .TabPosition = hang
+    End With
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' The number-line paragraph style. Based on Normal, keeps with the table that
+' follows it, no space after (the table is its body), and linked to the
+' example-number list style so applying it numbers the paragraph. If the link
+' cannot be made the number is applied to each paragraph directly instead.
+Private Sub EnsureExampleParaStyle(doc As Document)
+    Dim st As Style
+    If StyleExistsOfType(doc, STYLE_EXAMPLE, wdStyleTypeParagraph) Then Exit Sub
+    If StyleExists(doc, STYLE_EXAMPLE) Then Exit Sub
+
+    On Error Resume Next
+    Set st = doc.Styles.Add(Name:=STYLE_EXAMPLE, Type:=wdStyleTypeParagraph)
+    If Not st Is Nothing Then mCreatedStyle = True
+    Err.Clear
+    On Error GoTo 0
+    If st Is Nothing Then Exit Sub
+
+    On Error Resume Next
+    With st
+        .BaseStyle = doc.Styles(wdStyleNormal)
+        With .ParagraphFormat
+            .KeepWithNext = True
+            .SpaceBefore = 6
+            .SpaceAfter = 0
+            .WidowControl = False
+        End With
+        .NextParagraphStyle = doc.Styles(wdStyleNormal)
+        If StyleExistsOfType(doc, STYLE_NUMBER, wdStyleTypeList) Then
+            .LinkToListTemplate ListTemplate:=doc.Styles(STYLE_NUMBER).ListTemplate, _
+                                ListLevelNumber:=1
+        End If
     End With
     Err.Clear
     On Error GoTo 0
