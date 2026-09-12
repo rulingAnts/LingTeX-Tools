@@ -48,12 +48,11 @@ no automated suite can reach: what the thing actually looks like on the page.
    ordinary — `~/Desktop/lingtex-test.docx`. It has to be saved before the
    save-hook checks in pass 5 mean anything.
 
-3. **Arm the hooks.** Run **`LingTeXStart`** (Word for Mac's Macros dialog
-   does not list `AutoExec`, which is what it calls). That attaches the save
-   and selection handlers and keeps AutoCorrect out of cells. Every command
-   arms them on first use as well, and the test runner arms them at the end
-   of every run, so this is only needed after restarting Word if the first
-   thing you do is save.
+3. **The hooks arm themselves.** The engine's `AutoExec` attaches the save
+   and selection handlers when Word loads it, every command arms them on
+   first use, and the runner arms them at the end of every run. `LingTeXStart`
+   stays in the macro list for one case: a command interrupted mid-way can
+   leave the busy flag set, and running it clears that.
 
 4. **Put the sample somewhere you can copy it from.** Open
    `LingTeX-Word/samples/checklist-sample.txt` in TextEdit — the three-line FLEx

@@ -299,13 +299,6 @@ def ic_settings():
     return im
 
 
-def ic_start():
-    im = canvas(); d = ImageDraw.Draw(im)
-    disc(d, GREEN)
-    arrow(d, [(23, 17), (23, 47), (48, 32)], WHITE)
-    return im
-
-
 def ic_reset_styles():
     im = canvas(); d = ImageDraw.Draw(im)
     disc(d, ORANGE)
@@ -365,7 +358,6 @@ ICONS = [
     ("igtNumbers", ic_numbers, 32),
     ("igtInitialCap", ic_initial_cap, 32),
     ("igtSettings", ic_settings, 32),
-    ("igtStart", ic_start, 32),
     ("igtResetStyles", ic_reset_styles, 32),
     ("igtInstallKeys", ic_install_keys, 32),
     ("igtShowKeys", ic_show_keys, 32),
