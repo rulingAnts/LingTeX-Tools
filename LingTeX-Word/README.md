@@ -149,7 +149,8 @@ applies: deleting or moving an example renumbers the rest, a cross-reference
 can point at it, and you can put that paragraph on a bullet, on a level of your
 outline numbering, or change its indent — re-wrap leaves the line exactly as it
 is and lays the example out to whatever its indent has become. A short heading
-or caption can be typed after the number on that line. `LingTeXToggleExampleNumbers`
+or caption can be typed after the number on that line, and every command
+treats the cursor on that line as being inside the example. `LingTeXToggleExampleNumbers`
 decides only whether *new* examples get a number line; the `NumberHang` setting
 (36 pt) only seeds the list style's indent when it is first created.
 
