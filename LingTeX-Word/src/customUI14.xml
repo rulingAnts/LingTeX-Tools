@@ -51,31 +51,35 @@
         </group>
 
         <group id="LingTeXLayoutGroup" label="Layout">
-          <button id="LingTeXRewrapAll"
-                  label="Re-wrap All"
-                  size="large"
-                  image="igtRewrapAll"
-                  onAction="RbnRewrapAll"
-                  screentip="Re-wrap every example in the document"
-                  supertip="Also runs automatically when the document is saved. Turn that off with the LingTeX_RewrapOnSave document variable."/>
-          <button id="LingTeXRewrapCurrent"
-                  label="Re-wrap This"
-                  image="igtRewrapThis"
-                  onAction="RbnRewrapCurrent"
-                  screentip="Re-wrap the example at the cursor"
-                  supertip="Recomputes the wrap from scratch, so columns move down when space runs out and back up when it is freed -- after a margin, font or orientation change, or an edit."/>
-          <button id="LingTeXIndent"
-                  label="Indent"
-                  image="igtIndent"
-                  onAction="RbnIndent"
-                  screentip="Move the example half an inch to the right"
-                  supertip="The number and the translation move with it, and the example is re-wrapped to the narrower line. The indent is the table's own left indent, so the ruler works too."/>
-          <button id="LingTeXOutdent"
-                  label="Outdent"
-                  image="igtOutdent"
-                  onAction="RbnOutdent"
-                  screentip="Move the example half an inch to the left"
-                  supertip="Stops at the margin."/>
+          <!-- Two stacks of two (a bare group would stack small buttons three high). -->
+          <box id="LingTeXRewrapBox" boxStyle="vertical">
+            <button id="LingTeXRewrapAll"
+                    label="Re-wrap All"
+                    image="igtRewrapAll"
+                    onAction="RbnRewrapAll"
+                    screentip="Re-wrap every example in the document"
+                    supertip="Also runs automatically when the document is saved. Turn that off with the LingTeX_RewrapOnSave document variable."/>
+            <button id="LingTeXRewrapCurrent"
+                    label="Re-wrap This"
+                    image="igtRewrapThis"
+                    onAction="RbnRewrapCurrent"
+                    screentip="Re-wrap the example at the cursor"
+                    supertip="Recomputes the wrap from scratch, so columns move down when space runs out and back up when it is freed -- after a margin, font or orientation change, or an edit."/>
+          </box>
+          <box id="LingTeXIndentBox" boxStyle="vertical">
+            <button id="LingTeXIndent"
+                    label="Indent"
+                    image="igtIndent"
+                    onAction="RbnIndent"
+                    screentip="Move the example half an inch to the right"
+                    supertip="The number and the translation move with it, and the example is re-wrapped to the narrower line. The indent is the table's own left indent, so the ruler works too."/>
+            <button id="LingTeXOutdent"
+                    label="Outdent"
+                    image="igtOutdent"
+                    onAction="RbnOutdent"
+                    screentip="Move the example half an inch to the left"
+                    supertip="Stops at the margin."/>
+          </box>
         </group>
 
         <group id="LingTeXAlignGroup" label="Alignment">
