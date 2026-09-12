@@ -30,19 +30,19 @@ disagree.
 
 ## 2. Publish
 
-GitHub → Actions → **LingTeX-Word pre-release** → Run workflow, with a label
-such as `beta.1`. The workflow re-runs `check-dotm.sh`, builds
+Push a tag from the commit that holds the template:
+
+```bash
+git tag word-v0.1.0-beta.1 && git push origin word-v0.1.0-beta.1
+```
+
+(Or, once the workflow file is on the default branch, GitHub → Actions →
+**LingTeX-Word pre-release** → Run workflow, with a label such as `beta.1`.) The workflow re-runs `check-dotm.sh`, builds
 `LingTeX-Word-Setup-word-v0.1.0-<label>.exe` with NSIS (`install/installer.nsi`),
 packs `LingTeX-Word-word-v0.1.0-<label>-windows.zip` (template, `install.bat`,
 `install.ps1`, `INSTALL.md`) and `-macos.zip` (template, `install.command`,
 `install.sh`, `INSTALL.md`), and publishes them as a pre-release tagged
-`word-v0.1.0-<label>`. Or from a terminal:
-
-```bash
-gh workflow run lingtex-word-release.yml -f label=beta.1
-```
-
-## 3. Verify the release itself, on each platform
+`word-v0.1.0-<label>`. ## 3. Verify the release itself, on each platform
 
 Not the dev rig: the zip a user would download.
 
