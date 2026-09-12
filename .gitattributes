@@ -32,3 +32,7 @@
 # Shell scripts and AppleScript must stay LF even on Windows clones.
 *.sh            text eol=lf
 *.applescript   text eol=lf
+# Windows installers keep Windows line endings on every checkout, the CI runner included.
+LingTeX-Word/install/*.bat text eol=crlf
+LingTeX-Word/install/*.ps1 text eol=crlf
+LingTeX-Word/install/*.nsi text eol=crlf
