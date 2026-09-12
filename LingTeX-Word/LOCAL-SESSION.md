@@ -118,6 +118,11 @@ requests.
   by-hand pass from 3c/3e/3f. Then `SaveAsTemplate` + `tools/build-dotm.sh` +
   `tools/check-dotm.sh`, then packaging.
 - Later, wanted by Seth: a settings interface (gaps, styles) -- Phase 2 form.
+- Later, per Seth: convert-table lets the user mark bottom rows as free
+  translations (today: a row merged to one cell is the translation, and the
+  command now says so when none is found), and a table-from-text step before
+  it (space-separated lines, one per tier) -- possibly instead of the
+  data-sheet form. README, *Later*.
 - Later, per Seth: toggle an existing example between word- and
   morpheme-aligned in place -- split every boundary / merge every continuation
   column, then redraw; and in bulk over a selection (Outline view selects a

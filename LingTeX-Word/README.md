@@ -414,6 +414,19 @@ file. CI verifies rather than builds: it unzips the `.dotm`, diffs the embedded
 ribbon against `src/customUI14.xml`, and checks the manifest, so a template that
 has drifted from the sources fails the release.
 
+**Later — convert-table, finished.** `LingTeXConvertTableToIgt` adopts a hand-made
+or pasted table: one row per tier, and **a row whose cells are merged into a
+single cell is taken as the free translation** (it reads the table as TSV, and
+an untabbed line is a translation); with no such row it says so and how to add
+one. Two additions would make it the way most non-FieldWorks examples come in,
+and might make the Phase 2 data-sheet form unnecessary. First, let the user say
+which of the bottom rows are free translations (one or more, by language)
+rather than rely on the merged-row convention. Second, a step before it:
+**table from text** — the user types or pastes the example as ordinary lines,
+words separated by spaces, one line per tier, corresponding word for word but
+not aligned; the step splits each line on whitespace into a table (a longer
+line padding the shorter), and convert-table takes it from there.
+
 **Later — switch an example's alignment in place.** Today the alignment
 (by word or by morpheme) is chosen when an example is inserted; changing it
 means inserting again. The data supports switching without that: a

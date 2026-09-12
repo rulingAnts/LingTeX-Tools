@@ -138,7 +138,7 @@ Free Eng (When) she picked her yams early.
 | Change a table's style away from `LingTeX Interlinear` → `LingTeXRewrapAll` leaves it alone (the escape hatch) | ☐ | ☐ |
 | Restyle the `LingTeX Gloss` paragraph style → **every** example in the document updates | ☐ | ☐ |
 | Two examples with one empty paragraph between them, and two with only the translation between → `LingTeXRewrapAll` re-wraps both and deletes nothing | ☐ | ☐ |
-| `LingTeXConvertTableToIgt` on a plain two-row table → becomes an auto-wrapping example | ☐ | ☐ |
+| `LingTeXConvertTableToIgt` on a plain two-row table → becomes an auto-wrapping example. A row merged into a single cell is taken as the free translation; with none, the command says so and how to add one | ☐ | ☐ |
 | Our own TSV, copied out of a rendered example and pasted back in, reproduces the same grid | ☐ | ☐ |
 
 ### 3f. Undo and robustness

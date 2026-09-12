@@ -233,6 +233,43 @@ End Function
 '-----------------------------------------------------------------------------
 Public Function RewrapTable(tbl As Table) As Table
     Dim ex As IgtExample
+
+    gRenderError = ""
+    If tbl Is Nothing Then Exit Function
+
+    ex = ReadExampleFromTable(tbl)
+    If ex.TierCount = 0 Or ex.ColCount = 0 Then
+        gRenderError = "the table could not be read as an interlinear example"
+        Exit Function
+    End If
+
+    ' Absorb the free-translation paragraphs that belong to this example, so they
+    ' are rewritten rather than duplicated.
+    AbsorbFreeParagraphs ex, tbl
+
+    Set RewrapTable = RedrawExampleAt(tbl, ex)
+End Function
+
+'-----------------------------------------------------------------------------
+' Replace the table (and its translations) with a fresh drawing of ex. The one
+' definition of "delete and redraw", used by re-wrap, split, merge and fix.
+'
+' PLAN BEFORE DELETING. Re-wrapping cannot draw the new table until the old one
+' is gone, so a failure after the delete destroys the user's example -- and in
+' RewrapDocument and the selection-change handler that raise is swallowed, so it
+' destroys it silently. Planning first means every failure that can be
+' anticipated is found while the table is still on the page. It is also what
+' keeps the undo record whole: planning measures, measuring touches the hidden
+' scratch document, and the record must not open until that is done (see
+' modLingTeX.BeginUndo). So: plan, open the record, delete, draw.
+'
+' Planned against the paragraph AFTER the table, never against tbl.Range.
+' AvailableTextWidth treats a range inside a table as "the cell is the
+' container" and returns that cell's width -- correct when inserting into a
+' cell, and exactly wrong here, where it made every re-wrap plan against a few
+' points of budget.
+'-----------------------------------------------------------------------------
+Public Function RedrawExampleAt(tbl As Table, ex As IgtExample) As Table
     Dim doc As Document
     Dim anchor As Range
     Dim startPos As Long
@@ -246,29 +283,6 @@ Public Function RewrapTable(tbl As Table) As Table
     If tbl Is Nothing Then Exit Function
     Set doc = tbl.Range.Document
 
-    ex = ReadExampleFromTable(tbl)
-    If ex.TierCount = 0 Or ex.ColCount = 0 Then
-        gRenderError = "the table could not be read as an interlinear example"
-        Exit Function
-    End If
-
-    ' Absorb the free-translation paragraphs that belong to this example, so they
-    ' are rewritten rather than duplicated.
-    AbsorbFreeParagraphs ex, tbl
-
-    '-- PLAN BEFORE DELETING -----------------------------------------------
-    ' This order is the whole point. Re-wrapping cannot draw the new table until
-    ' the old one is gone, so a failure after the delete destroys the user's
-    ' example -- and in RewrapDocument and the selection-change handler that raise
-    ' is swallowed, so it destroys it silently. Planning first means every failure
-    ' that can be anticipated is found while the table is still on the page.
-    ' Planned against the paragraph AFTER the table, never against tbl.Range.
-    ' AvailableTextWidth treats a range inside a table as "the cell is the
-    ' container" and returns that cell's width -- correct when inserting into a
-    ' cell, and exactly wrong here, where it made every re-wrap plan against a few
-    ' points of budget. Before planning moved ahead of the delete, the old table was
-    ' already gone at this point and the anchor was outside it; the reorder that
-    ' made re-wrapping safe quietly changed what the budget was measured from.
     If Not PlanExample(ex, RangeAfterTable(tbl), doc, interTiers, nInter, colW, _
                        lineStarts, nLines, maxCols, why) Then
         gRenderError = why
@@ -284,8 +298,8 @@ Public Function RewrapTable(tbl As Table) As Table
     ' Past this point the old table is gone, so a failure here has to leave the
     ' content behind in SOME form rather than nothing at all.
     On Error GoTo DrawFailed
-    Set RewrapTable = DrawExample(ex, anchor, doc, interTiers, nInter, _
-                                  colW, lineStarts, nLines, maxCols)
+    Set RedrawExampleAt = DrawExample(ex, anchor, doc, interTiers, nInter, _
+                                      colW, lineStarts, nLines, maxCols)
     Exit Function
 
 DrawFailed:

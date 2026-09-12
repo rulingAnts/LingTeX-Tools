@@ -36,6 +36,16 @@ Private mEvents As clsAppEvents
 ' not yet opened. See BeginUndo.
 Private mPendingUndoLabel As String
 
+' Keyboard shortcuts, letter=command. Installed by LingTeXInstallShortcuts as
+' Ctrl+Alt+letter on Windows, which is Cmd+Option+letter on Mac (wdKeyControl
+' is the Command key there). Letters chosen to stay clear of Word's own
+' Ctrl+Alt / Cmd+Option bindings and of macOS system shortcuts.
+Private Const SHORTCUT_TABLE As String = _
+    "I=LingTeXInsertInterlinear|R=LingTeXRewrapCurrent|A=LingTeXRewrapAll|" & _
+    "S=LingTeXSplitColumn|M=LingTeXMergeColumns|K=LingTeXCheckExample|" & _
+    "T=LingTeXConvertTableToIgt|W=LingTeXAlignByWord|P=LingTeXAlignByMorpheme|" & _
+    "H=LingTeXShowSettings"
+
 '-----------------------------------------------------------------------------
 ' EVERY message to the user goes through Report or Confirm, never MsgBox.
 '
@@ -211,6 +221,7 @@ End Sub
 '-----------------------------------------------------------------------------
 Public Sub LingTeXConvertTableToIgt()
     Dim errNum As Long, errDesc As String
+    Dim warmed() As Double
     Dim tbl As Table
     Dim ex As IgtExample
     Dim doc As Document
@@ -259,12 +270,20 @@ Public Sub LingTeXConvertTableToIgt()
         Exit Sub
     End If
 
+    ' Styles and measurements BEFORE the undo record opens (see BeginUndo):
+    ' creating a style and measuring both write outside the record's document.
+    ' Then the record, then the delete -- which used to come first and sat in
+    ' the undo list as two or three steps of its own.
+    EnsureStyles doc
+    MeasureExample ex, doc, warmed
+
     gBusy = True
     BeginUndo "Convert table to interlinear"
     Application.ScreenUpdating = False
 
     Dim anchor As Range
     Set anchor = doc.Range(tbl.Range.Start, tbl.Range.Start)
+    StartPendingUndo
     tbl.Delete
     RenderExample ex, anchor
 
@@ -273,6 +292,18 @@ Public Sub LingTeXConvertTableToIgt()
     gBusy = False
     ReleaseScratch
 
+    ' A row merged into a single cell is what the converter takes as a free
+    ' translation (it reads the table as TSV, and an untabbed line is a
+    ' translation). Say so when there was none, rather than leaving the user
+    ' to wonder why the translation stayed inside the table (Seth, 2026-09-12).
+    If ex.FreeCount = 0 Then
+        Report "Converted. No free translation was found: a row whose cells " & _
+               "are merged into ONE cell is taken as the translation, and every " & _
+               "other row as a tier." & vbCr & vbCr & _
+               "To add one now, type it in the paragraph under the example and " & _
+               "give that paragraph the style LingTeX Free; it will be kept " & _
+               "with the example from then on.", vbInformation
+    End If
     ReportWarnings CheckExample(ex), False
     Exit Sub
 
@@ -739,17 +770,12 @@ End Sub
 
 ' Draw a model over the top of an existing table, keeping its position.
 Private Sub ReplaceTableWith(tbl As Table, ex As IgtExample)
-    Dim doc As Document
-    Dim anchor As Range
-    Dim startPos As Long
 
-    Set doc = tbl.Range.Document
-    startPos = tbl.Range.Start
-    ' modRender owns "how much of the document is this example", so there is only
-    ' one definition of it.
-    DeleteTableAndFreeLines tbl
-    Set anchor = doc.Range(startPos, startPos)
-    RenderExample ex, anchor
+    ' modRender owns "how much of the document is this example" and the order
+    ' that keeps the undo record whole (plan, open the record, delete, draw), so
+    ' there is only one definition of it. Deleting here first, as this used to,
+    ' put the delete outside the record: two or three stray undo steps.
+    RedrawExampleAt tbl, ex
 End Sub
 
 '-----------------------------------------------------------------------------
@@ -1062,6 +1088,88 @@ Public Sub LingTeXShowSettings()
 End Sub
 
 
+'=============================================================================
+' -- KEYBOARD SHORTCUTS -----------------------------------------------------
+'=============================================================================
+' Installed into the Normal template, so they work in every document, and
+' removable the same way. Word resolves a macro key binding by name when the
+' key is pressed, so the macros can live in LingTeX.docm (or the template) and
+' the binding in Normal. Added because Tools > Macro > Macros... for every one
+' of sixty-six checks was making the by-hand pass take far longer than it
+' needed to (Seth, 2026-09-12).
+
+Public Sub LingTeXInstallShortcuts()
+    Dim pairs() As String, kv() As String
+    Dim i As Long, n As Long
+    Dim errNum As Long, errDesc As String
+
+    On Error GoTo Fail
+    Application.CustomizationContext = NormalTemplate
+    pairs = Split(SHORTCUT_TABLE, "|")
+    For i = 0 To UBound(pairs)
+        kv = Split(pairs(i), "=")
+        KeyBindings.Add KeyCategory:=wdKeyCategoryMacro, Command:=kv(1), _
+                        KeyCode:=BuildKeyCode(wdKeyControl, wdKeyAlt, Asc(kv(0)))
+        n = n + 1
+    Next i
+    Report CStr(n) & " keyboard shortcuts installed in the Normal template:" & _
+           vbCr & vbCr & ShortcutList() & vbCr & _
+           "LingTeXRemoveShortcuts takes them out again.", vbInformation
+    Exit Sub
+Fail:
+    errNum = Err.Number: errDesc = Err.Description
+    Report "Could not install the shortcuts (" & CStr(errNum) & ": " & errDesc & _
+           ")." & vbCr & vbCr & "They can be set by hand: Tools > Customize " & _
+           "Keyboard..., category Macros.", vbExclamation
+End Sub
+
+Public Sub LingTeXRemoveShortcuts()
+    Dim pairs() As String, kv() As String
+    Dim i As Long, n As Long
+    Dim kb As Object
+
+    On Error Resume Next
+    Application.CustomizationContext = NormalTemplate
+    pairs = Split(SHORTCUT_TABLE, "|")
+    For i = 0 To UBound(pairs)
+        kv = Split(pairs(i), "=")
+        Set kb = FindKey(BuildKeyCode(wdKeyControl, wdKeyAlt, Asc(kv(0))))
+        If Not kb Is Nothing Then
+            If kb.Command = kv(1) Then
+                kb.Clear
+                n = n + 1
+            End If
+        End If
+    Next i
+    Err.Clear
+    On Error GoTo 0
+    Report CStr(n) & " LingTeX shortcuts removed from the Normal template.", _
+           vbInformation
+End Sub
+
+Public Sub LingTeXShowShortcuts()
+    Report "LingTeX-Word keyboard shortcuts (once LingTeXInstallShortcuts has " & _
+           "been run):" & vbCr & vbCr & ShortcutList(), vbInformation
+End Sub
+
+Private Function ShortcutList() As String
+    Dim pairs() As String, kv() As String
+    Dim i As Long
+    Dim prefix As String, s As String
+
+    If Application.PathSeparator = "/" Then
+        prefix = "Cmd+Option+"
+    Else
+        prefix = "Ctrl+Alt+"
+    End If
+    pairs = Split(SHORTCUT_TABLE, "|")
+    For i = 0 To UBound(pairs)
+        kv = Split(pairs(i), "=")
+        s = s & prefix & kv(0) & "   " & kv(1) & vbCr
+    Next i
+    ShortcutList = s
+End Function
+
 ' -- RIBBON CALLBACKS -------------------------------------------------------
 '=============================================================================
 ' The ribbon passes an IRibbonControl.  These are typed as Variant rather than
@@ -1094,4 +1202,36 @@ End Sub
 
 Public Sub RbnConvertTable(control As Variant)
     LingTeXConvertTableToIgt
+End Sub
+
+Public Sub RbnAlignByWord(control As Variant)
+    LingTeXAlignByWord
+End Sub
+
+Public Sub RbnAlignByMorpheme(control As Variant)
+    LingTeXAlignByMorpheme
+End Sub
+
+Public Sub RbnToggleRewrapOnSave(control As Variant)
+    LingTeXToggleRewrapOnSave
+End Sub
+
+Public Sub RbnToggleRewrapOnSelectionChange(control As Variant)
+    LingTeXToggleRewrapOnSelectionChange
+End Sub
+
+Public Sub RbnToggleGramGlossInitialCap(control As Variant)
+    LingTeXToggleGramGlossInitialCap
+End Sub
+
+Public Sub RbnShowSettings(control As Variant)
+    LingTeXShowSettings
+End Sub
+
+Public Sub RbnInstallShortcuts(control As Variant)
+    LingTeXInstallShortcuts
+End Sub
+
+Public Sub RbnShowShortcuts(control As Variant)
+    LingTeXShowShortcuts
 End Sub
