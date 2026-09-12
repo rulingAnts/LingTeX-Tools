@@ -112,5 +112,9 @@ requests.
   by-hand pass from 3c/3e/3f. Then `SaveAsTemplate` + `tools/build-dotm.sh` +
   `tools/check-dotm.sh`, then packaging.
 - Later, wanted by Seth: a settings interface (gaps, styles) -- Phase 2 form.
+- Later, wanted by Seth: re-wrap an example automatically when it is edited.
+  Plan (README, *Later*): make the selection-change hook change-aware via a
+  text fingerprint taken on entering, so it fires once on leaving an edited
+  example and never otherwise; then it can default to on.
 - The `.docm` is NEVER committed; `modImport` reads `src/` beside the document.
 - Reports are committed, one file per platform, by the runners themselves.

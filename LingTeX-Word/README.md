@@ -414,6 +414,16 @@ file. CI verifies rather than builds: it unzips the `.dotm`, diffs the embedded
 ribbon against `src/customUI14.xml`, and checks the manifest, so a template that
 has drifted from the sources fails the release.
 
+**Later — re-wrap on edit.** Word has no "content changed" event, so this is
+built on the selection-change hook that already exists (`clsAppEvents`,
+`LingTeXToggleRewrapOnSelectionChange`), made change-aware: fingerprint the
+example's text when the cursor enters it, and on leaving re-wrap only if the
+fingerprint differs. It then never fires while typing inside an example, never
+on a click-through, and exactly once on leaving an example that was edited —
+which is what would let it be on by default. A polling timer could catch edits
+sooner but would re-wrap under the cursor mid-keystroke, which is worse than
+nothing.
+
 **Later — PowerPoint.** The same problem exists in slides, and the architecture
 already anticipates it. Four modules are pure computation with no Word objects at
 all — `modFlexParse`, `modIgtModel`, `modLeipzig`, `modWrap` — and port verbatim.
