@@ -43,19 +43,30 @@ Private mPendingUndoLabel As String
 ' following changes until Word restarts; the known cost of this Office design.
 Private mRibbon As Object
 
-' Keyboard shortcuts, letter=command. Installed by LingTeXInstallShortcuts as
-' Ctrl+Alt+letter on Windows, which is Cmd+Option+letter on Mac (the Control
-' key code, 512, is the Command key there). Letters chosen to stay clear of Word's own
-' Ctrl+Alt / Cmd+Option bindings and of macOS system shortcuts.
+' Keyboard shortcuts, letter=command, installed by LingTeXInstallShortcuts and
+' by the first run. The modifiers are per platform (ShortcutModifiers): on
+' Windows Ctrl+Alt+Shift, which Word leaves free, where Ctrl+Alt alone is
+' Print Preview, Insert Comment, AutoFormat and more; on Mac what Word's VBA
+' will take, found by LingTeXProbeShortcuts (every code with the Option bit,
+' 1024, is refused there with 5853). A key that is already bound to anything,
+' built in or the user's own, is never taken (Seth): it is skipped and named.
 Private Const SHORTCUT_TABLE As String = _
     "I=LingTeXInsertInterlinear|R=LingTeXRewrapCurrent|A=LingTeXRewrapAll|" & _
     "S=LingTeXSplitColumn|M=LingTeXMergeColumns|K=LingTeXCheckExample|" & _
     "T=LingTeXConvertTableToIgt|W=LingTeXAlignByWord|P=LingTeXAlignByMorpheme|" & _
     "H=LingTeXShowSettings|N=LingTeXToggleExampleNumbers|" & _
     "G=LingTeXIndentExample|L=LingTeXOutdentExample"
+Private Const MODS_WINDOWS As Long = 512 + 1024 + 256      ' Ctrl+Alt+Shift
+Private Const MODS_MAC As Long = 512 + 256                 ' Cmd+Shift, until the probe says better
 
 ' How far Indent and Outdent move an example: half an inch, Word's own tab.
 Private Const INDENT_STEP As Double = 36
+
+' The first run: what the add-in does for itself the first time Word loads
+' it from STARTUP, recorded in the Normal template so it happens once. Bump
+' to run it again on every machine at the next start.
+Private Const SETUP_VERSION As String = "1"
+Private Const SETUP_VAR As String = "LingTeX_Setup"
 
 '-----------------------------------------------------------------------------
 ' EVERY message to the user goes through Report or Confirm, never MsgBox.
@@ -113,7 +124,61 @@ Public Sub AutoExec()
     mEvents.Attach
     Err.Clear
     On Error GoTo 0
+    FirstRunSetup
 End Sub
+
+'-----------------------------------------------------------------------------
+' Everything a fresh install needs, done once, without being asked (Seth: the
+' arming, installing and activating happen on first run). At present that is
+' the shortcuts; the hooks are armed above and the ribbon comes with the file.
+' Only when the template is loaded from Word's own STARTUP folder, which is
+' where the installer puts it: the dev rig loads it from the clone and must
+' see no dialog at Word start, or the test runner hangs on it. Recorded in
+' Normal, which Word saves at quit; done again only when SETUP_VERSION moves.
+'-----------------------------------------------------------------------------
+Private Sub FirstRunSetup()
+    Dim app As Object
+    Dim summary As String
+    Dim done As String
+
+    On Error Resume Next
+    Set app = Application
+    If Not LoadedFromStartup() Then Exit Sub
+    done = app.NormalTemplate.Variables(SETUP_VAR).Value
+    Err.Clear
+    If done = SETUP_VERSION Then Exit Sub
+
+    summary = InstallShortcuts()
+    app.NormalTemplate.Variables(SETUP_VAR).Value = SETUP_VERSION
+    If Err.Number <> 0 Then
+        Err.Clear
+        app.NormalTemplate.Variables.Add Name:=SETUP_VAR, Value:=SETUP_VERSION
+    End If
+    Err.Clear
+    On Error GoTo 0
+
+    Report "LingTeX-Word is installed." & vbCr & vbCr & _
+           "The LingTeX tab is on the ribbon of every document: insert an " & _
+           "interlinear example from FLEx or from text, re-wrap, split and " & _
+           "merge columns, check the glossing. Examples are numbered; the " & _
+           "Numbers button turns that off for a document." & vbCr & vbCr & _
+           summary, vbInformation
+End Sub
+
+' Is this template running from Word's STARTUP folder, as installed, rather
+' than from a development clone?
+Private Function LoadedFromStartup() As Boolean
+    Dim app As Object
+    Dim here As String, startup As String
+    On Error Resume Next
+    Set app = Application
+    here = ThisDocument.Path
+    startup = app.StartupPath
+    Err.Clear
+    On Error GoTo 0
+    If here = "" Or startup = "" Then Exit Function
+    LoadedFromStartup = (StrComp(here, startup, vbTextCompare) = 0)
+End Function
 
 Public Sub AutoExit()
     On Error Resume Next
@@ -1342,22 +1407,28 @@ End Sub
 ' is a run-time error inside the trap below, and nothing else suffers.
 
 Public Sub LingTeXInstallShortcuts()
+    Report InstallShortcuts(), vbInformation
+End Sub
+
+' Install every shortcut that can be installed, and say what happened: which
+' were installed and where, which keys were left alone because they already
+' do something, and what Word said if it refused one.
+Private Function InstallShortcuts() As String
     Dim pairs() As String, kv() As String
     Dim i As Long, n As Long, total As Long
     Dim app As Object
     Dim homes(1) As Object, homeNames(1) As String, nHomes As Long
     Dim names(1) As String
     Dim h As Long, k As Long
-    Dim why As String, detail As String, usedHome As String
+    Dim why As String, refused As String, taken As String, usedHome As String
     Dim code As Long
     Dim bound As Boolean
+    Dim owner As String
 
     ' Where a binding may live, in order of preference: this template when the
     ' code is in one (so the shortcuts ship with it), else Normal; and Normal
-    ' as the fallback when the template refuses them, which Word reports as
-    ' 5853 "Invalid parameter" without saying which parameter (Seth, on Mac,
-    ' 2026-09-12). Every combination is tried in turn, and when none works the
-    ' message lists what Word said to each, because that is the diagnosis.
+    ' as the fallback when the template refuses them. Every combination is
+    ' tried in turn, and when none works the report says what Word said.
     On Error Resume Next
     Set app = Application
     If ThisDocument.Type = 1 Then          ' 1 = a template
@@ -1379,119 +1450,63 @@ Public Sub LingTeXInstallShortcuts()
     For i = 0 To UBound(pairs)
         kv = Split(pairs(i), "=")
         code = KeyCodeFor(app, kv(0))
-        ' The bare macro name, then the qualified one Word sometimes insists
-        ' on for a macro that lives in another template.
-        names(0) = kv(1)
-        names(1) = ProjectName() & ".modLingTeX." & kv(1)
-        bound = False
-        For h = 0 To nHomes - 1
-            For k = 0 To 1
-                why = TryBindKey(app, homes(h), names(k), code)
-                If why = "" Then
-                    bound = True
-                    If usedHome = "" Then usedHome = homeNames(h)
-                    Exit For
-                End If
-                If i = 0 Then
-                    detail = detail & "  in " & homeNames(h) & ", " & names(k) & _
-                             ": " & why & vbCr
-                End If
-            Next k
-            If bound Then Exit For
-        Next h
-        If bound Then n = n + 1
-    Next i
 
-    If n = total Then
-        Report CStr(n) & " keyboard shortcuts installed in " & usedHome & ":" & _
-               vbCr & vbCr & ShortcutList() & vbCr & _
-               "LingTeXRemoveShortcuts takes them out again.", vbInformation
-    ElseIf n > 0 Then
-        Report "Installed " & CStr(n) & " of " & CStr(total) & " shortcuts, in " & _
-               usedHome & ". For the first one Word said:" & vbCr & detail & vbCr & _
-               "The rest can be set by hand: Tools > Customize Keyboard..., " & _
-               "category Macros.", vbExclamation
-    Else
-        Report "Could not install the shortcuts. Word said:" & vbCr & detail & vbCr & _
-               "They can be set by hand: Tools > Customize Keyboard..., " & _
-               "category Macros.", vbExclamation
-    End If
-End Sub
-
-'-----------------------------------------------------------------------------
-' LingTeXProbeShortcuts: which parameter Mac Word refuses in KeyBindings.Add.
-'
-' Install Shortcuts fails there with 5853 "Invalid parameter" in every home and
-' under every name (Seth, 2026-09-12), so the fault is the key code or the
-' category. This tries one binding at a time, each differing in one thing,
-' clears every one that succeeds, and reports the lot. Run it from the macro
-' list (it is in modLingTeX because modTests may not name a command); it changes nothing that it does not put back.
-'-----------------------------------------------------------------------------
-Public Sub LingTeXProbeShortcuts()
-    Dim app As Object
-    Dim msg As String
-    Dim bits As Variant, i As Long, v As Long
-
-    On Error Resume Next
-    Set app = Application
-    app.CustomizationContext = app.NormalTemplate
-    msg = "Round 2: which bit is Option? Each modifier bit with I, then with Cmd+I; " & _
-          "KeyString is what Word says it bound." & vbCr
-    bits = Array(256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
-    For i = 0 To UBound(bits)
-        msg = msg & Probe(app, CStr(bits(i)) & "+I", 2, "LingTeXInsertInterlinear", bits(i) + 73)
-    Next i
-    For i = 0 To UBound(bits)
-        If bits(i) <> 512 Then
-            msg = msg & Probe(app, "Cmd+" & CStr(bits(i)) & "+I", 2, "LingTeXInsertInterlinear", _
-                              512 + bits(i) + 73)
+        ' Never take a key that already does something -- Word's own command
+        ' or a binding the user made -- unless it is already ours.
+        owner = KeyOwner(app, homes(0), code)
+        If owner <> "" And InStr(1, owner, "LingTeX", vbTextCompare) = 0 Then
+            taken = taken & "  " & KeyName(kv(0)) & " is " & owner & _
+                    ", so " & kv(1) & " has no shortcut" & vbCr
+        Else
+            ' The bare macro name, then the qualified one Word sometimes insists
+            ' on for a macro that lives in another template.
+            names(0) = kv(1)
+            names(1) = ProjectName() & ".modLingTeX." & kv(1)
+            bound = False
+            For h = 0 To nHomes - 1
+                For k = 0 To 1
+                    why = TryBindKey(app, homes(h), names(k), code)
+                    If why = "" Then
+                        bound = True
+                        If usedHome = "" Then usedHome = homeNames(h)
+                        Exit For
+                    End If
+                    If refused = "" Then
+                        refused = "  in " & homeNames(h) & ", " & names(k) & _
+                                  ": " & why & vbCr
+                    End If
+                Next k
+                If bound Then Exit For
+            Next h
+            If bound Then n = n + 1
         End If
     Next i
-    Err.Clear
-    v = app.BuildKeyCode(512, 256, 73)
-    msg = msg & "BuildKeyCode(Cmd, Shift, I) = " & IIf(Err.Number = 0, CStr(v), "error " & _
-                CStr(Err.Number)) & vbCr
-    Err.Clear
-    v = app.BuildKeyCode(512, 1024, 73)
-    msg = msg & "BuildKeyCode(Cmd, 1024, I) = " & IIf(Err.Number = 0, CStr(v), "error " & _
-                CStr(Err.Number) & " " & Err.Description) & vbCr
-    Err.Clear
-    On Error GoTo 0
-    Report msg, vbInformation
-End Sub
 
-' One binding: added, then cleared again if it took.
-Private Function Probe(app As Object, ByVal what As String, ByVal category As Long, _
-        ByVal cmd As String, ByVal code As Long) As String
-    Dim kb As Object
-    On Error Resume Next
-    Err.Clear
-    app.KeyBindings.Add category, cmd, code
-    If Err.Number = 0 Then
-        Probe = "  " & what & ": OK" & vbCr
-        Err.Clear
-        Set kb = app.FindKey(code)
-        If Not kb Is Nothing Then kb.Clear
+    If n = 0 Then
+        InstallShortcuts = "No keyboard shortcuts could be installed." & vbCr
+        If refused <> "" Then InstallShortcuts = InstallShortcuts & "Word said:" & vbCr & refused
     Else
-        Probe = "  " & what & ": " & CStr(Err.Number) & " " & Err.Description & vbCr
+        InstallShortcuts = CStr(n) & " of " & CStr(total) & " keyboard shortcuts " & _
+                           "installed in " & usedHome & ":" & vbCr & ShortcutList() & vbCr
+        If refused <> "" Then
+            InstallShortcuts = InstallShortcuts & "Word refused one with:" & vbCr & refused
+        End If
     End If
-    Err.Clear
-    On Error GoTo 0
+    If taken <> "" Then
+        InstallShortcuts = InstallShortcuts & "Left alone, already in use:" & vbCr & taken
+    End If
+    InstallShortcuts = InstallShortcuts & "Any of them can be changed by hand: " & _
+                       "Tools > Customize Keyboard..., category Macros. " & _
+                       "LingTeXRemoveShortcuts takes ours out."
 End Function
 
-' One attempt: the customization context, then the binding. Empty on success,
-' else what Word said, prefixed "context" when it was the context that failed.
-Private Function TryBindKey(app As Object, home As Object, ByVal cmd As String, _
-        ByVal code As Long) As String
+' What a key does now, as Word describes it, or "" when it is free.
+Private Function KeyOwner(app As Object, home As Object, ByVal code As Long) As String
+    Dim kb As Object
     On Error Resume Next
     app.CustomizationContext = home
-    If Err.Number <> 0 Then
-        TryBindKey = "context: " & CStr(Err.Number) & ": " & Err.Description
-        Err.Clear
-        Exit Function
-    End If
-    app.KeyBindings.Add 2, cmd, code       ' 2 = wdKeyCategoryMacro
-    If Err.Number <> 0 Then TryBindKey = CStr(Err.Number) & ": " & Err.Description
+    Set kb = app.FindKey(code)
+    If Not kb Is Nothing Then KeyOwner = kb.Command
     Err.Clear
     On Error GoTo 0
 End Function
@@ -1500,10 +1515,34 @@ End Function
 ' same sum by hand when the call itself is what raises.
 Private Function KeyCodeFor(app As Object, ByVal letter As String) As Long
     On Error Resume Next
-    KeyCodeFor = app.BuildKeyCode(512, 1024, Asc(letter))
-    If Err.Number <> 0 Or KeyCodeFor = 0 Then KeyCodeFor = 512 + 1024 + Asc(letter)
+    KeyCodeFor = ShortcutModifiers() + Asc(letter)
     Err.Clear
     On Error GoTo 0
+End Function
+
+' The modifier bits for this platform (see SHORTCUT_TABLE).
+Private Function ShortcutModifiers() As Long
+    If Application.PathSeparator = "/" Then
+        ShortcutModifiers = MODS_MAC
+    Else
+        ShortcutModifiers = MODS_WINDOWS
+    End If
+End Function
+
+' A shortcut as a person reads it.
+Private Function KeyName(ByVal letter As String) As String
+    Dim m As Long, s As String
+    m = ShortcutModifiers()
+    If Application.PathSeparator = "/" Then
+        If (m And 512) <> 0 Then s = s & "Cmd+"
+        If (m And 1024) <> 0 Then s = s & "Option+"
+        If (m And 256) <> 0 Then s = s & "Shift+"
+    Else
+        If (m And 512) <> 0 Then s = s & "Ctrl+"
+        If (m And 1024) <> 0 Then s = s & "Alt+"
+        If (m And 256) <> 0 Then s = s & "Shift+"
+    End If
+    KeyName = s & letter
 End Function
 
 ' The VBA project's name, for the qualified macro name; "Project" (Word's
@@ -1559,6 +1598,23 @@ Public Sub LingTeXRemoveShortcuts()
     Report CStr(n) & " LingTeX shortcuts removed.", vbInformation
 End Sub
 
+' One attempt: the customization context, then the binding. Empty on success,
+' else what Word said, prefixed "context" when it was the context that failed.
+Private Function TryBindKey(app As Object, home As Object, ByVal cmd As String, _
+        ByVal code As Long) As String
+    On Error Resume Next
+    app.CustomizationContext = home
+    If Err.Number <> 0 Then
+        TryBindKey = "context: " & CStr(Err.Number) & ": " & Err.Description
+        Err.Clear
+        Exit Function
+    End If
+    app.KeyBindings.Add 2, cmd, code       ' 2 = wdKeyCategoryMacro
+    If Err.Number <> 0 Then TryBindKey = CStr(Err.Number) & ": " & Err.Description
+    Err.Clear
+    On Error GoTo 0
+End Function
+
 ' The status bar, late-bound: a progress line while a long command runs.
 Private Sub StatusLine(ByVal s As String)
     Dim app As Object
@@ -1577,17 +1633,12 @@ End Sub
 Private Function ShortcutList() As String
     Dim pairs() As String, kv() As String
     Dim i As Long
-    Dim prefix As String, s As String
+    Dim s As String
 
-    If Application.PathSeparator = "/" Then
-        prefix = "Cmd+Option+"
-    Else
-        prefix = "Ctrl+Alt+"
-    End If
     pairs = Split(SHORTCUT_TABLE, "|")
     For i = 0 To UBound(pairs)
         kv = Split(pairs(i), "=")
-        s = s & prefix & kv(0) & "   " & kv(1) & vbCr
+        s = s & KeyName(kv(0)) & "   " & kv(1) & vbCr
     Next i
     ShortcutList = s
 End Function
