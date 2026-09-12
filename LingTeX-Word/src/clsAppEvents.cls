@@ -76,8 +76,7 @@ End Sub
 ' since the examples were drawn, and this is the last moment to put that right.
 ' Failure is swallowed: a problem in the add-in must never stop a save.
 '-----------------------------------------------------------------------------
-Private Sub mApp_DocumentBeforeSave(ByVal Doc As Document, _
-        SaveAsUI As Boolean, Cancel As Boolean)
+Private Sub mApp_DocumentBeforeSave(ByVal Doc As Document, SaveAsUI As Boolean, Cancel As Boolean)
     On Error Resume Next
     If gBusy Then Exit Sub
     If Doc Is Nothing Then Exit Sub
@@ -99,6 +98,7 @@ Private Sub mApp_WindowSelectionChange(ByVal Sel As Selection)
     Dim doc As Document
     Dim leaving As Table
     Dim done As Table
+    Dim msg As String
 
     On Error Resume Next
     If gBusy Then Exit Sub
@@ -119,8 +119,7 @@ Private Sub mApp_WindowSelectionChange(ByVal Sel As Selection)
     ' Still in the same example: nothing to do.
     If nowStart = mLastTableStart And doc.Name = mLastDocName Then Exit Sub
 
-    If SettingRewrapOnSelectionChange(doc) _
-       And mLastTableStart >= 0 And doc.Name = mLastDocName Then
+    If SettingRewrapOnSelectionChange(doc) And mLastTableStart >= 0 And doc.Name = mLastDocName Then
         ' We have just left the example that started at mLastTableStart.
         Set leaving = ExampleStartingAt(doc, mLastTableStart)
         If Not leaving Is Nothing Then
@@ -157,11 +156,12 @@ Private Sub mApp_WindowSelectionChange(ByVal Sel As Selection)
                 ' once; this fires on cursor movement and must not nag.
                 If Not mWarnedThisDoc Then
                     mWarnedThisDoc = True
-                    Report "An interlinear example could not be re-wrapped " & _
-                           "automatically, so it was left as it was." & vbCr & vbCr & _
-                           IIf(gRenderError = "", "", gRenderError & vbCr & vbCr) & _
-                           "Automatic re-wrapping on cursor movement can be turned " & _
-                           "off in the settings.", vbExclamation
+                    msg = "An interlinear example could not be re-wrapped "
+                    msg = msg & "automatically, so it was left as it was." & vbCr & vbCr
+                    msg = msg & IIf(gRenderError = "", "", gRenderError & vbCr & vbCr)
+                    msg = msg & "Automatic re-wrapping on cursor movement can be turned "
+                    msg = msg & "off in the settings."
+                    Report msg, vbExclamation
                 End If
             End If
 
@@ -189,9 +189,10 @@ RewrapFailed:
     ReleaseScratch
     If Not mWarnedThisDoc Then
         mWarnedThisDoc = True
-        Report "Automatic re-wrapping stopped with an error: " & _
-               CStr(Err.Number) & ": " & Err.Description & vbCr & vbCr & _
-               "It can be turned off in the settings.", vbExclamation
+        msg = "Automatic re-wrapping stopped with an error: "
+        msg = msg & CStr(Err.Number) & ": " & Err.Description & vbCr & vbCr
+        msg = msg & "It can be turned off in the settings."
+        Report msg, vbExclamation
     End If
     mLastTableStart = nowStart
     Err.Clear
