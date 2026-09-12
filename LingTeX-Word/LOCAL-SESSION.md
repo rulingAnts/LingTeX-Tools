@@ -106,6 +106,9 @@ requests.
   summarised in QUICKSTART's *Status* and README's *Roadmap*).
 - Health pass done (2026-09-12): `TypeCheck`, `DiagnoseWrap` and `MicroDiagnose`
   are gone from `modTests`; `DebugPrintDiagnose` is the one diagnostic left.
+- The `.docm` is NEVER committed (it was once, by force): each machine's copy
+  carries its own `SRC_FOLDER`, and the Mac one pulled onto Windows pointed the
+  Windows import at a stale clone, which is what an untagged report name means.
 - Reports are committed, one file per platform (`RunDocTests.mac.txt`,
   `RunDocTests.win.txt`); both runners commit and push their own platform's
   files after a run, so `git pull` and read them -- no pasting.

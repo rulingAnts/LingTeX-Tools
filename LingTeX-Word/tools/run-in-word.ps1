@@ -79,12 +79,22 @@ foreach ($p in $files) {
     if ($text -match "FAILURES|CRASH|PROBLEM|FAILED") { $status = 1 }
     if ($text -match "(ALL PASS -- \d+ passed|FAILURES -- .*FAILED)") { $summary += " " + ($f -replace "\.win\.txt$", "") + ": " + $Matches[1] + ";" }
 }
-if (-not $NoCommit) {
+foreach ($stale in "RunAllTests.txt", "RunDocTests.txt") {
+    $sp = Join-Path $reports $stale
+    if (Test-Path $sp) {
+        Write-Host "   STALE MODULES: the run wrote $stale (no platform tag), so the modules Word"
+        Write-Host "   imported are older than $root\src. Check SRC_FOLDER in the document's"
+        Write-Host "   modImport: it must be $root\src."
+        Remove-Item -Force $sp
+        $status = 1
+    }
+}
+if (-not $NoCommit -and $status -eq 0) {
     # Commit and push this platform's reports, and nothing else, so a session on
     # the Mac can pull and read them. See the Mac script for the convention.
     $mine = @(Get-ChildItem -Path $reports -Filter *.win.txt | ForEach-Object { $_.FullName })
-    git -C $root add -- $mine 2>$null
-    git -C $root commit -q -m "LingTeX-Word reports (win):$summary" -- $mine 2>$null
+    git -C $root add -- $mine 2>$null | Out-Null
+    git -C $root commit -q -m "LingTeX-Word reports (win):$summary" -- $mine 2>$null | Out-Null
     if ($LASTEXITCODE -eq 0) {
         Write-Host "== reports committed: $(git -C $root log --oneline -1)"
         git -C $root push -q 2>$null

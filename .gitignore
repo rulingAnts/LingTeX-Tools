@@ -91,4 +91,7 @@ LingTeX-Word/build/
 # one file per platform, so a run on one machine can be read from another;
 # ImportModules.txt is not, its name being the same on both)
 LingTeX-Word/LingTeX-Word-reports/ImportModules.txt
+# Never commit the .docm: each machine's copy carries its own SRC_FOLDER in the
+# hand-pasted modImport, and a committed one from the Mac silently pointed the
+# Windows import at a stale clone (2026-09-12).
 LingTeX-Word/*.docm

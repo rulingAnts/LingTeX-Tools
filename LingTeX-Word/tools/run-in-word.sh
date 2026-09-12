@@ -241,6 +241,16 @@ for p in "$reports"/ImportModules.txt "$reports"/*.mac.txt; do
     [ -n "$s" ] && summary="$summary ${f%.mac.txt}: $s;"
 done
 
+# Untagged names mean the suites that ran are OLDER than src/: the document's
+# modImport imported from somewhere else (its SRC_FOLDER), not from this clone.
+if [ -f "$reports/RunAllTests.txt" ] || [ -f "$reports/RunDocTests.txt" ]; then
+    echo "   STALE MODULES: the run wrote RunAllTests.txt / RunDocTests.txt (no platform"
+    echo "   tag), so the modules Word imported are older than $root/src."
+    echo "   Check SRC_FOLDER in the document's modImport: it must be $root/src."
+    rm -f "$reports/RunAllTests.txt" "$reports/RunDocTests.txt"
+    status=1
+fi
+
 case "$macros" in
     *RunAllTestsToFile*) [ -f "$reports/RunAllTests.mac.txt" ] || { echo "no RunAllTests.mac.txt -- the macro ran but wrote nothing; if Word could not write beside the document, the report opened as a document in Word instead"; status=1; } ;;
 esac
