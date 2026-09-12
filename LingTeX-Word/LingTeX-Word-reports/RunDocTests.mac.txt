@@ -1,7 +1,7 @@
 
 LingTeX-Word document tests
 ===========================
-Open documents at start: 2
+Open documents at start: 1
 
 -- styles ----------------------------------------------------
   PASS   EnsureStyles leaves Err.Number at 0
@@ -150,7 +150,7 @@ Open documents at start: 2
 
 -- scratch ---------------------------------------------------
   PASS   two measuring batches create at most one document
-         3 open before, 4 after
+         2 open before, 3 after
   PASS   ReleaseScratch puts the document count back
   PASS   ReleaseScratch twice does not raise
   PASS   measuring works again after a release
