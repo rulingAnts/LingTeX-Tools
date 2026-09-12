@@ -85,20 +85,26 @@ requests.
 
 ## State of play
 
-- **Stage 1 and stage 2 pass on both platforms** (2026-09-12): `RunAllTests`
-  79/79 and `RunDocTests` 224/224 on Mac Word 16.112 and on Word for Windows.
-  The reports are in `LingTeX-Word-reports/*.mac.txt` and `*.win.txt`.
-- Next gate: the by-hand checklist, `TESTING.md` section 3, on both platforms.
-  Seth walks it; anything that fails there is the next thing to fix. Seth's two
-  earlier observations to check there: whether the free-translation row appears
-  under an inserted example (the suite says one styled paragraph per free
-  translation, but look), and the wrapping of the long sample.
-- Then `SaveAsTemplate` + `tools/build-dotm.sh` + `tools/check-dotm.sh`, then
-  packaging (QUICKSTART *Status*, README *Status*).
-- The `.docm` is NEVER committed (it was once, by force): each machine keeps its
-  own. `modImport` now reads `src/` from beside the document, so a freshly pasted
-  copy needs no path; the import log's `from` line says where it read from.
-- Reports are committed, one file per platform; both runners commit and push
-  their own platform's files after a run, so `git pull` and read them.
-- Health pass done: `TypeCheck`, `DiagnoseWrap`, `MicroDiagnose` are gone from
-  `modTests`; `DebugPrintDiagnose` is the one diagnostic left.
+- **Stage 2 is proven on both platforms**: `RunAllTests` 79/79 and `RunDocTests`
+  224/224 on Mac Word 16.112 and on Word for Windows. The reports are committed
+  per platform under `LingTeX-Word/LingTeX-Word-reports/` (`*.mac.txt`,
+  `*.win.txt`); the runners commit and push their own platform's after a run.
+- Three things the first runs taught, now rules in `vba-lint.py`: a `Debug.Print`
+  poisons the next floating-point statement on Mac (every `Debug.Print` is
+  followed by `SettleDebugPrint`); a `_` continuation in a `.cls` breaks when the
+  bootstrap installs it on Mac (none allowed in class modules); and `wd*`
+  constants must be on the allowlist, because Mac Word's type library lacks some
+  (`wdStyleTableGrid` was one). VBA compiles a procedure when it is first
+  *reached*, so an error in a late-called procedure surfaces mid-run; the linter
+  is the only project-wide compile there is. `run-in-word.sh --macro NAME` runs
+  one macro, for bisecting.
+- The VBA editor's own dialogs are invisible to System Events; the runner
+  watches the editor's window title for `[break]` instead, before and after
+  every macro, and says what to do.
+- **Next gate: `TESTING.md` section 3 by hand** — a real FLEx paste, the margin
+  round trip (narrow → columns push down; widen → they come back), the seven
+  ribbon buttons once the template exists. Then `SaveAsTemplate`,
+  `tools/build-dotm.sh`, `tools/check-dotm.sh`; then packaging (NSIS, the
+  uncompiled AppleScript installer, the `word-addin` CI job, the website card).
+- Later, not now: a health/efficiency pass over the engine, keeping both suites
+  green on both platforms.

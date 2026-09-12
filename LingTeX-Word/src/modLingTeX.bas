@@ -109,6 +109,7 @@ End Sub
 ' nothing is selected.
 '-----------------------------------------------------------------------------
 Public Sub LingTeXInsertInterlinear()
+    Dim errNum As Long, errDesc As String
     Dim doc As Document
     Dim raw As String
     Dim ex As IgtExample
@@ -190,11 +191,15 @@ Public Sub LingTeXInsertInterlinear()
     Exit Sub
 
 Fail:
+    ' Captured FIRST. EndUndo ends with Err.Clear and ReleaseScratch opens with
+    ' On Error Resume Next, either of which resets Err -- so reading Err.Number
+    ' after them reported "Error 0: " and lost the error being hunted.
+    errNum = Err.Number: errDesc = Err.Description
     Application.ScreenUpdating = True
     EndUndo
     gBusy = False
     ReleaseScratch
-    Report "Error " & Err.Number & ": " & Err.Description, vbCritical
+    Report "Error " & errNum & ": " & errDesc, vbCritical
 End Sub
 
 '-----------------------------------------------------------------------------
@@ -202,6 +207,7 @@ End Sub
 ' For tables typed by hand or pasted from a spreadsheet.
 '-----------------------------------------------------------------------------
 Public Sub LingTeXConvertTableToIgt()
+    Dim errNum As Long, errDesc As String
     Dim tbl As Table
     Dim ex As IgtExample
     Dim doc As Document
@@ -268,11 +274,15 @@ Public Sub LingTeXConvertTableToIgt()
     Exit Sub
 
 Fail:
+    ' Captured FIRST. EndUndo ends with Err.Clear and ReleaseScratch opens with
+    ' On Error Resume Next, either of which resets Err -- so reading Err.Number
+    ' after them reported "Error 0: " and lost the error being hunted.
+    errNum = Err.Number: errDesc = Err.Description
     Application.ScreenUpdating = True
     EndUndo
     gBusy = False
     ReleaseScratch
-    Report "Error " & Err.Number & ": " & Err.Description, vbCritical
+    Report "Error " & errNum & ": " & errDesc, vbCritical
 End Sub
 
 
@@ -282,6 +292,7 @@ End Sub
 
 ' Re-wrap the example containing the cursor.
 Public Sub LingTeXRewrapCurrent()
+    Dim errNum As Long, errDesc As String
     Dim tbl As Table
     If gBusy Then
         ' Not silence: a stuck flag would otherwise look like a dead button.
@@ -310,11 +321,15 @@ Public Sub LingTeXRewrapCurrent()
     Exit Sub
 
 Fail:
+    ' Captured FIRST. EndUndo ends with Err.Clear and ReleaseScratch opens with
+    ' On Error Resume Next, either of which resets Err -- so reading Err.Number
+    ' after them reported "Error 0: " and lost the error being hunted.
+    errNum = Err.Number: errDesc = Err.Description
     Application.ScreenUpdating = True
     EndUndo
     gBusy = False
     ReleaseScratch
-    Report "Error " & Err.Number & ": " & Err.Description, vbCritical
+    Report "Error " & errNum & ": " & errDesc, vbCritical
 End Sub
 
 ' Re-wrap every example in the active document.
@@ -347,6 +362,7 @@ End Sub
 ' working backwards keeps the remaining references valid.
 '-----------------------------------------------------------------------------
 Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
+    Dim errNum As Long, errDesc As String
     Dim tables As Collection
     Dim i As Long, n As Long, nFailed As Long, nDegraded As Long
     Dim done As Table
@@ -457,12 +473,16 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
     Exit Sub
 
 Fail:
+    ' Captured FIRST. EndUndo ends with Err.Clear and ReleaseScratch opens with
+    ' On Error Resume Next, either of which resets Err -- so reading Err.Number
+    ' after them reported "Error 0: " and lost the error being hunted.
+    errNum = Err.Number: errDesc = Err.Description
     Application.ScreenUpdating = True
     EndUndo
     gBusy = False
     ReleaseScratch
     If showResult Then
-        Report "Error " & Err.Number & ": " & Err.Description, vbCritical
+        Report "Error " & errNum & ": " & errDesc, vbCritical
     End If
 End Sub
 
@@ -480,6 +500,7 @@ End Sub
 ' column invariant holds without the user having to tidy up after it.
 '-----------------------------------------------------------------------------
 Public Sub LingTeXSplitColumn()
+    Dim errNum As Long, errDesc As String
     Dim tbl As Table
     Dim ex As IgtExample
     Dim flatCol As Long
@@ -534,11 +555,15 @@ Public Sub LingTeXSplitColumn()
     Exit Sub
 
 Fail:
+    ' Captured FIRST. EndUndo ends with Err.Clear and ReleaseScratch opens with
+    ' On Error Resume Next, either of which resets Err -- so reading Err.Number
+    ' after them reported "Error 0: " and lost the error being hunted.
+    errNum = Err.Number: errDesc = Err.Description
     Application.ScreenUpdating = True
     EndUndo
     gBusy = False
     ReleaseScratch
-    Report "Error " & Err.Number & ": " & Err.Description, vbCritical
+    Report "Error " & errNum & ": " & errDesc, vbCritical
 End Sub
 
 '-----------------------------------------------------------------------------
@@ -547,6 +572,7 @@ End Sub
 ' cell, that column is merged with the one after it.
 '-----------------------------------------------------------------------------
 Public Sub LingTeXMergeColumns()
+    Dim errNum As Long, errDesc As String
     Dim tbl As Table
     Dim ex As IgtExample
     Dim firstCol As Long, lastCol As Long
@@ -607,11 +633,15 @@ Public Sub LingTeXMergeColumns()
     Exit Sub
 
 Fail:
+    ' Captured FIRST. EndUndo ends with Err.Clear and ReleaseScratch opens with
+    ' On Error Resume Next, either of which resets Err -- so reading Err.Number
+    ' after them reported "Error 0: " and lost the error being hunted.
+    errNum = Err.Number: errDesc = Err.Description
     Application.ScreenUpdating = True
     EndUndo
     gBusy = False
     ReleaseScratch
-    Report "Error " & Err.Number & ": " & Err.Description, vbCritical
+    Report "Error " & errNum & ": " & errDesc, vbCritical
 End Sub
 
 
@@ -624,6 +654,7 @@ End Sub
 ' conventions, and offer to repair what has only one right answer.
 '-----------------------------------------------------------------------------
 Public Sub LingTeXCheckExample()
+    Dim errNum As Long, errDesc As String
     Dim tbl As Table
     Dim ex As IgtExample
     Dim warnings As Collection
@@ -681,11 +712,15 @@ Public Sub LingTeXCheckExample()
     Exit Sub
 
 Fail:
+    ' Captured FIRST. EndUndo ends with Err.Clear and ReleaseScratch opens with
+    ' On Error Resume Next, either of which resets Err -- so reading Err.Number
+    ' after them reported "Error 0: " and lost the error being hunted.
+    errNum = Err.Number: errDesc = Err.Description
     Application.ScreenUpdating = True
     EndUndo
     gBusy = False
     ReleaseScratch
-    Report "Error " & Err.Number & ": " & Err.Description, vbCritical
+    Report "Error " & errNum & ": " & errDesc, vbCritical
 End Sub
 
 

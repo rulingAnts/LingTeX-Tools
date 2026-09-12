@@ -98,6 +98,7 @@ Private Sub mApp_WindowSelectionChange(ByVal Sel As Selection)
     Dim doc As Document
     Dim leaving As Table
     Dim done As Table
+    Dim errNum As Long, errDesc As String
     Dim msg As String
 
     On Error Resume Next
@@ -182,6 +183,9 @@ Private Sub mApp_WindowSelectionChange(ByVal Sel As Selection)
 
 RewrapFailed:
     ' Only reachable if RewrapTable raised rather than returning Nothing.
+    ' Captured before the On Error Resume Next below, which resets Err; read
+    ' after it, the message said "0: " and the error was gone.
+    errNum = Err.Number: errDesc = Err.Description
     On Error Resume Next
     EndUndo
     Application.ScreenUpdating = True
@@ -190,7 +194,7 @@ RewrapFailed:
     If Not mWarnedThisDoc Then
         mWarnedThisDoc = True
         msg = "Automatic re-wrapping stopped with an error: "
-        msg = msg & CStr(Err.Number) & ": " & Err.Description & vbCr & vbCr
+        msg = msg & CStr(errNum) & ": " & errDesc & vbCr & vbCr
         msg = msg & "It can be turned off in the settings."
         Report msg, vbExclamation
     End If
