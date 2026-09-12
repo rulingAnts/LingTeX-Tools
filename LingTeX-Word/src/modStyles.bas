@@ -79,7 +79,7 @@ Private mCreatedStyle As Boolean
 ' settings live so it survives save and reopen. Versioned, so a future change to
 ' the style set re-runs rather than trusting a stale mark.
 Private Const STYLES_MADE_VAR As String = "LingTeX_StylesMade"
-Private Const STYLES_VERSION As String = "1-num3"
+Private Const STYLES_VERSION As String = "1-num3-noproof"
 
 
 '-- Last-resort font when the document reports only a theme placeholder.
@@ -269,6 +269,20 @@ Private Sub EnsureParaStyle(doc As Document, ByVal role As String, _
         ' Inside a cell the following paragraph keeps the tier's style.
         If role = ROLE_FREE Then .NextParagraphStyle = doc.Styles(wdStyleNormal)
     End With
+    Err.Clear
+    On Error GoTo 0
+    ' Vernacular forms and glosses are not English, and the spelling checker
+    ' underlining every cell is noise (Seth). The interlinear tier styles are
+    ' marked "do not check spelling or grammar"; the translation stays checked.
+    ' Late-bound: NoProofing is unproven on Mac, and a missing member would be
+    ' a compile error for the whole module.
+    If role <> ROLE_FREE Then SetNoProofing st
+End Sub
+
+' Mark a style, or a range, as not to be proofed.
+Public Sub SetNoProofing(target As Object)
+    On Error Resume Next
+    target.NoProofing = True
     Err.Clear
     On Error GoTo 0
 End Sub

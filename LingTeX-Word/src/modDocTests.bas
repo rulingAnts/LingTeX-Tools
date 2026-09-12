@@ -1050,6 +1050,7 @@ Private Sub TestRendering()
     CheckColumnAlignment tbl, ex
     CheckRowWidthsFit tbl, doc
     CheckRowRoles tbl, ex
+    CheckNotProofed tbl
     CheckSmallCapsRuns tbl
     CheckFreeParagraphs tbl, ex, doc
     CheckOverWideColumn doc
@@ -1269,6 +1270,21 @@ Private Sub CheckRowRoles(tbl As Table, ex As IgtExample)
 End Sub
 
 ' The first CONTENT cell: past the number column when the example has one.
+' The spelling checker stays out of the cells and in the translation.
+Private Sub CheckNotProofed(tbl As Table)
+    Dim cell As Object, para As Object
+    Dim cellOff As Boolean, transOn As Boolean
+    On Error Resume Next
+    Set cell = tbl.Cell(1, 1 + NumberColumns(tbl)).Range
+    cellOff = (cell.NoProofing = True)
+    Set para = ParagraphAfterTable(tbl)
+    If Not para Is Nothing Then transOn = (para.Range.NoProofing = False)
+    Err.Clear
+    On Error GoTo 0
+    Ok "interlinear cells are not spell-checked", cellOff
+    Ok "the translation still is", transOn
+End Sub
+
 Private Function FirstCellParaStyle(tbl As Table, ByVal r As Long) As String
     On Error Resume Next
     FirstCellParaStyle = tbl.Cell(r, 1 + NumberColumns(tbl)).Range.Paragraphs(1).Style
