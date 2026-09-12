@@ -20,7 +20,8 @@ then `LingTeX-Word/README.md`. The state of play is at the end of this note.
 
 Word for Mac is on this machine, with the project in
 `/Users/Seth/GIT/LingTeX-Tools/LingTeX-Word/LingTeX.docm` (gitignored) and the
-bootstrap module `modImport` already pasted into it with `SRC_FOLDER` set. So:
+bootstrap module `modImport` already pasted into it (it reads `src/` beside the
+document). So:
 
 ```
 python3 LingTeX-Word/tools/vba-lint.py          # the substitute compiler; must be ALL PASS first

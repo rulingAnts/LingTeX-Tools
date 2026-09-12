@@ -29,7 +29,7 @@
 # tools/probe/Probe AppleScript Bridge.applescript) but not "do Visual Basic", so a
 # script can run a macro that already exists and cannot inject one. Every macro this
 # drives therefore already lives in the project: ImportLingTeXModulesQuiet in
-# modImport (pasted by hand once, with SRC_FOLDER set), and RunAllTestsToFile /
+# modImport (pasted by hand once; it reads src/ beside the document), and RunAllTestsToFile /
 # RunDocTestsToFile in the suites. Each writes its report to a file in
 #
 #     <folder of the document>/LingTeX-Word-reports/
@@ -246,7 +246,8 @@ done
 if [ -f "$reports/RunAllTests.txt" ] || [ -f "$reports/RunDocTests.txt" ]; then
     echo "   STALE MODULES: the run wrote RunAllTests.txt / RunDocTests.txt (no platform"
     echo "   tag), so the modules Word imported are older than $root/src."
-    echo "   Check SRC_FOLDER in the document's modImport: it must be $root/src."
+    echo "   ImportModules.txt says where it read from (the 'from' line). The document"
+    echo "   must sit in LingTeX-Word/ beside src/, with the current modImport pasted in."
     rm -f "$reports/RunAllTests.txt" "$reports/RunDocTests.txt"
     status=1
 fi
