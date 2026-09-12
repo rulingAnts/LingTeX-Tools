@@ -51,7 +51,10 @@ Private mRibbon As Object
 ' Option+Shift -- Shift kept because Command+Option alone is macOS's own Hide
 ' Others, Minimise and Close All on H, M and W, which Word cannot see to
 ' refuse. A key that is already bound to anything, built in or the user's
-' own, is never taken (Seth): it is skipped and named.
+' own, is never taken (Seth): it is skipped and named -- so each command lists
+' its letters in order of preference and the first free one is used (on Mac
+' Cmd+Option+Shift+I is Mark Citation, +S the Styles pane, +L a ListNum
+' field). LingTeXShowShortcuts reports what actually landed.
 '
 ' MAC WORD'S MODIFIER BITS ARE NOT WINDOWS'S. Found by a probe macro (deleted
 ' since; git history around 72a95ef) that asked Word to name what it had bound: Command 256, Shift 512,
@@ -59,11 +62,11 @@ Private mRibbon As Object
 ' 1024) are Command, Shift and "Invalid parameter" there, which is why every
 ' Cmd+Option attempt failed with 5853 and BuildKeyCode raised on it.
 Private Const SHORTCUT_TABLE As String = _
-    "I=LingTeXInsertInterlinear|R=LingTeXRewrapCurrent|A=LingTeXRewrapAll|" & _
-    "S=LingTeXSplitColumn|M=LingTeXMergeColumns|K=LingTeXCheckExample|" & _
+    "IEJ=LingTeXInsertInterlinear|R=LingTeXRewrapCurrent|A=LingTeXRewrapAll|" & _
+    "SXD=LingTeXSplitColumn|M=LingTeXMergeColumns|K=LingTeXCheckExample|" & _
     "T=LingTeXConvertTableToIgt|W=LingTeXAlignByWord|P=LingTeXAlignByMorpheme|" & _
     "H=LingTeXShowSettings|N=LingTeXToggleExampleNumbers|" & _
-    "G=LingTeXIndentExample|L=LingTeXOutdentExample"
+    "G=LingTeXIndentExample|LOU=LingTeXOutdentExample"
 Private Const MODS_WINDOWS As Long = 512 + 1024 + 256      ' Ctrl+Alt+Shift
 Private Const MODS_MAC As Long = 256 + 2048 + 512          ' Command+Option+Shift
 
@@ -1429,10 +1432,11 @@ Private Function InstallShortcuts() As String
     Dim names(1) As String
     Dim h As Long, k As Long
     Dim why As String, refused As String, taken As String, usedHome As String
-    Dim installed As String
+    Dim installed As String, busy As String
     Dim code As Long
     Dim bound As Boolean
-    Dim owner As String
+    Dim owner As String, letter As String
+    Dim j As Long
     Dim kb As Object
 
     ' Where a binding may live, in order of preference: this template when the
@@ -1459,43 +1463,52 @@ Private Function InstallShortcuts() As String
     total = UBound(pairs) + 1
     For i = 0 To UBound(pairs)
         kv = Split(pairs(i), "=")
-        code = KeyCodeFor(app, kv(0))
-
-        ' Never take a key that already does something -- Word's own command
-        ' or a binding the user made -- unless it is already ours.
-        owner = KeyOwner(app, homes(0), code)
-        If owner <> "" And InStr(1, owner, "LingTeX", vbTextCompare) = 0 Then
-            taken = taken & IIf(taken = "", "", ", ") & KeyName(kv(0)) & " (" & owner & ")"
-        Else
-            ' The bare macro name, then the qualified one Word sometimes insists
-            ' on for a macro that lives in another template.
-            names(0) = kv(1)
-            names(1) = ProjectName() & ".modLingTeX." & kv(1)
-            bound = False
-            For h = 0 To nHomes - 1
-                For k = 0 To 1
-                    why = TryBindKey(app, homes(h), names(k), code)
-                    If why = "" Then
-                        bound = True
-                        If usedHome = "" Then usedHome = homeNames(h)
-                        ' The name Word gives the key, which is the truth about
-                        ' what the modifier bits mean on this platform.
-                        Set kb = Nothing
-                        Set kb = app.FindKey(code)
-                        If kb Is Nothing Then
-                            installed = installed & "  " & KeyName(kv(0)) & "  " & ShortName(kv(1)) & vbCr
-                        Else
-                            installed = installed & "  " & kb.KeyString & "  " & ShortName(kv(1)) & vbCr
+        names(0) = kv(1)
+        names(1) = ProjectName() & ".modLingTeX." & kv(1)
+        bound = False
+        busy = ""
+        ' The letters in order of preference; the first one free is taken.
+        For j = 1 To Len(kv(0))
+            letter = Mid$(kv(0), j, 1)
+            code = KeyCodeFor(app, letter)
+            ' Never take a key that already does something -- Word's own command
+            ' or a binding the user made -- unless it is already ours.
+            owner = KeyOwner(app, homes(0), code)
+            If owner <> "" And InStr(1, owner, "LingTeX", vbTextCompare) = 0 Then
+                busy = busy & IIf(busy = "", "", ", ") & KeyName(letter) & " (" & owner & ")"
+            Else
+                ' The bare macro name, then the qualified one Word sometimes
+                ' insists on for a macro that lives in another template.
+                For h = 0 To nHomes - 1
+                    For k = 0 To 1
+                        why = TryBindKey(app, homes(h), names(k), code)
+                        If why = "" Then
+                            bound = True
+                            If usedHome = "" Then usedHome = homeNames(h)
+                            ' The name Word gives the key, which is the truth about
+                            ' what the modifier bits mean on this platform.
+                            Set kb = Nothing
+                            Set kb = app.FindKey(code)
+                            If kb Is Nothing Then
+                                installed = installed & "  " & KeyName(letter) & "  " & ShortName(kv(1)) & vbCr
+                            Else
+                                installed = installed & "  " & kb.KeyString & "  " & ShortName(kv(1)) & vbCr
+                            End If
+                            Exit For
                         End If
-                        Exit For
-                    End If
-                    If refused = "" Then
-                        refused = names(k) & " in " & homeNames(h) & ": " & why
-                    End If
-                Next k
-                If bound Then Exit For
-            Next h
-            If bound Then n = n + 1
+                        If refused = "" Then
+                            refused = names(k) & " in " & homeNames(h) & ": " & why
+                        End If
+                    Next k
+                    If bound Then Exit For
+                Next h
+            End If
+            If bound Then Exit For
+        Next j
+        If bound Then
+            n = n + 1
+        ElseIf busy <> "" Then
+            taken = taken & IIf(taken = "", "", "; ") & ShortName(kv(1)) & ": " & busy
         End If
     Next i
 
@@ -1518,7 +1531,7 @@ Private Function InstallShortcuts() As String
         End If
     End If
     If taken <> "" Then
-        InstallShortcuts = InstallShortcuts & "Left alone, already in use: " & taken & vbCr
+        InstallShortcuts = InstallShortcuts & "No free key for " & taken & vbCr
     End If
     InstallShortcuts = InstallShortcuts & vbCr & "Change any by hand: Tools > Customize " & _
                        "Keyboard, category Macros. LingTeXRemoveShortcuts takes ours out."
@@ -1667,10 +1680,55 @@ Private Sub StatusLine(ByVal s As String)
 End Sub
 
 Public Sub LingTeXShowShortcuts()
-    Report "LingTeX-Word keyboard shortcuts (once LingTeXInstallShortcuts has " & _
-           "been run):" & vbCr & vbCr & ShortcutList(), vbInformation
+    Dim have As String
+    have = InstalledShortcutList()
+    If have = "" Then
+        Report "No LingTeX-Word keyboard shortcuts are installed yet. Install " & _
+               "Shortcuts (or LingTeXInstallShortcuts) would try:" & vbCr & vbCr & _
+               ShortcutList(), vbInformation
+    Else
+        Report "LingTeX-Word keyboard shortcuts:" & vbCr & vbCr & have, vbInformation
+    End If
 End Sub
 
+' Every binding that runs one of our macros, in either home, by the name Word
+' gives the key.
+Private Function InstalledShortcutList() As String
+    Dim app As Object, kb As Object
+    Dim homes(1) As Object, nHomes As Long
+    Dim h As Long, i As Long
+    Dim cmd As String, p As Long
+
+    On Error Resume Next
+    Set app = Application
+    Set homes(0) = app.NormalTemplate
+    nHomes = 1
+    If ThisDocument.Type = 1 Then
+        Set homes(1) = ThisDocument
+        nHomes = 2
+    End If
+    For h = 0 To nHomes - 1
+        app.CustomizationContext = homes(h)
+        If Err.Number <> 0 Then
+            Err.Clear
+        Else
+            For i = 1 To app.KeyBindings.Count
+                Set kb = app.KeyBindings(i)
+                cmd = kb.Command
+                p = InStr(1, cmd, "LingTeX", vbTextCompare)
+                If p > 0 Then
+                    InstalledShortcutList = InstalledShortcutList & "  " & kb.KeyString & _
+                                            "  " & ShortName(Mid$(cmd, p)) & vbCr
+                End If
+                Err.Clear
+            Next i
+        End If
+    Next h
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+' The table's first-choice keys, for when nothing is installed yet.
 Private Function ShortcutList() As String
     Dim pairs() As String, kv() As String
     Dim i As Long
@@ -1679,7 +1737,7 @@ Private Function ShortcutList() As String
     pairs = Split(SHORTCUT_TABLE, "|")
     For i = 0 To UBound(pairs)
         kv = Split(pairs(i), "=")
-        s = s & KeyName(kv(0)) & "   " & kv(1) & vbCr
+        s = s & "  " & KeyName(Left$(kv(0), 1)) & "  " & ShortName(kv(1)) & vbCr
     Next i
     ShortcutList = s
 End Function
