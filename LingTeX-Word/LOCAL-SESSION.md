@@ -89,6 +89,12 @@ requests.
   onLoad keeps the IRibbonUI; DocumentChange and every setting command call
   RefreshRibbon). Silent on the ribbon; the macro-list commands still report.
   Unproven on Mac (whether getPressed/onLoad callbacks fire there).
+- Shortcuts (2026-09-12, late): MAC WORD'S MODIFIER BITS ARE NOT WINDOWS'S --
+  Command 256, Shift 512, Option 2048, Control 4096 (found by a probe macro
+  that asked Word to name what it had bound; the probe is deleted, see git
+  history around 72a95ef). The set is Command+Option+Shift+letter on Mac,
+  Ctrl+Alt+Shift on Windows (unproven there); the installer never takes a
+  bound key, and saves the template so the bindings persist. 13/13 on Mac.
 - Icons: our own PNGs in src/icons (tools/make-icons.py, Pillow + macOS
   fonts), embedded by build-dotm.sh with a part-level .rels; check-dotm.sh
   guards them. Unproven on Mac (embedded ribbon images from STARTUP).

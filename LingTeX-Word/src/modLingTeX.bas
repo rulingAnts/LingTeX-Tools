@@ -46,13 +46,15 @@ Private mRibbon As Object
 ' Keyboard shortcuts, letter=command, installed by LingTeXInstallShortcuts and
 ' by the first run. The modifiers are per platform (ShortcutModifiers): on
 ' Windows Ctrl+Alt+Shift, which Word leaves free, where Ctrl+Alt alone is
-' Print Preview, Insert Comment, AutoFormat and more; on Mac Control+Option,
-' the same chord, free of Word's and of macOS's own keys (Command+Option has
-' Hide Others, Minimise, Close All). A key that is already bound to anything,
-' built in or the user's own, is never taken (Seth): it is skipped and named.
+' Print Preview, Insert Comment, AutoFormat and more; on Mac the same chord
+' with Command for Ctrl (Seth: Cmd wherever Windows has Ctrl), Command+
+' Option+Shift -- Shift kept because Command+Option alone is macOS's own Hide
+' Others, Minimise and Close All on H, M and W, which Word cannot see to
+' refuse. A key that is already bound to anything, built in or the user's
+' own, is never taken (Seth): it is skipped and named.
 '
-' MAC WORD'S MODIFIER BITS ARE NOT WINDOWS'S. Found by LingTeXProbeShortcuts,
-' asking Word to name what it had bound (2026-09-12): Command 256, Shift 512,
+' MAC WORD'S MODIFIER BITS ARE NOT WINDOWS'S. Found by a probe macro (deleted
+' since; git history around 72a95ef) that asked Word to name what it had bound: Command 256, Shift 512,
 ' Option 2048, Control 4096. The Windows values (Shift 256, Ctrl 512, Alt
 ' 1024) are Command, Shift and "Invalid parameter" there, which is why every
 ' Cmd+Option attempt failed with 5853 and BuildKeyCode raised on it.
@@ -63,7 +65,7 @@ Private Const SHORTCUT_TABLE As String = _
     "H=LingTeXShowSettings|N=LingTeXToggleExampleNumbers|" & _
     "G=LingTeXIndentExample|L=LingTeXOutdentExample"
 Private Const MODS_WINDOWS As Long = 512 + 1024 + 256      ' Ctrl+Alt+Shift
-Private Const MODS_MAC As Long = 4096 + 2048               ' Control+Option
+Private Const MODS_MAC As Long = 256 + 2048 + 512          ' Command+Option+Shift
 
 ' How far Indent and Outdent move an example: half an inch, Word's own tab.
 Private Const INDENT_STEP As Double = 36
@@ -1497,6 +1499,14 @@ Private Function InstallShortcuts() As String
         End If
     Next i
 
+    ' Bindings stored in this template last only if the template is saved, and
+    ' Word would otherwise ask about it at quit. Saved here; a failure (the
+    ' Mac sandbox refusing a file outside Word's own folders) is not fatal:
+    ' the shortcuts work for this session and the first run tries again.
+    If n > 0 And nHomes = 2 Then
+        If usedHome = homeNames(0) Then SaveThisTemplate
+    End If
+
     If n = 0 Then
         InstallShortcuts = "No keyboard shortcuts could be installed." & vbCr
         If refused <> "" Then InstallShortcuts = InstallShortcuts & "Word said: " & refused
@@ -1515,6 +1525,15 @@ Private Function InstallShortcuts() As String
     ' A dialog shows 1024 characters and garbage after that.
     If Len(InstallShortcuts) > 1000 Then InstallShortcuts = Left$(InstallShortcuts, 997) & "..."
 End Function
+
+Private Sub SaveThisTemplate()
+    Dim d As Object
+    On Error Resume Next
+    Set d = ThisDocument
+    If Not d.Saved Then d.Save
+    Err.Clear
+    On Error GoTo 0
+End Sub
 
 ' What a key does now, as Word describes it, or "" when it is free.
 Private Function KeyOwner(app As Object, home As Object, ByVal code As Long) As String
@@ -1559,10 +1578,10 @@ Private Function KeyName(ByVal letter As String) As String
     Dim m As Long, s As String
     m = ShortcutModifiers()
     If Application.PathSeparator = "/" Then
+        If (m And 256) <> 0 Then s = s & "Cmd+"
         If (m And 4096) <> 0 Then s = s & "Control+"
         If (m And 2048) <> 0 Then s = s & "Option+"
         If (m And 512) <> 0 Then s = s & "Shift+"
-        If (m And 256) <> 0 Then s = s & "Command+"
     Else
         If (m And 512) <> 0 Then s = s & "Ctrl+"
         If (m And 1024) <> 0 Then s = s & "Alt+"
@@ -1619,66 +1638,6 @@ Public Sub LingTeXRemoveShortcuts()
     On Error GoTo 0
     Report CStr(n) & " LingTeX shortcuts removed.", vbInformation
 End Sub
-
-'-----------------------------------------------------------------------------
-' LingTeXProbeShortcuts: which parameter Mac Word refuses in KeyBindings.Add.
-'
-' Install Shortcuts fails there with 5853 "Invalid parameter" in every home and
-' under every name (Seth, 2026-09-12), so the fault is the key code or the
-' category. This tries one binding at a time, each differing in one thing,
-' clears every one that succeeds, and reports the lot. Run it from the macro
-' list (it is in modLingTeX because modTests may not name a command); it changes nothing that it does not put back.
-'-----------------------------------------------------------------------------
-Public Sub LingTeXProbeShortcuts()
-    Dim app As Object
-    Dim msg As String
-
-    On Error Resume Next
-    Set app = Application
-    app.CustomizationContext = app.NormalTemplate
-    msg = "Round 3: what Word calls each key. 2048 and 4096 took in round 2." & vbCr
-    msg = msg & Probe(app, "256+I", 2, "LingTeXInsertInterlinear", 256 + 73)
-    msg = msg & Probe(app, "512+I", 2, "LingTeXInsertInterlinear", 512 + 73)
-    msg = msg & Probe(app, "2048+I", 2, "LingTeXInsertInterlinear", 2048 + 73)
-    msg = msg & Probe(app, "4096+I", 2, "LingTeXInsertInterlinear", 4096 + 73)
-    msg = msg & Probe(app, "512+2048+I", 2, "LingTeXInsertInterlinear", 512 + 2048 + 73)
-    msg = msg & Probe(app, "512+4096+I", 2, "LingTeXInsertInterlinear", 512 + 4096 + 73)
-    msg = msg & Probe(app, "2048+4096+I", 2, "LingTeXInsertInterlinear", 2048 + 4096 + 73)
-    msg = msg & Probe(app, "512+4096+R", 2, "LingTeXRewrapCurrent", 512 + 4096 + 82)
-    msg = msg & Probe(app, "512+4096+S", 2, "LingTeXSplitColumn", 512 + 4096 + 83)
-    Err.Clear
-    On Error GoTo 0
-    Report msg, vbInformation
-End Sub
-
-' One binding: what the key did before, then added and cleared again if it
-' took, reporting the name Word gives the key.
-Private Function Probe(app As Object, ByVal what As String, ByVal category As Long, _
-        ByVal cmd As String, ByVal code As Long) As String
-    Dim kb As Object
-    Dim before As String, ks As String
-    On Error Resume Next
-    Set kb = app.FindKey(code)
-    If Not kb Is Nothing Then before = kb.Command
-    Err.Clear
-    app.KeyBindings.Add category, cmd, code
-    If Err.Number = 0 Then
-        Err.Clear
-        Set kb = Nothing
-        Set kb = app.FindKey(code)
-        ks = "?"
-        If Not kb Is Nothing Then
-            ks = kb.KeyString
-            If InStr(1, kb.Command, "LingTeX", vbTextCompare) > 0 Then kb.Clear
-        End If
-        Probe = "  " & what & ": OK, Word calls it " & ks & _
-                IIf(before = "", "", ", was " & before) & vbCr
-    Else
-        Probe = "  " & what & ": " & CStr(Err.Number) & " " & Err.Description & vbCr
-    End If
-    Err.Clear
-    On Error GoTo 0
-End Function
 
 ' One attempt: the customization context, then the binding. Empty on success,
 ' else what Word said, prefixed "context" when it was the context that failed.
