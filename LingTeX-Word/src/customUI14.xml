@@ -63,6 +63,18 @@
                   onAction="RbnRewrapAll"
                   screentip="Re-wrap every example in the document"
                   supertip="Also runs automatically when the document is saved. Turn that off with the LingTeX_RewrapOnSave document variable."/>
+          <button id="LingTeXIndent"
+                  label="Indent"
+                  image="igtIndent"
+                  onAction="RbnIndent"
+                  screentip="Move the example half an inch to the right"
+                  supertip="The number and the translation move with it, and the example is re-wrapped to the narrower line. The indent is the table's own left indent, so the ruler works too."/>
+          <button id="LingTeXOutdent"
+                  label="Outdent"
+                  image="igtOutdent"
+                  onAction="RbnOutdent"
+                  screentip="Move the example half an inch to the left"
+                  supertip="Stops at the margin."/>
         </group>
 
         <group id="LingTeXAlignGroup" label="Alignment">

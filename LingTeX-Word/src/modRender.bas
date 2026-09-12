@@ -445,7 +445,10 @@ End Sub
 ' orientation flip, or an edit.  It is idempotent: running it on an example that
 ' is already correct changes nothing visible.
 '-----------------------------------------------------------------------------
-Public Function RewrapTable(tbl As Table) As Table
+' indentOverride: the indent commands pass the example's new indent; -1 (the
+' default) keeps the one the table has.
+Public Function RewrapTable(tbl As Table, _
+        Optional ByVal indentOverride As Double = -1) As Table
     Dim ex As IgtExample
 
     gRenderError = ""
@@ -461,7 +464,7 @@ Public Function RewrapTable(tbl As Table) As Table
     ' are rewritten rather than duplicated.
     AbsorbFreeParagraphs ex, tbl
 
-    Set RewrapTable = RedrawExampleAt(tbl, ex)
+    Set RewrapTable = RedrawExampleAt(tbl, ex, indentOverride)
 End Function
 
 '-----------------------------------------------------------------------------
@@ -483,7 +486,8 @@ End Function
 ' cell, and exactly wrong here, where it made every re-wrap plan against a few
 ' points of budget.
 '-----------------------------------------------------------------------------
-Public Function RedrawExampleAt(tbl As Table, ex As IgtExample) As Table
+Public Function RedrawExampleAt(tbl As Table, ex As IgtExample, _
+        Optional ByVal indentOverride As Double = -1) As Table
     Dim doc As Document
     Dim anchor As Range
     Dim startPos As Long
@@ -506,6 +510,7 @@ Public Function RedrawExampleAt(tbl As Table, ex As IgtExample) As Table
     ' from the setting, so changing NumberHang reaches every example on its
     ' next re-wrap.
     indent = ExampleIndent(tbl)
+    If indentOverride >= 0 Then indent = indentOverride
     level = SettingNumberLevel(doc)
     numW = 0
     Set numPara = NumberParagraphOf(tbl)
@@ -527,6 +532,7 @@ Public Function RedrawExampleAt(tbl As Table, ex As IgtExample) As Table
             Err.Clear
             On Error GoTo 0
             If indent < 0 Then indent = 0
+            If indentOverride >= 0 Then indent = indentOverride
         End If
     End If
 

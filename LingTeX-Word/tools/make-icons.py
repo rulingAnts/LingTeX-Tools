@@ -299,6 +299,23 @@ def ic_settings():
     return im
 
 
+def ic_indent(outdent=False):
+    """Lines of text pushed right (or back left) by an arrow."""
+    im = canvas(); d = ImageDraw.Draw(im)
+    disc(d, BLUE)
+    for y in (20, 31, 42):
+        d.rounded_rectangle((px(29), px(y), px(50), px(y + 3)), radius=px(1.5), fill=WHITE)
+    if outdent:
+        right_arrow(d, 26, 32.5, -12, head=5.5, shaft=3.5)
+    else:
+        right_arrow(d, 14, 32.5, 12, head=5.5, shaft=3.5)
+    return im
+
+
+def ic_outdent():
+    return ic_indent(True)
+
+
 def ic_reset_styles():
     im = canvas(); d = ImageDraw.Draw(im)
     disc(d, ORANGE)
@@ -349,6 +366,8 @@ ICONS = [
     ("igtConvert", ic_convert, 64),
     ("igtRewrapThis", ic_rewrap_this, 32),
     ("igtRewrapAll", ic_rewrap_all, 32),
+    ("igtIndent", ic_indent, 32),
+    ("igtOutdent", ic_outdent, 32),
     ("igtSplit", ic_split, 32),
     ("igtMerge", ic_merge, 32),
     ("igtByWord", ic_by_word, 32),

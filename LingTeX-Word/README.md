@@ -119,7 +119,7 @@ standard module or a *Class Module*.
 Commands run from **Alt+F8** (Windows) or **Tools → Macro → Macros** (Mac):
 `LingTeXInsertInterlinear`, `LingTeXRewrapCurrent`, `LingTeXRewrapAll`,
 `LingTeXSplitColumn`, `LingTeXMergeColumns`, `LingTeXCheckExample`,
-`LingTeXConvertTableToIgt`.
+`LingTeXConvertTableToIgt`, `LingTeXIndentExample`, `LingTeXOutdentExample`.
 
 `src/customUI14.xml` is the ribbon; it only takes effect once the modules are
 packaged into `LingTeX-Word.dotm`. Its icons are our own, `src/icons/*.png`,
@@ -168,10 +168,12 @@ through every re-wrap. An example drawn by an earlier build, with its number on
 a line above the table, is migrated by its next re-wrap: the number moves into
 the table and the line goes.
 
-**The example's indent** is its rows' left indent: drag the table's left edge
-on the ruler (or set `Rows.LeftIndent`), and a re-wrap keeps it and lays the
-translation out past the indent and the number. A fresh example takes the
-indent of the paragraph it is inserted into.
+**The example's indent** is its rows' left indent. Indent and Outdent on the
+ribbon (`LingTeXIndentExample`, `LingTeXOutdentExample`) step it half an inch,
+re-wrapping the example to the new line with the number and the translation
+moving with it; dragging the table's left edge on the ruler works too, and a
+re-wrap keeps whatever it finds. A fresh example takes the indent of the
+paragraph it is inserted into.
 
 **Per-chapter numbering.** Modify the list style (Format → Style →
 `LingTeX Example Number`): link its level 1 to Heading 1 with no number text,

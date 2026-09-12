@@ -51,7 +51,11 @@ Private Const SHORTCUT_TABLE As String = _
     "I=LingTeXInsertInterlinear|R=LingTeXRewrapCurrent|A=LingTeXRewrapAll|" & _
     "S=LingTeXSplitColumn|M=LingTeXMergeColumns|K=LingTeXCheckExample|" & _
     "T=LingTeXConvertTableToIgt|W=LingTeXAlignByWord|P=LingTeXAlignByMorpheme|" & _
-    "H=LingTeXShowSettings|N=LingTeXToggleExampleNumbers"
+    "H=LingTeXShowSettings|N=LingTeXToggleExampleNumbers|" & _
+    "G=LingTeXIndentExample|L=LingTeXOutdentExample"
+
+' How far Indent and Outdent move an example: half an inch, Word's own tab.
+Private Const INDENT_STEP As Double = 36
 
 '-----------------------------------------------------------------------------
 ' EVERY message to the user goes through Report or Confirm, never MsgBox.
@@ -398,6 +402,72 @@ Fail:
     ' Captured FIRST. EndUndo ends with Err.Clear and ReleaseScratch opens with
     ' On Error Resume Next, either of which resets Err -- so reading Err.Number
     ' after them reported "Error 0: " and lost the error being hunted.
+    errNum = Err.Number: errDesc = Err.Description
+    Application.ScreenUpdating = True
+    EndUndo
+    gBusy = False
+    ReleaseScratch
+    Report "Error " & errNum & ": " & errDesc, vbCritical
+End Sub
+
+'-----------------------------------------------------------------------------
+' Move the example at the cursor half an inch right or left.
+'
+' The example's indent is its rows' left indent (modRender.ExampleIndent); the
+' number column and the translation go with it. Done as a re-wrap at the new
+' indent rather than by moving the rows, so the wrap is re-planned for the
+' narrower or wider line and nothing changes if the plan fails.
+'-----------------------------------------------------------------------------
+Public Sub LingTeXIndentExample()
+    StepExampleIndent INDENT_STEP, "Indent interlinear example"
+End Sub
+
+Public Sub LingTeXOutdentExample()
+    StepExampleIndent -INDENT_STEP, "Outdent interlinear example"
+End Sub
+
+Private Sub StepExampleIndent(ByVal delta As Double, ByVal label As String)
+    Dim errNum As Long, errDesc As String
+    Dim tbl As Table
+    Dim v As Double
+
+    If gBusy Then
+        Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
+               "If this keeps happening, run LingTeXStart from the macro list " & _
+               "(or restart Word) to clear it.", vbInformation
+        Exit Sub
+    End If
+    On Error GoTo Fail
+    EnsureHooks
+
+    Set tbl = FindExampleAt(Selection.Range)
+    If tbl Is Nothing Then
+        Report "Put the cursor inside an interlinear example first.", _
+               vbInformation
+        Exit Sub
+    End If
+
+    v = ExampleIndent(tbl) + delta
+    If v < 0 Then v = 0
+    If Abs(v - ExampleIndent(tbl)) < 0.5 Then
+        Report "The example is at the left margin already.", vbInformation
+        Exit Sub
+    End If
+
+    gBusy = True
+    BeginUndo label
+    Application.ScreenUpdating = False
+    RewrapTable tbl, v
+    Application.ScreenUpdating = True
+    EndUndo
+    gBusy = False
+    ReleaseScratch
+    If gRenderError <> "" Then
+        Report "The example could not be moved: " & gRenderError, vbExclamation
+    End If
+    Exit Sub
+
+Fail:
     errNum = Err.Number: errDesc = Err.Description
     Application.ScreenUpdating = True
     EndUndo
@@ -1548,6 +1618,14 @@ End Sub
 
 Public Sub RbnRewrapAll(control As Variant)
     LingTeXRewrapAll
+End Sub
+
+Public Sub RbnIndent(control As Variant)
+    LingTeXIndentExample
+End Sub
+
+Public Sub RbnOutdent(control As Variant)
+    LingTeXOutdentExample
 End Sub
 
 Public Sub RbnSplitColumn(control As Variant)

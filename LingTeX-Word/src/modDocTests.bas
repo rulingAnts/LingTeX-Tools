@@ -1834,6 +1834,7 @@ Private Sub TestCommands()
     CheckCommandIsNoOp doc, "LingTeXMergeColumns"
     CheckCommandIsNoOp doc, "LingTeXCheckExample"
     CheckCommandIsNoOp doc, "LingTeXConvertTableToIgt"
+    CheckCommandIsNoOp doc, "LingTeXIndentExample"
 
     ' And on a document with no examples at all.
     CheckRewrapAllOnEmpty doc
@@ -1842,9 +1843,69 @@ Private Sub TestCommands()
     CheckRewrapAllCounts doc
     CheckSplitThenMerge doc
     CheckConvertPlainTable doc
+    CheckIndentCommands doc
 
     gQuiet = savedQuiet
     CloseNoSave doc
+End Sub
+
+' Indent and Outdent step the example half an inch, number column and
+' translation with it, and Outdent stops at the margin with a message.
+Private Sub CheckIndentCommands(doc As Document)
+    Dim ex As IgtExample
+    Dim tbl As Table
+    Dim hang As Double
+    Dim numW As Double
+
+    doc.Content.Delete
+    SetPageGeometry doc, 612, 792, 72
+    ex = ThreeTierExample()
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then
+        Ok "indent: an example could be drawn", False
+        Exit Sub
+    End If
+    numW = 0
+    If HasNumberColumn(tbl) Then numW = SettingNumberHang(doc)
+
+    On Error Resume Next
+    tbl.Cell(1, 1 + NumberColumns(tbl)).Range.Select
+    Err.Clear
+    On Error GoTo 0
+    gLastMessage = ""
+    RunCommandByName "LingTeXIndentExample"
+    Set tbl = FindExampleAt(Selection.Range)
+    If tbl Is Nothing Then
+        Ok "indent: the example survived", False
+        Emit "         said: " & gLastMessage
+        Exit Sub
+    End If
+    Ok "Indent moves the example half an inch", (Abs(ExampleIndent(tbl) - 36) <= 0.5)
+    Emit "         rows at " & CStr(ExampleIndent(tbl)) & "pt"
+    hang = ParagraphAfterTable(tbl).Format.LeftIndent
+    Ok "and the translation with it, past the number", (Abs(hang - 36 - numW) <= 0.5)
+    Ok "the number is still (1)", (ExampleNumberString(tbl) = "(1)") Or (numW = 0)
+
+    RunCommandByName "LingTeXIndentExample"
+    Set tbl = FindExampleAt(Selection.Range)
+    Ok "a second Indent makes an inch", _
+        (Not tbl Is Nothing) And (Abs(ExampleIndent(tbl) - 72) <= 0.5)
+
+    RunCommandByName "LingTeXOutdentExample"
+    Set tbl = FindExampleAt(Selection.Range)
+    Ok "Outdent takes half of it back", _
+        (Not tbl Is Nothing) And (Abs(ExampleIndent(tbl) - 36) <= 0.5)
+
+    RunCommandByName "LingTeXOutdentExample"
+    Set tbl = FindExampleAt(Selection.Range)
+    Ok "and the rest", (Not tbl Is Nothing) And (Abs(ExampleIndent(tbl)) <= 0.5)
+
+    gLastMessage = ""
+    RunCommandByName "LingTeXOutdentExample"
+    Ok "Outdent at the margin says so and stops", _
+        (InStr(1, gLastMessage, "left margin", vbTextCompare) > 0)
+    Ok "LingTeXOutdentExample leaves gBusy clear", (Not gBusy)
+    Ok "LingTeXOutdentExample leaves no undo record open", (Not UndoRecordIsOpen())
 End Sub
 
 ' Run a command with the cursor in ordinary text. Nothing may change, and the state
@@ -1906,6 +1967,8 @@ Private Sub RunCommandByName(ByVal name As String)
         Case "LingTeXCheckExample":     LingTeXCheckExample
         Case "LingTeXConvertTableToIgt": LingTeXConvertTableToIgt
         Case "LingTeXInsertInterlinear": LingTeXInsertInterlinear
+        Case "LingTeXIndentExample":    LingTeXIndentExample
+        Case "LingTeXOutdentExample":   LingTeXOutdentExample
     End Select
     Err.Clear
     On Error GoTo 0

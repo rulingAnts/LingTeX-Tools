@@ -69,13 +69,14 @@ the test document, then Tools → Macro → Macros…, pick the command, Run. If
 example lands in `LingTeX.docm` instead, that is the mistake — the code document
 was in front.
 
-The seven commands, as they appear in the list:
+The nine commands, as they appear in the list:
 
 ```
 LingTeXInsertInterlinear     LingTeXSplitColumn
 LingTeXRewrapCurrent         LingTeXMergeColumns
 LingTeXRewrapAll             LingTeXCheckExample
-LingTeXConvertTableToIgt
+LingTeXConvertTableToIgt     LingTeXIndentExample
+                             LingTeXOutdentExample
 ```
 
 ### The commands, and what each says outside an example
@@ -89,6 +90,7 @@ LingTeXConvertTableToIgt
 | `LingTeXMergeColumns` | Merges the selected columns, or the cursor's column with the one to its right | *Select the columns you want to merge.* |
 | `LingTeXCheckExample` | Runs the Leipzig checks on the example at the cursor and offers the fixes | *Put the cursor inside an interlinear example first.* |
 | `LingTeXConvertTableToIgt` | Adopts a plain Word table as an example: styles it and wraps it | *Put the cursor inside the table you want to convert.* |
+| `LingTeXIndentExample` / `LingTeXOutdentExample` | Moves the example at the cursor half an inch right or left, number and translation with it, re-wrapped to the new line | *Put the cursor inside an interlinear example first.*; at the margin, Outdent says *The example is at the left margin already.* |
 
 So the "outside any example" check is five commands and five messages; the
 other two behave the same inside or out. Every message is a dialog titled
@@ -103,7 +105,8 @@ matters to them.
   last time). It binds every command to ⌘⌥ + a letter in the Normal template,
   so they work in every document: ⌘⌥I insert, ⌘⌥R re-wrap this, ⌘⌥A re-wrap
   all, ⌘⌥S split, ⌘⌥M merge, ⌘⌥K check, ⌘⌥T convert table, ⌘⌥W by word,
-  ⌘⌥P by morpheme, ⌘⌥H settings. `LingTeXShowShortcuts` lists them;
+  ⌘⌥P by morpheme, ⌘⌥H settings, ⌘⌥N numbers, ⌘⌥G indent, ⌘⌥L outdent.
+  `LingTeXShowShortcuts` lists them;
   `LingTeXRemoveShortcuts` takes them out.
 - **The ribbon.** With Word quit:
 
