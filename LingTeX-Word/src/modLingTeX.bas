@@ -1273,81 +1273,160 @@ End Sub
 
 Public Sub LingTeXInstallShortcuts()
     Dim pairs() As String, kv() As String
-    Dim i As Long, n As Long
-    Dim errNum As Long, errDesc As String
-
+    Dim i As Long, n As Long, total As Long
     Dim app As Object
-    On Error GoTo Fail
+    Dim homes(1) As Object, homeNames(1) As String, nHomes As Long
+    Dim names(1) As String
+    Dim h As Long, k As Long
+    Dim why As String, detail As String, usedHome As String
+    Dim code As Long
+    Dim bound As Boolean
+
+    ' Where a binding may live, in order of preference: this template when the
+    ' code is in one (so the shortcuts ship with it), else Normal; and Normal
+    ' as the fallback when the template refuses them, which Word reports as
+    ' 5853 "Invalid parameter" without saying which parameter (Seth, on Mac,
+    ' 2026-09-12). Every combination is tried in turn, and when none works the
+    ' message lists what Word said to each, because that is the diagnosis.
+    On Error Resume Next
     Set app = Application
-    app.CustomizationContext = ShortcutHome()
+    If ThisDocument.Type = 1 Then          ' 1 = a template
+        Set homes(0) = ThisDocument
+        homeNames(0) = "the template " & ThisDocument.Name
+        Set homes(1) = app.NormalTemplate
+        homeNames(1) = "the Normal template"
+        nHomes = 2
+    Else
+        Set homes(0) = app.NormalTemplate
+        homeNames(0) = "the Normal template"
+        nHomes = 1
+    End If
+    Err.Clear
+    On Error GoTo 0
+
     pairs = Split(SHORTCUT_TABLE, "|")
+    total = UBound(pairs) + 1
     For i = 0 To UBound(pairs)
         kv = Split(pairs(i), "=")
-        app.KeyBindings.Add 2, kv(1), app.BuildKeyCode(512, 1024, Asc(kv(0)))
-        n = n + 1
+        code = KeyCodeFor(app, kv(0))
+        ' The bare macro name, then the qualified one Word sometimes insists
+        ' on for a macro that lives in another template.
+        names(0) = kv(1)
+        names(1) = ProjectName() & ".modLingTeX." & kv(1)
+        bound = False
+        For h = 0 To nHomes - 1
+            For k = 0 To 1
+                why = TryBindKey(app, homes(h), names(k), code)
+                If why = "" Then
+                    bound = True
+                    If usedHome = "" Then usedHome = homeNames(h)
+                    Exit For
+                End If
+                If i = 0 Then
+                    detail = detail & "  in " & homeNames(h) & ", " & names(k) & _
+                             ": " & why & vbCr
+                End If
+            Next k
+            If bound Then Exit For
+        Next h
+        If bound Then n = n + 1
     Next i
-    Report CStr(n) & " keyboard shortcuts installed in " & ShortcutHomeName() & ":" & _
-           vbCr & vbCr & ShortcutList() & vbCr & _
-           "LingTeXRemoveShortcuts takes them out again.", vbInformation
-    Exit Sub
-Fail:
-    errNum = Err.Number: errDesc = Err.Description
-    Report "Could not install the shortcuts (" & CStr(errNum) & ": " & errDesc & _
-           ")." & vbCr & vbCr & "They can be set by hand: Tools > Customize " & _
-           "Keyboard..., category Macros.", vbExclamation
+
+    If n = total Then
+        Report CStr(n) & " keyboard shortcuts installed in " & usedHome & ":" & _
+               vbCr & vbCr & ShortcutList() & vbCr & _
+               "LingTeXRemoveShortcuts takes them out again.", vbInformation
+    ElseIf n > 0 Then
+        Report "Installed " & CStr(n) & " of " & CStr(total) & " shortcuts, in " & _
+               usedHome & ". For the first one Word said:" & vbCr & detail & vbCr & _
+               "The rest can be set by hand: Tools > Customize Keyboard..., " & _
+               "category Macros.", vbExclamation
+    Else
+        Report "Could not install the shortcuts. Word said:" & vbCr & detail & vbCr & _
+               "They can be set by hand: Tools > Customize Keyboard..., " & _
+               "category Macros.", vbExclamation
+    End If
 End Sub
+
+' One attempt: the customization context, then the binding. Empty on success,
+' else what Word said, prefixed "context" when it was the context that failed.
+Private Function TryBindKey(app As Object, home As Object, ByVal cmd As String, _
+        ByVal code As Long) As String
+    On Error Resume Next
+    app.CustomizationContext = home
+    If Err.Number <> 0 Then
+        TryBindKey = "context: " & CStr(Err.Number) & ": " & Err.Description
+        Err.Clear
+        Exit Function
+    End If
+    app.KeyBindings.Add 2, cmd, code       ' 2 = wdKeyCategoryMacro
+    If Err.Number <> 0 Then TryBindKey = CStr(Err.Number) & ": " & Err.Description
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+' Command/Ctrl + Option/Alt + a letter. BuildKeyCode when Word offers it; the
+' same sum by hand when the call itself is what raises.
+Private Function KeyCodeFor(app As Object, ByVal letter As String) As Long
+    On Error Resume Next
+    KeyCodeFor = app.BuildKeyCode(512, 1024, Asc(letter))
+    If Err.Number <> 0 Or KeyCodeFor = 0 Then KeyCodeFor = 512 + 1024 + Asc(letter)
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+' The VBA project's name, for the qualified macro name; "Project" (Word's
+' default for a template) when it cannot be read, which on Windows it cannot
+' without trust access to the project object model.
+Private Function ProjectName() As String
+    Dim d As Object
+    On Error Resume Next
+    Set d = ThisDocument
+    ProjectName = d.VBProject.Name
+    If Err.Number <> 0 Or ProjectName = "" Then ProjectName = "Project"
+    Err.Clear
+    On Error GoTo 0
+End Function
 
 Public Sub LingTeXRemoveShortcuts()
     Dim pairs() As String, kv() As String
-    Dim i As Long, n As Long
+    Dim i As Long, n As Long, h As Long
     Dim kb As Object
     Dim app As Object
+    Dim homes(1) As Object, nHomes As Long
 
     On Error Resume Next
     Set app = Application
-    app.CustomizationContext = ShortcutHome()
+    Set homes(0) = app.NormalTemplate
+    nHomes = 1
+    If ThisDocument.Type = 1 Then
+        Set homes(1) = ThisDocument
+        nHomes = 2
+    End If
     pairs = Split(SHORTCUT_TABLE, "|")
-    For i = 0 To UBound(pairs)
-        kv = Split(pairs(i), "=")
-        Set kb = app.FindKey(app.BuildKeyCode(512, 1024, Asc(kv(0))))
-        If Not kb Is Nothing Then
-            If kb.Command = kv(1) Then
-                kb.Clear
-                n = n + 1
-            End If
+    For h = 0 To nHomes - 1
+        app.CustomizationContext = homes(h)
+        If Err.Number <> 0 Then
+            Err.Clear
+        Else
+            For i = 0 To UBound(pairs)
+                kv = Split(pairs(i), "=")
+                Set kb = Nothing
+                Set kb = app.FindKey(KeyCodeFor(app, kv(0)))
+                If Not kb Is Nothing Then
+                    If InStr(1, kb.Command, kv(1), vbTextCompare) > 0 Then
+                        kb.Clear
+                        n = n + 1
+                    End If
+                End If
+                Err.Clear
+            Next i
         End If
-    Next i
+    Next h
     Err.Clear
     On Error GoTo 0
-    Report CStr(n) & " LingTeX shortcuts removed from " & ShortcutHomeName() & ".", _
-           vbInformation
+    Report CStr(n) & " LingTeX shortcuts removed.", vbInformation
 End Sub
-
-' Where the shortcuts are stored: in this template when the code lives in one
-' (so they ship with it and apply everywhere it is loaded), else in Normal.
-Private Function ShortcutHome() As Object
-    Dim app As Object
-    On Error Resume Next
-    Set app = Application
-    If ThisDocument.Type = 1 Then          ' 1 = a template
-        Set ShortcutHome = ThisDocument
-    Else
-        Set ShortcutHome = app.NormalTemplate
-    End If
-    Err.Clear
-    On Error GoTo 0
-End Function
-
-Private Function ShortcutHomeName() As String
-    On Error Resume Next
-    If ThisDocument.Type = 1 Then          ' 1 = a template
-        ShortcutHomeName = "the template " & ThisDocument.Name
-    Else
-        ShortcutHomeName = "the Normal template"
-    End If
-    Err.Clear
-    On Error GoTo 0
-End Function
 
 ' The status bar, late-bound: a progress line while a long command runs.
 Private Sub StatusLine(ByVal s As String)
