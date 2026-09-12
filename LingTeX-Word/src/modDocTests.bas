@@ -1229,29 +1229,34 @@ Private Sub CheckSmallCapsRuns(tbl As Table)
     Dim r As Long, c As Long
     Dim txt As String
 
+    ' The example's gloss cell is "attack.CMP=REL" -- word-aligned, so the
+    ' grammatical parts share the cell with the lexical part and with each
+    ' other. Drawn, it must read "attack.cmp=rel" with the gram-gloss style on
+    ' exactly the two abbreviations: character 8 is the c of cmp, 12 the r of
+    ' rel, 1 the a of attack. (An earlier version looked for a cell that was
+    ' exactly "attack.cmp", found none, and skipped -- a silent pass.)
     For r = 1 To tbl.Rows.Count
         For c = 1 To tbl.Rows(r).Cells.Count
             txt = CleanText(CellTextOf(tbl, r, c))
-            If txt = "attack.cmp" Then
+            If Left$(txt, 10) = "attack.cmp" Then
                 found = True
-                Ok "attack.CMP is drawn as attack.cmp", True
+                Eq "attack.CMP=REL is drawn lower-cased for small caps", txt, "attack.cmp=rel"
                 Ok "the lexical part carries no gram-gloss style", _
                     (Not CharHasGramStyle(tbl, r, c, 1))
-                Ok "the grammatical part carries the gram-gloss style", _
+                Ok "the first grammatical part carries the gram-gloss style", _
                     CharHasGramStyle(tbl, r, c, 8)
-            ElseIf txt = "Edefina" Then
+                Ok "the second grammatical part carries it too", _
+                    CharHasGramStyle(tbl, r, c, 12)
+            ElseIf txt = "di=de" Then
                 ' A vernacular cell is drawn verbatim, with no run restyled, or an
                 ' all-caps object-language word would be silently small-capped.
-                Ok "a vernacular cell is drawn verbatim", True
-                Ok "and carries no gram-gloss style anywhere", _
+                Ok "a vernacular cell carries no gram-gloss style", _
                     (Not CharHasGramStyle(tbl, r, c, 1))
             End If
         Next c
     Next r
 
-    If Not found Then
-        Emit "  SKIP   no attack.cmp cell found to check small-caps runs"
-    End If
+    Ok "the attack.CMP=REL cell was found to check its small-caps runs", found
 End Sub
 
 Private Function CellTextOf(tbl As Table, ByVal r As Long, ByVal c As Long) As String

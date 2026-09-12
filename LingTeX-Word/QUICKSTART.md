@@ -483,15 +483,28 @@ it.
 
 ## Status
 
-**Stage 1 passes on Word 16.112 for Mac: `ALL PASS -- 79 passed`.** Every
-parsing, projection, routing, column-editing, Leipzig-check, gloss-detection and
-wrap-planning assertion, inside real Word VBA. Windows is still to do — see below.
+**Both suites pass on Word 16.112 for Mac: `RunAllTests` 79/79 and `RunDocTests`
+218/218** (2026-09-12) — every parsing, projection, routing, column-editing,
+Leipzig-check, gloss-detection and wrap-planning assertion, and then styles,
+settings, measurement, render/measure agreement, rendering, page geometry, the
+scratch document, the round trip (including re-wrapping down to six rows on a
+narrow page and back up to two), the commands and the save/selection events, all
+inside real Word. The one-command runner (`tools/run-in-word.sh`) proves it
+without a person in the loop. The same run on Windows is the next gate.
 
-Getting there found four real bugs that the JavaScript harness structurally could
-not: `any` used as a variable name (reserved in VBA), `IsGramGloss` accepting
-`P.N.`, a function's array return passed into a `ByRef` array parameter, and a
-run-time Overflow whose cause is still not understood (see *An unexplained
-failure* below).
+Getting there found real bugs that the JavaScript harness structurally could not:
+`any` used as a variable name (reserved in VBA), `IsGramGloss` accepting `P.N.`,
+a function's array return passed into a `ByRef` array parameter, seven
+module-level declarations placed after the first procedure, a scratch-document
+cleanup that closed the document holding the running code, `wdStyleTableGrid`
+(not in Mac Word's type library), a `_` continuation in a class module that the
+bootstrap installs double-spaced on Mac, and the Overflow that was blamed on
+`Single` and turned out to be `Debug.Print` — see *The `Single` failure* below.
+Each has a linter rule now.
+
+Still to do, in order: the same two suites on Windows; the by-hand checks in
+`TESTING.md`; `SaveAsTemplate` with `tools/build-dotm.sh` and
+`tools/check-dotm.sh`; then packaging.
 
 ---
 
