@@ -423,7 +423,11 @@ column; and morpheme to word is merging every continuation column (the ones
 `NoBreakFlags` marks) into the one before it. Both are the proven split and
 merge primitives, applied to the whole example, followed by the ordinary
 delete-and-redraw. One command, `LingTeXToggleExampleAlignment`, on the
-example at the cursor; its only new logic is the loop.
+example at the cursor; its only new logic is the loop. And its bulk form: the
+same over every example whose table lies within the selection — or the whole
+document when nothing is selected — as `LingTeXAlignSelectionByWord` /
+`…ByMorpheme`. Selecting a heading in Outline view selects its whole section,
+so a chapter's examples can be switched in one go with nothing new to write.
 
 **Later — numbering, headings, captions.** What an example carries in a
 FieldWorks text, and what a paper puts around it. Already handled: any number

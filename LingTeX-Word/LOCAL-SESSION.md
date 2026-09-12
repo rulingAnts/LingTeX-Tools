@@ -120,7 +120,8 @@ requests.
 - Later, wanted by Seth: a settings interface (gaps, styles) -- Phase 2 form.
 - Later, per Seth: toggle an existing example between word- and
   morpheme-aligned in place -- split every boundary / merge every continuation
-  column, then redraw (README, *Later*).
+  column, then redraw; and in bulk over a selection (Outline view selects a
+  section) or the whole document (README, *Later*).
 - Later, per Seth: example numbers, headings before, captions after, list
   numbering around, sub-numbering across a multi-block paste; and keep the
   language tag on a second free translation (dropped today). README, *Later*.
