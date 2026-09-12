@@ -17,6 +17,7 @@ param(
     [string]$Doc = "",
     [switch]$NoPull,
     [switch]$NoImport,
+    [switch]$NoCommit,
     [ValidateSet("both", "all", "doc")][string]$Tests = "both"
 )
 
@@ -31,8 +32,10 @@ Set-Content -Path $conf -Value $Doc
 $reports = Join-Path (Split-Path -Parent $Doc) "LingTeX-Word-reports"
 
 if (-not $NoPull) { Write-Host "== git pull"; git -C $root pull --ff-only }
-if (Test-Path $reports) { Remove-Item -Recurse -Force $reports }
 New-Item -ItemType Directory -Force -Path $reports | Out-Null
+# Only this platform's reports are replaced; the Mac ones sit beside them.
+Get-ChildItem -Path $reports -Filter *.win.txt | Remove-Item -Force
+$imp = Join-Path $reports "ImportModules.txt"; if (Test-Path $imp) { Remove-Item -Force $imp }
 
 $macros = @()
 if (-not $NoImport) { $macros += "ImportLingTeXModulesQuiet" }
@@ -65,12 +68,30 @@ try {
 }
 
 Write-Host ""
-foreach ($p in (Get-ChildItem -Path $reports -Filter *.txt | Sort-Object Name | ForEach-Object { $_.FullName })) {
+$summary = ""
+$files = @(Join-Path $reports "ImportModules.txt") + @(Get-ChildItem -Path $reports -Filter *.win.txt | Sort-Object Name | ForEach-Object { $_.FullName })
+foreach ($p in $files) {
+    if (-not (Test-Path $p)) { continue }
     $f = Split-Path -Leaf $p
     Write-Host "==================== $f ===================="
     $text = Get-Content $p -Raw
     Write-Host $text
     if ($text -match "FAILURES|CRASH|PROBLEM|FAILED") { $status = 1 }
+    if ($text -match "(ALL PASS -- \d+ passed|FAILURES -- .*FAILED)") { $summary += " " + ($f -replace "\.win\.txt$", "") + ": " + $Matches[1] + ";" }
+}
+if (-not $NoCommit) {
+    # Commit and push this platform's reports, and nothing else, so a session on
+    # the Mac can pull and read them. See the Mac script for the convention.
+    $mine = @(Get-ChildItem -Path $reports -Filter *.win.txt | ForEach-Object { $_.FullName })
+    git -C $root add -- $mine 2>$null
+    git -C $root commit -q -m "LingTeX-Word reports (win):$summary" -- $mine 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "== reports committed: $(git -C $root log --oneline -1)"
+        git -C $root push -q 2>$null
+        if ($LASTEXITCODE -eq 0) { Write-Host "   and pushed" } else { Write-Host "   (push failed; the commit is local -- push by hand)" }
+    } else {
+        Write-Host "== reports unchanged; nothing committed"
+    }
 }
 Write-Host "reports: $reports"
 exit $status

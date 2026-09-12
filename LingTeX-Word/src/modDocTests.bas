@@ -2309,7 +2309,7 @@ Private Sub DeliverResults()
     Dim msg As String
 
     If mQuietRun Then
-        If WriteReportFile("RunDocTests.txt", mRpt) Then Exit Sub
+        If WriteReportFile("RunDocTests." & PlatformTag() & ".txt", mRpt) Then Exit Sub
     End If
 
     On Error Resume Next

@@ -12,6 +12,12 @@ then `LingTeX-Word/README.md`. The state of play is at the end of this note.
 
 ## The loop you can run yourself
 
+> **How it is actually run (2026-09-12):** Seth runs the runner, on the Mac and on
+> the Windows VM, and it commits and pushes each platform's reports; you `git pull`
+> and read `LingTeX-Word/LingTeX-Word-reports/*.mac.txt` / `*.win.txt`. Do not
+> drive Word with screenshots or the desktop tools -- slower, and it heats the
+> machine. The description below is still how the runner works.
+
 Word for Mac is on this machine, with the project in
 `/Users/Seth/GIT/LingTeX-Tools/LingTeX-Word/LingTeX.docm` (gitignored) and the
 bootstrap module `modImport` already pasted into it with `SRC_FOLDER` set. So:
@@ -98,6 +104,8 @@ requests.
 - Then: the by-hand checks in `TESTING.md`, `SaveAsTemplate` +
   `tools/build-dotm.sh` + `tools/check-dotm.sh`, then packaging (the plan is
   summarised in QUICKSTART's *Status* and README's *Roadmap*).
-- Task for later, not now: remove `TypeCheck`, `DiagnoseWrap` and `MicroDiagnose`
-  from `modTests` (keep `DebugPrintDiagnose`) and do a health pass — only once
-  `RunDocTests` is green.
+- Health pass done (2026-09-12): `TypeCheck`, `DiagnoseWrap` and `MicroDiagnose`
+  are gone from `modTests`; `DebugPrintDiagnose` is the one diagnostic left.
+- Reports are committed, one file per platform (`RunDocTests.mac.txt`,
+  `RunDocTests.win.txt`); both runners commit and push their own platform's
+  files after a run, so `git pull` and read them -- no pasting.
