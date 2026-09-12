@@ -378,7 +378,10 @@ Mac and on Windows, by the one-command runners (QUICKSTART.md, *Status*).
 
 **Phase 2 — the form.** A dialog with an editable data table: paste FLEx or TSV,
 fix it up in a grid, split and merge columns from column headers, see the check
-findings per cell, and type free translations into their own boxes.
+findings per cell, and type free translations into their own boxes. It is also
+where the settings get an interface — column gap, line gap, continuation indent,
+the small-caps convention, the styles themselves — instead of a macro list and
+the Immediate window.
 
 No `.frm` ships in Phase 1, deliberately. A Word UserForm exports as a `.frm`
 *plus* a binary `.frx`, and a `.frm` written by hand without its companion does

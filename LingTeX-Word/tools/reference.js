@@ -51,7 +51,7 @@ var MORPHEME_ALIGNED = 'morpheme';
  * Mirrors core.js handleStandalonePunctuation. Compared by code point, not
  * byte length — convert.rs gets this wrong for multi-byte characters.
  */
-var ATTACH_PUNCT = '…,:;.!?-‒–—―/|&';
+var ATTACH_PUNCT = '…,:;.!?-‒–—―/|&ːˑ';   // + the IPA length marks (U+02D0, U+02D1)
 
 function isBoundary(ch) { return ch !== '' && MORPH_DIVS.indexOf(ch) !== -1; }
 

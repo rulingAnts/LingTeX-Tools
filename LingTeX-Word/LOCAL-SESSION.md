@@ -85,26 +85,32 @@ requests.
 
 ## State of play
 
-- **Stage 2 is proven on both platforms**: `RunAllTests` 79/79 and `RunDocTests`
-  224/224 on Mac Word 16.112 and on Word for Windows. The reports are committed
-  per platform under `LingTeX-Word/LingTeX-Word-reports/` (`*.mac.txt`,
-  `*.win.txt`); the runners commit and push their own platform's after a run.
-- Three things the first runs taught, now rules in `vba-lint.py`: a `Debug.Print`
-  poisons the next floating-point statement on Mac (every `Debug.Print` is
-  followed by `SettleDebugPrint`); a `_` continuation in a `.cls` breaks when the
-  bootstrap installs it on Mac (none allowed in class modules); and `wd*`
-  constants must be on the allowlist, because Mac Word's type library lacks some
-  (`wdStyleTableGrid` was one). VBA compiles a procedure when it is first
-  *reached*, so an error in a late-called procedure surfaces mid-run; the linter
-  is the only project-wide compile there is. `run-in-word.sh --macro NAME` runs
-  one macro, for bisecting.
-- The VBA editor's own dialogs are invisible to System Events; the runner
-  watches the editor's window title for `[break]` instead, before and after
-  every macro, and says what to do.
-- **Next gate: `TESTING.md` section 3 by hand** — a real FLEx paste, the margin
-  round trip (narrow → columns push down; widen → they come back), the seven
-  ribbon buttons once the template exists. Then `SaveAsTemplate`,
-  `tools/build-dotm.sh`, `tools/check-dotm.sh`; then packaging (NSIS, the
-  uncompiled AppleScript installer, the `word-addin` CI job, the website card).
-- Later, not now: a health/efficiency pass over the engine, keeping both suites
-  green on both platforms.
+- **Stage 1 and stage 2 pass on both platforms** (2026-09-12): `RunAllTests`
+  79/79 and `RunDocTests` 224/224 on Mac Word 16.112 and on Word for Windows.
+  Reports in `LingTeX-Word-reports/*.mac.txt` and `*.win.txt`.
+- **The by-hand pass (`TESTING.md` section 3, Mac) is under way**, driven from
+  the checklist artifact (marks readable with `read_db`, collection `checks`).
+  First pass: 3a, 3b, 3d green; 3c mostly. Findings, all addressed in the
+  commit after a8bcd69 and awaiting a Word run on both platforms:
+  - **Undo was not single-step**: every drawing step listed separately after
+    the custom record's label. Hypothesis: the hidden measuring document's
+    changes close the record. `BeginUndo` now only names the record;
+    `StartPendingUndo` opens it at the first change to the user's document,
+    after all measuring; `RewrapDocument` warms the cache first. If Seth still
+    sees several steps, plan B is to draw in the scratch document and transplant
+    with one `FormattedText` assignment.
+  - An over-wide form ran off the page: `CapColumnWidths` in `modRender`.
+  - Direct font sizing was lost on re-wrap (by design); the LingTeX paragraph
+    styles now inherit their SIZE from Normal (name still pinned).
+  - Grammatical glosses get a full-size first letter (`Erg`, `3Sg`) -- Seth's
+    preference; setting `GramGlossInitialCap`, default True.
+  - Settings are zero-argument commands now (`LingTeXAlignByWord` etc.).
+  - AutoCorrect's sentence/table-cell capitalisation is suppressed while the
+    selection is inside an example (`clsAppEvents`).
+  - The sample's `:` is the IPA length mark `ː`; `AttachPunct` includes it.
+- Next: Seth re-runs both runners (expect 79 and about 231), then continues the
+  by-hand pass from 3c/3e/3f. Then `SaveAsTemplate` + `tools/build-dotm.sh` +
+  `tools/check-dotm.sh`, then packaging.
+- Later, wanted by Seth: a settings interface (gaps, styles) -- Phase 2 form.
+- The `.docm` is NEVER committed; `modImport` reads `src/` beside the document.
+- Reports are committed, one file per platform, by the runners themselves.

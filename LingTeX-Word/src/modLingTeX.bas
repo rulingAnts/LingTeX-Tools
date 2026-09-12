@@ -32,6 +32,9 @@ Public gBusy As Boolean
 
 ' Set by AutoExec.  Module-level so the events object outlives the procedure.
 Private mEvents As clsAppEvents
+' The label of an undo record BeginUndo has named but StartPendingUndo has
+' not yet opened. See BeginUndo.
+Private mPendingUndoLabel As String
 
 '-----------------------------------------------------------------------------
 ' EVERY message to the user goes through Report or Confirm, never MsgBox.
@@ -404,6 +407,12 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
     On Error GoTo Fail
 
     gBusy = True
+    ' Measure everything BEFORE the undo record opens (see BeginUndo): with the
+    ' cache warm, the re-wraps below touch the scratch document only for text
+    ' the cache has never seen, so the record stays in one piece.
+    For i = 1 To tables.Count
+        WarmMeasureCache tables(i)
+    Next i
     BeginUndo "Re-wrap all interlinear examples"
     Application.ScreenUpdating = False
 
@@ -878,19 +887,35 @@ End Sub
 ' Without that, reversing a re-wrap nobody asked for -- it fires on a cursor move --
 ' takes an unknown number of Ctrl+Z presses.
 Public Sub BeginUndo(ByVal label As String)
+    ' The record is NOT opened here, only named. Measuring text writes to a
+    ' hidden scratch document, and a custom undo record that sees a change in
+    ' another document is closed by it -- on Mac every drawing step then lists
+    ' separately in the undo menu after the record's own label, so one insert
+    ' took dozens of Cmd+Z (Seth's screenshot, 2026-09-12). StartPendingUndo
+    ' opens the record at the first change to the user's document -- DrawExample,
+    ' or RewrapTable just before it deletes -- after every measurement is done,
+    ' and RewrapDocument warms the measurement cache before it starts.
+    mPendingUndoLabel = label
+End Sub
+
+' Open the record BeginUndo named, if it has not been opened yet. Called by the
+' renderer immediately before its first change to the document.
+Public Sub StartPendingUndo()
     Dim ur As Object
+    If mPendingUndoLabel = "" Then Exit Sub
     On Error Resume Next
     Set ur = Application.UndoRecord
     If Not ur Is Nothing Then
-        If ur.IsRecordingCustomRecord Then ur.EndCustomRecord
-        ur.StartCustomRecord label
+        If Not ur.IsRecordingCustomRecord Then ur.StartCustomRecord mPendingUndoLabel
     End If
     Err.Clear
     On Error GoTo 0
+    mPendingUndoLabel = ""
 End Sub
 
 Public Sub EndUndo()
     Dim ur As Object
+    mPendingUndoLabel = ""
     On Error Resume Next
     Set ur = Application.UndoRecord
     If Not ur Is Nothing Then
@@ -930,6 +955,113 @@ End Function
 
 
 '=============================================================================
+'=============================================================================
+' -- SETTINGS COMMANDS ------------------------------------------------------
+'=============================================================================
+' Zero-argument, so they appear in Tools > Macro > Macros and can sit on the
+' ribbon; the typed setters in modSettings take arguments and cannot. Each one
+' acts on the active document, stores the value in it, and says what it did.
+' Added because "type this in the Immediate window" turned out to be the one
+' step of the by-hand checklist nobody could follow (2026-09-12).
+
+Private Function DocForSetting() As Document
+    On Error Resume Next
+    Set DocForSetting = ActiveDocument
+    On Error GoTo 0
+    If DocForSetting Is Nothing Then
+        Report "Open a document first: settings are stored in the document.", vbInformation
+    End If
+End Function
+
+Public Sub LingTeXAlignByWord()
+    Dim doc As Document
+    Set doc = DocForSetting()
+    If doc Is Nothing Then Exit Sub
+    SetSettingGranularity doc, igtWordAligned
+    Report "New examples in this document will be WORD-aligned: one column per " & _
+           "word, with enclitics kept in their host's column." & vbCr & vbCr & _
+           "Examples already on the page are unchanged until inserted again.", _
+           vbInformation
+End Sub
+
+Public Sub LingTeXAlignByMorpheme()
+    Dim doc As Document
+    Set doc = DocForSetting()
+    If doc Is Nothing Then Exit Sub
+    SetSettingGranularity doc, igtMorphemeAligned
+    Report "New examples in this document will be MORPHEME-aligned: one column " & _
+           "per morpheme, with enclitic columns never starting a wrap line." & _
+           vbCr & vbCr & _
+           "Examples already on the page are unchanged until inserted again.", _
+           vbInformation
+End Sub
+
+Public Sub LingTeXToggleRewrapOnSave()
+    Dim doc As Document
+    Dim v As Boolean
+    Set doc = DocForSetting()
+    If doc Is Nothing Then Exit Sub
+    v = Not SettingRewrapOnSave(doc)
+    SetSettingRewrapOnSave doc, v
+    Report "Re-wrap every example when this document is saved: now " & _
+           IIf(v, "ON", "OFF") & ".", vbInformation
+End Sub
+
+Public Sub LingTeXToggleRewrapOnSelectionChange()
+    Dim doc As Document
+    Dim v As Boolean
+    Set doc = DocForSetting()
+    If doc Is Nothing Then Exit Sub
+    v = Not SettingRewrapOnSelectionChange(doc)
+    SetSettingRewrapOnSelectionChange doc, v
+    Report "Re-wrap an example as soon as the cursor leaves it: now " & _
+           IIf(v, "ON", "OFF") & " for this document." & vbCr & vbCr & _
+           IIf(v, "Off is the default, because this repaints while you type.", _
+                  ""), vbInformation
+End Sub
+
+Public Sub LingTeXToggleGramGlossInitialCap()
+    Dim doc As Document
+    Dim v As Boolean
+    Set doc = DocForSetting()
+    If doc Is Nothing Then Exit Sub
+    v = Not SettingGramGlossInitialCap(doc)
+    SetSettingGramGlossInitialCap doc, v
+    Report "Grammatical glosses in small capitals now " & _
+           IIf(v, "begin with a full-size capital (Erg, 3Sg)", _
+                  "are uniform small capitals throughout (erg, 3sg), as the " & _
+                  "Leipzig Glossing Rules print them") & "." & vbCr & vbCr & _
+           "Re-wrap the examples to apply it.", vbInformation
+End Sub
+
+Public Sub LingTeXShowSettings()
+    Dim doc As Document
+    Dim msg As String
+    Set doc = DocForSetting()
+    If doc Is Nothing Then Exit Sub
+    msg = "LingTeX-Word settings stored in " & doc.Name & ":" & vbCr & vbCr
+    msg = msg & "Alignment: " & IIf(SettingGranularity(doc) = igtMorphemeAligned, _
+                                    "by morpheme", "by word") & vbCr
+    msg = msg & "Gap between columns: " & CStr(SettingGap(doc)) & " pt" & vbCr
+    msg = msg & "Gap between wrap lines: " & CStr(SettingLineGap(doc)) & " pt" & vbCr
+    msg = msg & "Continuation indent: " & CStr(SettingContIndent(doc)) & " pt" & vbCr
+    msg = msg & "Space inside a cell becomes: " & SettingSpaceReplacement(doc) & vbCr
+    msg = msg & "Small capitals for grammatical glosses: " & _
+                IIf(SettingLowercaseGramGloss(doc), "on", "off") & vbCr
+    msg = msg & "  with a full-size first capital: " & _
+                IIf(SettingGramGlossInitialCap(doc), "on", "off") & vbCr
+    msg = msg & "Re-wrap on save: " & IIf(SettingRewrapOnSave(doc), "on", "off") & vbCr
+    msg = msg & "Re-wrap when the cursor leaves an example: " & _
+                IIf(SettingRewrapOnSelectionChange(doc), "on", "off") & vbCr & vbCr
+    msg = msg & "Commands: LingTeXAlignByWord, LingTeXAlignByMorpheme, " & _
+                "LingTeXToggleRewrapOnSave, LingTeXToggleRewrapOnSelectionChange, " & _
+                "LingTeXToggleGramGlossInitialCap. The gaps and the indent are " & _
+                "set from the Immediate window for now: " & _
+                "SetSettingLineGap ActiveDocument, 8"
+    Report msg, vbInformation
+End Sub
+
+
 ' -- RIBBON CALLBACKS -------------------------------------------------------
 '=============================================================================
 ' The ribbon passes an IRibbonControl.  These are typed as Variant rather than

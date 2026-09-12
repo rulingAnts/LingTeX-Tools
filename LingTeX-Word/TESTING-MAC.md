@@ -54,21 +54,22 @@ category *Macros*, and bind the four you will use most (`Insert`,
 `RewrapCurrent`, `Split`, `Merge`) to ⌥⌘1 … ⌥⌘4. Save the changes in
 `lingtex-test.docx`, not `Normal`.
 
-### Running a setting
+### Settings are commands too
 
-The settings take arguments, so they go in the Immediate window rather than the
-macro list. **Click the test document first** so it is the active document, then
-Tools → Macro → Visual Basic Editor, View → Immediate Window, and type:
+They are in the same macro list, act on the frontmost document, store the value
+in it, and say what they did:
 
-```vba
-SetSettingGranularity ActiveDocument, igtMorphemeAligned
-SetSettingGranularity ActiveDocument, igtWordAligned
-SetSettingRewrapOnSave ActiveDocument, False
-SetSettingRewrapOnSelectionChange ActiveDocument, True
+```
+LingTeXAlignByWord                  LingTeXToggleRewrapOnSave
+LingTeXAlignByMorpheme              LingTeXToggleRewrapOnSelectionChange
+LingTeXToggleGramGlossInitialCap    LingTeXShowSettings
 ```
 
-Every one of them is stored in the document, so they survive a save and reopen,
-and they do not leak into any other document.
+`LingTeXShowSettings` lists everything the document currently holds. Only the
+three measurements (gap, line gap, continuation indent) still need the Immediate
+window — click the test document first, then Tools → Macro → Visual Basic
+Editor, View → Immediate Window: `SetSettingLineGap ActiveDocument, 8`. A
+settings dialog is the Phase 2 form's job.
 
 ### What a "clear message" means
 
@@ -86,9 +87,10 @@ Both input paths, in one pass.
    FLEx path: with an insertion point and no selection the command reads the
    clipboard.
 2. Now the appearance checks, all on that one example: columns aligned, no
-   borders, small capitals on `SEQ ERG FOC 3SG` and not on `dog take carry`, the
+   borders, small capitals on `SEQ ERG FOC 3SG` — each with a full-size first letter, `Erg`,
+   `3Sg` — and none on `dog take carry`, the
    object-language row italic and *not* small-capped even at `Edefina` and `Su`,
-   `bi:` keeping its colon, `bujo=de=di` in one column glossed `speak=ABL=REL`.
+   `biː` keeping its length mark, `bujo=de=di` in one column glossed `speak=ABL=REL`.
 3. **The free translation** is a paragraph *below* the table, in style
    `LingTeX Free`, wrapped in curly single quotes: `'(When) she took her dogs
    hunting.'` If it is missing, stop and say so — that is the one you flagged
@@ -130,8 +132,12 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
    back** to 1", re-wrap → the extra group disappears and the columns are pulled
    back up. That pull-back-up is the check that matters most; a planner that
    only ever adds lines passes everything else and fails this.
-4. **Font size**: select the whole example, make it 16 pt, re-wrap → more
-   groups. Back to 12 pt, re-wrap → fewer.
+4. **Font size**: change the **Normal style** to 16 pt (Format → Style… →
+   Normal → Modify) and re-wrap → more groups. Back to 12 pt, re-wrap → fewer.
+   The LingTeX styles inherit their size from Normal. Selecting the cells and
+   sizing them directly does *not* count: direct formatting is not part of the
+   example and is discarded by a re-wrap, on purpose — the styles are the
+   description.
 5. **Landscape** (Layout → Orientation) → re-wrap reflows wider. Back to
    portrait → reflows back.
 6. **Two text columns** (Layout → Columns → Two) → re-wrap fits the *column*
@@ -148,12 +154,12 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
 
 ## Pass 3 — morpheme alignment and the column invariant (3c)
 
-1. Immediate window: `SetSettingGranularity ActiveDocument, igtMorphemeAligned`.
-   Insert the sample again into a fresh paragraph → one column per morpheme.
+1. Run `LingTeXAlignByMorpheme`, then insert the sample again into a fresh
+   paragraph → one column per morpheme, 22 of them against 15.
 2. **The invariant**: no wrap group may begin with `=te`, `=taha`, `=de` or
    `=di`, and every enclitic column carries the `=` on *both* the form row and
    the gloss row. Read along the left edge of each group.
-3. Back to `igtWordAligned` and insert once more for the split and merge checks.
+3. `LingTeXAlignByWord`, and insert once more for the split and merge checks.
 4. **Split**: cursor in the `kada=te` cell, `LingTeXSplitColumn` → two columns,
    `kada` / `carry.CMP` and `=te` / `=SEQ`, with the `=` leading the cell on
    every interlinear tier. The free translation is untouched. Re-wrap still
@@ -161,10 +167,14 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
 5. **Merge**: cursor in `kada`, `LingTeXMergeColumns` → back to `kada=te` /
    `carry.CMP=SEQ`. With one cell selected it merges with the column to its
    right; select across three cells and exactly those three become one.
-6. **The refusal that matters**: make a column whose tiers disagree — form
-   `kata-bi` over gloss `gone`, no break in the gloss — and split it. A dialog
-   must name the short tier, the gloss cell must stay whole on the left, and the
-   new column must be *empty* for that tier. Nothing is guessed.
+6. **The refusal that matters.** A split happens at the *first* boundary of the
+   column, on every tier at once — so `bujo=de=di` over `speak=ABL=REL` gives
+   `bujo` | `=de=di`, and a second split on the right half gives three. The
+   refusal is for a column whose tiers *disagree*: edit one column of the
+   example so the form reads `kata-bi` and its gloss reads `gone` (no break
+   anywhere in the gloss), put the cursor in `kata-bi`, split. A dialog must
+   name the Gloss tier, `gone` must stay whole in the left cell, and the new
+   right cell must be *empty* on that tier. Nothing is guessed.
 
 ---
 
@@ -184,6 +194,11 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
 6. Type `SUPEREL` into a gloss cell → small capitals, and *not* flagged as an
    unknown abbreviation. There is no allow-list, by design.
 7. A clean example → "No problems found."
+8. **AutoCorrect stays out of the cells**: click into an interlinear cell and
+   type `erg` at its start → it stays `erg`. Word's "capitalize first letter of
+   sentences / of table cells" are switched off while the cursor is inside an
+   example and restored outside it (needs `AutoExec`, which arms the selection
+   handler).
 
 ---
 
@@ -192,8 +207,8 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
 1. **Save** (⌘S) → every example re-wraps automatically, no visible flicker, and
    the cursor stays where it was. This is `AutoExec`'s save hook; if nothing
    happens, it was not run.
-2. `SetSettingRewrapOnSave ActiveDocument, False` → saving no longer re-wraps.
-   Set it back to `True`.
+2. `LingTeXToggleRewrapOnSave` → saving no longer re-wraps. Run it again to
+   turn it back on.
 3. **Close and reopen** the document, run `LingTeXRewrapAll` → the examples are
    still recognised, which proves the style tagging survived the file format.
 4. **Small caps survive**: after that re-wrap, read back a gloss — `ERG` must
@@ -217,9 +232,12 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
 
 ## Pass 6 — undo and robustness (3f)
 
-1. **One ⌘Z undoes a whole insert.** `Application.UndoRecord` is present on Mac
-   Word 16.112, so this should be single-step. If it takes several presses, say
-   so — it is a real finding, not a Mac limitation.
+1. **One ⌘Z undoes a whole insert.** The first pass found it did not: Word
+   listed every drawing step separately after the record's own label. The undo
+   record now opens only after all measuring is done (the hidden measuring
+   document was, on the evidence, closing it). If it still takes several
+   presses, say how many and what the undo list shows — the fallback design is
+   to draw the example off-page and drop it in with one assignment.
 2. ⌘Z after a re-wrap restores the previous layout.
 3. **Twenty examples**: select your example, copy, paste it twenty times, then
    `LingTeXRewrapAll` → a few seconds, not a minute.
@@ -229,10 +247,9 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
 6. After every command the screen is live, not frozen (`ScreenUpdating` back on).
 7. **No scratch document left open** — check the Window menu. The measuring
    document is hidden but it would still be listed.
-8. `SetSettingRewrapOnSelectionChange ActiveDocument, True`, then click in and
-   out of an example → it re-wraps on leaving, does not recurse, and typing
-   stays responsive. Set it back to `False` afterwards; it is off by default for
-   a reason.
+8. `LingTeXToggleRewrapOnSelectionChange`, then click in and out of an example
+   → it re-wraps on leaving, does not recurse, and typing stays responsive. Run
+   it again to turn it off; it is off by default for a reason.
 
 ---
 

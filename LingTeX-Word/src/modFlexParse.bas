@@ -92,9 +92,12 @@ End Property
 ' test is correct here -- unlike the Rust port, which compares UTF-8 byte
 ' length and therefore never matches the ellipsis or the dashes.
 Public Function AttachPunct() As String
+    ' ... and the IPA length marks (U+02D0, U+02D1): a lengthened segment written
+    ' as a separate token belongs to the form before it, as ":" does.
     AttachPunct = "-,:;.!?/|&" _
         & ChrW(&H2026) _
-        & ChrW(&H2012) & ChrW(&H2013) & ChrW(&H2014) & ChrW(&H2015)
+        & ChrW(&H2012) & ChrW(&H2013) & ChrW(&H2014) & ChrW(&H2015) _
+        & ChrW(&H2D0) & ChrW(&H2D1)
 End Function
 
 Public Property Get LeftSingleQuote() As String
@@ -293,6 +296,7 @@ Public Function MassageLine(ByVal s As String) As String
     body = Replace(body, " ?", "?")
     body = Replace(body, " !", "!")
     body = Replace(body, " :", ":")
+    body = Replace(body, " " & ChrW(&H2D0), ChrW(&H2D0))
     body = Replace(body, " ;", ";")
     body = Replace(body, "( ", "(")
     body = Replace(body, " )", ")")

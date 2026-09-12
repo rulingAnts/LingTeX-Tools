@@ -32,6 +32,10 @@ Private Const DEF_CONT_INDENT As Double = 0
 Private Const DEF_SPACE_REPL As String = "."
 ' Lowercase grammatical glosses so Word's small caps can render them.
 Private Const DEF_LOWERCASE_GRAM As Boolean = True
+' ...and leave the first LETTER of each a full-size capital (Erg, 3Sg). Seth's
+' preference (2026-09-12); the Leipzig Glossing Rules print them uniform, which
+' is what False gives.
+Private Const DEF_GRAM_INITIAL_CAP As Boolean = True
 ' Re-wrap every example in the document when it is saved.
 Private Const DEF_REWRAP_ON_SAVE As Boolean = True
 ' Re-wrap as soon as the selection leaves an example.  OFF by default: it is
@@ -79,6 +83,11 @@ Public Function SettingLowercaseGramGloss(doc As Document) As Boolean
                                          DEF_LOWERCASE_GRAM)
 End Function
 
+Public Function SettingGramGlossInitialCap(doc As Document) As Boolean
+    SettingGramGlossInitialCap = ReadBool(doc, "GramGlossInitialCap", _
+                                          DEF_GRAM_INITIAL_CAP)
+End Function
+
 Public Function SettingRewrapOnSave(doc As Document) As Boolean
     SettingRewrapOnSave = ReadBool(doc, "RewrapOnSave", DEF_REWRAP_ON_SAVE)
 End Function
@@ -120,6 +129,10 @@ End Sub
 
 Public Sub SetSettingLowercaseGramGloss(doc As Document, ByVal v As Boolean)
     WriteVar doc, "LowercaseGramGloss", BoolStr(v)
+End Sub
+
+Public Sub SetSettingGramGlossInitialCap(doc As Document, ByVal v As Boolean)
+    WriteVar doc, "GramGlossInitialCap", BoolStr(v)
 End Sub
 
 Public Sub SetSettingRewrapOnSave(doc As Document, ByVal v As Boolean)
