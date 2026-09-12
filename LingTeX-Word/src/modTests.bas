@@ -1163,7 +1163,11 @@ Public Function WriteReportFile(ByVal leaf As String, ByVal text As String) As B
     On Error GoTo Failed
     fn = FreeFile
     Open path For Output As #fn
-    Print #fn, text
+    ' The report is built with vbCr between lines. Write it with this platform's
+    ' newline (CRLF on Windows, CR on Mac): a bare CR in a Windows console is
+    ' "return to the start of the line", and the runner's printout came out as
+    ' every line overwriting the last (Windows run, 2026-09-12).
+    Print #fn, Replace(text, vbCr, vbNewLine)
     Close #fn
     WriteReportFile = True
     Exit Function

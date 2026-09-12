@@ -65,9 +65,8 @@ try {
 }
 
 Write-Host ""
-foreach ($f in "ImportModules.txt", "RunAllTests.txt", "RunDocTests.txt") {
-    $p = Join-Path $reports $f
-    if (-not (Test-Path $p)) { continue }
+foreach ($p in (Get-ChildItem -Path $reports -Filter *.txt | Sort-Object Name | ForEach-Object { $_.FullName })) {
+    $f = Split-Path -Leaf $p
     Write-Host "==================== $f ===================="
     $text = Get-Content $p -Raw
     Write-Host $text
