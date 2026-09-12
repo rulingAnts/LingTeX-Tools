@@ -38,7 +38,8 @@ Option Explicit
 ' ---------------------------------------------------------------------------
 '
 ' HOW TO RUN
-'   1. Set SRC_FOLDER below to the full path of LingTeX-Word/src in your clone.
+'   1. Keep this document in your clone's LingTeX-Word folder, beside src/ --
+'      that is where the modules are read from. (SRC_FOLDER below can override.)
 '   2. Insert > Module, paste this file in (without its first line, which the
 '      importer reads and which is a compile error if typed), name it modImport.
 '   3. Run  ImportLingTeXModules  from the Immediate window.
@@ -65,12 +66,16 @@ Option Explicit
 ' Pure ASCII on purpose -- see the header of modFlexParse.bas.
 '=============================================================================
 
-'-- SET THIS. The folder holding the .bas and .cls files, with no trailing
-'   separator. A path is used rather than a file picker because
-'   Application.FileDialog does not exist on Mac Word (probe section 15), and a
-'   constant works the same everywhere.
-'     Windows example:  "C:\Users\Seth\GIT\LingTeX-Tools\LingTeX-Word\src"
+'-- The folder holding the .bas and .cls files. Empty means "the src folder
+'   beside this document": the document lives in LingTeX-Word/, so
+'   ThisDocument.Path & "src" is right on every clone and both platforms, and
+'   nothing has to be edited. Set it only to import from somewhere else. A path
+'   rather than a file picker because Application.FileDialog does not exist on
+'   Mac Word (probe section 15). No trailing separator.
+'     Windows example:  "C:\GIT\LingTeX-Tools\LingTeX-Word\src"
 '     Mac example:      "/Users/Seth/GIT/LingTeX-Tools/LingTeX-Word/src"
+'   (Before 2026-09-12 this had to be set by hand, and a .docm committed from the
+'   Mac carried the Mac path onto Windows, which imported from a stale clone.)
 Private Const SRC_FOLDER As String = ""
 
 '-- Where SaveAsTemplate writes the template. Empty means "beside SRC_FOLDER",
@@ -112,6 +117,14 @@ Private Const IMPORT_CLASS_MODULES As Boolean = True
 Private mQuiet As Boolean
 Private Const REPORT_FOLDER As String = "LingTeX-Word-reports"
 
+Private Function SrcFolder() As String
+    SrcFolder = SRC_FOLDER
+    If SrcFolder = "" Then
+        On Error Resume Next
+        SrcFolder = ThisDocument.Path & Application.PathSeparator & "src"
+        On Error GoTo 0
+    End If
+End Function
 
 '=============================================================================
 ' -- IMPORT -----------------------------------------------------------------
@@ -134,8 +147,9 @@ Public Sub ImportLingTeXModules()
     Dim todo As String
     Dim msg As String
 
-    If SRC_FOLDER = "" Then
-        MsgBox "Set SRC_FOLDER at the top of modImport to the full path of the " & _
+    If SrcFolder() = "" Or SrcFolder() = Application.PathSeparator & "src" Then
+        MsgBox "This document has no folder yet (save it inside LingTeX-Word/), " & _
+               "or set SRC_FOLDER at the top of modImport to the full path of the " & _
                "LingTeX-Word/src folder in your clone, then run this again.", _
                vbExclamation, "LingTeX-Word import"
         Exit Sub
@@ -144,6 +158,7 @@ Public Sub ImportLingTeXModules()
     Set vbp = GetProject()
     If vbp Is Nothing Then Exit Sub              ' GetProject explains why
 
+    log = log & "  from     " & SrcFolder() & vbCr
     '-- the twelve standard modules: Import, which is reliable for these ------
     ImportGroup vbp, MODULE_LIST, False, log, okCount, failCount, todo, todoCount
 
@@ -193,7 +208,7 @@ Private Sub ImportGroup(vbp As Object, ByVal fileList As String, _
     names = Split(fileList, "|")
     For i = 0 To UBound(names)
         leaf = names(i)
-        fullPath = JoinPath(SRC_FOLDER, leaf)
+        fullPath = JoinPath(SrcFolder(), leaf)
         compName = BaseName(leaf)
 
         If Not FileExists(fullPath) Then
@@ -350,7 +365,7 @@ Public Sub SaveAsTemplate()
 
     target = DOTM_PATH
     If target = "" Then
-        target = JoinPath(ParentFolder(SRC_FOLDER), "LingTeX-Word.dotm")
+        target = JoinPath(ParentFolder(SrcFolder()), "LingTeX-Word.dotm")
     End If
 
     On Error Resume Next
@@ -368,7 +383,6 @@ Public Sub SaveAsTemplate()
            "Now run tools/build-dotm.sh to inject the ribbon and write the " & _
            "source manifest.", True
 End Sub
-
 
 '=============================================================================
 ' -- HELPERS ----------------------------------------------------------------

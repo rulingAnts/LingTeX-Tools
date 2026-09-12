@@ -268,7 +268,8 @@ both platforms** — see the note below if you have read otherwise here before.
    - **Mac:** Word → Preferences → Security & Privacy, tick the same
      **"Trust access to the VBA project object model"** — the label is identical.
 2. Paste `tools/ImportModules.bas` into a new module named `modImport`, and set
-   `SRC_FOLDER` at the top to your clone's `LingTeX-Word/src` path.
+   nothing else: it reads `src/` from beside the document, so the document must live
+   in your clone's `LingTeX-Word/` folder.
 3. Run `ImportLingTeXModules`. Re-running is safe — it replaces modules rather
    than duplicating them, so it is also how to pick up later edits to `src/`.
 4. Run `VerifyLingTeXModules`. It reads each component's *type* out of the project
@@ -315,7 +316,7 @@ be pasted straight back.
 
 **One-time setup:** `modImport` is pasted by hand, so it has to be re-pasted once
 from `tools/ImportModules.bas` to pick up `ImportLingTeXModulesQuiet`. Set
-`SRC_FOLDER` again when you do.
+nothing when you do: the path is derived from where the document sits.
 
 `--no-pull`, `--no-import`, and `--tests all` / `--tests doc` do what they say.
 

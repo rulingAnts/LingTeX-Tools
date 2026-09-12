@@ -9,7 +9,7 @@
 #     powershell -ExecutionPolicy Bypass -File LingTeX-Word\tools\run-in-word.ps1 C:\path\to\LingTeX.docm
 #
 # Needs the same one-time setup as the Mac script: modImport pasted into the
-# project with SRC_FOLDER set, and "Trust access to the VBA project object model"
+# project (it reads src beside the document), and "Trust access to the VBA project object model"
 # ticked.  Untested by the author -- written from the COM contract; report what it
 # does.
 
@@ -83,8 +83,8 @@ foreach ($stale in "RunAllTests.txt", "RunDocTests.txt") {
     $sp = Join-Path $reports $stale
     if (Test-Path $sp) {
         Write-Host "   STALE MODULES: the run wrote $stale (no platform tag), so the modules Word"
-        Write-Host "   imported are older than $root\src. Check SRC_FOLDER in the document's"
-        Write-Host "   modImport: it must be $root\src."
+        Write-Host "   imported are older than $root\src. ImportModules.txt says where it read"
+        Write-Host "   from (the 'from' line); the document must sit in LingTeX-Word beside src."
         Remove-Item -Force $sp
         $status = 1
     }
