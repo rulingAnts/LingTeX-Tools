@@ -286,6 +286,14 @@ case "$macros" in
     *RunDocTestsToFile*) [ -f "$reports/RunDocTests.mac.txt" ] || { echo "no RunDocTests.mac.txt -- see above"; status=1; } ;;
 esac
 
+if [ "$commit" = 1 ] && [ -z "$summary" ]; then
+    # A run that wrote no report must not be committed: the old reports were
+    # removed before the run, so committing now would only record their
+    # deletion with nothing to say -- which is exactly what happened when a
+    # template run wrote its reports beside the template instead (2026-09-12).
+    echo "== no report to commit"
+    commit=0
+fi
 if [ "$commit" = 1 ]; then
     # Only this platform's files: ImportModules.txt has the same name on both
     # platforms and would conflict, so it stays ignored.

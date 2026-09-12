@@ -92,7 +92,7 @@ foreach ($stale in "RunAllTests.txt", "RunDocTests.txt") {
         $status = 1
     }
 }
-if (-not $NoCommit -and $status -eq 0) {
+if (-not $NoCommit -and $status -eq 0 -and $summary -ne "") {
     # Commit and push this platform's reports, and nothing else, so a session on
     # the Mac can pull and read them. See the Mac script for the convention.
     $mine = @(Get-ChildItem -Path $reports -Filter *.win.txt | ForEach-Object { $_.FullName })
