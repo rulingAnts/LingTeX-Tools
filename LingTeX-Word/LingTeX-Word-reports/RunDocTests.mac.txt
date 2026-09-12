@@ -49,7 +49,7 @@ Open documents at start: 1
   PASS   default SpaceReplacement = .
   PASS   default LowercaseGramGloss = True
   PASS   default RewrapOnSave = True
-  PASS   default RewrapOnSelectionChange = False
+  PASS   default RewrapOnSelectionChange = True
   PASS   default Granularity = word-aligned
   PASS   Gap round trips 6.5 exactly
   PASS   LineGap round trips 6.5 exactly
@@ -122,6 +122,8 @@ Open documents at start: 1
   PASS   no row is wider than the text area
          widest row 192.75pt, text area 468pt
   PASS   every row's first cell carries its tier's paragraph style
+  PASS   interlinear cells are not spell-checked
+  PASS   the translation still is
   PASS   a vernacular cell carries no gram-gloss style
   PASS   follow.CMP=REL is drawn in small-caps case
   PASS   the lexical part carries no gram-gloss style
@@ -366,5 +368,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 312 passed
+ALL PASS -- 314 passed
 
