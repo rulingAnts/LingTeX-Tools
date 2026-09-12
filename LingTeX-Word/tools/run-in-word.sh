@@ -99,12 +99,14 @@ mkdir -p "$root/build"; printf '%s\n' "$doc" > "$conf"
 # where SetDevRoot pointed it, and both are this folder.
 reports="$root/LingTeX-Word-reports"
 
-# A template (.dotm) is expected to be LOADED, as a global add-in from Word's
-# STARTUP folder, not opened as a document: opening it would make it a document
-# window, and its ribbon, shortcuts and AutoExec would stop applying to every
-# other document. So for a .dotm the macros are run without opening anything;
-# a document is made if none is open, since some commands look at the active
-# one. A .docm is opened as before. --open / --no-open override the guess.
+# A template (.dotm) is expected to be LOADED as a global add-in -- the engine,
+# LingTeX-Word/LingTeX.dotm, loaded by the dev template LingTeX-Dev.dotm in
+# Word's startup folder -- not opened as a document. So for a .dotm the macros
+# are run without opening anything; a document is made if none is open, since
+# some commands look at the active one. ImportLingTeXModulesQuiet lives in the
+# dev template and does its own unload / open / import / save / close / load
+# of the engine, because a loaded add-in's project is protected (50289).
+# A .docm is opened as before. --open / --no-open override the guess.
 case "$doc" in *.dotm|*.DOTM) openit=0 ;; *) openit=1 ;; esac
 for a in "$@"; do
     case "$a" in --open) openit=1 ;; --no-open) openit=0 ;; esac
@@ -120,12 +122,13 @@ mkdir -p "$reports"; rm -f "$reports"/*.mac.txt "$reports"/ImportModules.txt
 macros=""
 [ "$import" = 1 ] && macros="$macros ImportLingTeXModulesQuiet"
 case "$tests" in
-    all)  macros="$macros RunAllTestsToFile AutoExec" ;;
-    doc)  macros="$macros RunDocTestsToFile AutoExec" ;;
-    both) macros="$macros RunAllTestsToFile RunDocTestsToFile AutoExec" ;;
+    all)  macros="$macros RunAllTestsToFile EnsureHooks" ;;
+    doc)  macros="$macros RunDocTestsToFile EnsureHooks" ;;
+    both) macros="$macros RunAllTestsToFile RunDocTestsToFile EnsureHooks" ;;
 esac
-# AutoExec last: it arms the save / selection hooks for the by-hand pass that
-# usually follows a run, which nothing else does while the code is in a .docm.
+# EnsureHooks last: arms the save / selection hooks for the by-hand pass that
+# usually follows a run. (Not AutoExec: both templates have one, and the dev
+# template's loads the engine rather than arming it.)
 macros="$macros$extra"
 
 #-- Dialogs -----------------------------------------------------------------
@@ -246,9 +249,9 @@ AS
         echo "   \"Can't continue run VB macro\" means the VBA editor is in break mode:"
         echo "   click OK on its dialog, then Run > Reset, and run this again."
         if [ "$openit" = 0 ]; then
-            echo "   A macro Word cannot find means the template is not loaded: it has"
-            echo "   to be in Word's STARTUP folder when Word starts (TESTING-MAC.md,"
-            echo "   \"The working template\"), or pass --open to open it as a document."
+            echo "   A macro Word cannot find means a template is not loaded: LingTeX-Dev.dotm"
+            echo "   must be in Word's startup folder when Word starts, and it loads the"
+            echo "   engine from the clone (TESTING-MAC.md, setup step 1)."
         fi
         exit 1
     fi

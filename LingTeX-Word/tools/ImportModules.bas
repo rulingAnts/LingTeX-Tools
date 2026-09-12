@@ -37,15 +37,31 @@ Option Explicit
 ' machine, and it is reasonable to turn it back off afterwards.
 ' ---------------------------------------------------------------------------
 '
-' HOW TO RUN
-'   1. Keep this document in your clone's LingTeX-Word folder, beside src/ --
-'      that is where the modules are read from. (SRC_FOLDER below can override.)
-'   2. Insert > Module, paste this file in (without its first line, which the
-'      importer reads and which is a compile error if typed), name it modImport.
-'   3. Run  ImportLingTeXModules  from the Immediate window.
-'   4. Run  VerifyLingTeXModules   -- confirms all fourteen are there and the two
-'      class modules really are classes. Do this before running any tests.
-'   5. Optionally run  SaveAsTemplate  to write LingTeX-Word.dotm.
+' TWO TEMPLATES
+'
+' This module lives in a small DEV template of its own -- LingTeX-Dev.dotm in
+' Word's startup folder, holding nothing but this -- and imports into the ENGINE
+' template, LingTeX.dotm, which lives in the clone's LingTeX-Word folder and is
+' loaded as a global add-in (by AutoExec below, at Word start). Two, because a
+' template that is loaded as a global add-in has its VBA project PROTECTED:
+' its macros run, it can even save itself, but nothing may import into it
+' (error 50289, found 2026-09-12 the first time this was tried from inside).
+' So the import unloads the engine, opens it as a document, imports, saves,
+' closes and loads it again. The shipped template never contains this module.
+'
+' HOW TO SET UP, ONCE
+'   1. In Word: new document, Insert > Module, paste this file in (without its
+'      first line, which the importer reads and which is a compile error if
+'      typed), name it modImport. File > Save As > Word Macro-Enabled Template,
+'      LingTeX-Dev.dotm, into Word's startup folder (Word > Settings > File
+'      Locations > Startup). Quit Word.
+'   2. sh LingTeX-Word/tools/install-dev-template.sh -- tells this template
+'      where the clone is (the LingTeX_DevRoot variable, see SetDevRoot), puts
+'      the ribbon into the engine template, points the test runner at it.
+'   3. Start Word. This template loads; its AutoExec loads the engine.
+'   4. sh LingTeX-Word/tools/run-in-word.sh -- ImportLingTeXModulesQuiet, the
+'      suites, EnsureHooks. Or by hand: ImportLingTeXModules, then
+'      VerifyLingTeXModules. SaveAsTemplate writes the release LingTeX-Word.dotm.
 '
 ' THE TWELVE STANDARD MODULES AND THE TWO CLASS MODULES ARE NOT THE SAME JOB.
 '
@@ -125,6 +141,18 @@ Private Const REPORT_FOLDER As String = "LingTeX-Word-reports"
 ' file is in (a .docm sitting in LingTeX-Word/, the earlier arrangement).
 Private Const DEV_ROOT_VAR As String = "LingTeX_DevRoot"
 
+' The engine template: the file the modules are imported into and that is loaded
+' as a global add-in. Beside src/ in the clone unless ENGINE_PATH says otherwise.
+Private Const ENGINE_FILE As String = "LingTeX.dotm"
+Private Const ENGINE_PATH As String = ""
+
+' The engine template while it is open for editing during an import. Nothing
+' between commands.
+Private mEngineDoc As Document
+' True while ImportLingTeXModulesQuiet runs the steps itself, so the individual
+' commands do not each close and reload the engine.
+Private mBatch As Boolean
+
 Private Function SrcFolder() As String
     SrcFolder = SRC_FOLDER
     If SrcFolder = "" Then SrcFolder = DevRoot() & Application.PathSeparator & "src"
@@ -170,9 +198,10 @@ Public Sub SetDevRoot()
     End If
     Err.Clear
     On Error GoTo 0
-    MsgBox "This template will import from" & vbCr & v & sep & "src" & vbCr & _
+    MsgBox "This dev template will import from" & vbCr & v & sep & "src" & vbCr & _
+           "into" & vbCr & v & sep & ENGINE_FILE & vbCr & _
            "and write reports to" & vbCr & v & sep & REPORT_FOLDER & vbCr & vbCr & _
-           "Save the template now (Cmd+S / Ctrl+S) so it remembers.", _
+           "Save this template now (Cmd+S / Ctrl+S) so it remembers.", _
            vbInformation, "LingTeX-Word"
 End Sub
 
@@ -185,28 +214,124 @@ End Sub
 ' For tools/run-in-word.sh and tools/run-in-word.ps1.
 Public Sub ImportLingTeXModulesQuiet()
     mQuiet = True
+    mBatch = True
     ImportLingTeXModules
     VerifyLingTeXModules
-    SaveThisFile
+    CloseEngine True
+    mBatch = False
     mQuiet = False
 End Sub
 
-' Save the file the modules were just imported into, so a template loaded from
-' STARTUP carries the current modules on disk for the next Word launch. Whether
-' Word lets a loaded global template save itself is the kind of thing the log
-' has to say rather than the code assume.
-Private Sub SaveThisFile()
-    On Error Resume Next
-    ThisDocument.Save
-    If Err.Number = 0 Then
-        AppendReport "saved " & ThisDocument.Name & " with the modules just imported" & vbCr
+'=============================================================================
+' -- THE ENGINE TEMPLATE: unload, open, save, close, load -------------------
+'=============================================================================
+
+Private Function EnginePath() As String
+    If ENGINE_PATH <> "" Then
+        EnginePath = ENGINE_PATH
     Else
-        AppendReport "NOT saved: " & ThisDocument.Name & " (" & CStr(Err.Number) & _
-                     ": " & Err.Description & "); the modules are current in " & _
-                     "memory until Word quits" & vbCr
+        EnginePath = DevRoot() & Application.PathSeparator & ENGINE_FILE
+    End If
+End Function
+
+' Runs when Word loads this dev template from its startup folder: load the
+' engine as a global add-in, so every document has its commands and ribbon.
+Public Sub AutoExec()
+    Dim wasQuiet As Boolean
+    wasQuiet = mQuiet
+    mQuiet = True                         ' never a dialog at Word start
+    If FileExists(EnginePath()) Then LoadEngine
+    mQuiet = wasQuiet
+End Sub
+
+' Load the engine template as a global add-in (Templates and Add-ins).
+Public Sub LoadEngine()
+    On Error Resume Next
+    AddIns.Add FileName:=EnginePath(), Install:=True
+    If Err.Number = 0 Then
+        If mQuiet Then AppendReport "loaded " & EnginePath() & " as a global add-in" & vbCr
+    Else
+        Report "Could not load the engine template as an add-in:" & vbCr & _
+               EnginePath() & vbCr & vbCr & CStr(Err.Number) & ": " & _
+               Err.Description, False
         Err.Clear
     End If
     On Error GoTo 0
+End Sub
+
+' Unload it, so its project is no longer protected and the file can be opened.
+Public Sub UnloadEngine()
+    Dim ai As Object
+    Dim want As String
+    want = LCase$(EnginePath())
+    On Error Resume Next
+    For Each ai In AddIns
+        If LCase$(JoinPath(ai.Path, ai.Name)) = want Then
+            ai.Installed = False
+            ai.Delete
+        End If
+    Next ai
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' The engine template open as a document -- opened here if it is not yet -- or
+' Nothing with an explanation. This is the only way into its project.
+Private Function EngineForEditing() As Document
+    Dim nm As String
+    On Error Resume Next
+    If Not mEngineDoc Is Nothing Then
+        nm = mEngineDoc.Name            ' raises if it was closed behind our back
+        If Err.Number = 0 Then
+            Set EngineForEditing = mEngineDoc
+            Exit Function
+        End If
+        Set mEngineDoc = Nothing
+        Err.Clear
+    End If
+    On Error GoTo 0
+
+    If Not FileExists(EnginePath()) Then
+        Report "There is no engine template at" & vbCr & EnginePath() & vbCr & vbCr & _
+               "It is LingTeX.dotm in the clone's LingTeX-Word folder (see " & _
+               "SetDevRoot for where this template thinks the clone is).", False
+        Exit Function
+    End If
+
+    UnloadEngine
+    On Error Resume Next
+    Set mEngineDoc = Documents.Open(FileName:=EnginePath(), AddToRecentFiles:=False)
+    If Err.Number <> 0 Or mEngineDoc Is Nothing Then
+        Report "Could not open the engine template for editing:" & vbCr & _
+               EnginePath() & vbCr & vbCr & CStr(Err.Number) & ": " & _
+               Err.Description, False
+        Err.Clear
+        Set mEngineDoc = Nothing
+        Exit Function
+    End If
+    On Error GoTo 0
+    Set EngineForEditing = mEngineDoc
+End Function
+
+' Save (or not), close, and load the engine again as an add-in.
+Private Sub CloseEngine(ByVal saveIt As Boolean)
+    If mEngineDoc Is Nothing Then Exit Sub
+    On Error Resume Next
+    If saveIt Then
+        mEngineDoc.Save
+        If Err.Number = 0 Then
+            If mQuiet Then AppendReport "saved " & mEngineDoc.Name & " with the modules just imported" & vbCr
+        Else
+            Report "NOT saved: " & mEngineDoc.Name & " (" & CStr(Err.Number) & ": " & _
+                   Err.Description & ")", False
+            Err.Clear
+        End If
+    End If
+    mEngineDoc.Close SaveChanges:=0        ' 0 = wdDoNotSaveChanges
+    Err.Clear
+    On Error GoTo 0
+    Set mEngineDoc = Nothing
+    LoadEngine
 End Sub
 
 Public Sub ImportLingTeXModules()
@@ -228,6 +353,9 @@ Public Sub ImportLingTeXModules()
     If vbp Is Nothing Then Exit Sub              ' GetProject explains why
 
     log = log & "  from     " & SrcFolder() & vbCr
+    log = log & "  into     " & EnginePath() & vbCr
+    ' From the days when this module lived inside the engine: it must not ship.
+    RemoveComponent vbp, "modImport"
     '-- the twelve standard modules: Import, which is reliable for these ------
     ImportGroup vbp, MODULE_LIST, False, log, okCount, failCount, todo, todoCount
 
@@ -259,6 +387,7 @@ Public Sub ImportLingTeXModules()
           "classes, before you run anything."
 
     Report msg, (failCount = 0 And todoCount = 0)
+    If Not mBatch Then CloseEngine True
 End Sub
 
 '-----------------------------------------------------------------------------
@@ -399,14 +528,15 @@ Public Sub VerifyLingTeXModules()
         Report "All " & CStr(UBound(names) + 1) & " modules present and of the " & _
                "right kind." & vbCr & vbCr & log & vbCr & _
                "Next:  RunAllTests    (expect ALL PASS, 79 checks)" & vbCr & _
-               "then:  RunDocTests    (expect ALL PASS, about 250 checks)" & vbCr & _
-               "then:  AutoExec       (arms the save hook)", True
+               "then:  RunDocTests    (expect ALL PASS, about 270 checks)" & vbCr & _
+               "then:  LingTeXStart   (arms the hooks; any command does too)", True
     Else
         Report CStr(problems) & " problem(s) with the project:" & vbCr & vbCr & log & _
                vbCr & "A class module that came in as a standard module is the " & _
                "usual one. Delete it and redo it with Insert > Class Module and " & _
                "the matching file in LingTeX-Word/build/paste/.", False
     End If
+    If Not mBatch Then CloseEngine False
 End Sub
 
 ' 0 = not present, otherwise the VBComponent Type (1 standard, 2 class, 3 form).
@@ -437,16 +567,27 @@ Public Sub SaveAsTemplate()
         target = JoinPath(ParentFolder(SrcFolder()), "LingTeX-Word.dotm")
     End If
 
+    Dim doc As Document
+    Set doc = EngineForEditing()
+    If doc Is Nothing Then Exit Sub
+
     On Error Resume Next
     ' 13 = wdFormatXMLTemplateMacroEnabled
-    ActiveDocument.SaveAs2 FileName:=target, FileFormat:=13
+    doc.SaveAs2 FileName:=target, FileFormat:=13
     If Err.Number <> 0 Then
         Report "Could not save the template:" & vbCr & vbCr & _
                CStr(Err.Number) & ": " & Err.Description, False
         Err.Clear
+        CloseEngine False
         Exit Sub
     End If
+    ' The open document IS the release file now; close it and load the engine
+    ' back from its own path.
+    doc.Close SaveChanges:=0
+    Err.Clear
     On Error GoTo 0
+    Set mEngineDoc = Nothing
+    LoadEngine
 
     Report "Saved:" & vbCr & vbCr & target & vbCr & vbCr & _
            "Now run tools/build-dotm.sh to inject the ribbon and write the " & _
@@ -633,12 +774,13 @@ End Function
 Private Function GetProject() As Object
     Dim vbp As Object
 
-    ' THIS file's project -- the template's, when it is loaded as a global
-    ' add-in and the active document is whatever the user has open. It used to
-    ' be ActiveDocument.VBProject, which is the same thing only while the file
-    ' holding the code is the one in front.
+    ' The ENGINE template's project, with the engine opened as a document for
+    ' the purpose: loaded as a global add-in its project is protected (50289).
+    Dim doc As Document
+    Set doc = EngineForEditing()
+    If doc Is Nothing Then Exit Function
     On Error Resume Next
-    Set vbp = ThisDocument.VBProject
+    Set vbp = doc.VBProject
     If Err.Number = 0 Then
         Set GetProject = vbp
         Exit Function
@@ -667,8 +809,11 @@ End Function
 ' Never removes the module this code is running from, which VBA would refuse.
 Private Sub RemoveComponent(vbp As Object, ByVal compName As String)
     Dim c As Object
-    If LCase$(compName) = "modimport" Then Exit Sub
     On Error Resume Next
+    ' Never the project this code is running from, which VBA would refuse.
+    If LCase$(vbp.FileName) = LCase$(ThisDocument.FullName) Then
+        If LCase$(compName) = "modimport" Then Exit Sub
+    End If
     Set c = vbp.VBComponents(compName)
     If Err.Number = 0 Then
         If Not c Is Nothing Then vbp.VBComponents.Remove c

@@ -552,9 +552,10 @@ recorded so the module boundaries are not lost.
   is text measurement, which the width cache reduces on repeat runs.
 - **A document whose LingTeX styles were created before the styles followed
   Normal keeps their pinned size**; `LingTeXResetStyles` fixes it once.
-- **Hooks must be armed once per Word session** while the code lives in a
-  `.docm`: any command does it, or `LingTeXStart`. A STARTUP template will do
-  it by itself.
+- **A template loaded as a global add-in has a protected VBA project**
+  (error 50289): its macros run, it can save itself, but nothing may import
+  into it. The dev loop therefore uses two templates (TESTING-MAC.md, setup
+  step 1); the shipped template is unaffected.
 
 ---
 

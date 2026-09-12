@@ -85,6 +85,15 @@ requests.
 
 ## State of play
 
+- **A loaded global template's project is protected** (error 50289 on every
+  import, 2026-09-12 second template run; it did save itself). So: TWO
+  templates. LingTeX-Dev.dotm in the startup folder holds only modImport,
+  loads the engine (LingTeX-Word/LingTeX.dotm, in the clone, gitignored) as
+  an add-in at Word start, and re-imports it by unloading, opening as a
+  document, importing, saving, closing, loading. install-dev-template.sh
+  does the file-side setup; Seth makes the dev template in Word once.
+  Unproven: AddIns.Add / Installed=False / Documents.Open on Mac in that
+  sequence, and whether the ribbon part survives the engine's Save.
 - **First template run wrote nothing to the repo** (2026-09-12 17:00): SetDevRoot
   had not been run, so the bootstrap looked for src beside the template,
   imported 0 of 14, and the (old) tests wrote their reports beside the template;
