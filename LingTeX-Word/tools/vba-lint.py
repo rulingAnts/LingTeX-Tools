@@ -835,6 +835,25 @@ def check_wd_constants(files):
     return problems
 
 
+def check_no_continuation_in_classes(files):
+    """No line continuation in a .cls. The classes are installed by the bootstrap
+    from a string, and on Mac Word that arrives double-spaced (see ReadTextFile in
+    ImportModules.bas), so a "_" followed by a blank line is a compile error that
+    surfaces only when the class is first used -- the events section, after
+    everything else passed (clsAppEvents, 2026-09-12). Build long strings with
+    several statements instead."""
+    problems = []
+    for f in files:
+        if f.suffix.lower() != ".cls":
+            continue
+        for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            if _code_only(line).rstrip().endswith(" _"):
+                problems.append(
+                    f"{f.name}:{n}: line continuation in a class module; put the statement "
+                    f"on one line or build it in several statements")
+    return problems
+
+
 def main():
     files = []
     for d in SRC_DIRS:
@@ -941,6 +960,15 @@ def main():
             print("          " + msg)
     else:
         print("  OK    every wd* constant is on the allowlist")
+
+    cont = check_no_continuation_in_classes(files)
+    if cont:
+        total += len(cont)
+        print("  FAIL  continuation in class module")
+        for msg in cont:
+            print("          " + msg)
+    else:
+        print("  OK    no line continuation in the class modules")
 
     print()
     print("ALL PASS" if total == 0 else f"{total} problem(s)")

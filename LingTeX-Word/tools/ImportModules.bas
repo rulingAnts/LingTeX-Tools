@@ -467,7 +467,7 @@ Private Function IsClassFile(ByVal leaf As String) As Boolean
 End Function
 
 '-----------------------------------------------------------------------------
-' A whole text file as one string, with CRLF line endings.
+' A whole text file as one string, with this platform's line endings.
 '
 ' Read as binary rather than with Line Input so the file's own line endings do
 ' not matter: both are normalised here. That is the point of doing it this way --
@@ -487,11 +487,15 @@ Private Function ReadTextFile(ByVal fullPath As String) As String
     Close #fn
 
     ' CRLF -> LF -> CR -> LF collapses every convention to LF, then one pass
-    ' back to CRLF. Doing it in this order means a CRLF file is not turned into
-    ' CR CR LF.
+    ' back to THIS platform's newline: CRLF on Windows, CR on Mac (vbNewLine).
+    ' Mac Word's AddFromString treats CR and LF as two line breaks, so a CRLF
+    ' string arrives double-spaced -- harmless until a "_" continuation is
+    ' followed by one of those blank lines, which is a syntax error (found in
+    ' clsAppEvents, 2026-09-12). Doing it in this order means a CRLF file is not
+    ' turned into CR CR LF.
     buf = Replace(buf, vbCrLf, vbLf)
     buf = Replace(buf, vbCr, vbLf)
-    ReadTextFile = Replace(buf, vbLf, vbCrLf)
+    ReadTextFile = Replace(buf, vbLf, vbNewLine)
     Exit Function
 
 Failed:
