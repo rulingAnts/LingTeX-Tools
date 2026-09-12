@@ -414,6 +414,22 @@ file. CI verifies rather than builds: it unzips the `.dotm`, diffs the embedded
 ribbon against `src/customUI14.xml`, and checks the manifest, so a template that
 has drifted from the sources fails the release.
 
+**Later — numbering, headings, captions.** What an example carries in a
+FieldWorks text, and what a paper puts around it. Already handled: any number
+of interlinear tiers per wrap line, and several free translations (one
+paragraph each). One gap in that: a second translation's language tag (`Free
+Ind`) is dropped on the way in, so two translations render alike — keep the
+tag, and give each language a way to be styled (a per-language style, or the
+tag as a prefix). Not handled at all yet: an example number before the table
+(`(12)`), a heading before, a caption after with a figure or example number,
+list bullets or numbering around it, and sub-numbering (`a.`, `b.`) across the
+examples of one multi-block paste. Two constraints for whoever designs it:
+numbers must be Word's own — a `SEQ` field or a list level — so that
+cross-references and renumbering keep working, and whatever carries the number
+(a paragraph before, or an indent on the table) must be something
+`AvailableTextWidth` already sees, so the planner's budget stays right; a left
+indent on the table is already subtracted.
+
 **Later — input that is not from FieldWorks.** The engine was specified as
 source-agnostic, and for its two inputs it is: FLEx interlinear text (tier
 labels, tab-separated) and plain TSV with one row per tier. What is still

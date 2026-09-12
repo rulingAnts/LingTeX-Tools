@@ -118,6 +118,9 @@ requests.
   by-hand pass from 3c/3e/3f. Then `SaveAsTemplate` + `tools/build-dotm.sh` +
   `tools/check-dotm.sh`, then packaging.
 - Later, wanted by Seth: a settings interface (gaps, styles) -- Phase 2 form.
+- Later, per Seth: example numbers, headings before, captions after, list
+  numbering around, sub-numbering across a multi-block paste; and keep the
+  language tag on a second free translation (dropped today). README, *Later*.
 - Later, per Seth: revisit the source-agnostic input model for Toolbox/SFM,
   Excel/Numbers pastes and the Phase 2 hand-typed data sheet -- the FLEx-shaped
   assumptions are listed in README, *Later*. FieldWorks data first.
