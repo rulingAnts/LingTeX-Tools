@@ -217,6 +217,11 @@ Private Sub EnsureParaStyle(doc As Document, ByVal role As String, _
             .Hyphenation = False
         End With
         .NoSpaceBetweenParagraphsOfSameStyle = True
+        ' Enter after a translation gives an ORDINARY paragraph, not another
+        ' LingTeX Free one -- otherwise the blank line a person leaves between
+        ' two examples looks like part of the first (see IsTranslationParagraph).
+        ' Inside a cell the following paragraph keeps the tier's style.
+        If role = ROLE_FREE Then .NextParagraphStyle = doc.Styles(wdStyleNormal)
     End With
     Err.Clear
     On Error GoTo 0

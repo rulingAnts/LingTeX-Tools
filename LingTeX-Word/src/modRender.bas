@@ -704,11 +704,34 @@ Public Sub AbsorbFreeParagraphs(ByRef ex As IgtExample, tbl As Table)
     Do While Not para Is Nothing
         guard = guard + 1
         If guard > 64 Then Exit Do             ' nothing legitimate runs this long
-        If Not IsFreeParagraph(para) Then Exit Do
+        If Not IsTranslationParagraph(para) Then Exit Do
         AddFreeLine ex, StripQuotes(ParaText(para))
         Set para = NextParagraph(para)
     Loop
 End Sub
+
+' A paragraph that belongs to the example as one of its translations: styled
+' LingTeX Free AND not empty. The empty paragraph a person gets by pressing
+' Enter after a translation inherits the style, and counting it as a
+' translation is how re-wrap-all deleted the second of two examples
+' (2026-09-12): absorbed, then deleted, it was the only paragraph between two
+' tables; they touched, Word merged them, and tbl.Delete took both. An empty
+' paragraph ENDS an example.
+Public Function IsTranslationParagraph(para As Paragraph) As Boolean
+    If Not IsFreeParagraph(para) Then Exit Function
+    IsTranslationParagraph = (Len(Trim$(ParaText(para))) > 0)
+End Function
+
+' True when the paragraph's mark is the last thing before a table.
+Private Function ParagraphPrecedesTable(para As Paragraph) As Boolean
+    Dim nxt As Paragraph
+    On Error Resume Next
+    Set nxt = para.Next
+    If nxt Is Nothing Then Exit Function
+    ParagraphPrecedesTable = nxt.Range.Information(wdWithInTable)
+    Err.Clear
+    On Error GoTo 0
+End Function
 
 '-----------------------------------------------------------------------------
 ' Delete a table together with the free-translation paragraphs that belong to it.
@@ -718,6 +741,7 @@ End Sub
 '-----------------------------------------------------------------------------
 Public Sub DeleteTableAndFreeLines(tbl As Table)
     Dim para As Paragraph
+    Dim rng As Range
     Dim guard As Long
 
     If tbl Is Nothing Then Exit Sub
@@ -729,7 +753,17 @@ Public Sub DeleteTableAndFreeLines(tbl As Table)
         If guard > 64 Then Exit Do
         Set para = ParagraphAfterTable(tbl)
         If para Is Nothing Then Exit Do
-        If Not IsFreeParagraph(para) Then Exit Do
+        If Not IsTranslationParagraph(para) Then Exit Do
+        If ParagraphPrecedesTable(para) Then
+            ' Its paragraph mark is the only thing between this example and the
+            ' next table. Removing it makes Word merge the two tables, and
+            ' tbl.Delete below then takes both. The text goes; the mark stays,
+            ' and the redraw writes the translation back in front of it.
+            Set rng = para.Range
+            rng.MoveEnd wdCharacter, -1
+            If rng.End > rng.Start Then rng.Delete
+            Exit Do
+        End If
         para.Range.Delete
     Loop
 

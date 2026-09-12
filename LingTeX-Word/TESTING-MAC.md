@@ -223,9 +223,14 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
    on.
 8. **Restyle `LingTeX Gloss`** — Format → Style…, change its size — and *every*
    example in the document follows. The styles are yours; that is the point.
-9. `LingTeXConvertTableToIgt` on a plain two-row table you type by hand →
+9. **Two examples close together.** Insert one, press Enter after its
+   translation, insert another (one empty paragraph between); and elsewhere
+   insert two back to back (nothing but the translation between).
+   `LingTeXRewrapAll` → both pairs re-wrap and nothing is deleted. The first
+   pass lost the second example here.
+10. `LingTeXConvertTableToIgt` on a plain two-row table you type by hand →
    becomes an auto-wrapping example.
-10. Copy a rendered example, paste it into TextEdit → tab-separated text. Paste
+11. Copy a rendered example, paste it into TextEdit → tab-separated text. Paste
     that back into Word and insert → the same grid.
 
 ---

@@ -108,6 +108,12 @@ requests.
   - AutoCorrect's sentence/table-cell capitalisation is suppressed while the
     selection is inside an example (`clsAppEvents`).
   - The sample's `:` is the IPA length mark `ː`; `AttachPunct` includes it.
+  - **Re-wrap-all deleted the second of two examples** separated by one
+    empty paragraph: the paragraph inherited LingTeX Free, was absorbed as a
+    translation and deleted, the tables merged, `tbl.Delete` took both. Now an
+    empty paragraph ends an example (`IsTranslationParagraph`), no deletion
+    removes a paragraph mark that precedes a table, and LingTeX Free's next
+    paragraph style is Normal. Doc-test section `adjacent` proves both layouts.
 - Next: Seth re-runs both runners (expect 79 and about 231), then continues the
   by-hand pass from 3c/3e/3f. Then `SaveAsTemplate` + `tools/build-dotm.sh` +
   `tools/check-dotm.sh`, then packaging.

@@ -137,6 +137,7 @@ Free Eng (When) she picked her yams early.
 | Paste an example into a **new** document → styles are recreated and it re-wraps | ☐ | ☐ |
 | Change a table's style away from `LingTeX Interlinear` → `LingTeXRewrapAll` leaves it alone (the escape hatch) | ☐ | ☐ |
 | Restyle the `LingTeX Gloss` paragraph style → **every** example in the document updates | ☐ | ☐ |
+| Two examples with one empty paragraph between them, and two with only the translation between → `LingTeXRewrapAll` re-wraps both and deletes nothing | ☐ | ☐ |
 | `LingTeXConvertTableToIgt` on a plain two-row table → becomes an auto-wrapping example | ☐ | ☐ |
 | Our own TSV, copied out of a rendered example and pasted back in, reproduces the same grid | ☐ | ☐ |
 
