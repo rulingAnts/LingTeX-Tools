@@ -166,6 +166,40 @@ Public Sub EnsureStyles(doc As Document, Optional ByVal force As Boolean = False
 End Sub
 
 
+' Make the six tier styles follow Normal again: based on it, size inherited,
+' font pinned from the body font. For documents whose styles predate that
+' rule, and for a user who wants their tuning undone. See LingTeXResetStyles.
+Public Sub ResetParaStylesToBody(doc As Document)
+    Dim roles(0 To 5) As String
+    Dim i As Long
+    Dim st As Style
+    Dim bodyFont As String, bodySize As Double
+
+    roles(0) = ROLE_VERNACULAR
+    roles(1) = ROLE_MORPHEMES
+    roles(2) = ROLE_GLOSS
+    roles(3) = ROLE_WORDGLOSS
+    roles(4) = ROLE_CATEGORY
+    roles(5) = ROLE_FREE
+    bodyFont = BodyFontName(doc)
+    bodySize = BodyFontSize(doc)
+
+    For i = 0 To 5
+        If StyleExistsOfType(doc, ParaStyleName(roles(i)), wdStyleTypeParagraph) Then
+            On Error Resume Next
+            Set st = doc.Styles(ParaStyleName(roles(i)))
+            st.BaseStyle = doc.Styles(wdStyleNormal)
+            st.Font.Name = bodyFont
+            ' Equal to the base's value, which Word stores as "no difference",
+            ' so from here on the size follows Normal.
+            st.Font.Size = bodySize
+            Err.Clear
+            On Error GoTo 0
+        End If
+    Next i
+    ClearCache
+End Sub
+
 Private Sub EnsureParaStyle(doc As Document, ByVal role As String, _
         ByVal fontName As String, ByVal fontSize As Double, _
         ByVal italic As Boolean, ByVal spaceAfter As Double)

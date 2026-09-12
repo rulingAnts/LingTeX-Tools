@@ -515,6 +515,19 @@ recorded so the module boundaries are not lost.
 
 ---
 
+## Known issues
+
+- **Re-wrap All over many examples shows the busy cursor for a few seconds.**
+  VBA is single-threaded; the status bar reports progress meanwhile. The time
+  is text measurement, which the width cache reduces on repeat runs.
+- **A document whose LingTeX styles were created before the styles followed
+  Normal keeps their pinned size**; `LingTeXResetStyles` fixes it once.
+- **Hooks must be armed once per Word session** while the code lives in a
+  `.docm`: any command does it, or `LingTeXStart`. A STARTUP template will do
+  it by itself.
+
+---
+
 ## Superseded work
 
 `../word_processing_tools/FLExToWord.bas` renders each word as an OMML

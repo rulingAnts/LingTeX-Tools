@@ -21,9 +21,12 @@ no automated suite can reach: what the thing actually looks like on the page.
    ordinary — `~/Desktop/lingtex-test.docx`. It has to be saved before the
    save-hook checks in pass 5 mean anything.
 
-3. **Arm the hooks.** Tools → Macro → Macros…, choose **`AutoExec`**, Run. That
-   attaches the save and selection handlers. Word runs it by itself once the
-   add-in is installed as a template; here it is manual, once per Word session.
+3. **Arm the hooks.** Run **`LingTeXStart`** (Word for Mac's Macros dialog
+   does not list `AutoExec`, which is what it calls). That attaches the save
+   and selection handlers and keeps AutoCorrect out of cells. Every command
+   arms them on first use as well, and the test runner arms them at the end
+   of every run, so this is only needed after restarting Word if the first
+   thing you do is save.
 
 4. **Put the sample somewhere you can copy it from.** Open
    `LingTeX-Word/samples/checklist-sample.txt` in TextEdit — the three-line FLEx
@@ -172,6 +175,10 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
    sizing them directly does *not* count: direct formatting is not part of the
    example and is discarded by a re-wrap, on purpose — the styles are the
    description.
+   **A document whose LingTeX styles were created before 2026-09-12 keeps their
+   pinned size** (a style is never clobbered once it exists): run
+   `LingTeXResetStyles` once, which makes the six follow Normal again and
+   re-wraps.
 5. **Landscape** (Layout → Orientation) → re-wrap reflows wider. Back to
    portrait → reflows back.
 6. **Two text columns** (Layout → Columns → Two) → re-wrap fits the *column*
@@ -293,6 +300,16 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
    it again to turn it off; it is off by default for a reason.
 
 ---
+
+## Known, and accepted for now
+
+- **Re-wrap All over twenty examples takes a few seconds with the busy
+  cursor.** VBA has no thread to keep the window live; the status bar shows
+  "re-wrapping example n of N" meanwhile. A progress dialog is a later
+  refinement; the wait itself is measurement, and is what the width cache is
+  for.
+- **Split happens at the first boundary only**, on every tier at once. Split
+  the right half again for three columns.
 
 ## If something fails
 

@@ -40,9 +40,9 @@ $imp = Join-Path $reports "ImportModules.txt"; if (Test-Path $imp) { Remove-Item
 $macros = @()
 if (-not $NoImport) { $macros += "ImportLingTeXModulesQuiet" }
 switch ($Tests) {
-    "all"  { $macros += "RunAllTestsToFile" }
-    "doc"  { $macros += "RunDocTestsToFile" }
-    "both" { $macros += "RunAllTestsToFile", "RunDocTestsToFile" }
+    "all"  { $macros += "RunAllTestsToFile", "AutoExec" }
+    "doc"  { $macros += "RunDocTestsToFile", "AutoExec" }
+    "both" { $macros += "RunAllTestsToFile", "RunDocTestsToFile", "AutoExec" }
 }
 
 $word = New-Object -ComObject Word.Application

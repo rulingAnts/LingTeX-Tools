@@ -44,7 +44,7 @@ Private Const SHORTCUT_TABLE As String = _
     "I=LingTeXInsertInterlinear|R=LingTeXRewrapCurrent|A=LingTeXRewrapAll|" & _
     "S=LingTeXSplitColumn|M=LingTeXMergeColumns|K=LingTeXCheckExample|" & _
     "T=LingTeXConvertTableToIgt|W=LingTeXAlignByWord|P=LingTeXAlignByMorpheme|" & _
-    "H=LingTeXShowSettings"
+    "H=LingTeXShowSettings|L=LingTeXStart"
 
 '-----------------------------------------------------------------------------
 ' EVERY message to the user goes through Report or Confirm, never MsgBox.
@@ -112,6 +112,34 @@ Public Sub AutoExit()
     On Error GoTo 0
 End Sub
 
+' Attach the application hooks if nothing has yet: re-wrap on save, re-wrap
+' on leaving an example, AutoCorrect kept out of cells. AutoExec does this when
+' Word loads the add-in from STARTUP, but while the code lives in a .docm
+' nobody runs it -- and Word for Mac's Macros dialog does not even list it --
+' so two by-hand checks that depend on the hooks failed for no other reason
+' (2026-09-12). Every command calls this first; it does nothing once armed.
+' Deliberately not AutoExec itself, which also clears gBusy.
+Public Sub EnsureHooks()
+    On Error Resume Next
+    If mEvents Is Nothing Then
+        Set mEvents = New clsAppEvents
+        mEvents.Attach
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' AutoExec by a name that appears in the macro list, on the ribbon and on a
+' shortcut, and says what it did.
+Public Sub LingTeXStart()
+    AutoExec
+    Report "LingTeX-Word is armed for this Word session: examples re-wrap " & _
+           "when a document is saved (and, if turned on, when the cursor " & _
+           "leaves one), and AutoCorrect stays out of interlinear cells." & _
+           vbCr & vbCr & "Every command arms this on first use as well.", _
+           vbInformation
+End Sub
+
 
 '=============================================================================
 ' -- INSERTING --------------------------------------------------------------
@@ -139,6 +167,7 @@ Public Sub LingTeXInsertInterlinear()
         Exit Sub
     End If
     On Error GoTo Fail
+    EnsureHooks
     Set doc = ActiveDocument
 
     If Selection.Type = wdSelectionIP Then
@@ -236,6 +265,7 @@ Public Sub LingTeXConvertTableToIgt()
         Exit Sub
     End If
     On Error GoTo Fail
+    EnsureHooks
 
     If Not Selection.Information(wdWithInTable) Then
         Report "Put the cursor inside the table you want to convert.", _
@@ -336,6 +366,7 @@ Public Sub LingTeXRewrapCurrent()
         Exit Sub
     End If
     On Error GoTo Fail
+    EnsureHooks
 
     Set tbl = FindExampleAt(Selection.Range)
     If tbl Is Nothing Then
@@ -372,6 +403,7 @@ End Sub
 ' with no document open it raises, and without this the user got a bare VBA error
 ' dialog with a line number in it.
 Public Sub LingTeXRewrapAll()
+    EnsureHooks
     Dim doc As Document
 
     On Error GoTo Fail
@@ -418,6 +450,7 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
         Exit Sub
     End If
     On Error GoTo Fail
+    EnsureHooks
 
     Set tables = AllInterlinearTables(doc)
     If tables.Count = 0 Then
@@ -461,6 +494,11 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
     nFailed = 0
     For i = tables.Count To 1 Step -1
         On Error Resume Next
+        ' A document of twenty examples takes a few seconds and shows the busy
+        ' cursor meanwhile; VBA has no thread to keep the window live, so the
+        ' status bar says how far along it is.
+        Application.StatusBar = "LingTeX: re-wrapping example " & _
+                                CStr(tables.Count - i + 1) & " of " & CStr(tables.Count)
         Set done = RewrapTable(tables(i))
         If done Is Nothing Then
             nFailed = nFailed + 1
@@ -478,6 +516,10 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
         Err.Clear
         On Error GoTo Fail
     Next i
+
+    On Error Resume Next
+    Application.StatusBar = ""
+    On Error GoTo Fail
 
     If restore Then
         On Error Resume Next
@@ -555,6 +597,7 @@ Public Sub LingTeXSplitColumn()
         Exit Sub
     End If
     On Error GoTo Fail
+    EnsureHooks
 
     Set tbl = FindExampleAt(Selection.Range)
     If tbl Is Nothing Then
@@ -626,6 +669,7 @@ Public Sub LingTeXMergeColumns()
         Exit Sub
     End If
     On Error GoTo Fail
+    EnsureHooks
 
     Set tbl = FindExampleAt(Selection.Range)
     If tbl Is Nothing Then
@@ -708,6 +752,7 @@ Public Sub LingTeXCheckExample()
         Exit Sub
     End If
     On Error GoTo Fail
+    EnsureHooks
 
     Set tbl = FindExampleAt(Selection.Range)
     If tbl Is Nothing Then
@@ -1003,6 +1048,7 @@ Public Sub LingTeXAlignByWord()
     Dim doc As Document
     Set doc = DocForSetting()
     If doc Is Nothing Then Exit Sub
+    EnsureHooks
     SetSettingGranularity doc, igtWordAligned
     Report "New examples in this document will be WORD-aligned: one column per " & _
            "word, with enclitics kept in their host's column." & vbCr & vbCr & _
@@ -1014,6 +1060,7 @@ Public Sub LingTeXAlignByMorpheme()
     Dim doc As Document
     Set doc = DocForSetting()
     If doc Is Nothing Then Exit Sub
+    EnsureHooks
     SetSettingGranularity doc, igtMorphemeAligned
     Report "New examples in this document will be MORPHEME-aligned: one column " & _
            "per morpheme, with enclitic columns never starting a wrap line." & _
@@ -1027,6 +1074,7 @@ Public Sub LingTeXToggleRewrapOnSave()
     Dim v As Boolean
     Set doc = DocForSetting()
     If doc Is Nothing Then Exit Sub
+    EnsureHooks
     v = Not SettingRewrapOnSave(doc)
     SetSettingRewrapOnSave doc, v
     Report "Re-wrap every example when this document is saved: now " & _
@@ -1038,6 +1086,7 @@ Public Sub LingTeXToggleRewrapOnSelectionChange()
     Dim v As Boolean
     Set doc = DocForSetting()
     If doc Is Nothing Then Exit Sub
+    EnsureHooks
     v = Not SettingRewrapOnSelectionChange(doc)
     SetSettingRewrapOnSelectionChange doc, v
     Report "Re-wrap an example as soon as the cursor leaves it: now " & _
@@ -1051,6 +1100,7 @@ Public Sub LingTeXToggleGramGlossInitialCap()
     Dim v As Boolean
     Set doc = DocForSetting()
     If doc Is Nothing Then Exit Sub
+    EnsureHooks
     v = Not SettingGramGlossInitialCap(doc)
     SetSettingGramGlossInitialCap doc, v
     Report "Grammatical glosses in small capitals now " & _
@@ -1060,11 +1110,31 @@ Public Sub LingTeXToggleGramGlossInitialCap()
            "Re-wrap the examples to apply it.", vbInformation
 End Sub
 
+' The LingTeX paragraph styles follow the document's Normal style -- size
+' inherited, font pinned from the body font -- but only from when they are
+' created; a style is never clobbered once it exists. A document whose styles
+' were made before that rule keeps their pinned size, so making Normal bigger
+' changes nothing (Seth, 2026-09-12). This resets the six to follow Normal
+' again, then re-wraps. It IS a clobber, of any tuning too, and says so.
+Public Sub LingTeXResetStyles()
+    Dim doc As Document
+    Set doc = DocForSetting()
+    If doc Is Nothing Then Exit Sub
+    EnsureHooks
+    If Not Confirm("Reset the LingTeX paragraph styles to follow this " & _
+                   "document's Normal style (its font and size), and re-wrap " & _
+                   "every example?" & vbCr & vbCr & "Any size or font you set " & _
+                   "on a LingTeX style yourself is replaced.") Then Exit Sub
+    ResetParaStylesToBody doc
+    RewrapDocument doc, True
+End Sub
+
 Public Sub LingTeXShowSettings()
     Dim doc As Document
     Dim msg As String
     Set doc = DocForSetting()
     If doc Is Nothing Then Exit Sub
+    EnsureHooks
     msg = "LingTeX-Word settings stored in " & doc.Name & ":" & vbCr & vbCr
     msg = msg & "Alignment: " & IIf(SettingGranularity(doc) = igtMorphemeAligned, _
                                     "by morpheme", "by word") & vbCr
@@ -1234,4 +1304,12 @@ End Sub
 
 Public Sub RbnShowShortcuts(control As Variant)
     LingTeXShowShortcuts
+End Sub
+
+Public Sub RbnStart(control As Variant)
+    LingTeXStart
+End Sub
+
+Public Sub RbnResetStyles(control As Variant)
+    LingTeXResetStyles
 End Sub

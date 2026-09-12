@@ -102,10 +102,12 @@ mkdir -p "$reports"; rm -f "$reports"/*.mac.txt "$reports"/ImportModules.txt
 macros=""
 [ "$import" = 1 ] && macros="$macros ImportLingTeXModulesQuiet"
 case "$tests" in
-    all)  macros="$macros RunAllTestsToFile" ;;
-    doc)  macros="$macros RunDocTestsToFile" ;;
-    both) macros="$macros RunAllTestsToFile RunDocTestsToFile" ;;
+    all)  macros="$macros RunAllTestsToFile AutoExec" ;;
+    doc)  macros="$macros RunDocTestsToFile AutoExec" ;;
+    both) macros="$macros RunAllTestsToFile RunDocTestsToFile AutoExec" ;;
 esac
+# AutoExec last: it arms the save / selection hooks for the by-hand pass that
+# usually follows a run, which nothing else does while the code is in a .docm.
 macros="$macros$extra"
 
 #-- Dialogs -----------------------------------------------------------------
