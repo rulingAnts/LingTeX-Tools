@@ -36,6 +36,13 @@ Private mEvents As clsAppEvents
 ' not yet opened. See BeginUndo.
 Private mPendingUndoLabel As String
 
+' The ribbon, handed over by its onLoad callback, so the toggle buttons can be
+' told to ask for their pressed state again when a setting or the active
+' document changes (settings live in the document). Lost if the VBA project
+' is reset -- an untrapped error, Run > Reset -- after which the toggles stop
+' following changes until Word restarts; the known cost of this Office design.
+Private mRibbon As Object
+
 ' Keyboard shortcuts, letter=command. Installed by LingTeXInstallShortcuts as
 ' Ctrl+Alt+letter on Windows, which is Cmd+Option+letter on Mac (the Control
 ' key code, 512, is the Command key there). Letters chosen to stay clear of Word's own
@@ -1048,6 +1055,7 @@ Public Sub LingTeXAlignByWord()
     If doc Is Nothing Then Exit Sub
     EnsureHooks
     SetSettingGranularity doc, igtWordAligned
+    RefreshRibbon
     Report "New examples in this document will be WORD-aligned: one column per " & _
            "word, with enclitics kept in their host's column." & vbCr & vbCr & _
            "Examples already on the page are unchanged until inserted again.", _
@@ -1060,6 +1068,7 @@ Public Sub LingTeXAlignByMorpheme()
     If doc Is Nothing Then Exit Sub
     EnsureHooks
     SetSettingGranularity doc, igtMorphemeAligned
+    RefreshRibbon
     Report "New examples in this document will be MORPHEME-aligned: one column " & _
            "per morpheme, with enclitic columns never starting a wrap line." & _
            vbCr & vbCr & _
@@ -1075,6 +1084,7 @@ Public Sub LingTeXToggleRewrapOnSave()
     EnsureHooks
     v = Not SettingRewrapOnSave(doc)
     SetSettingRewrapOnSave doc, v
+    RefreshRibbon
     Report "Re-wrap every example when this document is saved: now " & _
            IIf(v, "ON", "OFF") & ".", vbInformation
 End Sub
@@ -1087,6 +1097,7 @@ Public Sub LingTeXToggleRewrapOnSelectionChange()
     EnsureHooks
     v = Not SettingRewrapOnSelectionChange(doc)
     SetSettingRewrapOnSelectionChange doc, v
+    RefreshRibbon
     Report "Re-wrap an example as soon as the cursor leaves it: now " & _
            IIf(v, "ON", "OFF") & " for this document." & vbCr & vbCr & _
            IIf(v, "Off is the default, because this repaints while you type.", _
@@ -1101,6 +1112,7 @@ Public Sub LingTeXToggleExampleNumbers()
     EnsureHooks
     v = Not SettingNumberExamples(doc)
     SetSettingNumberExamples doc, v
+    RefreshRibbon
     Report "New examples in this document are " & IIf(v, "NUMBERED: (1), (2)... " & _
            "with Word's own list numbering, continuing through the document.", _
            "NOT numbered.") & vbCr & vbCr & _
@@ -1116,6 +1128,7 @@ Public Sub LingTeXToggleGramGlossInitialCap()
     EnsureHooks
     v = Not SettingGramGlossInitialCap(doc)
     SetSettingGramGlossInitialCap doc, v
+    RefreshRibbon
     Report "Grammatical glosses in small capitals now " & _
            IIf(v, "begin with a full-size capital (Erg, 3Sg)", _
                   "are uniform small capitals throughout (erg, 3sg), as the " & _
@@ -1308,6 +1321,77 @@ End Function
 ' The ribbon passes an IRibbonControl.  These are typed as Variant rather than
 ' IRibbonControl so the project needs no reference to the Office object library,
 ' which keeps the module importable into a bare VBA project on either platform.
+
+' -- the toggles: state shown on the button, no message ----------------------
+' getPressed: Word asks what to show; onAction: the user clicked. Both look at
+' the ACTIVE document, because that is where the settings live. The two
+' alignment buttons behave as a pair: pressing either sets that alignment and
+' both are refreshed.
+
+Public Sub RbnOnLoad(ribbon As Variant)
+    On Error Resume Next
+    Set mRibbon = ribbon
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' Ask every ribbon control to refresh. Called after any setting changes and
+' when the active document changes (clsAppEvents).
+Public Sub RefreshRibbon()
+    On Error Resume Next
+    If Not mRibbon Is Nothing Then mRibbon.Invalidate
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+Public Sub RbnGetPressed(control As Variant, ByRef returnedVal As Variant)
+    Dim doc As Document
+    returnedVal = False
+    On Error Resume Next
+    Set doc = ActiveDocument
+    If doc Is Nothing Then Exit Sub
+    Select Case control.Id
+        Case "LingTeXAlignWord"
+            returnedVal = (SettingGranularity(doc) = igtWordAligned)
+        Case "LingTeXAlignMorpheme"
+            returnedVal = (SettingGranularity(doc) = igtMorphemeAligned)
+        Case "LingTeXRewrapOnSaveToggle"
+            returnedVal = SettingRewrapOnSave(doc)
+        Case "LingTeXRewrapOnLeaveToggle"
+            returnedVal = SettingRewrapOnSelectionChange(doc)
+        Case "LingTeXInitialCapToggle"
+            returnedVal = SettingGramGlossInitialCap(doc)
+        Case "LingTeXNumbersToggle"
+            returnedVal = SettingNumberExamples(doc)
+    End Select
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+Public Sub RbnToggle(control As Variant, pressed As Boolean)
+    Dim doc As Document
+    On Error Resume Next
+    Set doc = ActiveDocument
+    If doc Is Nothing Then Exit Sub
+    EnsureHooks
+    Select Case control.Id
+        Case "LingTeXAlignWord"
+            SetSettingGranularity doc, igtWordAligned
+        Case "LingTeXAlignMorpheme"
+            SetSettingGranularity doc, igtMorphemeAligned
+        Case "LingTeXRewrapOnSaveToggle"
+            SetSettingRewrapOnSave doc, pressed
+        Case "LingTeXRewrapOnLeaveToggle"
+            SetSettingRewrapOnSelectionChange doc, pressed
+        Case "LingTeXInitialCapToggle"
+            SetSettingGramGlossInitialCap doc, pressed
+        Case "LingTeXNumbersToggle"
+            SetSettingNumberExamples doc, pressed
+    End Select
+    Err.Clear
+    On Error GoTo 0
+    RefreshRibbon
+End Sub
 
 Public Sub RbnInsert(control As Variant)
     LingTeXInsertInterlinear

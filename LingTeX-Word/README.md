@@ -137,6 +137,14 @@ packaged into `LingTeX-Word.dotm`.
 | **Merge Columns** | Select across cells to merge those; with one cell selected, merges it with the next column. |
 | **Check Glossing** | Reports and optionally repairs, as above. |
 
+### The ribbon's toggles
+
+By Word / By Morpheme, Re-wrap on Save, Re-wrap on Leave, Numbers and First
+Capital are toggle buttons: they show the active document's setting and flip it
+silently. The same settings are also commands in the macro list, which report
+what they did. If the toggles stop following changes, the VBA project was reset
+and Word must be restarted for the ribbon to reconnect.
+
 ### Numbering
 
 Every new example is the body of a numbered paragraph: an otherwise empty line

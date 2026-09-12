@@ -118,6 +118,15 @@ End Sub
 ' since the examples were drawn, and this is the last moment to put that right.
 ' Failure is swallowed: a problem in the add-in must never stop a save.
 '-----------------------------------------------------------------------------
+' The settings live in the document, so the ribbon's toggles must show the
+' active document's values: refresh them whenever that document changes.
+Private Sub mApp_DocumentChange()
+    On Error Resume Next
+    RefreshRibbon
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
 Private Sub mApp_DocumentBeforeSave(ByVal Doc As Document, SaveAsUI As Boolean, Cancel As Boolean)
     On Error Resume Next
     If gBusy Then Exit Sub
