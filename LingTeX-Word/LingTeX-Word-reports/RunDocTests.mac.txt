@@ -310,10 +310,13 @@ Open documents at start: 1
   PASS   and the split column count is one higher
   PASS   split then merge is the identity
   PASS   a plain table is not yet interlinear
-  FAIL   converting adopts the table as interlinear
-         said: Converted. No free translation was found: a row whose cells are merged into ONE cell is taken as the translation, and every other row as a tier.
-
-To add one now, type it in the paragraph under the example and give that paragraph the style LingTeX Free; it will be kept with the example from then on.
+  PASS   converting adopts the table as interlinear
+  PASS   the converted table keeps its first cell
+  PASS   and its grammatical gloss, capitals and all
+  PASS   LingTeXConvertTableToIgt leaves gBusy clear
+  PASS   LingTeXConvertTableToIgt leaves ScreenUpdating on
+  PASS   LingTeXConvertTableToIgt leaks no document
+  PASS   LingTeXConvertTableToIgt leaves no undo record open
 
 -- events ----------------------------------------------------
   PASS   clsAppEvents really is a class module
@@ -326,5 +329,5 @@ To add one now, type it in the paragraph under the example and give that paragra
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-FAILURES -- 271 passed, 1 FAILED
+ALL PASS -- 278 passed
 
