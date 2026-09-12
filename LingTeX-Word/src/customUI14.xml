@@ -111,10 +111,25 @@
                   screentip="Show every setting stored in this document"/>
         </group>
 
+        <group id="LingTeXSetupGroup" label="Setup">
+          <button id="LingTeXStartButton"
+                  label="Start"
+                  imageMso="MacroPlay"
+                  onAction="RbnStart"
+                  screentip="Arm the hooks for this Word session"
+                  supertip="Re-wrap on save, re-wrap on leaving an example (if turned on), AutoCorrect kept out of cells. Every command arms these on first use too; this just does it explicitly and says so."/>
+          <button id="LingTeXResetStylesButton"
+                  label="Reset Styles"
+                  imageMso="StylesPane"
+                  onAction="RbnResetStyles"
+                  screentip="Make the LingTeX styles follow this document's Normal style again, and re-wrap"
+                  supertip="Replaces any size or font you set on a LingTeX style yourself. Asks first."/>
+        </group>
+
         <group id="LingTeXKeysGroup" label="Keys">
           <button id="LingTeXInstallKeys"
                   label="Install Shortcuts"
-                  imageMso="MacroPlay"
+                  imageMso="MacroSecurity"
                   onAction="RbnInstallShortcuts"
                   screentip="Bind every command to Ctrl+Alt (Cmd+Option on Mac) + a letter"
                   supertip="Installed in the Normal template, so they work in every document. LingTeXRemoveShortcuts takes them out again."/>
