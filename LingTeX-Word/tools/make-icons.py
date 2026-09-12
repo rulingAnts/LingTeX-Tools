@@ -9,7 +9,7 @@ Insert shows what the user gets: a little page carrying a three-line interlinear
 example (source, glosses, free translation). Every other button is one plain
 symbol for what it does, big enough to tell apart at a glance: the re-wrap
 family shares the cycle arrow and differs by a corner mark (all / on save / on
-leave), the alignment pair underlines a word or its morphemes, the rest are the
+leave), the alignment pair is a word as one block or as two, the rest are the
 obvious sign in a coloured disc.
 
 Every icon is drawn at 4x and downsampled, so the edges are smooth at the size
@@ -51,6 +51,7 @@ BLUE = (43, 87, 154, 255)
 GREEN = (46, 125, 50, 255)
 ORANGE = (214, 106, 24, 255)
 SLATE = (84, 94, 102, 255)
+PURPLE = (94, 53, 177, 255)
 WHITE = (255, 255, 255, 255)
 
 
@@ -236,25 +237,19 @@ def ic_merge():
 
 
 def ic_by_word():
+    """One word, one block."""
     im = canvas(); d = ImageDraw.Draw(im)
-    chip(d)
-    fb = font(F_BOLD, 19)
-    w = width(fb, "kami")
-    x = 32 - w / 2
-    d.text((px(x), px(38)), "kami", font=fb, fill=SOURCE, anchor="ls")
-    underline(d, x, 41, w, BLUE, 3.5)
+    disc(d, PURPLE)
+    d.rounded_rectangle((px(13), px(27), px(51), px(37)), radius=px(3), fill=WHITE)
     return im
 
 
 def ic_by_morpheme():
+    """The same word in two pieces."""
     im = canvas(); d = ImageDraw.Draw(im)
-    chip(d)
-    fb = font(F_BOLD, 19)
-    w = width(fb, "ka-mi")
-    x = 32 - w / 2
-    d.text((px(x), px(38)), "ka-mi", font=fb, fill=SOURCE, anchor="ls")
-    underline(d, x, 41, width(fb, "ka"), BLUE, 3.5)
-    underline(d, x + width(fb, "ka-"), 41, width(fb, "mi"), BLUE, 3.5)
+    disc(d, PURPLE)
+    d.rounded_rectangle((px(13), px(27), px(29), px(37)), radius=px(3), fill=WHITE)
+    d.rounded_rectangle((px(35), px(27), px(51), px(37)), radius=px(3), fill=WHITE)
     return im
 
 
