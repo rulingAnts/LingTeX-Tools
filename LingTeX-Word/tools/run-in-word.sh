@@ -16,6 +16,9 @@
 #           --macro NAME  run only that macro (after the import), for bisecting;
 #                         every *.txt it leaves in the reports folder is printed
 #           --no-commit   do not commit and push the reports afterwards
+#           --open / --no-open   open the file as a document first, or not; the
+#                         default is not for a .dotm (loaded from STARTUP) and
+#                         yes for a .docm
 #
 # REPORTS ARE COMMITTED.  Each platform writes its own files (RunAllTests.mac.txt
 # here, RunAllTests.win.txt from the PowerShell twin), so they never overwrite
@@ -71,6 +74,7 @@ for a in "$@"; do
         --no-pull)   pull=0 ;;
         --no-import) import=0 ;;
         --no-commit) commit=0 ;;
+        --open|--no-open) ;;
         --tests)     tests=NEXT ;;
         all|doc|both) if [ "$tests" = NEXT ] || [ "$tests" = both ]; then tests=$a; fi ;;
         -h|--help)   sed -n '2,30p' "$0"; exit 0 ;;
@@ -90,7 +94,21 @@ case "$doc" in /*) ;; *) doc="$(pwd)/$doc" ;; esac
 [ -f "$doc" ] || { echo "run-in-word: no such document: $doc" >&2; exit 2; }
 mkdir -p "$root/build"; printf '%s\n' "$doc" > "$conf"
 
-reports="$(dirname "$doc")/LingTeX-Word-reports"
+# Reports live in the repository whatever holds the code: a .docm in
+# LingTeX-Word/ writes beside itself, a template in Word's STARTUP folder writes
+# where SetDevRoot pointed it, and both are this folder.
+reports="$root/LingTeX-Word-reports"
+
+# A template (.dotm) is expected to be LOADED, as a global add-in from Word's
+# STARTUP folder, not opened as a document: opening it would make it a document
+# window, and its ribbon, shortcuts and AutoExec would stop applying to every
+# other document. So for a .dotm the macros are run without opening anything;
+# a document is made if none is open, since some commands look at the active
+# one. A .docm is opened as before. --open / --no-open override the guess.
+case "$doc" in *.dotm|*.DOTM) openit=0 ;; *) openit=1 ;; esac
+for a in "$@"; do
+    case "$a" in --open) openit=1 ;; --no-open) openit=0 ;; esac
+done
 
 if [ "$pull" = 1 ]; then
     echo "== git pull"
@@ -175,13 +193,15 @@ fi
 echo "== Word: $(basename "$doc")"
 for m in $macros; do
     echo "   running $m ..."
-    osascript - "$doc" "$m" <<'AS' > "$reports/.osascript.$m" 2>&1 &
+    osascript - "$doc" "$m" "$openit" <<'AS' > "$reports/.osascript.$m" 2>&1 &
 on run argv
     set docPath to item 1 of argv
     set macroName to item 2 of argv
+    set openIt to ((item 3 of argv) is "1")
     tell application "Microsoft Word"
         activate
-        open (POSIX file docPath)
+        if openIt then open (POSIX file docPath)
+        if (count of documents) = 0 then make new document
         with timeout of 3600 seconds
             run VB macro macro name macroName
         end timeout
@@ -225,6 +245,11 @@ AS
         echo "   $m did not return cleanly (see the osascript output above)."
         echo "   \"Can't continue run VB macro\" means the VBA editor is in break mode:"
         echo "   click OK on its dialog, then Run > Reset, and run this again."
+        if [ "$openit" = 0 ]; then
+            echo "   A macro Word cannot find means the template is not loaded: it has"
+            echo "   to be in Word's STARTUP folder when Word starts (TESTING-MAC.md,"
+            echo "   \"The working template\"), or pass --open to open it as a document."
+        fi
         exit 1
     fi
 done

@@ -777,8 +777,14 @@ End Function
 
 Public Function ReportFolderPath() As String
     Dim base As String, sep As String
+    ' The clone's LingTeX-Word folder if the file holding the code has been
+    ' told where it is (a document variable set by SetDevRoot in modImport, so
+    ' the template can live in Word's STARTUP folder); else the file's own.
     On Error Resume Next
-    base = ThisDocument.Path
+    base = CStr(ThisDocument.Variables("LingTeX_DevRoot").Value)
+    If Err.Number <> 0 Then base = ""
+    Err.Clear
+    If base = "" Then base = ThisDocument.Path
     sep = Application.PathSeparator
     Err.Clear
     On Error GoTo 0

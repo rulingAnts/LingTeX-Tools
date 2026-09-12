@@ -1192,7 +1192,7 @@ Public Sub LingTeXInstallShortcuts()
     Dim errNum As Long, errDesc As String
 
     On Error GoTo Fail
-    Application.CustomizationContext = NormalTemplate
+    Application.CustomizationContext = ShortcutHome()
     pairs = Split(SHORTCUT_TABLE, "|")
     For i = 0 To UBound(pairs)
         kv = Split(pairs(i), "=")
@@ -1200,7 +1200,7 @@ Public Sub LingTeXInstallShortcuts()
                         KeyCode:=BuildKeyCode(wdKeyControl, wdKeyAlt, Asc(kv(0)))
         n = n + 1
     Next i
-    Report CStr(n) & " keyboard shortcuts installed in the Normal template:" & _
+    Report CStr(n) & " keyboard shortcuts installed in " & ShortcutHomeName() & ":" & _
            vbCr & vbCr & ShortcutList() & vbCr & _
            "LingTeXRemoveShortcuts takes them out again.", vbInformation
     Exit Sub
@@ -1217,7 +1217,7 @@ Public Sub LingTeXRemoveShortcuts()
     Dim kb As Object
 
     On Error Resume Next
-    Application.CustomizationContext = NormalTemplate
+    Application.CustomizationContext = ShortcutHome()
     pairs = Split(SHORTCUT_TABLE, "|")
     For i = 0 To UBound(pairs)
         kv = Split(pairs(i), "=")
@@ -1231,9 +1231,33 @@ Public Sub LingTeXRemoveShortcuts()
     Next i
     Err.Clear
     On Error GoTo 0
-    Report CStr(n) & " LingTeX shortcuts removed from the Normal template.", _
+    Report CStr(n) & " LingTeX shortcuts removed from " & ShortcutHomeName() & ".", _
            vbInformation
 End Sub
+
+' Where the shortcuts are stored: in this template when the code lives in one
+' (so they ship with it and apply everywhere it is loaded), else in Normal.
+Private Function ShortcutHome() As Object
+    On Error Resume Next
+    If ThisDocument.Type = wdTypeTemplate Then
+        Set ShortcutHome = ThisDocument
+    Else
+        Set ShortcutHome = NormalTemplate
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+Private Function ShortcutHomeName() As String
+    On Error Resume Next
+    If ThisDocument.Type = wdTypeTemplate Then
+        ShortcutHomeName = "the template " & ThisDocument.Name
+    Else
+        ShortcutHomeName = "the Normal template"
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Function
 
 Public Sub LingTeXShowShortcuts()
     Report "LingTeX-Word keyboard shortcuts (once LingTeXInstallShortcuts has " & _

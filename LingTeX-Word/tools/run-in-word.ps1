@@ -29,7 +29,7 @@ $Doc = (Resolve-Path $Doc).Path
 New-Item -ItemType Directory -Force -Path (Join-Path $root "build") | Out-Null
 Set-Content -Path $conf -Value $Doc
 
-$reports = Join-Path (Split-Path -Parent $Doc) "LingTeX-Word-reports"
+$reports = Join-Path $root "LingTeX-Word-reports"
 
 if (-not $NoPull) { Write-Host "== git pull"; git -C $root pull --ff-only }
 New-Item -ItemType Directory -Force -Path $reports | Out-Null
@@ -49,7 +49,10 @@ $word = New-Object -ComObject Word.Application
 $word.Visible = $true
 $status = 0
 try {
-    $null = $word.Documents.Open($Doc)
+    # A .dotm is expected to be loaded from Word's STARTUP folder as a global
+    # add-in, not opened as a document (see run-in-word.sh). A .docm is opened.
+    if ($Doc -notmatch '\.dotm$') { $null = $word.Documents.Open($Doc) }
+    if ($word.Documents.Count -eq 0) { $null = $word.Documents.Add() }
     foreach ($m in $macros) {
         Write-Host "   running $m ..."
         try {

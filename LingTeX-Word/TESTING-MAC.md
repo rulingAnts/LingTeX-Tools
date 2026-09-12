@@ -13,9 +13,26 @@ no automated suite can reach: what the thing actually looks like on the page.
 
 ## Setup, once
 
-1. **Open `LingTeX-Word/LingTeX.docm` and leave it open.** It holds the code.
-   Close it and every command disappears from the macro list. It is *not* the
-   document you test in.
+1. **The working template.** The code lives in a template loaded as a global
+   add-in, which is what the product will be: every document gets the
+   commands, the ribbon tab, the shortcuts and `AutoExec`. Once:
+   - In Word, open the file that holds the code (`LingTeX.docm`), open
+     `modImport` in the VBA editor and paste the current
+     `tools/ImportModules.bas` over it (without its first line).
+   - File → Save As → **Word Macro-Enabled Template**, name `LingTeX.dotm`,
+     into Word's startup folder (the one Word → Settings → File Locations →
+     Startup shows; on this Mac it is `~/Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/Word` — create it if it is missing).
+   - Still in that template: Tools → Macro → Macros… → **`SetDevRoot`**, give
+     it the clone's `LingTeX-Word` folder (the default it offers is right if
+     you saved from the repo), then ⌘S and close it.
+   - With Word quit, put the ribbon in it:
+     `sh LingTeX-Word/tools/add-ribbon.sh "<that folder>/LingTeX.dotm"`.
+   - Start Word: the template loads, `AutoExec` runs, and a **LingTeX** tab is on
+     every document's ribbon. Then run the test runner once with that path;
+     it imports the current modules into the loaded template, tests, saves
+     the template and arms the hooks:
+     `sh LingTeX-Word/tools/run-in-word.sh "<that folder>/LingTeX.dotm"`.
+     (The path is remembered after the first time.)
 
 2. **Make the test document.** ⌘N for a blank one, then save it somewhere
    ordinary — `~/Desktop/lingtex-test.docx`. It has to be saved before the
@@ -79,17 +96,17 @@ matters to them.
   all, ⌘⌥S split, ⌘⌥M merge, ⌘⌥K check, ⌘⌥T convert table, ⌘⌥W by word,
   ⌘⌥P by morpheme, ⌘⌥H settings. `LingTeXShowShortcuts` lists them;
   `LingTeXRemoveShortcuts` takes them out.
-- **The ribbon.** With `LingTeX.docm` closed in Word:
+- **The ribbon.** With Word quit:
 
 ```bash
-sh LingTeX-Word/tools/add-ribbon.sh LingTeX-Word/LingTeX.docm
+sh LingTeX-Word/tools/add-ribbon.sh "<startup folder>/LingTeX.dotm"
 ```
 
-  Reopen it, run the test runner once so the modules are current, and a
-  **LingTeX** tab is on the ribbon whenever that document is open, with every
-  command and setting as a button. This is the same ribbon the packaged
-  template will carry, so if a button comes through blank or does nothing on
-  Mac, that is a finding for the packaging step as well.
+  With the code in a template loaded from STARTUP (setup step 1), the tab is
+  on every document's ribbon, with every command and setting as a button.
+  This is the same ribbon the packaged template will carry, so if a button
+  comes through blank or does nothing on Mac, that is a finding for the
+  packaging step as well.
 
 ### Settings are commands too
 

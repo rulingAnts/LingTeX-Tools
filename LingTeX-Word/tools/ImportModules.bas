@@ -117,14 +117,64 @@ Private Const IMPORT_CLASS_MODULES As Boolean = True
 Private mQuiet As Boolean
 Private Const REPORT_FOLDER As String = "LingTeX-Word-reports"
 
+' Where the clone's LingTeX-Word folder is, kept as a document variable INSIDE
+' this file, so that the template can live in Word's STARTUP folder -- loaded
+' as a global add-in, which is what gives every document the macros, the
+' ribbon tab, the shortcuts and AutoExec -- and still read src/ and write its
+' reports in the repository. Set once with SetDevRoot. Empty: the folder this
+' file is in (a .docm sitting in LingTeX-Word/, the earlier arrangement).
+Private Const DEV_ROOT_VAR As String = "LingTeX_DevRoot"
+
 Private Function SrcFolder() As String
     SrcFolder = SRC_FOLDER
-    If SrcFolder = "" Then
-        On Error Resume Next
-        SrcFolder = ThisDocument.Path & Application.PathSeparator & "src"
-        On Error GoTo 0
-    End If
+    If SrcFolder = "" Then SrcFolder = DevRoot() & Application.PathSeparator & "src"
 End Function
+
+' The clone's LingTeX-Word folder: the stored variable, else this file's folder.
+Private Function DevRoot() As String
+    Dim v As String
+    On Error Resume Next
+    v = CStr(ThisDocument.Variables(DEV_ROOT_VAR).Value)
+    If Err.Number <> 0 Then v = ""
+    Err.Clear
+    If v = "" Then v = ThisDocument.Path
+    Err.Clear
+    On Error GoTo 0
+    If Right$(v, 1) = Application.PathSeparator Then v = Left$(v, Len(v) - 1)
+    DevRoot = v
+End Function
+
+' Tell this file where the clone is. Run it ONCE, from the template opened for
+' editing (before it is moved to STARTUP is easiest, when the default is right),
+' then save the template. The by-hand loop in TESTING-MAC.md walks through it.
+Public Sub SetDevRoot()
+    Dim v As String, sep As String
+    sep = Application.PathSeparator
+    v = InputBox("The LingTeX-Word folder of your clone (the one that holds " & _
+                 "src/ and tools/). The modules are imported from its src/ and " & _
+                 "the test reports are written beside it, wherever this " & _
+                 "template itself lives.", "LingTeX-Word: where is the clone?", _
+                 DevRoot())
+    If v = "" Then Exit Sub
+    If Right$(v, 1) = sep Then v = Left$(v, Len(v) - 1)
+    If Dir(v & sep & "src", vbDirectory) = "" Then
+        MsgBox "There is no src folder in " & v & ". Not saved.", vbExclamation, _
+               "LingTeX-Word"
+        Exit Sub
+    End If
+    On Error Resume Next
+    ThisDocument.Variables(DEV_ROOT_VAR).Value = v
+    If Err.Number <> 0 Then
+        Err.Clear
+        ThisDocument.Variables.Add Name:=DEV_ROOT_VAR, Value:=v
+    End If
+    Err.Clear
+    On Error GoTo 0
+    MsgBox "This template will import from" & vbCr & v & sep & "src" & vbCr & _
+           "and write reports to" & vbCr & v & sep & REPORT_FOLDER & vbCr & vbCr & _
+           "Save the template now (Cmd+S / Ctrl+S) so it remembers.", _
+           vbInformation, "LingTeX-Word"
+End Sub
 
 '=============================================================================
 ' -- IMPORT -----------------------------------------------------------------
@@ -137,7 +187,26 @@ Public Sub ImportLingTeXModulesQuiet()
     mQuiet = True
     ImportLingTeXModules
     VerifyLingTeXModules
+    SaveThisFile
     mQuiet = False
+End Sub
+
+' Save the file the modules were just imported into, so a template loaded from
+' STARTUP carries the current modules on disk for the next Word launch. Whether
+' Word lets a loaded global template save itself is the kind of thing the log
+' has to say rather than the code assume.
+Private Sub SaveThisFile()
+    On Error Resume Next
+    ThisDocument.Save
+    If Err.Number = 0 Then
+        AppendReport "saved " & ThisDocument.Name & " with the modules just imported" & vbCr
+    Else
+        AppendReport "NOT saved: " & ThisDocument.Name & " (" & CStr(Err.Number) & _
+                     ": " & Err.Description & "); the modules are current in " & _
+                     "memory until Word quits" & vbCr
+        Err.Clear
+    End If
+    On Error GoTo 0
 End Sub
 
 Public Sub ImportLingTeXModules()
@@ -564,8 +633,12 @@ End Function
 Private Function GetProject() As Object
     Dim vbp As Object
 
+    ' THIS file's project -- the template's, when it is loaded as a global
+    ' add-in and the active document is whatever the user has open. It used to
+    ' be ActiveDocument.VBProject, which is the same thing only while the file
+    ' holding the code is the one in front.
     On Error Resume Next
-    Set vbp = ActiveDocument.VBProject
+    Set vbp = ThisDocument.VBProject
     If Err.Number = 0 Then
         Set GetProject = vbp
         Exit Function
@@ -657,12 +730,11 @@ Private Function AppendReport(ByVal text As String) As Boolean
     Dim fn As Integer
 
     On Error Resume Next
-    folder = ThisDocument.Path
+    folder = DevRoot()
     sep = Application.PathSeparator
     Err.Clear
     On Error GoTo 0
     If folder = "" Then Exit Function
-    If Right$(folder, 1) = sep Then folder = Left$(folder, Len(folder) - 1)
     folder = folder & sep & REPORT_FOLDER
 
     On Error Resume Next
