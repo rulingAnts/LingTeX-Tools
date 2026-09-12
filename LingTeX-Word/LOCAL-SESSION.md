@@ -118,6 +118,9 @@ requests.
   by-hand pass from 3c/3e/3f. Then `SaveAsTemplate` + `tools/build-dotm.sh` +
   `tools/check-dotm.sh`, then packaging.
 - Later, wanted by Seth: a settings interface (gaps, styles) -- Phase 2 form.
+- Later, per Seth: toggle an existing example between word- and
+  morpheme-aligned in place -- split every boundary / merge every continuation
+  column, then redraw (README, *Later*).
 - Later, per Seth: example numbers, headings before, captions after, list
   numbering around, sub-numbering across a multi-block paste; and keep the
   language tag on a second free translation (dropped today). README, *Later*.
