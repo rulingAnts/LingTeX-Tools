@@ -15,10 +15,15 @@
   needs no reference to the Office object library, which keeps the modules
   importable into a bare project on Windows and on Mac alike.
 
-  imageMso names are built-in Office icons, so no image resources have to ship.
-  Mac Word honours customUI from a startup template, but its icon set is not
-  identical to Windows; if one of these comes through blank on Mac, substitute
-  another imageMso rather than embedding a bitmap.
+  The icons are our own, src/icons/*.png, drawn by ../tools/make-icons.py: a
+  little page carrying an interlinear example, with a badge for what the button
+  does to it.  The buttons act on interlinear examples, which are tables to Word
+  but not to the user, so nothing in an icon is a grid.  image="igtInsert" names
+  a relationship of THIS part, which build-dotm.sh writes alongside the PNGs
+  (customUI/_rels/customUI14.xml.rels, id = file name); a button whose icon is
+  missing from src/icons/ fails the build rather than coming through blank.
+  Embedded images from a startup template are unproven on Mac; if every button
+  is blank there, that is the finding, and the fallback is imageMso names.
 
   (Note for editors: an XML comment may not contain two consecutive hyphens,
   so prose in here uses commas where the rest of the project uses dashes.)
@@ -32,14 +37,14 @@
           <button id="LingTeXInsert"
                   label="Insert Interlinear"
                   size="large"
-                  imageMso="TableInsertExcel"
+                  image="igtInsert"
                   onAction="RbnInsert"
                   screentip="Insert an interlinear example"
                   supertip="Copy an interlinear selection in FLEx and click here, or paste the text into the document, select it, and click here. The example is drawn as a borderless table, one column per alignment slot, wrapped to the page."/>
           <button id="LingTeXConvert"
                   label="Convert Table"
                   size="large"
-                  imageMso="TableStylesGalleryWord"
+                  image="igtConvert"
                   onAction="RbnConvertTable"
                   screentip="Convert a plain table into an interlinear example"
                   supertip="Turns an ordinary Word table -- typed by hand or pasted from a spreadsheet -- into an auto-wrapping interlinear example. One row per tier."/>
@@ -48,13 +53,13 @@
         <group id="LingTeXLayoutGroup" label="Layout">
           <button id="LingTeXRewrapCurrent"
                   label="Re-wrap This"
-                  imageMso="TableAutoFitWindow"
+                  image="igtRewrapThis"
                   onAction="RbnRewrapCurrent"
                   screentip="Re-wrap the example at the cursor"
                   supertip="Recomputes the wrap from scratch, so columns move down when space runs out and back up when it is freed -- after a margin, font or orientation change, or an edit."/>
           <button id="LingTeXRewrapAll"
                   label="Re-wrap All"
-                  imageMso="TableAutoFitContents"
+                  image="igtRewrapAll"
                   onAction="RbnRewrapAll"
                   screentip="Re-wrap every example in the document"
                   supertip="Also runs automatically when the document is saved. Turn that off with the LingTeX_RewrapOnSave document variable."/>
@@ -63,13 +68,13 @@
         <group id="LingTeXAlignGroup" label="Alignment">
           <button id="LingTeXSplit"
                   label="Split Column"
-                  imageMso="TableCellsSplit"
+                  image="igtSplit"
                   onAction="RbnSplitColumn"
                   screentip="Split the column at the cursor"
                   supertip="Pulls an affix, clitic or reduplicant out into an alignment column of its own, carrying the morpheme break character onto the start of the new column on every interlinear tier. Use it to morpheme-align part of an otherwise word-aligned example."/>
           <button id="LingTeXMerge"
                   label="Merge Columns"
-                  imageMso="TableCellsMerge"
+                  image="igtMerge"
                   onAction="RbnMergeColumns"
                   screentip="Merge columns back together"
                   supertip="Select across several cells to merge exactly those. With the cursor in a single cell, that column is merged with the one after it."/>
@@ -78,47 +83,47 @@
         <group id="LingTeXSettingsGroup" label="Settings">
           <toggleButton id="LingTeXAlignWord"
                   label="By Word"
-                  imageMso="TableColumnsDistribute"
+                  image="igtByWord"
                   getPressed="RbnGetPressed"
                   onAction="RbnToggle"
                   screentip="New examples: one column per word"
                   supertip="Enclitics stay in their host's column. Stored in this document; examples already on the page are unchanged until inserted again."/>
           <toggleButton id="LingTeXAlignMorpheme"
                   label="By Morpheme"
-                  imageMso="TableRowsDistribute"
+                  image="igtByMorpheme"
                   getPressed="RbnGetPressed"
                   onAction="RbnToggle"
                   screentip="New examples: one column per morpheme"
                   supertip="Enclitic columns never start a wrap line. Stored in this document; examples already on the page are unchanged until inserted again."/>
           <toggleButton id="LingTeXRewrapOnSaveToggle"
                   label="Re-wrap on Save"
-                  imageMso="FileSave"
+                  image="igtRewrapOnSave"
                   getPressed="RbnGetPressed"
                   onAction="RbnToggle"
                   screentip="Re-wrap every example when this document is saved"/>
           <toggleButton id="LingTeXRewrapOnLeaveToggle"
                   label="Re-wrap on Leave"
-                  imageMso="SelectAll"
+                  image="igtRewrapOnLeave"
                   getPressed="RbnGetPressed"
                   onAction="RbnToggle"
                   screentip="Re-wrap an example as soon as the cursor leaves it"
                   supertip="Off by default: it repaints while you type."/>
           <toggleButton id="LingTeXNumbersToggle"
                   label="Numbers"
-                  imageMso="NumberingList"
+                  image="igtNumbers"
                   getPressed="RbnGetPressed"
                   onAction="RbnToggle"
                   screentip="Number new examples (1), (2)... with Word list numbering"
                   supertip="A number line above the table, continuing through the document, so deleting or moving an example renumbers the rest. To restart per chapter, link level 1 of the LingTeX Example Number list style to Heading 1 and set NumberLevel to 2."/>
           <toggleButton id="LingTeXInitialCapToggle"
                   label="First Capital"
-                  imageMso="Font"
+                  image="igtInitialCap"
                   getPressed="RbnGetPressed"
                   onAction="RbnToggle"
                   screentip="Grammatical glosses as Erg / 3Sg; off, uniform small capitals"/>
           <button id="LingTeXShowSettingsButton"
                   label="Settings"
-                  imageMso="Properties"
+                  image="igtSettings"
                   onAction="RbnShowSettings"
                   screentip="Show every setting stored in this document"/>
         </group>
@@ -126,13 +131,13 @@
         <group id="LingTeXSetupGroup" label="Setup">
           <button id="LingTeXStartButton"
                   label="Start"
-                  imageMso="MacroPlay"
+                  image="igtStart"
                   onAction="RbnStart"
                   screentip="Arm the hooks for this Word session"
                   supertip="Re-wrap on save, re-wrap on leaving an example (if turned on), AutoCorrect kept out of cells. Every command arms these on first use too; this just does it explicitly and says so."/>
           <button id="LingTeXResetStylesButton"
                   label="Reset Styles"
-                  imageMso="StylesPane"
+                  image="igtResetStyles"
                   onAction="RbnResetStyles"
                   screentip="Make the LingTeX styles follow this document's Normal style again, and re-wrap"
                   supertip="Replaces any size or font you set on a LingTeX style yourself. Asks first."/>
@@ -141,13 +146,13 @@
         <group id="LingTeXKeysGroup" label="Keys">
           <button id="LingTeXInstallKeys"
                   label="Install Shortcuts"
-                  imageMso="MacroSecurity"
+                  image="igtInstallKeys"
                   onAction="RbnInstallShortcuts"
                   screentip="Bind every command to Ctrl+Alt (Cmd+Option on Mac) + a letter"
                   supertip="Installed in the Normal template, so they work in every document. LingTeXRemoveShortcuts takes them out again."/>
           <button id="LingTeXShowKeys"
                   label="Shortcuts"
-                  imageMso="MacroRecord"
+                  image="igtShowKeys"
                   onAction="RbnShowShortcuts"
                   screentip="List the keyboard shortcuts"/>
         </group>
@@ -156,7 +161,7 @@
           <button id="LingTeXCheck"
                   label="Check Glossing"
                   size="large"
-                  imageMso="SpellingAndGrammar"
+                  image="igtCheck"
                   onAction="RbnCheck"
                   screentip="Check the example against the glossing conventions"
                   supertip="Reports columns whose cells disagree about a morpheme break character, spaces inside interlinear cells, form and gloss showing a different number of morpheme breaks, and unmatched infix brackets. Offers to fix the ones that have a single right answer. Grammatical glosses are recognised by their shape, so your own abbreviations are never flagged as unknown."/>
