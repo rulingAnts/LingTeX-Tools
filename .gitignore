@@ -95,3 +95,7 @@ LingTeX-Word/LingTeX-Word-reports/ImportModules.txt
 # hand-pasted modImport, and a committed one from the Mac silently pointed the
 # Windows import at a stale clone (2026-09-12).
 LingTeX-Word/*.docm
+
+# Python bytecode from tools/vba-lint.py
+__pycache__/
+*.pyc
