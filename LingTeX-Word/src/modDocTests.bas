@@ -68,6 +68,10 @@ Public Sub RunDocTests()
     mFail = 0
     mRpt = ""
     mFirstFails = ""
+    ' The hidden measuring document may be open from a command run by hand
+    ' before this; the sections release it, and counting it now made that
+    ' look like a document lost ("open now 1, was 2", twice, 2026-09-12).
+    ReleaseScratch
     mDocsAtStart = Documents.Count
     RecordOpenDocuments
 
