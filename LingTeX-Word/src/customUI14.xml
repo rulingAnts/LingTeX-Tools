@@ -99,6 +99,12 @@
                   onAction="RbnToggleRewrapOnSelectionChange"
                   screentip="Toggle: re-wrap an example as soon as the cursor leaves it"
                   supertip="Off by default: it repaints while you type."/>
+          <button id="LingTeXNumbersToggle"
+                  label="Numbers"
+                  imageMso="NumberingList"
+                  onAction="RbnToggleExampleNumbers"
+                  screentip="Toggle: number new examples (1), (2)... with Word list numbering"
+                  supertip="The number is list numbering on the first cell, continuing through the document, so deleting or moving an example renumbers the rest. To restart per chapter, link level 1 of the LingTeX Example Number list style to Heading 1 and set NumberLevel to 2."/>
           <button id="LingTeXInitialCapToggle"
                   label="First Capital"
                   imageMso="Font"

@@ -89,6 +89,7 @@ Public Sub RunDocTests()
     RunSection "scratch"
     RunSection "roundtrip"
     RunSection "adjacent"
+    RunSection "numbering"
     RunSection "commands"
     RunSection "events"
 
@@ -127,6 +128,7 @@ Private Sub RunSection(ByVal which As String)
         Case "scratch":      TestScratchLifecycle
         Case "roundtrip":    TestRoundTrip
         Case "adjacent":     TestAdjacentExamples
+        Case "numbering":    TestNumbering
         Case "commands":     TestCommands
         Case "events":       TestEvents
         Case Else
@@ -2297,6 +2299,132 @@ Private Sub CheckAdjacentPair(ByVal tag As String, ByVal emptyBetween As Boolean
             (back.ColCount = ex.ColCount)
     End If
     CloseNoSave doc
+End Sub
+
+
+'=============================================================================
+' -- NUMBERING --------------------------------------------------------------
+'=============================================================================
+' Word list numbering on the first cell, from the LingTeX Example Number list
+' style, continuing through the document. Not in the cell's text (so read-back
+' never sees it), renumbered by Word when an example goes, carried through a
+' re-wrap, and the hanging indent it needs applied to everything after it.
+Private Sub TestNumbering()
+    Dim doc As Document
+    Dim ex As IgtExample, back As IgtExample
+    Dim where As Range
+    Dim t1 As Table, t2 As Table
+    Dim hang As Double
+    Dim indent As Double
+    Dim savedQuiet As Boolean
+
+    savedQuiet = gQuiet
+    gQuiet = True
+
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "numbering: could create a blank document", False
+        gQuiet = savedQuiet
+        Exit Sub
+    End If
+
+    Ok "default NumberExamples = True", SettingNumberExamples(doc)
+    Ok "default NumberHang = 36", (SettingNumberHang(doc) = 36)
+    Ok "default NumberLevel = 1", (SettingNumberLevel(doc) = 1)
+    hang = SettingNumberHang(doc)
+
+    EnsureStyles doc, True
+    Ok STYLE_NUMBER & " exists as a LIST style", _
+        StyleExistsOfType(doc, STYLE_NUMBER, wdStyleTypeList)
+
+    ex = ThreeTierExample()
+    Set t1 = RenderExample(ex, doc.Content)
+    Ok "a numbered example draws", (Not t1 Is Nothing)
+    If t1 Is Nothing Then
+        Emit "         " & gRenderError
+        CloseNoSave doc
+        gQuiet = savedQuiet
+        Exit Sub
+    End If
+    Ok "and nothing was reported about the numbering", (gRenderError = "")
+    If gRenderError <> "" Then Emit "         " & gRenderError
+
+    Ok "the first cell carries list numbering", CellIsNumbered(t1)
+    Eq "and shows (1)", ExampleNumberString(t1), "(1)"
+    Ok "the second cell of the first row does not", _
+        (t1.Cell(1, 2).Range.ListFormat.ListType = wdListNoNumbering)
+    Ok "nor does the gloss cell under the number", _
+        (t1.Cell(2, 1).Range.ListFormat.ListType = wdListNoNumbering)
+
+    indent = t1.Cell(2, 1).Range.ParagraphFormat.LeftIndent
+    Ok "the gloss cell under the number is indented to the text position", _
+        (Abs(indent - hang) <= 0.5)
+    indent = t1.Cell(1, 1).Range.ParagraphFormat.LeftIndent
+    Ok "the numbered cell hangs its number in the same indent", _
+        (Abs(indent - hang) <= 0.5)
+    indent = ParagraphAfterTable(t1).Format.LeftIndent
+    Ok "the translation is indented to the text position too", _
+        (Abs(indent - hang) <= 0.5)
+
+    back = ReadExampleFromTable(t1)
+    Eq "the number is not part of the cell's text", back.Cells(0, 0), "di=de"
+
+    Set where = doc.Content
+    where.Collapse wdCollapseEnd
+    Set t2 = RenderExample(ex, where)
+    Ok "a second example draws", (Not t2 Is Nothing)
+    If Not t2 Is Nothing Then
+        Eq "and shows (2)", ExampleNumberString(t2), "(2)"
+    End If
+
+    RewrapDocument doc, False
+    Ok "re-wrap all keeps both tables", (doc.Tables.Count = 2)
+    If doc.Tables.Count = 2 Then
+        Eq "re-wrap keeps (1) on the first", ExampleNumberString(doc.Tables(1)), "(1)"
+        Eq "and (2) on the second", ExampleNumberString(doc.Tables(2)), "(2)"
+
+        DeleteTableAndFreeLines doc.Tables(1)
+        Ok "deleting the first example leaves one table", (doc.Tables.Count = 1)
+        If doc.Tables.Count = 1 Then
+            Eq "and Word renumbers it (1)", ExampleNumberString(doc.Tables(1)), "(1)"
+        End If
+    End If
+
+    '-- turned off, a new example is not numbered ---------------------------
+    SetSettingNumberExamples doc, False
+    Set where = doc.Content
+    where.Collapse wdCollapseEnd
+    Set t2 = RenderExample(ex, where)
+    Ok "with numbering off, a new example draws", (Not t2 Is Nothing)
+    If Not t2 Is Nothing Then
+        Ok "and carries no number", (Not CellIsNumbered(t2))
+        indent = t2.Cell(2, 1).Range.ParagraphFormat.LeftIndent
+        Ok "and its cells are not indented", (Abs(indent) <= 0.5)
+    End If
+    SetSettingNumberExamples doc, True
+    CloseNoSave doc
+
+    '-- a wrapped example: later wrap lines move over by the hang -------------
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        gQuiet = savedQuiet
+        Exit Sub
+    End If
+    SetPageGeometry doc, 200, 792, 36
+    EnsureStyles doc, True
+    Set t1 = RenderExample(ex, doc.Content)
+    Ok "numbering: a wrapped example draws on a narrow page", (Not t1 Is Nothing)
+    If Not t1 Is Nothing Then
+        Ok "and it did wrap", (t1.Rows.Count > 2)
+        If t1.Rows.Count > 2 Then
+            indent = t1.Rows(3).LeftIndent
+            Ok "a later wrap line is indented by the hang", (Abs(indent - hang) <= 0.5)
+            indent = t1.Rows(1).LeftIndent
+            Ok "and the first is not", (Abs(indent) <= 0.5)
+        End If
+    End If
+    CloseNoSave doc
+    gQuiet = savedQuiet
 End Sub
 
 

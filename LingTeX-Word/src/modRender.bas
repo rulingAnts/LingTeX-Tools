@@ -52,16 +52,22 @@ Public Function RenderExample(ex As IgtExample, target As Range) As Table
     Dim interTiers() As Long, nInter As Long
     Dim nLines As Long, maxCols As Long
     Dim why As String
+    Dim hang As Double
 
     Set doc = target.Document
+    ' A fresh example is numbered if the document says so; the number's hanging
+    ' indent is part of the plan, because the first column has to hold it.
+    hang = 0
+    If SettingNumberExamples(doc) Then hang = SettingNumberHang(doc)
     If Not PlanExample(ex, target, doc, interTiers, nInter, colW, _
-                       lineStarts, nLines, maxCols, why) Then
+                       lineStarts, nLines, maxCols, why, hang) Then
         gRenderError = why
         Exit Function
     End If
 
     Set RenderExample = DrawExample(ex, target, doc, interTiers, nInter, _
-                                    colW, lineStarts, nLines, maxCols)
+                                    colW, lineStarts, nLines, maxCols, _
+                                    hang, Nothing, SettingNumberLevel(doc))
 End Function
 
 '-----------------------------------------------------------------------------
@@ -80,7 +86,7 @@ Private Function PlanExample(ex As IgtExample, target As Range, doc As Document,
         ByRef interTiers() As Long, ByRef nInter As Long, _
         ByRef colW() As Double, ByRef lineStarts() As Long, _
         ByRef nLines As Long, ByRef maxCols As Long, _
-        ByRef why As String) As Boolean
+        ByRef why As String, ByVal hang As Double) As Boolean
 
     Dim cellWidths() As Double
     Dim flags() As Boolean
@@ -121,8 +127,11 @@ Private Function PlanExample(ex As IgtExample, target As Range, doc As Document,
     End If
 
     colW = ColumnWidths(ex, cellWidths, gap)
+    ' Numbering: the number hangs inside the first cell, so the first column is
+    ' wider by the hang, and every later wrap line is indented by it.
+    If hang > 0 Then colW(LBound(colW)) = colW(LBound(colW)) + hang
     flags = NoBreakFlags(ex)
-    lineStarts = ComputeWrapLines(colW, flags, avail, 0, contIndent)
+    lineStarts = ComputeWrapLines(colW, flags, avail, 0, contIndent + hang)
 
     nLines = UBound(lineStarts) - LBound(lineStarts) + 1
 
@@ -131,7 +140,7 @@ Private Function PlanExample(ex As IgtExample, target As Range, doc As Document,
     ' Capped at the room its line has, the cell wraps its text inside itself
     ' instead (found by hand, 2026-09-12: a 60-character form ran past the margin
     ' and off the page, because SetWidth was given the full measured width).
-    CapColumnWidths colW, lineStarts, nLines, ex.ColCount, avail, contIndent
+    CapColumnWidths colW, lineStarts, nLines, ex.ColCount, avail, contIndent + hang
 
     maxCols = MaxColumnsPerLine(lineStarts, ex.ColCount)
     If maxCols < 1 Then
@@ -195,7 +204,8 @@ End Sub
 Private Function DrawExample(ex As IgtExample, target As Range, doc As Document, _
         interTiers() As Long, ByVal nInter As Long, _
         colW() As Double, lineStarts() As Long, _
-        ByVal nLines As Long, ByVal maxCols As Long) As Table
+        ByVal nLines As Long, ByVal maxCols As Long, _
+        ByVal hang As Double, lt As Object, ByVal level As Long) As Table
 
     Dim tbl As Table
     Dim anchor As Range
@@ -209,16 +219,91 @@ Private Function DrawExample(ex As IgtExample, target As Range, doc As Document,
     StyleTable tbl, doc
 
     gRenderError = ""
-    FillTable tbl, ex, interTiers, nInter, lineStarts, colW, doc
+    FillTable tbl, ex, interTiers, nInter, lineStarts, colW, doc, hang
 
     '-- free translations, after the table ----------------------------------
     ' Written BEFORE the row keeps, so SetRowKeeps can see the first translation
     ' paragraph and keep the last row of the table with it. Done the other way
     ' round, a page break can fall between an example and its translation.
-    WriteFreeLines ex, tbl, doc
+    WriteFreeLines ex, tbl, doc, hang
     SetRowKeeps tbl, (ex.FreeCount > 0)
 
+    '-- the number, last: list numbering on the first cell -------------------
+    If hang > 0 Then
+        ApplyExampleNumber tbl, doc, lt, level, hang
+    Else
+        StripStrayNumber tbl
+    End If
+
     Set DrawExample = tbl
+End Function
+
+'-----------------------------------------------------------------------------
+' Number the example: Word list numbering on the first cell's paragraph, from
+' the "LingTeX Example Number" list style (or the template the example carried
+' before a re-wrap), continuing the previous list so the numbers run through
+' the document and renumber themselves. The number sits in a hanging indent
+' inside the cell; FillTable has already indented everything else to match.
+'-----------------------------------------------------------------------------
+Private Sub ApplyExampleNumber(tbl As Table, doc As Document, lt As Object, _
+        ByVal level As Long, ByVal hang As Double)
+    Dim rng As Range
+    Dim tpl As Object
+
+    On Error Resume Next
+    Set tpl = lt
+    If tpl Is Nothing Then Set tpl = doc.Styles(STYLE_NUMBER).ListTemplate
+    If tpl Is Nothing Then
+        gRenderError = "the example could not be numbered: the list style " & _
+                       STYLE_NUMBER & " is missing"
+        Err.Clear
+        Exit Sub
+    End If
+    Set rng = tbl.Cell(1, 1).Range
+    rng.End = rng.End - 1
+    rng.ListFormat.ApplyListTemplate ListTemplate:=tpl, ContinuePreviousList:=True
+    If level > 1 Then rng.ListFormat.ListLevelNumber = level
+    rng.ParagraphFormat.LeftIndent = hang
+    rng.ParagraphFormat.FirstLineIndent = -hang
+    If Err.Number <> 0 Then
+        gRenderError = "the example could not be numbered (" & CStr(Err.Number) & _
+                       ": " & Err.Description & ")"
+        Err.Clear
+    End If
+    On Error GoTo 0
+End Sub
+
+' An unnumbered example drawn at a paragraph that carried list numbering can
+' inherit it into the first cell, number and all. Not ours: take it off.
+Private Sub StripStrayNumber(tbl As Table)
+    Dim rng As Range
+    On Error Resume Next
+    If CellIsNumbered(tbl) Then
+        Set rng = tbl.Cell(1, 1).Range
+        rng.End = rng.End - 1
+        rng.ListFormat.RemoveNumbers
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' Whether the example's first cell carries list numbering.
+Public Function CellIsNumbered(tbl As Table) As Boolean
+    On Error Resume Next
+    CellIsNumbered = (tbl.Cell(1, 1).Range.ListFormat.ListType <> wdListNoNumbering)
+    If Err.Number <> 0 Then CellIsNumbered = False
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+' The number the example shows, e.g. "(3)"; empty when it has none.
+Public Function ExampleNumberString(tbl As Table) As String
+    On Error Resume Next
+    If CellIsNumbered(tbl) Then
+        ExampleNumberString = tbl.Cell(1, 1).Range.ListFormat.ListString
+    End If
+    Err.Clear
+    On Error GoTo 0
 End Function
 
 '-----------------------------------------------------------------------------
@@ -278,13 +363,29 @@ Public Function RedrawExampleAt(tbl As Table, ex As IgtExample) As Table
     Dim interTiers() As Long, nInter As Long
     Dim nLines As Long, maxCols As Long
     Dim why As String
+    Dim hang As Double, level As Long
+    Dim savedLT As Object
 
     gRenderError = ""
     If tbl Is Nothing Then Exit Function
     Set doc = tbl.Range.Document
 
+    ' A numbered example stays numbered, with the list and level it carried:
+    ' the setting decides only for NEW examples.
+    hang = 0
+    level = 1
+    If CellIsNumbered(tbl) Then
+        hang = SettingNumberHang(doc)
+        On Error Resume Next
+        Set savedLT = tbl.Cell(1, 1).Range.ListFormat.ListTemplate
+        level = tbl.Cell(1, 1).Range.ListFormat.ListLevelNumber
+        If level < 1 Then level = 1
+        Err.Clear
+        On Error GoTo 0
+    End If
+
     If Not PlanExample(ex, RangeAfterTable(tbl), doc, interTiers, nInter, colW, _
-                       lineStarts, nLines, maxCols, why) Then
+                       lineStarts, nLines, maxCols, why, hang) Then
         gRenderError = why
         Exit Function                      ' table untouched
     End If
@@ -299,7 +400,8 @@ Public Function RedrawExampleAt(tbl As Table, ex As IgtExample) As Table
     ' content behind in SOME form rather than nothing at all.
     On Error GoTo DrawFailed
     Set RedrawExampleAt = DrawExample(ex, anchor, doc, interTiers, nInter, _
-                                      colW, lineStarts, nLines, maxCols)
+                                      colW, lineStarts, nLines, maxCols, _
+                                      hang, savedLT, level)
     Exit Function
 
 DrawFailed:
@@ -361,7 +463,8 @@ End Sub
 ' because Word shifts the remaining cells left each time.
 '-----------------------------------------------------------------------------
 Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
-        ByVal nInter As Long, lineStarts() As Long, colW() As Double, doc As Document)
+        ByVal nInter As Long, lineStarts() As Long, colW() As Double, doc As Document, _
+        ByVal hang As Double)
 
     Dim g As Long, i As Long, c As Long, r As Long
     Dim lineFirst As Long, lineLast As Long, lineCols As Long
@@ -370,10 +473,12 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
     Dim role As String
     Dim cellRng As Range
     Dim lineGap As Double
+    Dim contIndent As Double
 
     nLines = UBound(lineStarts) - LBound(lineStarts) + 1
     maxCols = MaxColumnsPerLine(lineStarts, ex.ColCount)
     lineGap = SettingLineGap(doc)
+    contIndent = SettingContIndent(doc)
 
     For g = 0 To nLines - 1
         lineFirst = lineStarts(g)
@@ -434,6 +539,23 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
                 End If
                 On Error GoTo 0
             Next c
+
+            ' Where the row starts. The number, if any, hangs inside the first
+            ' cell of the first row; the other rows of the first wrap line
+            ' indent their first cell to the text position, and every later
+            ' wrap line moves the whole row over by the same, plus the
+            ' continuation indent -- which the plan already budgeted for and
+            ' which, before numbering, nothing drew.
+            On Error Resume Next
+            If g = 0 Then
+                If hang > 0 And i > 0 Then
+                    tbl.Cell(r, 1).Range.ParagraphFormat.LeftIndent = hang
+                End If
+            Else
+                tbl.Rows(r).LeftIndent = hang + contIndent
+            End If
+            Err.Clear
+            On Error GoTo 0
 
             ' Air between wrap lines goes on the last tier row of each group,
             ' except the final group, which is followed by the free translation.
@@ -672,7 +794,8 @@ End Function
 ' Write the free translations as paragraphs after the table, in single quotes,
 ' matching the convention the superseded LibreOffice and Word macros used.
 '-----------------------------------------------------------------------------
-Private Sub WriteFreeLines(ex As IgtExample, tbl As Table, doc As Document)
+Private Sub WriteFreeLines(ex As IgtExample, tbl As Table, doc As Document, _
+        ByVal hang As Double)
     Dim i As Long
     Dim s As String
     Dim after As Range
@@ -691,6 +814,14 @@ Private Sub WriteFreeLines(ex As IgtExample, tbl As Table, doc As Document)
     ' InsertBefore grows the range over what it inserted, so this styles exactly
     ' the paragraphs just added and nothing else.
     ApplyParaStyle after, doc, ROLE_FREE
+    ' Under a numbered example the translation lines up with the text, not
+    ' with the number.
+    If hang > 0 Then
+        On Error Resume Next
+        after.ParagraphFormat.LeftIndent = hang
+        Err.Clear
+        On Error GoTo 0
+    End If
 
     ' Several translations hold together; the last one releases, so the example
     ' does not drag the following body text onto its page.

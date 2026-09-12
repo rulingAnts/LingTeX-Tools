@@ -132,24 +132,31 @@ Both input paths, in one pass.
    `LingTeX Free`, wrapped in curly single quotes: `'(When) she took her dogs
    hunting.'` If it is missing, stop and say so — that is the one you flagged
    earlier, and it would be a real bug.
-4. **Fonts.** Cursor in a cell, look at the font name box. It must be the
+4. **The number.** The example carries `(1)` at the left of its first line,
+   as Word list numbering on the first cell; the gloss under it, any later
+   wrap lines and the translation are indented to the text position. Insert
+   the sample again below → `(2)`. Delete the first example (select the
+   table and its translation, Delete) → the remaining one reads `(1)`.
+   `LingTeXToggleExampleNumbers` → the next insert has no number and no
+   indent. Per-chapter restarts are a list-style setting: see `TESTING.md`.
+5. **Fonts.** Cursor in a cell, look at the font name box. It must be the
    document's body font, not Cambria Math and not Times New Roman.
-5. **Selection path.** ⌘Z back to nothing. Paste the sample as plain text —
+6. **Selection path.** ⌘Z back to nothing. Paste the sample as plain text —
    Edit → Paste Special… (⌃⌘V) → Unformatted Text — select those three
    paragraphs, run Insert. The selection is *replaced*: no stray empty paragraph
    left above or below.
-6. **The two refusals.** Insert with an empty clipboard and nothing selected → a
+7. **The two refusals.** Insert with an empty clipboard and nothing selected → a
    dialog saying there is nothing to insert. Insert with an ordinary sentence of
    prose selected → a dialog explaining what was expected. Neither may be a VBA
    error dialog.
-7. **No file written.** Nothing in this pass should touch the disk. If you want
+8. **No file written.** Nothing in this pass should touch the disk. If you want
    it checked rather than assumed, run this in Terminal straight afterwards:
 
 ```bash
 find ~/Library/Containers/com.microsoft.Word -newermt '-10 minutes' -type f 2>/dev/null | head
 ```
 
-Keep the example from step 5. Pass 2 needs it.
+Keep the example from step 6. Pass 2 needs it.
 
 ---
 
