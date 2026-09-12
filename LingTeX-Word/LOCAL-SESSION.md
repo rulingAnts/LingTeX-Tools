@@ -85,6 +85,11 @@ requests.
 
 ## State of play
 
+- **The engine loads at Word start only when marked good** (build/engine-ok,
+  removed by the runner before a run, written after a clean one; dev
+  AutoExec checks it). A broken import can no longer be loaded twice, and
+  the repair path (import into the engine opened as a document) never runs
+  stale engine code. Needs the dev template re-pasted once (its AutoExec).
 - **Fourth run: "Compile error in hidden module: modLingTeX", endlessly.** The
   two-template import WORKED (it wrote modules into the engine and reloaded
   it), and what it imported had never been compiled by Word: the shortcuts

@@ -33,6 +33,9 @@ $reports = Join-Path $root "LingTeX-Word-reports"
 
 if (-not $NoPull) { Write-Host "== git pull"; git -C $root pull --ff-only }
 New-Item -ItemType Directory -Force -Path $reports | Out-Null
+# The engine loads at Word start only when its last run was green (see
+# AutoExec in tools/ImportModules.bas); the marker goes before a run.
+Remove-Item -Force (Join-Path $root "build\engine-ok") -ErrorAction SilentlyContinue
 # Only this platform's reports are replaced; the Mac ones sit beside them.
 Get-ChildItem -Path $reports -Filter *.win.txt | Remove-Item -Force
 $imp = Join-Path $reports "ImportModules.txt"; if (Test-Path $imp) { Remove-Item -Force $imp }
@@ -105,6 +108,10 @@ if (-not $NoCommit -and $status -eq 0 -and $summary -ne "") {
     } else {
         Write-Host "== reports unchanged; nothing committed"
     }
+}
+if ($status -eq 0 -and $summary -ne "") {
+    New-Item -ItemType File -Force -Path (Join-Path $root "build\engine-ok") | Out-Null
+    Write-Host "== engine marked good: it will load at the next Word start"
 }
 Write-Host "reports: $reports"
 exit $status
