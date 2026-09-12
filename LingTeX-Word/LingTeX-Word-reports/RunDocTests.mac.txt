@@ -311,6 +311,13 @@ Open documents at start: 1
   PASS   LingTeXConvertTableToIgt leaves ScreenUpdating on
   PASS   LingTeXConvertTableToIgt leaks no document
   PASS   LingTeXConvertTableToIgt leaves no undo record open
+  PASS   LingTeXIndentExample outside an example changes no text
+  PASS   LingTeXIndentExample outside an example adds no table
+  PASS   LingTeXIndentExample says something rather than nothing
+  PASS   LingTeXIndentExample leaves gBusy clear
+  PASS   LingTeXIndentExample leaves ScreenUpdating on
+  PASS   LingTeXIndentExample leaks no document
+  PASS   LingTeXIndentExample leaves no undo record open
   PASS   RewrapAll on a document with no examples changes nothing
   PASS   and says so
   PASS   LingTeXRewrapAll (empty) leaves gBusy clear
@@ -334,6 +341,16 @@ Open documents at start: 1
   PASS   LingTeXConvertTableToIgt leaves ScreenUpdating on
   PASS   LingTeXConvertTableToIgt leaks no document
   PASS   LingTeXConvertTableToIgt leaves no undo record open
+  PASS   Indent moves the example half an inch
+         rows at 36pt
+  PASS   and the translation with it, past the number
+  PASS   the number is still (1)
+  PASS   a second Indent makes an inch
+  PASS   Outdent takes half of it back
+  PASS   and the rest
+  PASS   Outdent at the margin says so and stops
+  PASS   LingTeXOutdentExample leaves gBusy clear
+  PASS   LingTeXOutdentExample leaves no undo record open
 
 -- events ----------------------------------------------------
   PASS   clsAppEvents really is a class module
@@ -349,5 +366,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 296 passed
+ALL PASS -- 312 passed
 
