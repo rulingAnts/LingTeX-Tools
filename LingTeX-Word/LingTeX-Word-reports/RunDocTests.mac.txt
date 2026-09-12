@@ -325,9 +325,12 @@ Open documents at start: 1
   PASS   rewrap-on-save reads back as on
   PASS   while busy, a cursor move re-wraps nothing
   PASS   and the handler did no work
+  PASS   leaving an example with re-wrap on leave redraws it
+  PASS   and the cursor is still on the paragraph after the translation
+         rows 2 before, 6 after; cursor 1 from the end both times
   PASS   Detach does not raise
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 278 passed
+ALL PASS -- 280 passed
 
