@@ -69,12 +69,31 @@ End Function
 '-----------------------------------------------------------------------------
 Public Function FindExampleAt(rng As Range) As Table
     Dim tbl As Table
+    Dim para As Paragraph, nxt As Paragraph
     If rng Is Nothing Then Exit Function
     On Error Resume Next
-    If Not rng.Information(wdWithInTable) Then Exit Function
-    Set tbl = rng.Tables(1)
+    If rng.Information(wdWithInTable) Then
+        Set tbl = rng.Tables(1)
+    Else
+        ' The number line above an example is part of the example: a paragraph
+        ' in the LingTeX Example style whose next paragraph is in a table. A
+        ' command run with the cursor there -- which is where the cursor lands
+        ' after an insert or a conversion -- acts on that example.
+        Set para = rng.Paragraphs(1)
+        If Not para Is Nothing Then
+            If para.Style = STYLE_EXAMPLE Then
+                Set nxt = para.Next
+                If Not nxt Is Nothing Then
+                    If nxt.Range.Information(wdWithInTable) Then
+                        Set tbl = nxt.Range.Tables(1)
+                    End If
+                End If
+            End If
+        End If
+    End If
     Err.Clear
     On Error GoTo 0
+    If tbl Is Nothing Then Exit Function
     If IsInterlinearTable(tbl) Then Set FindExampleAt = tbl
 End Function
 

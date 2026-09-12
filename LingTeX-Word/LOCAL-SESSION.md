@@ -85,6 +85,11 @@ requests.
 
 ## State of play
 
+- **The two-template loop works end to end** (2026-09-12 evening): import
+  14/14 into the engine as a document, saved, loaded as a global add-in, 79
+  and 271/272 -- every numbering check green. The one failure: after
+  convert-table the cursor sits on the new number line, which FindExampleAt
+  did not count as the example; it does now.
 - **FOUND IT (Debug > Compile in the open): both class modules were EMPTY.**
   ReadTextFile ends lines with vbNewLine (CR on Mac) since the double-spacing
   fix; StripVbaMetadata still split on vbCrLf, so a Mac class file was one
