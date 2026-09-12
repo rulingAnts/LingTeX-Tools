@@ -43,6 +43,9 @@ Private mFail As Long
 Private mRpt  As String
 Private mFirstFails As String
 Private mDocsAtStart As Long
+' The full names of every document open when the run began, so a crashed
+' section's cleanup can tell scratch from the user's own -- and from ThisDocument.
+Private mOpenAtStart As Collection
 
 ' Set by RunDocTestsToFile: report to a file, no dialog. See modTests.
 Private mQuietRun As Boolean
@@ -66,6 +69,7 @@ Public Sub RunDocTests()
     mRpt = ""
     mFirstFails = ""
     mDocsAtStart = Documents.Count
+    RecordOpenDocuments
 
     Emit ""
     Emit "LingTeX-Word document tests"
@@ -1659,9 +1663,12 @@ Private Sub CheckEscapeHatch(doc As Document)
 End Sub
 
 ' Off the interlinear style, by whatever name the built-in table style has here.
+' By NAME, not enum: wdStyleTableGrid is not defined in Mac Word's type library,
+' and a constant that does not exist is a compile error that surfaces only when
+' the procedure is first reached -- half-way through a run, as a dialog.
 Private Function ChangeTableStyle(tbl As Table, doc As Document) As Boolean
     On Error Resume Next
-    tbl.Style = doc.Styles(wdStyleTableGrid)
+    tbl.Style = doc.Styles("Table Grid")
     If Err.Number <> 0 Then
         Err.Clear
         tbl.Style = doc.Styles("Normal Table")
@@ -2190,23 +2197,57 @@ Private Sub CloseNoSave(doc As Document)
 End Sub
 
 ' After a crashed section, shut anything extra that is open so the leak check at
-' the end still means something. Never closes a document the user already had.
+' the end still means something. Never closes a document the user already had,
+' and NEVER the document holding this code: on Mac Word, Documents(Documents.Count)
+' is not the newest document, and closing ThisDocument from its own macro ends the
+' run silently -- no report, no dialog, the rest of the suite simply never runs.
+' That is how a styles-section crash became a suite that "wrote nothing".
 Private Sub CloseAllScratchDocs()
-    Dim guard As Long
+    Dim i As Long
+    Dim d As Document
 
     ReleaseScratch
-    Do While Documents.Count > mDocsAtStart
-        guard = guard + 1
-        If guard > 32 Then Exit Do
-        On Error Resume Next
-        Documents(Documents.Count).Close SaveChanges:=wdDoNotSaveChanges
-        If Err.Number <> 0 Then
-            Err.Clear
-            Exit Do
+    On Error Resume Next
+    For i = Documents.Count To 1 Step -1
+        If Documents.Count <= mDocsAtStart Then Exit For
+        Set d = Documents(i)
+        If Not d Is ThisDocument Then
+            If Not WasOpenAtStart(d) Then
+                d.Close SaveChanges:=wdDoNotSaveChanges
+            End If
         End If
-        On Error GoTo 0
-    Loop
+        Err.Clear
+    Next i
+    On Error GoTo 0
 End Sub
+
+Private Sub RecordOpenDocuments()
+    Dim d As Document
+    Set mOpenAtStart = New Collection
+    On Error Resume Next
+    For Each d In Documents
+        mOpenAtStart.Add d.FullName
+    Next d
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+Private Function WasOpenAtStart(d As Document) As Boolean
+    Dim i As Long
+    Dim nm As String
+
+    If mOpenAtStart Is Nothing Then Exit Function
+    On Error Resume Next
+    nm = d.FullName
+    Err.Clear
+    On Error GoTo 0
+    For i = 1 To mOpenAtStart.Count
+        If mOpenAtStart(i) = nm Then
+            WasOpenAtStart = True
+            Exit Function
+        End If
+    Next i
+End Function
 
 
 '=============================================================================
@@ -2215,6 +2256,7 @@ End Sub
 
 Private Sub Emit(ByVal s As String)
     Debug.Print s
+    SettleDebugPrint 0#   ' see modTests: Debug.Print arms an Overflow on Mac
     mRpt = mRpt & s & vbCr
 End Sub
 

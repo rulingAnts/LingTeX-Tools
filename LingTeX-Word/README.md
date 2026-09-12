@@ -315,14 +315,15 @@ arrived inside a downloaded zip.
 Still unverified because Mac cannot cover them, for one pass on Windows: the NSIS
 installer, and whether custom ribbon XML in a STARTUP `.dotm` loads.
 
-**And one finding that changes the testing policy.** `MicroDiagnose` produced
-run-time error 6, *Overflow*, on `s1 = 10` where `s1` is `As Single` — a primitive
-that cannot fail on a correct implementation, and which `modProbe` had already
-used successfully on the same build. Until that is understood, Mac passing is no
-longer taken to imply Windows passing: **stage 1 must return `ALL PASS` on both
-platforms** before any document-rendering work is built on top. The wrap planner
-is pure arithmetic, so a numeric-type discrepancy would surface later as a
-mis-rendered table with no obvious cause.
+**And one finding that changed the testing policy, then changed again.** `MicroDiagnose`
+produced run-time error 6, *Overflow*, on `s1 = 10` where `s1` is `As Single`, and
+for a while the type was blamed. The cause is `Debug.Print`: on Mac Word 16.112 it
+arms an Overflow in the next floating-point statement, in that procedure or its
+caller, and any call in between clears it (bisected 2026-09-12; see
+`SettleDebugPrint` in `modTests` and QUICKSTART.md). Every `Debug.Print` is now
+followed by that call and the linter enforces it. The policy stands regardless:
+**stage 1 must return `ALL PASS` on both platforms** before document-rendering
+work is built on top — cross-platform VBA differences are real, and this was one.
 
 ---
 

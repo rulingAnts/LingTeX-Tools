@@ -517,32 +517,49 @@ fourteen modules, and re-running re-syncs them after any pull.
 
 ---
 
-## The `Single` failure, now explained
+## The `Single` failure, explained — and then actually explained
 
 During stage 1 a `Dim s1 As Single` / `s1 = 10` assignment raised run-time error
 6, *Overflow* — in one procedure, while the identical assignment in a smaller
 procedure worked, and `TypeCheck` confirmed every numeric type including `Single`
-behaved correctly on this build. Splitting the code into smaller procedures made
-it go away, which was recorded here as a workaround rather than a diagnosis.
+behaved correctly on this build. Stage 2's first run died the same way at a call
+passing the literal `0` into a `ByVal … As Single` parameter, so the type was
+blamed and the engine moved to `Double` everywhere.
 
-Stage 2's first run supplied the diagnosis. `RunDocTests` compiled and then died
-in its first section with the same error 6, at a call passing the literal `0`
-into a `ByVal … As Single` parameter — a different module, no arithmetic anywhere
-near it. Two occurrences of one shape on the same Mac build: **converting an
-integer into a `Single` fails on this build, depending on the stack frame it
-happens in.** That is why `TypeCheck` could not see it — it tests each type in a
-one-line function, the one kind of frame where it never fails — and why "make
-the procedure smaller" appeared to fix it.
+Then stage 2 died the same way with `Double`, and a local session that could run
+Word itself bisected it across some fifty variants (2026-09-12). **The trigger is
+`Debug.Print`.** On Mac Word 16.112 (Apple silicon) a `Debug.Print` leaves the VBA
+interpreter in a state where the next floating-point assignment or comparison —
+in the same procedure, *or in the procedure that called the printing one* — raises
+error 6. Any procedure call made in between clears it; `Long` arithmetic does
+not. Every failure ever seen fits: each was the first floating-point statement
+after an `Emit`, `TypeCheck`'s one-line functions never printed before assigning,
+and "make the procedure smaller" moved the assignment away from the print.
 
-**The engine no longer uses `Single` anywhere. Every width, size, gap and
-position is a `Double`** — VBA's native floating type, and what the JavaScript
-reference implementation has used all along. Two proven modules changed with it,
-`modWrap` and `modTests`, which is why `RunAllTests` has to be run again after this
-change: its 79 checks re-prove them. The `Single` in `TypeCheck` and
-`MicroDiagnose` is kept on purpose, as the reproduction.
+The rule that follows, enforced by `tools/vba-lint.py`: **every `Debug.Print` is
+followed on the next line by `SettleDebugPrint 0#`** — an empty `Sub` in
+`modTests` that exists only to be that call. `DebugPrintDiagnose` in `modTests` is
+the two-line reproduction: step A crashes, step B (settled) passes. Windows is
+expected to pass both; the rule costs nothing there.
 
-If error 6 ever appears again with no arithmetic in sight, look for a `Single`
-first.
+`Double` stays — it is what the JavaScript reference uses and mixing the two
+invites rounding drift — and the linter now rejects `Single` in the engine.
+`TypeCheck`, `DiagnoseWrap` and `MicroDiagnose` are history and go in the next
+health pass.
+
+Two more things that same session established about Mac Word's VBA, both now
+built into `run-in-word.sh`:
+
+- **A procedure is compiled when it is first reached.** `wdStyleTableGrid` — not
+  in Mac Word's type library — sat in a procedure the tests call late, so it
+  surfaced as a *Compile error: Variable not defined* dialog after a hundred
+  `PASS` lines. Built-in styles are now addressed by name. There is no
+  project-wide compile a macro can trigger on Mac (the VBE command-bar trick,
+  `FindControl 578`, raises error 445), so the linter is the substitute.
+- **The editor's dialogs are invisible to System Events**, so no script can
+  read or dismiss them; what a script can see is the editor's window title,
+  which carries `[break]` until *Run → Reset*, and while it does no macro can
+  run at all. The runner checks for it before and after every macro.
 
 ---
 

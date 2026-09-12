@@ -47,9 +47,21 @@ requests.
   (`modFlexParse`, `modIgtModel`, `modLeipzig`, `modWrap`, `modTests`,
   `clsIgtWarning`) pass 79 checks on both platforms. If a fix needs them touched,
   re-run `RunAllTests` and keep 79/79. Prefer fixing the stage-2 side.
-- **No `Single` anywhere.** Converting an integer to a `Single` raises run-time
-  error 6 on this Mac build, depending on the stack frame. Everything is
-  `Double`. The linter does not check this yet; add the rule if you touch it.
+- **Every `Debug.Print` is followed by `SettleDebugPrint 0#`.** On this Mac build
+  a `Debug.Print` arms run-time error 6 in the next floating-point assignment or
+  comparison, in that procedure or its caller; any call in between clears it.
+  The linter enforces the rule; `DebugPrintDiagnose` reproduces the fault.
+- **No `Single` anywhere.** It was blamed for the above before the cause was
+  found; `Double` stays because the JavaScript reference uses it. The linter
+  checks this now.
+- **Word enumeration constants must exist on Mac.** `wdStyleTableGrid` does not,
+  and VBA compiles a procedure only when it is first reached, so a bad constant
+  is a compile-error dialog half-way through a run. Prefer names to enums for
+  built-in styles; the linter keeps an allowlist of the constants in use.
+- **The VBA editor's dialogs are invisible to System Events.** The runner can
+  only see the editor's `[break]` window title; a person reads the dialog and
+  the highlighted line, clicks OK, then *Run → Reset*. Seth runs the runner and
+  pastes its output; do not drive Word with screenshots — it is slower and hot.
 - **Every module-level declaration precedes the first procedure.** A `Type`,
   `Const` or variable after a `Sub` silently does not exist and the error shows
   up in a different module. The linter checks this.
@@ -66,23 +78,26 @@ requests.
 
 ## State of play
 
-- `RunAllTests`: **79/79** on Mac Word 16.112 with the `Double` build (`0e7074d`).
-- `RunDocTests`: does not compile — **"Compile error: Sub or Function not
-  defined"**, surfaced when the runner ran `RunDocTestsToFile`. Five static
-  scans (undefined bare calls, cross-module `Private` calls, every name in
-  `modLingTeX` and `clsAppEvents` against every definition, rare built-ins) found
-  nothing, so the offending statement has a shape those scans miss. The user may
-  have sent the highlighted line; if not, bisect as above. Find it, add the
-  linter rule for its class, sweep for more of the same class, then run.
-- Before the `Double` change, `RunDocTests` did run and crashed with Overflow in
-  three sections (styles, settings, measure) — every crash a `Single`
-  conversion. Those should now pass; anything else that fails is new information.
-- A background sweep for further compile errors was running in the remote
-  session; its results, if any, will arrive as a commit on the branch.
+- `RunAllTests`: **79/79** on Mac Word 16.112, with `SettleDebugPrint` in `Emit`.
+- `RunDocTests`: runs. With the `Debug.Print` fix the sections styles, stylecollide,
+  settings, measure, agreement, rendering, geometry, scratch and roundtrip were
+  seen passing in the Immediate window (no report file yet, see next). It then
+  stopped on *Compile error: Variable not defined* at `wdStyleTableGrid` in
+  `ChangeTableStyle` (commands section) — fixed by name. Everything after that
+  point (rest of commands, events, the leak check) is unproven.
+- A crashed section used to close `Documents(Documents.Count)`, which on Mac
+  was the document holding the code — the run ended silently with no report.
+  `CloseAllScratchDocs` now closes only documents that were not open at the
+  start and never `ThisDocument`. Leaked blank `DocumentNN` windows from earlier
+  crashed runs can simply be closed.
+- Seth's observations on the rendered example (from an earlier run's leak): no
+  free-translation row appeared below the table, and nothing exercises wrapping
+  yet. Check both against the RunDocTests report once it is green.
+- Each phase is also run on Windows (Parallels) by Seth with `run-in-word.ps1`
+  before moving on; Claude does not drive the VM.
 - Then: the by-hand checks in `TESTING.md`, `SaveAsTemplate` +
-  `tools/build-dotm.sh` + `tools/check-dotm.sh`, then packaging (see
-  `/root/.claude/plans/` is not on this machine — the plan is summarised in
-  QUICKSTART's *Status* and README's *Roadmap*).
-- Task for later, not now: remove the stage-1 `Single` diagnostics from
-  `modTests` (`TypeCheck`, `DiagnoseWrap`; keep `MicroDiagnose` as the
-  reproduction) and do a health pass — only once `RunDocTests` is green.
+  `tools/build-dotm.sh` + `tools/check-dotm.sh`, then packaging (the plan is
+  summarised in QUICKSTART's *Status* and README's *Roadmap*).
+- Task for later, not now: remove `TypeCheck`, `DiagnoseWrap` and `MicroDiagnose`
+  from `modTests` (keep `DebugPrintDiagnose`) and do a health pass — only once
+  `RunDocTests` is green.
