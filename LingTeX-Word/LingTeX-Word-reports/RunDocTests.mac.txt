@@ -67,16 +67,16 @@ Open documents at start: 1
 
 -- measure ---------------------------------------------------
   PASS   widths are strictly increasing for i < iii < WWW
-         i=3  iii=8.25  WWW=25.5
+         i=3  iii=8.25  WWW=27.75
   PASS   measurement reported no failure
   PASS   width of i is in 1..12pt
   PASS   width of WWWWW is in 20..90pt
-         i=3  WWWWW=42   (probe recorded 3.0 and 53.3 at 12pt)
+         i=3  WWWWW=44.25   (probe recorded 3.0 and 53.3 at 12pt)
   PASS   empty string measures 0
   PASS   a single space measures 0
   PASS   a letter measures more than 0
   PASS   a batch agrees with single measurements
-         PST as a gloss 13.5, as a morpheme 17.25
+         PST as a gloss 15, as a morpheme 17.25
   PASS   role is part of the cache identity
   PASS   a cache hit opens no document
   PASS   ClearCache really invalidates
@@ -86,15 +86,17 @@ Open documents at start: 1
 
 -- agreement -------------------------------------------------
   PASS   measured width of ERG matches the drawn width
-         measured 15.75, drawn 15.75
+         measured 17.25, drawn 17.25
   PASS   measured width of follow.CMP matches the drawn width
-         measured 50.25, drawn 50.25
+         measured 51.75, drawn 51.75
   PASS   measured width of dream matches the drawn width
          measured 28.5, drawn 28.5
   PASS   measured width of Ozivela matches the drawn width
          measured 36, drawn 36
-  PASS   transform: follow.CMP on a gloss row
+  PASS   transform: follow.CMP on a gloss row keeps a full-size first capital
   PASS   transform: ERG on a gloss row
+  PASS   transform: the capital is the first LETTER, so 3SG is 3Sg
+  PASS   transform: without the initial capital, uniform small caps
   PASS   transform: Ozivela on a vernacular row is untouched
   PASS   transform: an all-caps vernacular word is untouched
   PASS   transform preserves length (follow.CMP=REL)
@@ -118,10 +120,10 @@ Open documents at start: 1
   PASS   bottom padding is 0
   PASS   every form sits directly above its gloss (equal column widths)
   PASS   no row is wider than the text area
-         widest row 153.75pt, text area 468pt
+         widest row 156.75pt, text area 468pt
   PASS   every row's first cell carries its tier's paragraph style
   PASS   a vernacular cell carries no gram-gloss style
-  PASS   follow.CMP=REL is drawn lower-cased for small caps
+  PASS   follow.CMP=REL is drawn in small-caps case
   PASS   the lexical part carries no gram-gloss style
   PASS   the first grammatical part carries the gram-gloss style
   PASS   the second grammatical part carries it too
@@ -131,6 +133,9 @@ Open documents at start: 1
   PASS   the last table row keeps with the translation
   PASS   quotes round trip off a translation
   PASS   StripQuotes leaves unquoted text alone
+  PASS   an example with an over-wide form still draws
+  PASS   and no row of it is wider than the text area (the cell wraps inside itself)
+         widest row 468pt, text area 468pt
 
 -- geometry --------------------------------------------------
   PASS   Letter portrait with 1in margins gives 468pt
@@ -269,5 +274,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 224 passed
+ALL PASS -- 228 passed
 
