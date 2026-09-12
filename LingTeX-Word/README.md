@@ -13,6 +13,17 @@ and ships as its own two downloads.
 
 ---
 
+## Installing
+
+Releases are on the [releases page](https://github.com/rulingAnts/LingTeX-Tools/releases)
+(pre-releases tagged `word-v…`): a Windows installer (`LingTeX-Word-Setup-….exe`),
+a Windows zip with the template and `install.bat`, and a Mac zip with the
+template and `install.command`. Each puts one file, `LingTeX-Word.dotm`, into
+Word's STARTUP folder, where Word loads it at every start; the first time Word
+loads it, the add-in installs its keyboard shortcuts and says so. Details and
+removal: [install/INSTALL.md](install/INSTALL.md). How a release is made:
+[RELEASING.md](RELEASING.md).
+
 ## What it does
 
 Copy an interlinear selection in FLEx, click **Insert Interlinear**, and the

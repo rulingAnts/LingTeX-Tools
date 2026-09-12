@@ -1,0 +1,113 @@
+name: LingTeX-Word pre-release
+
+# Packages the committed LingTeX-Word.dotm with its installers and publishes a
+# GitHub pre-release. CI cannot BUILD the template -- the VBA project is a
+# binary only Word writes, and no runner has Word -- so the template is built
+# in Word by hand (LingTeX-Word/RELEASING.md), injected and verified by the
+# scripts, and committed; this workflow verifies it again and ships it.
+#
+# Run from the Actions tab (Run workflow) with a label, e.g. beta.1.
+# Public repository, standard runner: free.
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: 'Version label for the tag, e.g. beta.1'
+        required: true
+        default: 'beta.1'
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: The template is committed and matches src/
+        run: |
+          [ -f LingTeX-Word/LingTeX-Word.dotm ] || { echo "::error::LingTeX-Word/LingTeX-Word.dotm is not committed; see LingTeX-Word/RELEASING.md"; exit 1; }
+          sh LingTeX-Word/tools/check-dotm.sh
+
+      - name: NSIS
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nsis
+
+      - name: Windows installer (.exe)
+        # The same two actions as install.bat, wrapped for people who would
+        # rather not see a console: copy the template into STARTUP, register an
+        # uninstaller. Unsigned: SmartScreen will say "unknown publisher".
+        run: |
+          mkdir -p out
+          makensis -V2 -DVERSION="0.1.0-${{ inputs.label }}" \
+            -DDOTM="$PWD/LingTeX-Word/LingTeX-Word.dotm" \
+            -XOutFile "$PWD/out/LingTeX-Word-Setup.exe" \
+            LingTeX-Word/install/installer.nsi
+          ls -la out
+
+      - name: Package
+        run: |
+          tag="word-v0.1.0-${{ inputs.label }}"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          mv out/LingTeX-Word-Setup.exe "out/LingTeX-Word-Setup-$tag.exe"
+          mkdir -p out/win out/mac
+          cp LingTeX-Word/LingTeX-Word.dotm LingTeX-Word/install/INSTALL.md out/win/
+          cp LingTeX-Word/install/install.bat LingTeX-Word/install/install.ps1 out/win/
+          cp LingTeX-Word/LingTeX-Word.dotm LingTeX-Word/install/INSTALL.md out/mac/
+          cp LingTeX-Word/install/install.command LingTeX-Word/install/install.sh out/mac/
+          chmod +x out/mac/install.command out/mac/install.sh
+          ( cd out/win && zip -q -X -r "../LingTeX-Word-$tag-windows.zip" . )
+          ( cd out/mac && zip -q -X -r "../LingTeX-Word-$tag-macos.zip" . )
+          cp LingTeX-Word/LingTeX-Word.dotm out/
+          ls -la out
+
+      - name: Publish pre-release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
+          name: 'LingTeX-Word ${{ env.TAG }} (pre-release)'
+          prerelease: true
+          files: |
+            out/LingTeX-Word-Setup-${{ env.TAG }}.exe
+            out/LingTeX-Word-${{ env.TAG }}-windows.zip
+            out/LingTeX-Word-${{ env.TAG }}-macos.zip
+            out/LingTeX-Word.dotm
+          body: |
+            **LingTeX-Word** is a Word add-in for interlinear glossed text: paste an
+            example from FLEx (or type it), and it becomes a borderless table that
+            wraps to the page and re-wraps when the page changes; columns split and
+            merge; glossing is checked against the Leipzig rules; examples are
+            numbered with Word's own numbering and can be indented.
+
+            This is a **pre-release**: tested by hand on Mac and Windows, one Word
+            each. Please report what breaks.
+
+            ## Install
+
+            Close Word first, then:
+
+            - **Windows:** run `LingTeX-Word-Setup-…exe`. It is unsigned, so
+              SmartScreen says "unknown publisher": More info → Run anyway. It
+              copies `LingTeX-Word.dotm` into `%APPDATA%\Microsoft\Word\STARTUP`
+              and registers an uninstaller under Settings → Apps. (The
+              `-windows.zip` holds the same template with `install.bat`, for
+              anyone who prefers to see what the installer does.)
+            - **Mac:** unzip `-macos.zip`, double-click `install.command` (if macOS refuses, right-click
+              it and choose Open). It copies the template into Word's Startup folder
+              and clears the download quarantine. When Word asks whether to enable
+              macros in `LingTeX-Word.dotm`, choose **Enable Macros**.
+
+            Then start Word. A message says LingTeX-Word is installed and lists its
+            keyboard shortcuts (Ctrl+Alt+Shift + a letter on Windows,
+            Cmd+Option+Shift + a letter on Mac; a key Word already uses is skipped
+            for an alternate letter, and **Shortcuts** on the tab lists what
+            landed). The **LingTeX** tab is on the ribbon of every document.
+
+            `INSTALL.md` in the zip has the same steps, and how to remove it.
