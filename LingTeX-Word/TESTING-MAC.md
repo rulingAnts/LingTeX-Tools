@@ -102,11 +102,11 @@ matters to them.
 **Two faster ways than the Macros dialog**, both worth setting up once:
 
 - **Shortcuts.** Run `LingTeXInstallShortcuts` (from the Macros dialog, one
-  last time). It binds every command to ⌘⌥ + a letter in the Normal template,
-  so they work in every document: ⌘⌥I insert, ⌘⌥R re-wrap this, ⌘⌥A re-wrap
-  all, ⌘⌥S split, ⌘⌥M merge, ⌘⌥K check, ⌘⌥T convert table, ⌘⌥W by word,
-  ⌘⌥P by morpheme, ⌘⌥H settings, ⌘⌥N numbers, ⌘⌥G indent, ⌘⌥L outdent.
-  `LingTeXShowShortcuts` lists them;
+  last time). It binds every command to Control+Option + a letter (Ctrl+Alt+Shift
+  on Windows), so they work in every document: I insert, R re-wrap this, A
+  re-wrap all, S split, M merge, K check, T convert table, W by word, P by
+  morpheme, H settings, N numbers, G indent, L outdent. A key that already does
+  something is left alone and named in the report. `LingTeXShowShortcuts` lists them;
   `LingTeXRemoveShortcuts` takes them out.
 - **The ribbon.** With Word quit:
 
