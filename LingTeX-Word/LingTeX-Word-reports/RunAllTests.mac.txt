@@ -1,0 +1,99 @@
+
+LingTeX-Word self-tests
+=======================
+
+Golden vectors (PROMPT.md)
+  PASS  example 1: parsed
+  PASS  example 1: word-aligned forms
+  PASS  example 1: word-aligned glosses
+  PASS  example 1: free translation captured
+  PASS  example 1: free translation text
+  PASS  example 2: parsed
+  PASS  example 2: word-aligned forms
+  PASS  example 2: word-aligned glosses
+  PASS  example 2: free translation captured
+  PASS  example 2: free translation text
+
+Projections (word-aligned vs morpheme-aligned)
+  PASS  example 1: morpheme-aligned has at least as many columns
+  PASS  example 1: morpheme-aligned satisfies break-char agreement
+  PASS  example 1: merging continuations reproduces word-aligned forms
+  PASS  example 1: merging continuations reproduces word-aligned glosses
+  PASS  example 2: morpheme-aligned has at least as many columns
+  PASS  example 2: morpheme-aligned satisfies break-char agreement
+  PASS  example 2: merging continuations reproduces word-aligned forms
+  PASS  example 2: merging continuations reproduces word-aligned glosses
+
+Input routing
+  PASS  recognises FLEx text by its tier labels
+  PASS  recognises a space-separated labelled block
+  PASS  recognises the spaced label spellings
+  PASS  does NOT mistake plain TSV for FLEx
+  PASS  plain TSV parses
+  PASS  plain TSV keeps its first column
+  PASS  plain TSV keeps its gloss row
+  PASS  plain TSV lifts the untabbed line to a free translation
+  PASS  TSV round trip preserves the form row
+  PASS  TSV round trip preserves the gloss row
+
+Column split and merge
+  PASS  split: reports success
+  PASS  split: form pieces
+  PASS  split: gloss pieces
+  PASS  split: the boundary leads both new cells, so invariant 1 holds
+  PASS  split: the untouched column moved right
+  PASS  merge: restores the form
+  PASS  merge: restores the gloss
+  PASS  split: reports failure when a tier has no boundary
+  PASS  split: names the short tier
+  PASS  split: the short tier keeps its cell whole on the left
+  PASS  split: the short tier leaves the right column empty
+  PASS  split: does not split on a leading boundary
+  PASS  insert: shifts the tail right
+  PASS  delete: closes the gap
+
+Leipzig checks
+  PASS  detects a column where only some cells carry the break character
+  PASS  auto-fix adds the agreed character
+  PASS  auto-fix result
+  PASS  no break-char warning remains
+  PASS  detects conflicting break characters
+  PASS  auto-fix refuses to pick one
+  PASS  detects a space inside an interlinear cell
+  PASS  space fix reports one cell changed
+  PASS  space fix result
+  PASS  no space warning remains
+  PASS  a free row is exempt from the space rule
+  PASS  a free row keeps its spaces through a fix
+  PASS  rule 2 ignores "."  and ":"
+  PASS  rule 2 flags a real boundary mismatch
+  PASS  detects an unmatched infix bracket
+
+Grammatical-gloss detection (no abbreviation allow-list)
+  PASS  IsGramGloss(FOC) = True
+  PASS  IsGramGloss(3SG) = True
+  PASS  IsGramGloss(3sg) = True
+  PASS  IsGramGloss(1s) = True
+  PASS  IsGramGloss(bark) = False
+  PASS  IsGramGloss(P.N.) = False
+  PASS  IsGramGloss(N.) = False
+  PASS  IsGramGloss(A.) = False
+  PASS  IsGramGloss(DIST) = True
+  PASS  IsGramGloss(CMP) = True
+  PASS  IsGramGloss(ERG) = True
+  PASS  IsGramGloss(POSS) = True
+  PASS  IsGramGloss(NOTALEIPZIGABBREVIATION) = True
+
+Wrap planner
+  PASS  exact fit stays on one line
+  PASS  one column over the budget wraps
+  PASS  three wrap lines
+  PASS  an over-wide single column gets its own line and overflows
+  PASS  widening pulls columns back up (same input, bigger budget)
+  PASS  a wrap line never starts on a continuation column
+  PASS  backing up is abandoned rather than emptying a line
+  PASS  NoBreakFlags never flags the first column
+  PASS  NoBreakFlags flags the enclitic columns of example 2
+
+ALL PASS -- 79 passed
+
