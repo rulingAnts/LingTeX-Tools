@@ -144,7 +144,14 @@ End Sub
 ' otherwise it would fight the user mid-edit.
 '-----------------------------------------------------------------------------
 Private Sub mApp_WindowSelectionChange(ByVal Sel As Selection)
+    SelectionMoved Sel
+End Sub
+
+' The handler's work, callable by name so modDocTests can drive it without
+' depending on whether Word raises the event while a macro is running.
+Public Sub SelectionMoved(ByVal Sel As Selection)
     Dim tbl As Table
+    Dim selMode As Long, selPos As Long, selLen As Long
     Dim nowStart As Long
     Dim doc As Document
     Dim leaving As Table
@@ -196,11 +203,16 @@ Private Sub mApp_WindowSelectionChange(ByVal Sel As Selection)
             mHandlerCount = mHandlerCount + 1
             gBusy = True
             Application.ScreenUpdating = False
+            ' The user has just clicked somewhere; that is where they must
+            ' still be afterwards (modLingTeX.RememberSelection).
+            RememberSelection doc, leaving.Range.Start, leaving.Range.End, selMode, selPos, selLen
             On Error GoTo RewrapFailed
             BeginUndo "Re-wrap interlinear example"
             Set done = RewrapTable(leaving)
             EndUndo
             On Error Resume Next
+            ' While gBusy still holds, so the move does not re-enter this handler.
+            RestoreSelection doc, selMode, selPos, selLen
             Application.ScreenUpdating = True
             gBusy = False
             ReleaseScratch

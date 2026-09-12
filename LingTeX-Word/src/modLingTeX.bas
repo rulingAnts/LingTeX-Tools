@@ -404,6 +404,70 @@ Fail:
     Report "Error " & errNum & ": " & errDesc, vbCritical
 End Sub
 
+'-----------------------------------------------------------------------------
+' Keep the selection through a re-wrap.
+'
+' A re-wrap deletes an example and draws it again, so the character count
+' inside it changes, and the redraw inserts at the very position the old
+' example occupied. Seth found what that does to a cursor parked on the empty
+' paragraph right after the translation, the natural place to click to keep
+' writing: the deletion pulls that position back to the anchor, the draw
+' happens at it, and the cursor is now in the first cell of the new table.
+' An absolute position cannot survive that. What does survive is the text
+' before the first table redrawn and the text from the last table's end on
+' (its translations are rewritten letter for letter, and after them nothing
+' is touched). So the selection is remembered as an offset from the document's
+' start when it lies before the span, from its end when it lies after; inside
+' the span it is left to Word.
+'
+' firstStart and lastEnd are the first redrawn table's Range.Start and the
+' last one's Range.End. mode comes back 0 = leave it, 1 = from the start,
+' 2 = from the end.
+'-----------------------------------------------------------------------------
+Public Sub RememberSelection(doc As Document, ByVal firstStart As Long, _
+        ByVal lastEnd As Long, ByRef mode As Long, ByRef pos As Long, _
+        ByRef length As Long)
+    Dim s As Long, e As Long
+    mode = 0
+    On Error Resume Next
+    If Selection Is Nothing Then Exit Sub
+    If Not (Selection.Document Is doc) Then Exit Sub
+    s = Selection.Range.Start
+    e = Selection.Range.End
+    If Err.Number <> 0 Then
+        Err.Clear
+        Exit Sub
+    End If
+    On Error GoTo 0
+    length = e - s
+    If e <= firstStart Then
+        mode = 1
+        pos = s
+    ElseIf s >= lastEnd Then
+        mode = 2
+        pos = doc.Content.End - s
+    End If
+End Sub
+
+Public Sub RestoreSelection(doc As Document, ByVal mode As Long, _
+        ByVal pos As Long, ByVal length As Long)
+    Dim s As Long, e As Long
+    If mode = 0 Then Exit Sub
+    On Error Resume Next
+    If mode = 1 Then
+        s = pos
+    Else
+        s = doc.Content.End - pos
+    End If
+    If s < 0 Then s = 0
+    e = s + length
+    If e > doc.Content.End Then e = doc.Content.End
+    If s > e Then s = e
+    doc.Range(s, e).Select
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
 ' Re-wrap every example in the active document.
 '
 ' ActiveDocument is evaluated behind a handler, unlike every other command here:
@@ -440,8 +504,8 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
     Dim i As Long, n As Long, nFailed As Long, nDegraded As Long
     Dim done As Table
     Dim firstWhy As String
-    Dim savedStart As Long, savedEnd As Long
-    Dim restore As Boolean
+    Dim selMode As Long, selPos As Long, selLen As Long
+    Dim firstStart As Long, lastEnd As Long
 
     If doc Is Nothing Then Exit Sub
     If gBusy Then
@@ -468,14 +532,11 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
         Exit Sub
     End If
 
-    ' Remember where the user was, so an automatic re-wrap does not move them.
-    On Error Resume Next
-    If Not Selection Is Nothing Then
-        savedStart = Selection.Range.Start
-        savedEnd = Selection.Range.End
-        restore = True
-    End If
-    On Error GoTo Fail
+    ' Remember where the user was, so an automatic re-wrap does not move them
+    ' (see RememberSelection). The tables come in document order.
+    firstStart = tables(1).Range.Start
+    lastEnd = tables(tables.Count).Range.End
+    RememberSelection doc, firstStart, lastEnd, selMode, selPos, selLen
 
     gBusy = True
     ' Measure everything BEFORE the undo record opens (see BeginUndo): with the
@@ -526,14 +587,7 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
 
     StatusLine ""
 
-    If restore Then
-        On Error Resume Next
-        If savedEnd > doc.Content.End Then savedEnd = doc.Content.End
-        If savedStart > savedEnd Then savedStart = savedEnd
-        doc.Range(savedStart, savedEnd).Select
-        Err.Clear
-        On Error GoTo Fail
-    End If
+    RestoreSelection doc, selMode, selPos, selLen
 
     Application.ScreenUpdating = True
     EndUndo
