@@ -373,11 +373,24 @@ ICONS = [
 ]
 
 
+def fit(im, margin=1.0):
+    """Crop to what was drawn, squared and centred, so the symbol fills its
+    frame; margin in final-size pixels."""
+    l, t, r, b = im.getbbox()
+    side = max(r - l, b - t) + 2 * px(margin)
+    cx, cy = (l + r) / 2, (t + b) / 2
+    box = (int(cx - side / 2), int(cy - side / 2), int(cx + side / 2), int(cy + side / 2))
+    return im.crop(box)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     finals = []
     for name, draw, size in ICONS:
-        im = draw().resize((size, size), Image.LANCZOS)
+        im = draw()
+        if name in ("igtByWord", "igtByMorpheme"):   # Seth: these two a little larger
+            im = fit(im)
+        im = im.resize((size, size), Image.LANCZOS)
         im.save(os.path.join(OUT, name + ".png"), optimize=True)
         finals.append((name, im))
     print("wrote %d icons to %s" % (len(finals), os.path.relpath(OUT)))
