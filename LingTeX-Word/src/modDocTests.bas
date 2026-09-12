@@ -2135,6 +2135,8 @@ Private Sub TestEvents()
     CheckHandlerRespectsBusy ev, doc
     gBusy = False
 
+    CheckLeavingKeepsCursor ev, doc
+
     ev.Detach
     Ok "Detach does not raise", True
 
@@ -2144,6 +2146,59 @@ Private Sub TestEvents()
 
     gQuiet = savedQuiet
     CloseNoSave doc
+End Sub
+
+' Seth, with re-wrap on leave switched on: clicking the empty paragraph right
+' after the translation, to keep writing, put the cursor in the first cell of
+' the example. The re-wrap deletes and redraws the table at the very position
+' that paragraph had been pulled back to. The handler must put the cursor back.
+Private Sub CheckLeavingKeepsCursor(ev As clsAppEvents, doc As Document)
+    Dim ex As IgtExample
+    Dim tbl As Table
+    Dim rowsBefore As Long
+    Dim tailPos As Long, fromEnd As Long
+    Dim inTable As Boolean
+
+    gBusy = False
+    doc.Content.Delete
+    SetPageGeometry doc, 612, 792, 72
+    ex = ThreeTierExample()
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then
+        Ok "leaving: an example drew", False
+        Exit Sub
+    End If
+    rowsBefore = tbl.Rows.Count
+    SetSettingRewrapOnSelectionChange doc, True
+
+    ' In the example, as the user is while editing it.
+    On Error Resume Next
+    tbl.Cell(1, 1).Range.Select
+    ev.SelectionMoved Selection
+    Err.Clear
+    On Error GoTo 0
+
+    ' Stale, so leaving it really redraws it, with more rows than before.
+    SetPageGeometry doc, 234, 792, 72
+
+    ' The empty paragraph after the translation: the last one in the document.
+    tailPos = doc.Content.End - 1
+    On Error Resume Next
+    doc.Range(tailPos, tailPos).Select
+    fromEnd = doc.Content.End - Selection.Start
+    ev.SelectionMoved Selection
+    inTable = Selection.Information(wdWithInTable)
+    Err.Clear
+    On Error GoTo 0
+
+    Ok "leaving an example with re-wrap on leave redraws it", _
+        (doc.Tables.Count = 1 And doc.Tables(1).Rows.Count > rowsBefore)
+    Ok "and the cursor is still on the paragraph after the translation", _
+        (Not inTable) And (doc.Content.End - Selection.Start = fromEnd)
+    Emit "         rows " & CStr(rowsBefore) & " before, " & CStr(doc.Tables(1).Rows.Count) & _
+         " after; cursor " & CStr(fromEnd) & " from the end both times"
+
+    SetSettingRewrapOnSelectionChange doc, False
 End Sub
 
 Private Function WarningClassIsAClass() As Boolean
