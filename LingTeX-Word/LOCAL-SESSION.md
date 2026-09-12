@@ -89,6 +89,8 @@ requests.
   onLoad keeps the IRibbonUI; DocumentChange and every setting command call
   RefreshRibbon). Silent on the ribbon; the macro-list commands still report.
   Unproven on Mac (whether getPressed/onLoad callbacks fire there).
+- Later (Seth): shortcut tooltips on the ribbon buttons via getScreentip,
+  reading the live binding, since the letter differs per machine.
 - Shortcuts (2026-09-12, late): MAC WORD'S MODIFIER BITS ARE NOT WINDOWS'S --
   Command 256, Shift 512, Option 2048, Control 4096 (found by a probe macro
   that asked Word to name what it had bound; the probe is deleted, see git

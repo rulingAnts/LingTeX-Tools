@@ -126,6 +126,22 @@ for id in $(sed -n 's/.*[^A-Za-z]image="\([A-Za-z_][A-Za-z0-9_]*\)".*/\1/p' "$ri
     nicons=$((nicons + 1))
 done
 
+#-- 1c. no keyboard customizations ship ----------------------------------------
+# Shortcuts installed while developing are stored in the template itself
+# (word/customizations.xml, the key map), and they would ship: Mac key codes
+# landing on random keys in every user's Word. The part goes, with its
+# relationship and its content type; users get their own set on first run.
+kmap="$stage/word/customizations.xml"
+if [ -f "$kmap" ]; then
+    rm -f "$kmap"
+    drels="$stage/word/_rels/document.xml.rels"
+    sed -e 's|<Relationship[^>]*Target="customizations\.xml"[^>]*/>||g' "$drels" > "$drels.new"
+    mv "$drels.new" "$drels"
+    sed -e 's|<Override PartName="/word/customizations\.xml"[^>]*/>||g' "$stage/[Content_Types].xml" > "$stage/ct.new"
+    mv "$stage/ct.new" "$stage/[Content_Types].xml"
+    echo "  removed the keyboard customizations (word/customizations.xml) from the build"
+fi
+
 #-- 2. the root relationship --------------------------------------------------
 # Any existing relationship pointing at this part is removed first, so re-running
 # replaces rather than duplicates. Relationship elements in .rels are always

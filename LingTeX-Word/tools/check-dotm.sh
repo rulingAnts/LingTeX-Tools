@@ -126,6 +126,15 @@ if [ -n "$named" ]; then
     fi
 fi
 
+#-- 2c. no keyboard customizations ship ----------------------------------------
+# A key map in the template is the developer's shortcuts, and Mac key codes
+# would land on random keys in every user's Word. build-dotm.sh strips it.
+if [ -f "$work/word/customizations.xml" ]; then
+    fail "word/customizations.xml is in the template: keyboard customizations would ship -- re-run build-dotm.sh"
+else
+    pass "no keyboard customizations in the template"
+fi
+
 #-- 3. the root relationship points at it, with the type the namespace needs --
 rels="$work/_rels/.rels"
 if [ ! -f "$rels" ]; then
