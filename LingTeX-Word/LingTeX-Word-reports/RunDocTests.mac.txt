@@ -120,7 +120,7 @@ Open documents at start: 1
   PASS   bottom padding is 0
   PASS   every form sits directly above its gloss (equal column widths)
   PASS   no row is wider than the text area
-         widest row 156.75pt, text area 432pt
+         widest row 192.75pt, text area 468pt
   PASS   every row's first cell carries its tier's paragraph style
   PASS   a vernacular cell carries no gram-gloss style
   PASS   follow.CMP=REL is drawn in small-caps case
@@ -135,7 +135,7 @@ Open documents at start: 1
   PASS   StripQuotes leaves unquoted text alone
   PASS   an example with an over-wide form still draws
   PASS   and no row of it is wider than the text area (the cell wraps inside itself)
-         widest row 432pt, text area 468pt
+         widest row 468pt, text area 468pt
 
 -- geometry --------------------------------------------------
   PASS   Letter portrait with 1in margins gives 468pt
@@ -228,34 +228,51 @@ Open documents at start: 1
   PASS   LingTeX Example exists as a PARAGRAPH style
   PASS   a numbered example draws
   PASS   and nothing was reported about the numbering
-  PASS   a number line precedes the table
+  PASS   the example has a number column
+  PASS   its first cell holds the number paragraph
   PASS   in the LingTeX Example style
   PASS   carrying Word list numbering
   PASS   and showing (1)
-  PASS   with nothing typed on it
-  PASS   no cell carries numbering
-  PASS   the table is indented to the number line's text position
-         row indent 36pt, text position 36pt
-  PASS   the translation is indented to it too
+  PASS   with nothing typed in it
+  PASS   and no indent of its own
+  PASS   no content cell carries numbering
+  PASS   the number cell is as wide as the hang
+         number cell 36pt, hang 36pt
+  PASS   every row has one
+  PASS   the rows themselves are not indented
+  PASS   the translation is indented past the number column
+  PASS   the cursor on the number is inside the example
   PASS   the first cell's text is just the form
+  PASS   and the read-back counts no number column
+  PASS   nor does TableColumnCount
   PASS   a second example draws
   PASS   and shows (2)
   PASS   re-wrap all keeps both tables
   PASS   re-wrap keeps (1) on the first
   PASS   and (2) on the second
-  PASS   and did not add number lines
-  PASS   a wider indent on the number line moves the table on re-wrap
-  PASS   and the translation with it
+  PASS   and each still has exactly one number paragraph
+  PASS   an indent on the rows survives a re-wrap
+         rows at 72pt
+  PASS   and the translation sits past the indent and the number
+  PASS   and the number is still (1)
   PASS   deleting the first example leaves one table
-  PASS   and one number line
+  PASS   and one number paragraph
   PASS   and Word renumbers it (1)
   PASS   with numbering off, a new example draws
-  PASS   and has no number line
+  PASS   and has no number column
   PASS   and is not indented
+  PASS   and its first cell is content
   PASS   numbering: a wrapped example draws on a narrow page
   PASS   and it did wrap
-  PASS   the first wrap line is indented by the text position
-  PASS   and so is a later one
+  PASS   the first wrap line has the number cell
+  PASS   and so does a later one, empty
+  PASS   and the number is (1)
+  PASS   legacy: an unnumbered example drew after a paragraph
+  PASS   legacy: the number line is recognised
+  PASS   re-wrapping moves the number into the table
+  PASS   and it reads (1)
+  PASS   and the number line is gone
+  PASS   and the example is not indented
 
 -- commands --------------------------------------------------
   PASS   LingTeXPing answers (so the project compiled)
@@ -332,5 +349,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 280 passed
+ALL PASS -- 296 passed
 
