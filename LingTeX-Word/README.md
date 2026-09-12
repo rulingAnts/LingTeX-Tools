@@ -334,8 +334,9 @@ distinguishes "installed and loaded" from "installed and silently ignored". That
 matters because the known silent failure is macOS quarantining a `.dotm` that
 arrived inside a downloaded zip.
 
-Still unverified because Mac cannot cover them, for one pass on Windows: the NSIS
-installer, and whether custom ribbon XML in a STARTUP `.dotm` loads.
+Still unverified, for one pass on Windows: the NSIS installer. Custom ribbon XML
+in a startup `.dotm` **does** load on Mac — verified 2026-09-12 on Word 16.112,
+the full LingTeX tab over a new document, every group and icon present.
 
 **And one finding that changed the testing policy, then changed again.** `MicroDiagnose`
 produced run-time error 6, *Overflow*, on `s1 = 10` where `s1` is `As Single`, and
