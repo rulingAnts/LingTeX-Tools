@@ -124,7 +124,7 @@
                   getPressed="RbnGetPressed"
                   onAction="RbnToggle"
                   screentip="Re-wrap an example as soon as the cursor leaves it"
-                  supertip="Off by default: it repaints while you type."/>
+                  supertip="On by default. It fires only when the cursor leaves an example, never while you type inside one, and the cursor stays where you clicked."/>
           <toggleButton id="LingTeXNumbersToggle"
                   label="Numbers"
                   image="igtNumbers"

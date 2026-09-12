@@ -337,9 +337,9 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
 6. After every command the screen is live, not frozen (`ScreenUpdating` back on).
 7. **No scratch document left open** — check the Window menu. The measuring
    document is hidden but it would still be listed.
-8. `LingTeXToggleRewrapOnSelectionChange`, then click in and out of an example
-   → it re-wraps on leaving, does not recurse, and typing stays responsive. Run
-   it again to turn it off; it is off by default for a reason.
+8. Re-wrap on Leave is on by default: edit an example and click out of it →
+   it re-wraps on leaving, the cursor stays where you clicked, typing inside
+   it is untouched. The ribbon toggle turns it off per document.
 
 ---
 

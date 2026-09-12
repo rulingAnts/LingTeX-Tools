@@ -25,11 +25,11 @@ Option Explicit
 '                  document has to be right, and a moment the user already
 '                  expects to pause.
 '
-'   On selection   WindowSelectionChange, OFF by default.  Re-wrapping the
-'                  moment the cursor leaves an example is correct and feels
-'                  automatic, but it repaints and moves the insertion point while
-'                  someone may still be typing.  Turn it on per document with
-'                  modSettings.SetSettingRewrapOnSelectionChange.
+'   On selection   WindowSelectionChange, ON by default.  Re-wraps the moment
+'                  the cursor leaves an example, never on a move inside one,
+'                  and puts the cursor back where the user clicked (see
+'                  SelectionMoved).  Off per document with the ribbon toggle
+'                  or modSettings.SetSettingRewrapOnSelectionChange.
 '
 ' Both are in addition to the ribbon commands, which are always available.
 '

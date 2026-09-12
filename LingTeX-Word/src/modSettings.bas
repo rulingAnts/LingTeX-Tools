@@ -38,9 +38,10 @@ Private Const DEF_LOWERCASE_GRAM As Boolean = True
 Private Const DEF_GRAM_INITIAL_CAP As Boolean = True
 ' Re-wrap every example in the document when it is saved.
 Private Const DEF_REWRAP_ON_SAVE As Boolean = True
-' Re-wrap as soon as the selection leaves an example.  OFF by default: it is
-' correct but it moves the cursor and repaints while the user is still typing.
-Private Const DEF_REWRAP_ON_SELECTION As Boolean = False
+' Re-wrap as soon as the selection leaves an example. ON by default (Seth,
+' once the cursor was put back where the user clicked): it fires only on
+' leaving a table, never on a move inside one, so it does not fight typing.
+Private Const DEF_REWRAP_ON_SELECTION As Boolean = True
 ' Number new examples: Word list numbering "(1)", "(2)"... on the first cell,
 ' continuing through the document, so deleting or moving one renumbers the rest.
 Private Const DEF_NUMBER_EXAMPLES As Boolean = True

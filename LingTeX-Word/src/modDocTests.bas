@@ -383,8 +383,8 @@ Private Sub TestSettings()
     Ok "default SpaceReplacement = .", (SettingSpaceReplacement(doc) = ".")
     Ok "default LowercaseGramGloss = True", (SettingLowercaseGramGloss(doc) = True)
     Ok "default RewrapOnSave = True", (SettingRewrapOnSave(doc) = True)
-    Ok "default RewrapOnSelectionChange = False", _
-        (SettingRewrapOnSelectionChange(doc) = False)
+    Ok "default RewrapOnSelectionChange = True", _
+        (SettingRewrapOnSelectionChange(doc) = True)
     Ok "default Granularity = word-aligned", _
         (SettingGranularity(doc) = igtWordAligned)
 
