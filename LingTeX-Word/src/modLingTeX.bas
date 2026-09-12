@@ -51,7 +51,7 @@ Private Const SHORTCUT_TABLE As String = _
     "I=LingTeXInsertInterlinear|R=LingTeXRewrapCurrent|A=LingTeXRewrapAll|" & _
     "S=LingTeXSplitColumn|M=LingTeXMergeColumns|K=LingTeXCheckExample|" & _
     "T=LingTeXConvertTableToIgt|W=LingTeXAlignByWord|P=LingTeXAlignByMorpheme|" & _
-    "H=LingTeXShowSettings|L=LingTeXStart|N=LingTeXToggleExampleNumbers"
+    "H=LingTeXShowSettings|N=LingTeXToggleExampleNumbers"
 
 '-----------------------------------------------------------------------------
 ' EVERY message to the user goes through Report or Confirm, never MsgBox.
@@ -136,14 +136,16 @@ Public Sub EnsureHooks()
     On Error GoTo 0
 End Sub
 
-' AutoExec by a name that appears in the macro list, on the ribbon and on a
-' shortcut, and says what it did.
+' AutoExec by a name that appears in the macro list. Not on the ribbon: every
+' command arms the hooks on first use, so its one remaining job is to clear a
+' wedged busy flag, which the busy message names it for.
 Public Sub LingTeXStart()
     AutoExec
     Report "LingTeX-Word is armed for this Word session: examples re-wrap " & _
            "when a document is saved (and, if turned on, when the cursor " & _
            "leaves one), and AutoCorrect stays out of interlinear cells." & _
-           vbCr & vbCr & "Every command arms this on first use as well.", _
+           vbCr & vbCr & "Every command arms this on first use as well; this " & _
+           "also clears the busy flag if a command was interrupted.", _
            vbInformation
 End Sub
 
@@ -169,7 +171,7 @@ Public Sub LingTeXInsertInterlinear()
     If gBusy Then
         ' Not silence: a stuck flag would otherwise look like a dead button.
         Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
-               "If this keeps happening, run AutoExec in the Immediate window " & _
+               "If this keeps happening, run LingTeXStart from the macro list " & _
                "(or restart Word) to clear it.", vbInformation
         Exit Sub
     End If
@@ -267,7 +269,7 @@ Public Sub LingTeXConvertTableToIgt()
     If gBusy Then
         ' Not silence: a stuck flag would otherwise look like a dead button.
         Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
-               "If this keeps happening, run AutoExec in the Immediate window " & _
+               "If this keeps happening, run LingTeXStart from the macro list " & _
                "(or restart Word) to clear it.", vbInformation
         Exit Sub
     End If
@@ -368,7 +370,7 @@ Public Sub LingTeXRewrapCurrent()
     If gBusy Then
         ' Not silence: a stuck flag would otherwise look like a dead button.
         Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
-               "If this keeps happening, run AutoExec in the Immediate window " & _
+               "If this keeps happening, run LingTeXStart from the macro list " & _
                "(or restart Word) to clear it.", vbInformation
         Exit Sub
     End If
@@ -515,8 +517,8 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
         ' than the silence it replaces. The seven commands report; this does not.
         If showResult Then
             Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
-                   "If this keeps happening, run AutoExec in the Immediate " & _
-                   "window (or restart Word) to clear it.", vbInformation
+                   "If this keeps happening, run LingTeXStart from the macro " & _
+                   "list (or restart Word) to clear it.", vbInformation
         End If
         Exit Sub
     End If
@@ -651,7 +653,7 @@ Public Sub LingTeXSplitColumn()
     If gBusy Then
         ' Not silence: a stuck flag would otherwise look like a dead button.
         Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
-               "If this keeps happening, run AutoExec in the Immediate window " & _
+               "If this keeps happening, run LingTeXStart from the macro list " & _
                "(or restart Word) to clear it.", vbInformation
         Exit Sub
     End If
@@ -728,7 +730,7 @@ Public Sub LingTeXMergeColumns()
     If gBusy Then
         ' Not silence: a stuck flag would otherwise look like a dead button.
         Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
-               "If this keeps happening, run AutoExec in the Immediate window " & _
+               "If this keeps happening, run LingTeXStart from the macro list " & _
                "(or restart Word) to clear it.", vbInformation
         Exit Sub
     End If
@@ -816,7 +818,7 @@ Public Sub LingTeXCheckExample()
     If gBusy Then
         ' Not silence: a stuck flag would otherwise look like a dead button.
         Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
-               "If this keeps happening, run AutoExec in the Immediate window " & _
+               "If this keeps happening, run LingTeXStart from the macro list " & _
                "(or restart Word) to clear it.", vbInformation
         Exit Sub
     End If
@@ -1519,10 +1521,6 @@ End Sub
 
 Public Sub RbnToggleExampleNumbers(control As Variant)
     LingTeXToggleExampleNumbers
-End Sub
-
-Public Sub RbnStart(control As Variant)
-    LingTeXStart
 End Sub
 
 Public Sub RbnResetStyles(control As Variant)
