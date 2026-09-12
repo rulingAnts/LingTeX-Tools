@@ -23,7 +23,7 @@
   (Note for editors: an XML comment may not contain two consecutive hyphens,
   so prose in here uses commas where the rest of the project uses dashes.)
 -->
-<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui">
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui" onLoad="RbnOnLoad">
   <ribbon>
     <tabs>
       <tab id="LingTeXTab" label="LingTeX">
@@ -76,40 +76,46 @@
         </group>
 
         <group id="LingTeXSettingsGroup" label="Settings">
-          <button id="LingTeXAlignWord"
+          <toggleButton id="LingTeXAlignWord"
                   label="By Word"
                   imageMso="TableColumnsDistribute"
-                  onAction="RbnAlignByWord"
+                  getPressed="RbnGetPressed"
+                  onAction="RbnToggle"
                   screentip="New examples: one column per word"
                   supertip="Enclitics stay in their host's column. Stored in this document; examples already on the page are unchanged until inserted again."/>
-          <button id="LingTeXAlignMorpheme"
+          <toggleButton id="LingTeXAlignMorpheme"
                   label="By Morpheme"
                   imageMso="TableRowsDistribute"
-                  onAction="RbnAlignByMorpheme"
+                  getPressed="RbnGetPressed"
+                  onAction="RbnToggle"
                   screentip="New examples: one column per morpheme"
                   supertip="Enclitic columns never start a wrap line. Stored in this document; examples already on the page are unchanged until inserted again."/>
-          <button id="LingTeXRewrapOnSaveToggle"
+          <toggleButton id="LingTeXRewrapOnSaveToggle"
                   label="Re-wrap on Save"
                   imageMso="FileSave"
-                  onAction="RbnToggleRewrapOnSave"
-                  screentip="Toggle: re-wrap every example when this document is saved"/>
-          <button id="LingTeXRewrapOnLeaveToggle"
+                  getPressed="RbnGetPressed"
+                  onAction="RbnToggle"
+                  screentip="Re-wrap every example when this document is saved"/>
+          <toggleButton id="LingTeXRewrapOnLeaveToggle"
                   label="Re-wrap on Leave"
                   imageMso="SelectAll"
-                  onAction="RbnToggleRewrapOnSelectionChange"
-                  screentip="Toggle: re-wrap an example as soon as the cursor leaves it"
+                  getPressed="RbnGetPressed"
+                  onAction="RbnToggle"
+                  screentip="Re-wrap an example as soon as the cursor leaves it"
                   supertip="Off by default: it repaints while you type."/>
-          <button id="LingTeXNumbersToggle"
+          <toggleButton id="LingTeXNumbersToggle"
                   label="Numbers"
                   imageMso="NumberingList"
-                  onAction="RbnToggleExampleNumbers"
-                  screentip="Toggle: number new examples (1), (2)... with Word list numbering"
-                  supertip="The number is list numbering on the first cell, continuing through the document, so deleting or moving an example renumbers the rest. To restart per chapter, link level 1 of the LingTeX Example Number list style to Heading 1 and set NumberLevel to 2."/>
-          <button id="LingTeXInitialCapToggle"
+                  getPressed="RbnGetPressed"
+                  onAction="RbnToggle"
+                  screentip="Number new examples (1), (2)... with Word list numbering"
+                  supertip="A number line above the table, continuing through the document, so deleting or moving an example renumbers the rest. To restart per chapter, link level 1 of the LingTeX Example Number list style to Heading 1 and set NumberLevel to 2."/>
+          <toggleButton id="LingTeXInitialCapToggle"
                   label="First Capital"
                   imageMso="Font"
-                  onAction="RbnToggleGramGlossInitialCap"
-                  screentip="Toggle: grammatical glosses as Erg / 3Sg, or uniform small capitals"/>
+                  getPressed="RbnGetPressed"
+                  onAction="RbnToggle"
+                  screentip="Grammatical glosses as Erg / 3Sg; off, uniform small capitals"/>
           <button id="LingTeXShowSettingsButton"
                   label="Settings"
                   imageMso="Properties"

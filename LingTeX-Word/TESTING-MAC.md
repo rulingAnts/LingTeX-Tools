@@ -337,6 +337,21 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
 
 ---
 
+## After a ribbon change
+
+The ribbon lives in the engine file, injected from `src/customUI14.xml`, so a
+change to that file reaches Word only by re-injection with Word quit:
+
+```bash
+sh LingTeX-Word/tools/install-dev-template.sh
+```
+
+then start Word and run the runner. The six settings buttons are toggles
+that show their state; the state is the active document's, refreshed
+whenever a setting or the active document changes. If they stop following
+changes, the VBA project was reset (an untrapped error, Run → Reset) and the
+ribbon handle with it: restart Word.
+
 ## If the engine will not compile at Word start
 
 "Compile error in hidden module: modLingTeX" (or another module) at every
