@@ -414,6 +414,21 @@ file. CI verifies rather than builds: it unzips the `.dotm`, diffs the embedded
 ribbon against `src/customUI14.xml`, and checks the manifest, so a template that
 has drifted from the sources fails the release.
 
+**Later — input that is not from FieldWorks.** The engine was specified as
+source-agnostic, and for its two inputs it is: FLEx interlinear text (tier
+labels, tab-separated) and plain TSV with one row per tier. What is still
+FLEx-shaped is the routing and the conventions underneath — recognising a
+block by its tier labels, `Free` / `Free Eng` introducing a translation,
+a morpheme-break character split across tokens, a standalone punctuation
+token belonging to the word before it. The sources still to come will each
+test a different one of those: Toolbox / SFM (`\tx` `\mb` `\ge` `\ft`
+lines, where the label is a backslash code and alignment is by whitespace
+column, not tab), a table pasted from Excel or Numbers (which arrives in Word
+as a table, so `LingTeXConvertTableToIgt` is the door, or as TSV), and the
+Phase 2 data sheet, where a linguist types the example by hand and the only
+rule is what she typed. FieldWorks data working correctly comes first, and it
+is most of the way there; this is the question to reopen once it is done.
+
 **Later — every space a user might want to set.** Today three are document
 settings (column gap, wrap-line gap, continuation indent) and the rest are
 paragraph spacing on styles the user already owns: space before an example is
