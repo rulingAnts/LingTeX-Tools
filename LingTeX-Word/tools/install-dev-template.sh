@@ -48,7 +48,16 @@ fi
 [ -f "$engine" ] || die "no engine template at $engine
 Make it in Word: open the file that holds the modules, File > Save As > Word
 Macro-Enabled Template, LingTeX.dotm, into $root"
-[ -f "$startup/LingTeX.dotm" ] && echo "  note: a LingTeX.dotm is still in the startup folder; it would load twice. Remove it."
+if [ -f "$startup/LingTeX.dotm" ]; then
+    # Left over from the one-template arrangement. Word would load it too, and
+    # "run VB macro" would find ITS old modImport first, inside a protected
+    # add-in -- which is exactly what happened on 2026-09-12. Word ignores
+    # files in the startup folder that are not templates, so a rename disables it.
+    mv "$startup/LingTeX.dotm" "$startup/LingTeX.dotm.old"
+    rm -f "$startup/~\$ingTeX.dotm"
+    rm -rf "$startup/LingTeX-Word-reports"
+    echo "  disabled the stale LingTeX.dotm in the startup folder (renamed .old)"
+fi
 RIBBON_ONLY=1 sh "$here/build-dotm.sh" "$engine" || exit 1
 
 #-- the dev template: where the clone is --------------------------------------

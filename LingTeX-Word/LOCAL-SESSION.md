@@ -85,6 +85,11 @@ requests.
 
 ## State of play
 
+- **Third template run: 50289 again -- from the STALE copy.** The old
+  LingTeX.dotm was still in the startup folder beside LingTeX-Dev.dotm, so
+  Word loaded both and `run VB macro` found the old modImport first. Renamed
+  to .old; install-dev-template.sh now does that itself. The two-template
+  sequence is still unproven; next run answers it.
 - **A loaded global template's project is protected** (error 50289 on every
   import, 2026-09-12 second template run; it did save itself). So: TWO
   templates. LingTeX-Dev.dotm in the startup folder holds only modImport,
