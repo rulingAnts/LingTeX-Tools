@@ -137,6 +137,25 @@ packaged into `LingTeX-Word.dotm`.
 | **Merge Columns** | Select across cells to merge those; with one cell selected, merges it with the next column. |
 | **Check Glossing** | Reports and optionally repairs, as above. |
 
+### Numbering
+
+Every new example is numbered `(1)`, `(2)`… The number is Word's own list
+numbering on the first cell of the table, from a list style called
+`LingTeX Example Number`, continuing the previous example's list — so deleting
+or moving an example renumbers the rest, and a cross-reference can point at
+one. It sits in a hanging indent inside that cell; the gloss under it, every
+later wrap line and the translation are indented to the same text position, so
+everything after the number lines up. Re-wrap keeps whatever number an example
+carries; `LingTeXToggleExampleNumbers` decides only whether *new* examples get
+one. The indent is the `NumberHang` setting (36 pt).
+
+**Per-chapter numbering.** Modify the list style (Format → Style →
+`LingTeX Example Number`): link its level 1 to Heading 1 with no number text,
+put `(%2)` on level 2, then `SetSettingNumberLevel ActiveDocument, 2`. New
+examples are then numbered on level 2, which Word restarts after every
+Heading 1. Any multilevel scheme Word can express works the same way; the
+add-in only ever applies a level of that style.
+
 ### Settings
 
 Stored as **document variables**, so they travel inside the `.docx` and a
@@ -448,10 +467,11 @@ of interlinear tiers per wrap line, and several free translations (one
 paragraph each). One gap in that: a second translation's language tag (`Free
 Ind`) is dropped on the way in, so two translations render alike — keep the
 tag, and give each language a way to be styled (a per-language style, or the
-tag as a prefix). Not handled at all yet: an example number before the table
-(`(12)`), a heading before, a caption after with a figure or example number,
-list bullets or numbering around it, and sub-numbering (`a.`, `b.`) across the
-examples of one multi-block paste. Two constraints for whoever designs it:
+tag as a prefix). Example numbers are done (see *Numbering* under *Using it*). Not handled yet:
+a heading before, a caption after with a figure number, list bullets or
+numbering around the example, and sub-numbering (`a.`, `b.`) across the
+examples of one multi-block paste — the natural home for which is a second
+level of the same list style. Two constraints for whoever designs it:
 numbers must be Word's own — a `SEQ` field or a list level — so that
 cross-references and renumbering keep working, and whatever carries the number
 (a paragraph before, or an indent on the table) must be something

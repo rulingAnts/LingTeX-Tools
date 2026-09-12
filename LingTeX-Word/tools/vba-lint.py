@@ -810,6 +810,8 @@ WD_CONSTANTS = {
     "wdKeyControl",
     "wdLineSpaceSingle",
     "wdLineStyleNone",
+    "wdListNoNumbering",
+    "wdListNumberStyleArabic",
     "wdPasteText",
     "wdSelectionIP",
     "wdStyleDefaultParagraphFont",
@@ -817,6 +819,8 @@ WD_CONSTANTS = {
     "wdStyleTypeCharacter",
     "wdStyleTypeParagraph",
     "wdStyleTypeTable",
+    "wdStyleTypeList",
+    "wdTrailingTab",
     "wdUndefined",
     "wdWithInTable",
 }

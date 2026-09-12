@@ -41,6 +41,15 @@ Private Const DEF_REWRAP_ON_SAVE As Boolean = True
 ' Re-wrap as soon as the selection leaves an example.  OFF by default: it is
 ' correct but it moves the cursor and repaints while the user is still typing.
 Private Const DEF_REWRAP_ON_SELECTION As Boolean = False
+' Number new examples: Word list numbering "(1)", "(2)"... on the first cell,
+' continuing through the document, so deleting or moving one renumbers the rest.
+Private Const DEF_NUMBER_EXAMPLES As Boolean = True
+' The hanging indent that holds the number, in points. Everything after the
+' number -- the cells under it, later wrap lines, the translation -- starts here.
+Private Const DEF_NUMBER_HANG As Double = 36
+' Which level of the "LingTeX Example Number" list style carries the number.
+' 1 by default; 2 once level 1 is linked to Heading 1 for per-chapter restarts.
+Private Const DEF_NUMBER_LEVEL As Long = 1
 
 
 '=============================================================================
@@ -81,6 +90,24 @@ End Function
 Public Function SettingLowercaseGramGloss(doc As Document) As Boolean
     SettingLowercaseGramGloss = ReadBool(doc, "LowercaseGramGloss", _
                                          DEF_LOWERCASE_GRAM)
+End Function
+
+Public Function SettingNumberExamples(doc As Document) As Boolean
+    SettingNumberExamples = ReadBool(doc, "NumberExamples", DEF_NUMBER_EXAMPLES)
+End Function
+
+Public Function SettingNumberHang(doc As Document) As Double
+    Dim v As Double
+    v = ReadDouble(doc, "NumberHang", DEF_NUMBER_HANG)
+    If v < 6 Then v = DEF_NUMBER_HANG
+    SettingNumberHang = v
+End Function
+
+Public Function SettingNumberLevel(doc As Document) As Long
+    Dim v As Double
+    v = ReadDouble(doc, "NumberLevel", DEF_NUMBER_LEVEL)
+    If v < 1 Or v > 9 Then v = DEF_NUMBER_LEVEL
+    SettingNumberLevel = CLng(v)
 End Function
 
 Public Function SettingGramGlossInitialCap(doc As Document) As Boolean
@@ -129,6 +156,18 @@ End Sub
 
 Public Sub SetSettingLowercaseGramGloss(doc As Document, ByVal v As Boolean)
     WriteVar doc, "LowercaseGramGloss", BoolStr(v)
+End Sub
+
+Public Sub SetSettingNumberExamples(doc As Document, ByVal v As Boolean)
+    WriteVar doc, "NumberExamples", BoolStr(v)
+End Sub
+
+Public Sub SetSettingNumberHang(doc As Document, ByVal v As Double)
+    WriteVar doc, "NumberHang", CStr(v)
+End Sub
+
+Public Sub SetSettingNumberLevel(doc As Document, ByVal v As Long)
+    WriteVar doc, "NumberLevel", CStr(v)
 End Sub
 
 Public Sub SetSettingGramGlossInitialCap(doc As Document, ByVal v As Boolean)

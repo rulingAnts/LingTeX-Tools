@@ -51,6 +51,11 @@ Public Const STYLE_PREFIX As String = "LingTeX "
 
 '-- Character style for grammatical gloss runs.
 Public Const STYLE_GRAM As String = "LingTeX Gram Gloss"
+' The list style whose level 1 numbers examples "(1)", "(2)"... Applied to the
+' first cell's paragraph, so the number is Word's own: it renumbers when an
+' example is deleted or moved, cross-references can point at it, and linking
+' its level 1 to Heading 1 (then NumberLevel 2) restarts it per chapter.
+Public Const STYLE_NUMBER As String = "LingTeX Example Number"
 
 ' Module-level state lives HERE, above the first procedure, or it does not exist:
 ' VBA's declarations section ends at the first Sub/Function, and a variable or
@@ -69,7 +74,7 @@ Private mCreatedStyle As Boolean
 ' settings live so it survives save and reopen. Versioned, so a future change to
 ' the style set re-runs rather than trusting a stale mark.
 Private Const STYLES_MADE_VAR As String = "LingTeX_StylesMade"
-Private Const STYLES_VERSION As String = "1"
+Private Const STYLES_VERSION As String = "1-num"
 
 
 '-- Last-resort font when the document reports only a theme placeholder.
@@ -146,6 +151,7 @@ Public Sub EnsureStyles(doc As Document, Optional ByVal force As Boolean = False
 
     EnsureGramStyle doc, bodyFont
     EnsureTableStyle doc
+    EnsureNumberListStyle doc
 
     createdAny = mCreatedStyle
 
@@ -318,6 +324,36 @@ End Sub
 ' a caller that tested Err.Number to decide whether its own work had succeeded
 ' concluded that it had not. RewrapDocument did exactly that, and reported
 ' "Re-wrapped 0 interlinear examples" for a run that had just re-wrapped them all.
+' The example-number list style. Missing, examples draw unnumbered and
+' ApplyExampleNumber says so in gRenderError; it never blocks a render.
+Private Sub EnsureNumberListStyle(doc As Document)
+    Dim st As Style
+    Dim hang As Double
+
+    If StyleExistsOfType(doc, STYLE_NUMBER, wdStyleTypeList) Then Exit Sub
+    If StyleExists(doc, STYLE_NUMBER) Then Exit Sub    ' wrong kind; drawn unnumbered
+
+    hang = SettingNumberHang(doc)
+    On Error Resume Next
+    Set st = doc.Styles.Add(Name:=STYLE_NUMBER, Type:=wdStyleTypeList)
+    If Not st Is Nothing Then mCreatedStyle = True
+    Err.Clear
+    On Error GoTo 0
+    If st Is Nothing Then Exit Sub
+
+    On Error Resume Next
+    With st.ListTemplate.ListLevels(1)
+        .NumberFormat = "(%1)"
+        .NumberStyle = wdListNumberStyleArabic
+        .TrailingCharacter = wdTrailingTab
+        .NumberPosition = 0
+        .TextPosition = hang
+        .TabPosition = hang
+    End With
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
 Private Sub EnsureTableStyle(doc As Document)
     Dim st As Style
     If StyleExistsOfType(doc, STYLE_TABLE, wdStyleTypeTable) Then Exit Sub

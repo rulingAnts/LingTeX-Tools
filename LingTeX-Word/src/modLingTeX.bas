@@ -44,7 +44,7 @@ Private Const SHORTCUT_TABLE As String = _
     "I=LingTeXInsertInterlinear|R=LingTeXRewrapCurrent|A=LingTeXRewrapAll|" & _
     "S=LingTeXSplitColumn|M=LingTeXMergeColumns|K=LingTeXCheckExample|" & _
     "T=LingTeXConvertTableToIgt|W=LingTeXAlignByWord|P=LingTeXAlignByMorpheme|" & _
-    "H=LingTeXShowSettings|L=LingTeXStart"
+    "H=LingTeXShowSettings|L=LingTeXStart|N=LingTeXToggleExampleNumbers"
 
 '-----------------------------------------------------------------------------
 ' EVERY message to the user goes through Report or Confirm, never MsgBox.
@@ -1095,6 +1095,21 @@ Public Sub LingTeXToggleRewrapOnSelectionChange()
                   ""), vbInformation
 End Sub
 
+Public Sub LingTeXToggleExampleNumbers()
+    Dim doc As Document
+    Dim v As Boolean
+    Set doc = DocForSetting()
+    If doc Is Nothing Then Exit Sub
+    EnsureHooks
+    v = Not SettingNumberExamples(doc)
+    SetSettingNumberExamples doc, v
+    Report "New examples in this document are " & IIf(v, "NUMBERED: (1), (2)... " & _
+           "with Word's own list numbering, continuing through the document.", _
+           "NOT numbered.") & vbCr & vbCr & _
+           "Examples already on the page keep whatever they have; a re-wrap " & _
+           "keeps a number an example carries.", vbInformation
+End Sub
+
 Public Sub LingTeXToggleGramGlossInitialCap()
     Dim doc As Document
     Dim v As Boolean
@@ -1146,14 +1161,17 @@ Public Sub LingTeXShowSettings()
                 IIf(SettingLowercaseGramGloss(doc), "on", "off") & vbCr
     msg = msg & "  with a full-size first capital: " & _
                 IIf(SettingGramGlossInitialCap(doc), "on", "off") & vbCr
+    msg = msg & "Number new examples: " & IIf(SettingNumberExamples(doc), "on", "off") & _
+                " (hang " & CStr(SettingNumberHang(doc)) & " pt, list level " & _
+                CStr(SettingNumberLevel(doc)) & ")" & vbCr
     msg = msg & "Re-wrap on save: " & IIf(SettingRewrapOnSave(doc), "on", "off") & vbCr
     msg = msg & "Re-wrap when the cursor leaves an example: " & _
                 IIf(SettingRewrapOnSelectionChange(doc), "on", "off") & vbCr & vbCr
     msg = msg & "Commands: LingTeXAlignByWord, LingTeXAlignByMorpheme, " & _
                 "LingTeXToggleRewrapOnSave, LingTeXToggleRewrapOnSelectionChange, " & _
-                "LingTeXToggleGramGlossInitialCap. The gaps and the indent are " & _
-                "set from the Immediate window for now: " & _
-                "SetSettingLineGap ActiveDocument, 8"
+                "LingTeXToggleGramGlossInitialCap, LingTeXToggleExampleNumbers. " & _
+                "The gaps, the indent, the number hang and level are set from " & _
+                "the Immediate window for now: SetSettingLineGap ActiveDocument, 8"
     Report msg, vbInformation
 End Sub
 
@@ -1304,6 +1322,10 @@ End Sub
 
 Public Sub RbnShowShortcuts(control As Variant)
     LingTeXShowShortcuts
+End Sub
+
+Public Sub RbnToggleExampleNumbers(control As Variant)
+    LingTeXToggleExampleNumbers
 End Sub
 
 Public Sub RbnStart(control As Variant)
