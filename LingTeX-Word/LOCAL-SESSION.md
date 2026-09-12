@@ -146,5 +146,11 @@ requests.
   Plan (README, *Later*): make the selection-change hook change-aware via a
   text fingerprint taken on entering, so it fires once on leaving an edited
   example and never otherwise; then it can default to on.
-- The `.docm` is NEVER committed; `modImport` reads `src/` beside the document.
+- **The code lives in a template in Word's STARTUP folder** (2026-09-12, Seth's
+  call): loaded as a global add-in, so every document has the commands, the
+  ribbon, the shortcuts and AutoExec. `SetDevRoot` (modImport) stores the
+  clone's LingTeX-Word folder in the template as a document variable;
+  `SrcFolder` and both report folders read it. The runners do not open a
+  `.dotm`, they run the macros in the loaded template (and make a document if
+  none is open). Neither the `.docm` nor `LingTeX.dotm` is committed.
 - Reports are committed, one file per platform, by the runners themselves.
