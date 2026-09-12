@@ -13,26 +13,31 @@ no automated suite can reach: what the thing actually looks like on the page.
 
 ## Setup, once
 
-1. **The working template.** The code lives in a template loaded as a global
-   add-in, which is what the product will be: every document gets the
-   commands, the ribbon tab, the shortcuts and `AutoExec`. Once:
-   - In Word, open the file that holds the code (`LingTeX.docm`), open
-     `modImport` in the VBA editor and paste the current
-     `tools/ImportModules.bas` over it (without its first line).
-   - File → Save As → **Word Macro-Enabled Template**, name `LingTeX.dotm`,
-     into Word's startup folder (the one Word → Settings → File Locations →
-     Startup shows; on this Mac it is `~/Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/Word` — create it if it is missing).
-   - Quit Word, then one command puts the ribbon in the template, tells it
-     where the clone is, and points the runner at it:
-     `sh LingTeX-Word/tools/install-dev-template.sh "<that folder>/LingTeX.dotm"`
-     (`SetDevRoot`, run inside Word, does the middle part by hand if you
-     prefer; the import log's `from` line shows which folder it is reading.)
-   - Start Word: the template loads, `AutoExec` runs, and a **LingTeX** tab is on
-     every document's ribbon. Then run the test runner once with that path;
-     it imports the current modules into the loaded template, tests, saves
-     the template and arms the hooks:
-     `sh LingTeX-Word/tools/run-in-word.sh` (the install step already told it
-     the path).
+1. **The two templates.** A template loaded as a global add-in has its VBA
+   project protected (nothing may import into it, error 50289), so the code
+   is split: a tiny **dev template** in Word's startup folder holds only the
+   bootstrap and loads the **engine template** from the clone at Word start;
+   the engine is the add-in itself, and it gets refreshed by the dev template
+   unloading it, importing into it as a document, saving, and loading it
+   again. Once:
+   - In Word: a new document, Tools → Macro → Visual Basic Editor,
+     Insert → Module, paste `tools/ImportModules.bas` without its first line,
+     name the module `modImport`. File → Save As → **Word Macro-Enabled
+     Template**, `LingTeX-Dev.dotm`, into the startup folder
+     (`~/Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/Word`).
+   - The engine: `LingTeX-Word/LingTeX.dotm` in the clone. If you already have
+     one in the startup folder from the earlier arrangement, the next step
+     moves it. Otherwise make it once the same way from the file that holds
+     the modules (Save As template into the clone's `LingTeX-Word` folder).
+   - Quit Word, then:
+     `sh LingTeX-Word/tools/install-dev-template.sh`
+     (ribbon into the engine, clone location into the dev template, runner
+     pointed at the engine).
+   - Start Word: the dev template loads, its `AutoExec` loads the engine, and
+     every document has a **LingTeX** tab. Then
+     `sh LingTeX-Word/tools/run-in-word.sh`: the import log's `from` and
+     `into` lines name the clone's `src` and the engine, then the suites, then
+     the hooks are armed.
 
 2. **Make the test document.** ⌘N for a blank one, then save it somewhere
    ordinary — `~/Desktop/lingtex-test.docx`. It has to be saved before the

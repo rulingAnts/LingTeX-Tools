@@ -1,27 +1,66 @@
 #!/bin/sh
 # install-dev-template.sh  --  LingTeX-Word
 #
-# Finish setting up the working template in Word's startup folder, with Word
-# QUIT: put the ribbon in it, tell it where the clone is (the LingTeX_DevRoot
-# variable that SetDevRoot would set from inside Word), and point the test
-# runner at it. After this: start Word, then  sh LingTeX-Word/tools/run-in-word.sh
+# Finish setting up the two-template dev loop, with Word QUIT:
 #
-#     sh LingTeX-Word/tools/install-dev-template.sh "<startup folder>/LingTeX.dotm"
+#   the DEV template   LingTeX-Dev.dotm   in Word's startup folder, holding only
+#                      modImport (made once in Word, see below), which loads the
+#                      engine at Word start and re-imports it on demand;
+#   the ENGINE template   LingTeX-Word/LingTeX.dotm   in the clone, the add-in
+#                      itself, which this script gives the ribbon.
 #
-# The template itself is made in Word: open the file that holds modImport,
-# File > Save As > Word Macro-Enabled Template, into the startup folder.
-# Re-running this is safe; do it again after any ribbon change.
+#     sh LingTeX-Word/tools/install-dev-template.sh
+#
+# What it does: moves an engine template still sitting in the startup folder
+# (the earlier arrangement) into the clone; injects the ribbon into it; writes
+# the clone's location into the dev template (the LingTeX_DevRoot variable, what
+# SetDevRoot does from inside Word); points the test runner at the engine.
+# Re-running is safe; run it again after any ribbon change.
+#
+# Making the dev template, once, in Word: new document; Tools > Macro > Visual
+# Basic Editor; Insert > Module; paste tools/ImportModules.bas without its first
+# line; name the module modImport; File > Save As > Word Macro-Enabled Template,
+# LingTeX-Dev.dotm, into the startup folder. Quit Word, run this.
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
-dotm=$1
-[ -n "$dotm" ] || { echo "install-dev-template: give the path to LingTeX.dotm in Word's startup folder" >&2; exit 2; }
-[ -f "$dotm" ] || { echo "install-dev-template: no such file: $dotm" >&2; exit 2; }
+die() { echo "install-dev-template: $1" >&2; exit 1; }
+
 if pgrep -x "Microsoft Word" >/dev/null 2>&1; then
-    echo "install-dev-template: quit Word first -- it holds the template open." >&2
-    exit 1
+    die "quit Word first -- it holds the templates open."
 fi
-RIBBON_ONLY=1 sh "$here/build-dotm.sh" "$dotm" || exit 1
-python3 "$here/set-dev-root.py" "$dotm" "$root" || exit 1
-mkdir -p "$root/build"; printf '%s\n' "$dotm" > "$root/build/runner.conf"
-echo "  runner will use $dotm"
-echo "Now start Word, then:  sh LingTeX-Word/tools/run-in-word.sh"
+
+# Word's startup folder on this Mac (Word > Settings > File Locations > Startup).
+for d in "$HOME/Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/Word" \
+         "$HOME/Library/Group Containers/UBF8T346G9.Office/User Content/Startup/Word"; do
+    [ -d "$d" ] && { startup=$d; break; }
+done
+[ -n "$startup" ] || die "cannot find Word's startup folder; Word > Settings > File Locations > Startup shows it"
+
+engine="$root/LingTeX.dotm"
+dev="$startup/LingTeX-Dev.dotm"
+
+#-- the engine: into the clone if it is still in the startup folder ------------
+if [ ! -f "$engine" ] && [ -f "$startup/LingTeX.dotm" ]; then
+    mv "$startup/LingTeX.dotm" "$engine"
+    rm -f "$startup/~\$ingTeX.dotm"
+    echo "  moved LingTeX.dotm from the startup folder into $root"
+fi
+[ -f "$engine" ] || die "no engine template at $engine
+Make it in Word: open the file that holds the modules, File > Save As > Word
+Macro-Enabled Template, LingTeX.dotm, into $root"
+[ -f "$startup/LingTeX.dotm" ] && echo "  note: a LingTeX.dotm is still in the startup folder; it would load twice. Remove it."
+RIBBON_ONLY=1 sh "$here/build-dotm.sh" "$engine" || exit 1
+
+#-- the dev template: where the clone is --------------------------------------
+[ -f "$dev" ] || die "no dev template at $dev
+Make it in Word (once): new document; Tools > Macro > Visual Basic Editor;
+Insert > Module; paste $here/ImportModules.bas without its first line; name
+the module modImport; File > Save As > Word Macro-Enabled Template,
+LingTeX-Dev.dotm, into
+  $startup
+Quit Word and run this again."
+python3 "$here/set-dev-root.py" "$dev" "$root" || exit 1
+
+mkdir -p "$root/build"; printf '%s\n' "$engine" > "$root/build/runner.conf"
+echo "  runner will address $engine"
+echo "Now start Word (the dev template loads the engine), then:  sh LingTeX-Word/tools/run-in-word.sh"
