@@ -6,10 +6,15 @@ name: LingTeX-Word pre-release
 # in Word by hand (LingTeX-Word/RELEASING.md), injected and verified by the
 # scripts, and committed; this workflow verifies it again and ships it.
 #
-# Run from the Actions tab (Run workflow) with a label, e.g. beta.1.
-# Public repository, standard runner: free.
+# Push a tag, e.g. word-v0.1.0-beta.1, and it runs from the tagged commit (so
+# it works from any branch); or, once this file is on the default branch, run
+# it from the Actions tab with a label. Public repository, standard runner:
+# free.
 
 on:
+  push:
+    tags:
+      - 'word-v*'
   workflow_dispatch:
     inputs:
       label:
@@ -37,13 +42,20 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq nsis
 
+      - name: The tag
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then tag="${{ github.ref_name }}"; else tag="word-v0.1.0-${{ inputs.label }}"; fi
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "VERSION=${tag#word-v}" >> "$GITHUB_ENV"
+          echo "$tag"
+
       - name: Windows installer (.exe)
         # The same two actions as install.bat, wrapped for people who would
         # rather not see a console: copy the template into STARTUP, register an
         # uninstaller. Unsigned: SmartScreen will say "unknown publisher".
         run: |
           mkdir -p out
-          makensis -V2 -DVERSION="0.1.0-${{ inputs.label }}" \
+          makensis -V2 -DVERSION="$VERSION" \
             -DDOTM="$PWD/LingTeX-Word/LingTeX-Word.dotm" \
             -XOutFile "$PWD/out/LingTeX-Word-Setup.exe" \
             LingTeX-Word/install/installer.nsi
@@ -51,8 +63,7 @@ jobs:
 
       - name: Package
         run: |
-          tag="word-v0.1.0-${{ inputs.label }}"
-          echo "TAG=$tag" >> "$GITHUB_ENV"
+          tag="$TAG"
           mv out/LingTeX-Word-Setup.exe "out/LingTeX-Word-Setup-$tag.exe"
           mkdir -p out/win out/mac
           cp LingTeX-Word/LingTeX-Word.dotm LingTeX-Word/install/INSTALL.md out/win/
