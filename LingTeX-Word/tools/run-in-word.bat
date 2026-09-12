@@ -1,0 +1,1 @@
+powershell -ExecutionPolicy Bypass -File run-in-word.ps1 ..\LingTex.docm
