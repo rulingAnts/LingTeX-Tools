@@ -49,6 +49,25 @@ LingTeXRewrapAll             LingTeXCheckExample
 LingTeXConvertTableToIgt
 ```
 
+### The commands, and what each says outside an example
+
+| Command | What it does | With the cursor outside any example |
+|---|---|---|
+| `LingTeXInsertInterlinear` | Draws an example from the selection, or from the clipboard when nothing is selected | Not an "outside" case: with nothing selected it reads the clipboard and inserts, or says *Nothing to insert.* |
+| `LingTeXRewrapCurrent` | Re-plans and redraws the example at the cursor | *Put the cursor inside an interlinear example first.* |
+| `LingTeXRewrapAll` | Re-plans and redraws every example in the document | Works from anywhere: *Re-wrapped N interlinear examples.*, or *This document contains no interlinear examples.* |
+| `LingTeXSplitColumn` | Splits the column at the cursor at its first morpheme boundary, on every tier | *Put the cursor in the column you want to split.* |
+| `LingTeXMergeColumns` | Merges the selected columns, or the cursor's column with the one to its right | *Select the columns you want to merge.* |
+| `LingTeXCheckExample` | Runs the Leipzig checks on the example at the cursor and offers the fixes | *Put the cursor inside an interlinear example first.* |
+| `LingTeXConvertTableToIgt` | Adopts a plain Word table as an example: styles it and wraps it | *Put the cursor inside the table you want to convert.* |
+
+So the "outside any example" check is five commands and five messages; the
+other two behave the same inside or out. Every message is a dialog titled
+LingTeX-Word, never a VBA error dialog, and the document is unchanged
+afterwards. The six settings commands (`LingTeXAlignByWord` and the rest)
+act on the document, not on an example, so the cursor's position never
+matters to them.
+
 Worth five minutes before a hundred checks: **Tools → Customize Keyboard…**,
 category *Macros*, and bind the four you will use most (`Insert`,
 `RewrapCurrent`, `Split`, `Merge`) to ⌥⌘1 … ⌥⌘4. Save the changes in

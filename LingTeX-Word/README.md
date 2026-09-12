@@ -414,6 +414,17 @@ file. CI verifies rather than builds: it unzips the `.dotm`, diffs the embedded
 ribbon against `src/customUI14.xml`, and checks the manifest, so a template that
 has drifted from the sources fails the release.
 
+**Later — switch an example's alignment in place.** Today the alignment
+(by word or by morpheme) is chosen when an example is inserted; changing it
+means inserting again. The data supports switching without that: a
+word-aligned cell still holds its boundaries (`kada=te` / `carry.CMP=SEQ`), so
+word to morpheme is the split at every boundary, on every tier, column by
+column; and morpheme to word is merging every continuation column (the ones
+`NoBreakFlags` marks) into the one before it. Both are the proven split and
+merge primitives, applied to the whole example, followed by the ordinary
+delete-and-redraw. One command, `LingTeXToggleExampleAlignment`, on the
+example at the cursor; its only new logic is the loop.
+
 **Later — numbering, headings, captions.** What an example carries in a
 FieldWorks text, and what a paper puts around it. Already handled: any number
 of interlinear tiers per wrap line, and several free translations (one
