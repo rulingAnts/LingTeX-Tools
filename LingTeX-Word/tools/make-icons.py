@@ -365,7 +365,7 @@ ICONS = [
     ("igtInsert", ic_insert, 64),
     ("igtConvert", ic_convert, 64),
     ("igtRewrapThis", ic_rewrap_this, 32),
-    ("igtRewrapAll", ic_rewrap_all, 64),
+    ("igtRewrapAll", ic_rewrap_all, 32),
     ("igtIndent", ic_indent, 32),
     ("igtOutdent", ic_outdent, 32),
     ("igtSplit", ic_split, 32),
