@@ -124,9 +124,12 @@ if [ "$pull" = 1 ]; then
 fi
 
 mkdir -p "$reports"; rm -f "$reports"/*.mac.txt "$reports"/ImportModules.txt
-# The engine is loaded at Word start only when its last run was green: the
-# marker goes before a run and comes back after a clean one (see AutoExec in
-# tools/ImportModules.bas). A broken import is therefore never loaded twice.
+# The engine is loaded at Word start only when its last run got as far as
+# running the suites: the marker goes before a run and comes back once the
+# reports exist (see AutoExec in tools/ImportModules.bas). An engine that will
+# not compile produces no report and is therefore never loaded twice. A run
+# with a failed assertion still writes it -- one red line used to switch the
+# engine off at the next Word start, which looked like the add-in vanishing.
 rm -f "$root/build/engine-ok"
 
 macros=""
@@ -341,9 +344,13 @@ if [ "$commit" = 1 ]; then
     fi
 fi
 
-if [ "$status" -eq 0 ] && [ -n "$summary" ]; then
+if [ -n "$summary" ]; then
     mkdir -p "$root/build"; : > "$root/build/engine-ok"
-    echo "== engine marked good: it will load at the next Word start"
+    echo "== engine marked loadable: it will load at the next Word start"
+else
+    echo "== NO REPORT, so the engine is NOT marked loadable: it will not load at the"
+    echo "   next Word start until a run gets as far as the suites. Fix the import or"
+    echo "   the compile error above, then run this again."
 fi
 echo "reports: $reports"
 exit $status
