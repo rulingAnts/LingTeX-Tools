@@ -374,7 +374,14 @@ It quits Word, hides the engine while Word starts so nothing loads, puts it
 back, and imports the current `src/` into it as a document, where nothing
 compiles until it has been replaced; then loads it and runs the suites. With
 the dev template's current `AutoExec` this cannot recur: the engine is only
-loaded at Word start when the last run was green (`build/engine-ok`).
+loaded at Word start when the last run got as far as running the suites
+(`build/engine-ok`, written once reports exist; a failed assertion still
+writes it, a compile error never does).
+
+**If the LingTeX tab and the macros are simply missing after a Word start**,
+that is this marker: the last runner run produced no report (it was
+interrupted, or a dialog blocked it), so the engine was not loaded. Run the
+runner once and it is back.
 
 ## Known, and accepted for now
 

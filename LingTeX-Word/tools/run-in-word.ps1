@@ -33,8 +33,10 @@ $reports = Join-Path $root "LingTeX-Word-reports"
 
 if (-not $NoPull) { Write-Host "== git pull"; git -C $root pull --ff-only }
 New-Item -ItemType Directory -Force -Path $reports | Out-Null
-# The engine loads at Word start only when its last run was green (see
-# AutoExec in tools/ImportModules.bas); the marker goes before a run.
+# The engine loads at Word start only when its last run got as far as the
+# suites (see AutoExec in tools/ImportModules.bas): the marker goes before a
+# run and comes back once reports exist, so an engine that will not compile is
+# never loaded twice, while a failed assertion does not switch it off.
 Remove-Item -Force (Join-Path $root "build\engine-ok") -ErrorAction SilentlyContinue
 # Only this platform's reports are replaced; the Mac ones sit beside them.
 Get-ChildItem -Path $reports -Filter *.win.txt | Remove-Item -Force
@@ -109,9 +111,12 @@ if (-not $NoCommit -and $status -eq 0 -and $summary -ne "") {
         Write-Host "== reports unchanged; nothing committed"
     }
 }
-if ($status -eq 0 -and $summary -ne "") {
+if ($summary -ne "") {
     New-Item -ItemType File -Force -Path (Join-Path $root "build\engine-ok") | Out-Null
-    Write-Host "== engine marked good: it will load at the next Word start"
+    Write-Host "== engine marked loadable: it will load at the next Word start"
+} else {
+    Write-Host "== NO REPORT, so the engine is NOT marked loadable: it will not load at the"
+    Write-Host "   next Word start until a run gets as far as the suites."
 }
 Write-Host "reports: $reports"
 exit $status

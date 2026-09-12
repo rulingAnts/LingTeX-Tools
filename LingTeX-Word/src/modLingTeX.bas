@@ -54,7 +54,8 @@ Private mRibbon As Object
 ' own, is never taken (Seth): it is skipped and named -- so each command lists
 ' its letters in order of preference and the first free one is used (on Mac
 ' Cmd+Option+Shift+I is Mark Citation, +S the Styles pane, +L a ListNum
-' field). LingTeXShowShortcuts reports what actually landed.
+' field, +O a TOC entry, +U Update Fields). LingTeXShowShortcuts reports what
+' actually landed.
 '
 ' MAC WORD'S MODIFIER BITS ARE NOT WINDOWS'S. Found by a probe macro (deleted
 ' since; git history around 72a95ef) that asked Word to name what it had bound: Command 256, Shift 512,
@@ -66,7 +67,7 @@ Private Const SHORTCUT_TABLE As String = _
     "SXD=LingTeXSplitColumn|M=LingTeXMergeColumns|K=LingTeXCheckExample|" & _
     "T=LingTeXConvertTableToIgt|W=LingTeXAlignByWord|P=LingTeXAlignByMorpheme|" & _
     "H=LingTeXShowSettings|N=LingTeXToggleExampleNumbers|" & _
-    "G=LingTeXIndentExample|LOU=LingTeXOutdentExample"
+    "G=LingTeXIndentExample|LOUYQ=LingTeXOutdentExample"
 Private Const MODS_WINDOWS As Long = 512 + 1024 + 256      ' Ctrl+Alt+Shift
 Private Const MODS_MAC As Long = 256 + 2048 + 512          ' Command+Option+Shift
 
