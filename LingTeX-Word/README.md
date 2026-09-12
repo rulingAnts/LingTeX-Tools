@@ -417,7 +417,13 @@ controls raise no events in the form's own module. The engine does not change
 when it arrives: the form will build an `IgtExample` and hand it to
 `RenderExample`.
 
-**Phase 3 — packaging**, as two downloads:
+**Phase 3 — packaging**, as two downloads. Both install `LingTeX-Word.dotm` into
+Word's startup folder, where it is loaded as a **global add-in**: its commands,
+ribbon tab, shortcuts and `AutoExec` apply to every document, whatever
+template that document is based on, and no document is ever attached to it.
+That is the sense in which the ribbon and the macros are not template-specific
+(Seth, 2026-09-12); the file is a `.dotm` only because that is the container
+Word loads from that folder.
 
 - **Windows** — `installer/LingTeX-Word.nsi`, an NSIS installer that drops
   `LingTeX-Word.dotm` into Word's STARTUP folder, registers that folder as a
