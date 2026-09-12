@@ -52,13 +52,25 @@ Public Function RenderExample(ex As IgtExample, target As Range) As Table
     Dim interTiers() As Long, nInter As Long
     Dim nLines As Long, maxCols As Long
     Dim why As String
-    Dim hang As Double
+    Dim hang As Double, level As Long
+    Dim lt As Object
 
     Set doc = target.Document
     ' A fresh example is numbered if the document says so; the number's hanging
-    ' indent is part of the plan, because the first column has to hold it.
+    ' indent is part of the plan, because the first column has to hold it. The
+    ' indent is the LIST STYLE's own text position for the level in use, so a
+    ' user who changes the style's indent changes every example on its next
+    ' re-wrap; the NumberHang setting only seeds the style when it is created.
     hang = 0
-    If SettingNumberExamples(doc) Then hang = SettingNumberHang(doc)
+    level = SettingNumberLevel(doc)
+    If SettingNumberExamples(doc) Then
+        EnsureStyles doc
+        On Error Resume Next
+        Set lt = doc.Styles(STYLE_NUMBER).ListTemplate
+        Err.Clear
+        On Error GoTo 0
+        hang = HangFromTemplate(lt, level, SettingNumberHang(doc))
+    End If
     If Not PlanExample(ex, target, doc, interTiers, nInter, colW, _
                        lineStarts, nLines, maxCols, why, hang) Then
         gRenderError = why
@@ -67,7 +79,22 @@ Public Function RenderExample(ex As IgtExample, target As Range) As Table
 
     Set RenderExample = DrawExample(ex, target, doc, interTiers, nInter, _
                                     colW, lineStarts, nLines, maxCols, _
-                                    hang, Nothing, SettingNumberLevel(doc))
+                                    hang, lt, level)
+End Function
+
+' The text position of a list level: where the text starts after the number,
+' which is the indent everything after the number lines up to. dflt when the
+' template cannot say (missing, or a level it has not got).
+Private Function HangFromTemplate(lt As Object, ByVal level As Long, _
+        ByVal dflt As Double) As Double
+    Dim v As Double
+    HangFromTemplate = dflt
+    If lt Is Nothing Then Exit Function
+    On Error Resume Next
+    v = lt.ListLevels(level).TextPosition
+    If Err.Number = 0 And v >= 6 Then HangFromTemplate = v
+    Err.Clear
+    On Error GoTo 0
 End Function
 
 '-----------------------------------------------------------------------------
@@ -375,13 +402,16 @@ Public Function RedrawExampleAt(tbl As Table, ex As IgtExample) As Table
     hang = 0
     level = 1
     If CellIsNumbered(tbl) Then
-        hang = SettingNumberHang(doc)
         On Error Resume Next
         Set savedLT = tbl.Cell(1, 1).Range.ListFormat.ListTemplate
         level = tbl.Cell(1, 1).Range.ListFormat.ListLevelNumber
         If level < 1 Then level = 1
         Err.Clear
         On Error GoTo 0
+        ' Whatever list the cell carries -- ours, a bullet, an outline level
+        ' the user chose -- its indent for that level is what the re-wrap
+        ' lays the example out to.
+        hang = HangFromTemplate(savedLT, level, SettingNumberHang(doc))
     End If
 
     If Not PlanExample(ex, RangeAfterTable(tbl), doc, interTiers, nInter, colW, _

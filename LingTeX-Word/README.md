@@ -145,9 +145,12 @@ numbering on the first cell of the table, from a list style called
 or moving an example renumbers the rest, and a cross-reference can point at
 one. It sits in a hanging indent inside that cell; the gloss under it, every
 later wrap line and the translation are indented to the same text position, so
-everything after the number lines up. Re-wrap keeps whatever number an example
-carries; `LingTeXToggleExampleNumbers` decides only whether *new* examples get
-one. The indent is the `NumberHang` setting (36 pt).
+everything after the number lines up. Re-wrap keeps whatever list an example
+carries — ours, a bullet, an outline level you chose — and lays the example out
+to that list level's own text indent, so changing the indent in the list style
+changes every example on its next re-wrap. `LingTeXToggleExampleNumbers`
+decides only whether *new* examples get a number; the `NumberHang` setting
+(36 pt) only seeds the list style when it is first created.
 
 **Per-chapter numbering.** Modify the list style (Format → Style →
 `LingTeX Example Number`): link its level 1 to Heading 1 with no number text,
