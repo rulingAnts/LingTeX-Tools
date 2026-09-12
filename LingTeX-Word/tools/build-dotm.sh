@@ -134,6 +134,11 @@ out="$work/out.dotm"
 unzip -tq "$out" >/dev/null 2>&1 || die "the rebuilt archive does not verify"
 cp "$out" "$dotm"
 
+if [ "${RIBBON_ONLY:-0}" = 1 ]; then
+    echo "  ribbon injected into $(basename "$dotm") (no manifest: RIBBON_ONLY)"
+    exit 0
+fi
+
 #-- 5. the manifest -----------------------------------------------------------
 # What source the committed binary was built from. check-dotm.sh compares this to
 # the working tree, which is the only way to notice that someone fixed a module in

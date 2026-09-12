@@ -75,6 +75,56 @@
                   supertip="Select across several cells to merge exactly those. With the cursor in a single cell, that column is merged with the one after it."/>
         </group>
 
+        <group id="LingTeXSettingsGroup" label="Settings">
+          <button id="LingTeXAlignWord"
+                  label="By Word"
+                  imageMso="TableColumnsDistribute"
+                  onAction="RbnAlignByWord"
+                  screentip="New examples: one column per word"
+                  supertip="Enclitics stay in their host's column. Stored in this document; examples already on the page are unchanged until inserted again."/>
+          <button id="LingTeXAlignMorpheme"
+                  label="By Morpheme"
+                  imageMso="TableRowsDistribute"
+                  onAction="RbnAlignByMorpheme"
+                  screentip="New examples: one column per morpheme"
+                  supertip="Enclitic columns never start a wrap line. Stored in this document; examples already on the page are unchanged until inserted again."/>
+          <button id="LingTeXRewrapOnSaveToggle"
+                  label="Re-wrap on Save"
+                  imageMso="FileSave"
+                  onAction="RbnToggleRewrapOnSave"
+                  screentip="Toggle: re-wrap every example when this document is saved"/>
+          <button id="LingTeXRewrapOnLeaveToggle"
+                  label="Re-wrap on Leave"
+                  imageMso="SelectAll"
+                  onAction="RbnToggleRewrapOnSelectionChange"
+                  screentip="Toggle: re-wrap an example as soon as the cursor leaves it"
+                  supertip="Off by default: it repaints while you type."/>
+          <button id="LingTeXInitialCapToggle"
+                  label="First Capital"
+                  imageMso="Font"
+                  onAction="RbnToggleGramGlossInitialCap"
+                  screentip="Toggle: grammatical glosses as Erg / 3Sg, or uniform small capitals"/>
+          <button id="LingTeXShowSettingsButton"
+                  label="Settings"
+                  imageMso="Properties"
+                  onAction="RbnShowSettings"
+                  screentip="Show every setting stored in this document"/>
+        </group>
+
+        <group id="LingTeXKeysGroup" label="Keys">
+          <button id="LingTeXInstallKeys"
+                  label="Install Shortcuts"
+                  imageMso="MacroPlay"
+                  onAction="RbnInstallShortcuts"
+                  screentip="Bind every command to Ctrl+Alt (Cmd+Option on Mac) + a letter"
+                  supertip="Installed in the Normal template, so they work in every document. LingTeXRemoveShortcuts takes them out again."/>
+          <button id="LingTeXShowKeys"
+                  label="Shortcuts"
+                  imageMso="MacroRecord"
+                  onAction="RbnShowShortcuts"
+                  screentip="List the keyboard shortcuts"/>
+        </group>
+
         <group id="LingTeXCheckGroup" label="Check">
           <button id="LingTeXCheck"
                   label="Check Glossing"

@@ -68,10 +68,25 @@ afterwards. The six settings commands (`LingTeXAlignByWord` and the rest)
 act on the document, not on an example, so the cursor's position never
 matters to them.
 
-Worth five minutes before a hundred checks: **Tools → Customize Keyboard…**,
-category *Macros*, and bind the four you will use most (`Insert`,
-`RewrapCurrent`, `Split`, `Merge`) to ⌥⌘1 … ⌥⌘4. Save the changes in
-`lingtex-test.docx`, not `Normal`.
+**Two faster ways than the Macros dialog**, both worth setting up once:
+
+- **Shortcuts.** Run `LingTeXInstallShortcuts` (from the Macros dialog, one
+  last time). It binds every command to ⌘⌥ + a letter in the Normal template,
+  so they work in every document: ⌘⌥I insert, ⌘⌥R re-wrap this, ⌘⌥A re-wrap
+  all, ⌘⌥S split, ⌘⌥M merge, ⌘⌥K check, ⌘⌥T convert table, ⌘⌥W by word,
+  ⌘⌥P by morpheme, ⌘⌥H settings. `LingTeXShowShortcuts` lists them;
+  `LingTeXRemoveShortcuts` takes them out.
+- **The ribbon.** With `LingTeX.docm` closed in Word:
+
+```bash
+sh LingTeX-Word/tools/add-ribbon.sh LingTeX-Word/LingTeX.docm
+```
+
+  Reopen it, run the test runner once so the modules are current, and a
+  **LingTeX** tab is on the ribbon whenever that document is open, with every
+  command and setting as a button. This is the same ribbon the packaged
+  template will carry, so if a button comes through blank or does nothing on
+  Mac, that is a finding for the packaging step as well.
 
 ### Settings are commands too
 
@@ -248,7 +263,9 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
    `LingTeXRewrapAll` → both pairs re-wrap and nothing is deleted. The first
    pass lost the second example here.
 10. `LingTeXConvertTableToIgt` on a plain two-row table you type by hand →
-   becomes an auto-wrapping example.
+   becomes an auto-wrapping example. **A row whose cells are merged into one
+   cell is taken as the free translation**; every other row is a tier. With no
+   such row the command says so and tells you how to add one.
 11. Copy a rendered example, paste it into TextEdit → tab-separated text. Paste
     that back into Word and insert → the same grid.
 
