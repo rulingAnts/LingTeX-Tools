@@ -1,0 +1,248 @@
+# Walking `TESTING.md` section 3 on a Mac
+
+The checks themselves are in `TESTING.md`. This is how to run them on Mac Word
+without stopping to work out the mechanics each time: the setup once, the way a
+command is run, and then six passes in an order where each one leaves the
+document ready for the next.
+
+Sections 1 and 2 are already green on both platforms — `RunAllTests` 79/79 and
+`RunDocTests` 224/224, reports in `LingTeX-Word-reports/`. Section 3 is the part
+no automated suite can reach: what the thing actually looks like on the page.
+
+---
+
+## Setup, once
+
+1. **Open `LingTeX-Word/LingTeX.docm` and leave it open.** It holds the code.
+   Close it and every command disappears from the macro list. It is *not* the
+   document you test in.
+
+2. **Make the test document.** ⌘N for a blank one, then save it somewhere
+   ordinary — `~/Desktop/lingtex-test.docx`. It has to be saved before the
+   save-hook checks in pass 5 mean anything.
+
+3. **Arm the hooks.** Tools → Macro → Macros…, choose **`AutoExec`**, Run. That
+   attaches the save and selection handlers. Word runs it by itself once the
+   add-in is installed as a template; here it is manual, once per Word session.
+
+4. **Put the sample somewhere you can copy it from.** Open
+   `LingTeX-Word/samples/checklist-sample.txt` in TextEdit — the three-line FLEx
+   block from `TESTING.md`, in a plain file so the tabs survive. ⌘A, ⌘C.
+
+```bash
+open -a TextEdit LingTeX-Word/samples/checklist-sample.txt
+```
+
+### Running a command
+
+**The frontmost Word document is the one every command acts on.** So: click into
+the test document, then Tools → Macro → Macros…, pick the command, Run. If the
+example lands in `LingTeX.docm` instead, that is the mistake — the code document
+was in front.
+
+The seven commands, as they appear in the list:
+
+```
+LingTeXInsertInterlinear     LingTeXSplitColumn
+LingTeXRewrapCurrent         LingTeXMergeColumns
+LingTeXRewrapAll             LingTeXCheckExample
+LingTeXConvertTableToIgt
+```
+
+Worth five minutes before a hundred checks: **Tools → Customize Keyboard…**,
+category *Macros*, and bind the four you will use most (`Insert`,
+`RewrapCurrent`, `Split`, `Merge`) to ⌥⌘1 … ⌥⌘4. Save the changes in
+`lingtex-test.docx`, not `Normal`.
+
+### Running a setting
+
+The settings take arguments, so they go in the Immediate window rather than the
+macro list. **Click the test document first** so it is the active document, then
+Tools → Macro → Visual Basic Editor, View → Immediate Window, and type:
+
+```vba
+SetSettingGranularity ActiveDocument, igtMorphemeAligned
+SetSettingGranularity ActiveDocument, igtWordAligned
+SetSettingRewrapOnSave ActiveDocument, False
+SetSettingRewrapOnSelectionChange ActiveDocument, True
+```
+
+Every one of them is stored in the document, so they survive a save and reopen,
+and they do not leak into any other document.
+
+### What a "clear message" means
+
+Every message goes through `Report`, which is a dialog with a title. A command
+that does nothing and says nothing is a failure even when nothing looks wrong.
+
+---
+
+## Pass 1 — inserting (`TESTING.md` 3a)
+
+Both input paths, in one pass.
+
+1. **Clipboard path.** Sample copied from TextEdit, cursor in the empty test
+   document with *nothing selected*, run `LingTeXInsertInterlinear`. This is the
+   FLEx path: with an insertion point and no selection the command reads the
+   clipboard.
+2. Now the appearance checks, all on that one example: columns aligned, no
+   borders, small capitals on `SEQ ERG FOC 3SG` and not on `yam pick stack`, the
+   object-language row italic and *not* small-capped even at `Ozivela` and `Vo`,
+   `ze:` keeping its colon, `zuvo=ve=zi` in one column glossed `dream=ABL=REL`.
+3. **The free translation** is a paragraph *below* the table, in style
+   `LingTeX Free`, wrapped in curly single quotes: `'(When) she picked her yams
+   early.'` If it is missing, stop and say so — that is the one you flagged
+   earlier, and it would be a real bug.
+4. **Fonts.** Cursor in a cell, look at the font name box. It must be the
+   document's body font, not Cambria Math and not Times New Roman.
+5. **Selection path.** ⌘Z back to nothing. Paste the sample as plain text —
+   Edit → Paste Special… (⌃⌘V) → Unformatted Text — select those three
+   paragraphs, run Insert. The selection is *replaced*: no stray empty paragraph
+   left above or below.
+6. **The two refusals.** Insert with an empty clipboard and nothing selected → a
+   dialog saying there is nothing to insert. Insert with an ordinary sentence of
+   prose selected → a dialog explaining what was expected. Neither may be a VBA
+   error dialog.
+7. **No file written.** Nothing in this pass should touch the disk. If you want
+   it checked rather than assumed, run this in Terminal straight afterwards:
+
+```bash
+find ~/Library/Containers/com.microsoft.Word -newermt '-10 minutes' -type f 2>/dev/null | head
+```
+
+Keep the example from step 5. Pass 2 needs it.
+
+---
+
+## Pass 2 — wrapping (3b)
+
+The engine's reason for existing. Every step here is: change the page, then put
+the cursor in the example and run `LingTeXRewrapCurrent`.
+
+1. As inserted, the long sample should already be **two or more row groups
+   inside one table**, nothing past the right margin.
+2. **The gap between groups** is `LingTeX_LineGap`, 6 pt by default. To check it
+   rather than eyeball it: cursor in the **last row of a wrap group**,
+   Format → Paragraph…, *Spacing After* should read 6 pt. Rows that are not the
+   last in their group read 0.
+3. **Narrow the margins** — Layout → Margins → Custom Margins, set left and
+   right to 0.5" — re-wrap → columns push down onto another group. **Widen them
+   back** to 1", re-wrap → the extra group disappears and the columns are pulled
+   back up. That pull-back-up is the check that matters most; a planner that
+   only ever adds lines passes everything else and fails this.
+4. **Font size**: select the whole example, make it 16 pt, re-wrap → more
+   groups. Back to 12 pt, re-wrap → fewer.
+5. **Landscape** (Layout → Orientation) → re-wrap reflows wider. Back to
+   portrait → reflows back.
+6. **Two text columns** (Layout → Columns → Two) → re-wrap fits the *column*
+   width, not the page width. This one has caught a real bug before.
+7. **Idempotent**: re-wrap an example that is already correct → nothing visibly
+   changes. Re-wrap twice in a row → identical.
+8. **Page break**: add paragraphs above until the example straddles a page
+   boundary → no stack of aligned cells is split across the break.
+9. **An over-wide column**: type a 60-character run into one form cell, re-wrap
+   → that column gets a group to itself and wraps inside its cell rather than
+   running off the page.
+
+---
+
+## Pass 3 — morpheme alignment and the column invariant (3c)
+
+1. Immediate window: `SetSettingGranularity ActiveDocument, igtMorphemeAligned`.
+   Insert the sample again into a fresh paragraph → one column per morpheme.
+2. **The invariant**: no wrap group may begin with `=xo`, `=vexu`, `=ve` or
+   `=zi`, and every enclitic column carries the `=` on *both* the form row and
+   the gloss row. Read along the left edge of each group.
+3. Back to `igtWordAligned` and insert once more for the split and merge checks.
+4. **Split**: cursor in the `rixu=xo` cell, `LingTeXSplitColumn` → two columns,
+   `rixu` / `stack.CMP` and `=xo` / `=SEQ`, with the `=` leading the cell on
+   every interlinear tier. The free translation is untouched. Re-wrap still
+   works afterwards.
+5. **Merge**: cursor in `rixu`, `LingTeXMergeColumns` → back to `rixu=xo` /
+   `stack.CMP=SEQ`. With one cell selected it merges with the column to its
+   right; select across three cells and exactly those three become one.
+6. **The refusal that matters**: make a column whose tiers disagree — form
+   `zomu-xa` over gloss `gone`, no break in the gloss — and split it. A dialog
+   must name the short tier, the gloss cell must stay whole on the left, and the
+   new column must be *empty* for that tier. Nothing is guessed.
+
+---
+
+## Pass 4 — checking and fixing (3d)
+
+`LingTeXCheckExample` with the cursor anywhere in the example.
+
+1. Type a space into an interlinear cell → reported, and the fix replaces it
+   with `.` (the `LingTeX_SpaceReplacement` setting).
+2. A space in the **free translation** → not reported. Prose is allowed spaces.
+3. Delete the `-` from one tier's cell of a split column → break-char agreement
+   reported, and the fix restores it.
+4. Make two tiers claim *different* break characters — `-xa` over `=DIST` → a
+   conflict, reported and **not** silently resolved.
+5. `rixu=xo` over `stack.CMP=SEQ` → no rule-2 warning; `.` and `:` are not
+   morpheme breaks. Change it to `stack-CMP=SEQ` → a rule-2 warning.
+6. Type `SUPEREL` into a gloss cell → small capitals, and *not* flagged as an
+   unknown abbreviation. There is no allow-list, by design.
+7. A clean example → "No problems found."
+
+---
+
+## Pass 5 — round trip and persistence (3e)
+
+1. **Save** (⌘S) → every example re-wraps automatically, no visible flicker, and
+   the cursor stays where it was. This is `AutoExec`'s save hook; if nothing
+   happens, it was not run.
+2. `SetSettingRewrapOnSave ActiveDocument, False` → saving no longer re-wraps.
+   Set it back to `True`.
+3. **Close and reopen** the document, run `LingTeXRewrapAll` → the examples are
+   still recognised, which proves the style tagging survived the file format.
+4. **Small caps survive**: after that re-wrap, read back a gloss — `ERG` must
+   still be `ERG`, not `erg`. The lowercasing is reversible, and this is what
+   proves it.
+5. **Copy an example** (table *and* its free translation paragraph) and paste it
+   elsewhere in the document → both re-wrap independently.
+6. **Paste into a brand new document** → the styles are recreated there and it
+   re-wraps.
+7. **The escape hatch**: change a table's style away from `LingTeX Interlinear`
+   (Table Design → a plain style) → `LingTeXRewrapAll` leaves it alone from then
+   on.
+8. **Restyle `LingTeX Gloss`** — Format → Style…, change its size — and *every*
+   example in the document follows. The styles are yours; that is the point.
+9. `LingTeXConvertTableToIgt` on a plain two-row table you type by hand →
+   becomes an auto-wrapping example.
+10. Copy a rendered example, paste it into TextEdit → tab-separated text. Paste
+    that back into Word and insert → the same grid.
+
+---
+
+## Pass 6 — undo and robustness (3f)
+
+1. **One ⌘Z undoes a whole insert.** `Application.UndoRecord` is present on Mac
+   Word 16.112, so this should be single-step. If it takes several presses, say
+   so — it is a real finding, not a Mac limitation.
+2. ⌘Z after a re-wrap restores the previous layout.
+3. **Twenty examples**: select your example, copy, paste it twenty times, then
+   `LingTeXRewrapAll` → a few seconds, not a minute.
+4. `LingTeXRewrapAll` on a document with **no** examples → a clear message.
+5. Each of the seven commands with the cursor **outside** any example → a clear
+   message, no error dialog.
+6. After every command the screen is live, not frozen (`ScreenUpdating` back on).
+7. **No scratch document left open** — check the Window menu. The measuring
+   document is hidden but it would still be listed.
+8. `SetSettingRewrapOnSelectionChange ActiveDocument, True`, then click in and
+   out of an example → it re-wraps on leaving, does not recurse, and typing
+   stays responsive. Set it back to `False` afterwards; it is off by default for
+   a reason.
+
+---
+
+## If something fails
+
+Give the check's own wording and what you saw instead. If a dialog appeared,
+its exact text. If it is a layout problem, a screenshot of the example is worth
+more than a description.
+
+If a VBA error dialog appears, the editor will be sitting on the offending line
+with the window title reading `[break]`; the line and the message together are
+usually enough. Click OK, then **Run → Reset** before running anything else —
+while it is in break mode no macro can run at all, including the test runner.
