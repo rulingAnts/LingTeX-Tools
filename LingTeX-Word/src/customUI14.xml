@@ -138,14 +138,14 @@
                   getPressed="RbnGetPressed"
                   onAction="RbnToggle"
                   screentip="Grammatical glosses as Erg / 3Sg; off, uniform small capitals"/>
+        </group>
+
+        <group id="LingTeXSetupGroup" label="Setup">
           <button id="LingTeXShowSettingsButton"
                   label="Settings"
                   image="igtSettings"
                   onAction="RbnShowSettings"
                   screentip="Show every setting stored in this document"/>
-        </group>
-
-        <group id="LingTeXSetupGroup" label="Setup">
           <button id="LingTeXResetStylesButton"
                   label="Reset Styles"
                   image="igtResetStyles"
