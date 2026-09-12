@@ -1598,6 +1598,67 @@ Public Sub LingTeXRemoveShortcuts()
     Report CStr(n) & " LingTeX shortcuts removed.", vbInformation
 End Sub
 
+'-----------------------------------------------------------------------------
+' LingTeXProbeShortcuts: which parameter Mac Word refuses in KeyBindings.Add.
+'
+' Install Shortcuts fails there with 5853 "Invalid parameter" in every home and
+' under every name (Seth, 2026-09-12), so the fault is the key code or the
+' category. This tries one binding at a time, each differing in one thing,
+' clears every one that succeeds, and reports the lot. Run it from the macro
+' list (it is in modLingTeX because modTests may not name a command); it changes nothing that it does not put back.
+'-----------------------------------------------------------------------------
+Public Sub LingTeXProbeShortcuts()
+    Dim app As Object
+    Dim msg As String
+    Dim bits As Variant, i As Long, v As Long
+
+    On Error Resume Next
+    Set app = Application
+    app.CustomizationContext = app.NormalTemplate
+    msg = "Round 2: which bit is Option? Each modifier bit with I, then with Cmd+I; " & _
+          "KeyString is what Word says it bound." & vbCr
+    bits = Array(256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
+    For i = 0 To UBound(bits)
+        msg = msg & Probe(app, CStr(bits(i)) & "+I", 2, "LingTeXInsertInterlinear", bits(i) + 73)
+    Next i
+    For i = 0 To UBound(bits)
+        If bits(i) <> 512 Then
+            msg = msg & Probe(app, "Cmd+" & CStr(bits(i)) & "+I", 2, "LingTeXInsertInterlinear", _
+                              512 + bits(i) + 73)
+        End If
+    Next i
+    Err.Clear
+    v = app.BuildKeyCode(512, 256, 73)
+    msg = msg & "BuildKeyCode(Cmd, Shift, I) = " & IIf(Err.Number = 0, CStr(v), "error " & _
+                CStr(Err.Number)) & vbCr
+    Err.Clear
+    v = app.BuildKeyCode(512, 1024, 73)
+    msg = msg & "BuildKeyCode(Cmd, 1024, I) = " & IIf(Err.Number = 0, CStr(v), "error " & _
+                CStr(Err.Number) & " " & Err.Description) & vbCr
+    Err.Clear
+    On Error GoTo 0
+    Report msg, vbInformation
+End Sub
+
+' One binding: added, then cleared again if it took.
+Private Function Probe(app As Object, ByVal what As String, ByVal category As Long, _
+        ByVal cmd As String, ByVal code As Long) As String
+    Dim kb As Object
+    On Error Resume Next
+    Err.Clear
+    app.KeyBindings.Add category, cmd, code
+    If Err.Number = 0 Then
+        Probe = "  " & what & ": OK" & vbCr
+        Err.Clear
+        Set kb = app.FindKey(code)
+        If Not kb Is Nothing Then kb.Clear
+    Else
+        Probe = "  " & what & ": " & CStr(Err.Number) & " " & Err.Description & vbCr
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Function
+
 ' One attempt: the customization context, then the binding. Empty on success,
 ' else what Word said, prefixed "context" when it was the context that failed.
 Private Function TryBindKey(app As Object, home As Object, ByVal cmd As String, _
