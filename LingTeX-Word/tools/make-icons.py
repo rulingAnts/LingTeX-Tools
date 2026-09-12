@@ -4,9 +4,13 @@
 Draws the ribbon icons into src/icons/*.png.
 
 The buttons act on interlinear examples, which are tables to Word but not to the
-user, so the icons show what the user sees: a little page carrying a three-line
-interlinear example (source, glosses, free translation), with a badge in the
-corner for what the button does to it. Nothing here is a grid.
+user, so no icon shows a grid except Convert Table's, whose input really is one.
+Insert shows what the user gets: a little page carrying a three-line interlinear
+example (source, glosses, free translation). Every other button is one plain
+symbol for what it does, big enough to tell apart at a glance: the re-wrap
+family shares the cycle arrow and differs by a corner mark (all / on save / on
+leave), the alignment pair underlines a word or its morphemes, the rest are the
+obvious sign in a coloured disc.
 
 Every icon is drawn at 4x and downsampled, so the edges are smooth at the size
 Office shows them: 64 px for the large buttons (32 logical, sharp on Retina), 32
@@ -140,6 +144,41 @@ def cycle(d, colour, cx=49, cy=49, r=13):
     badge_text(d, "↻", F_SYM, r * 1.7, cx, cy, dy=-0.5)
 
 
+def disc(d, colour, cx=32, cy=32, r=26):
+    """The main icon: a coloured disc with a white rim, readable on a light or dark ribbon."""
+    badge(d, colour, cx, cy, r)
+
+
+def mark(d, colour, cx=51, cy=51, r=11):
+    """A corner mark on a disc, for the variants of one action."""
+    badge(d, colour, cx, cy, r)
+
+
+def chip(d, x0=4, y0=13, x1=60, y1=51):
+    """A white tablet for text icons, so the text reads on either ribbon theme."""
+    d.rounded_rectangle((px(x0), px(y0), px(x1), px(y1)), radius=px(5),
+                        fill=PAGE, outline=PAGE_EDGE, width=px(2))
+
+
+def grid(d, x0, y0, x1, y1, cols, rows):
+    """A plain table: the one place a grid belongs."""
+    d.rounded_rectangle((px(x0), px(y0), px(x1), px(y1)), radius=px(2),
+                        fill=PAGE, outline=SLATE, width=px(2))
+    for c in range(1, cols):
+        x = x0 + (x1 - x0) * c / cols
+        d.line([(px(x), px(y0)), (px(x), px(y1))], fill=SLATE, width=px(1.5))
+    for r in range(1, rows):
+        y = y0 + (y1 - y0) * r / rows
+        d.line([(px(x0), px(y)), (px(x1), px(y))], fill=SLATE, width=px(1.5))
+
+
+def glyph(d, s, path, size, cx, cy, colour=WHITE, dy=0):
+    f = font(path, size)
+    l, t, r, b = f.getbbox(s)
+    w, h = (r - l) / S, (b - t) / S
+    d.text((px(cx - w / 2 - l / S), px(cy - h / 2 - t / S + dy)), s, font=f, fill=colour)
+
+
 # -- the icons ---------------------------------------------------------------
 
 def ic_insert():
@@ -152,164 +191,167 @@ def ic_insert():
 
 
 def ic_convert():
+    """A table becoming interlinear lines."""
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d); igt(d)
-    badge(d, BLUE)
-    right_arrow(d, 41, 45.5, 16)
-    right_arrow(d, 57, 53, -16)
+    grid(d, 5, 3, 59, 25, 4, 2)
+    down_arrow(d, 32, 27, 12, head=7, shaft=4, colour=BLUE)
+    chip(d, 5, 40, 59, 62)
+    text(d, 10, 41, "ka-mi na", font(F_BOLD, 9.5), SOURCE)
+    text(d, 10, 51, "1-ERG go", font(F_REG, 8.5), GLOSS)
     return im
 
 
 def ic_rewrap_this():
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d); igt(d)
-    cycle(d, BLUE)
+    disc(d, BLUE)
+    glyph(d, "\u21bb", F_SYM, 46, 32, 32, dy=-1)
     return im
 
 
 def ic_rewrap_all():
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d, 12, 2, 60, 52)
-    page(d, 4, 10, 52, 60)
-    igt(d, x=9, y=14, lines=3, gap=13, src_px=11, gloss_px=9, free_px=10)
-    cycle(d, BLUE, 51, 51, 12)
+    disc(d, BLUE)
+    glyph(d, "\u21bb", F_SYM, 46, 32, 32, dy=-1)
+    mark(d, SLATE)
+    for y in (46.5, 50.5, 54.5):                      # all of them: a list
+        d.rounded_rectangle((px(45), px(y), px(57), px(y + 2)), radius=px(1), fill=WHITE)
     return im
 
 
 def ic_split():
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d); igt(d)
-    badge(d, BLUE)
-    d.rectangle((px(48.25), px(40.5), px(49.75), px(57.5)), fill=WHITE)
-    right_arrow(d, 46.5, 49, -9, head=4.5, shaft=2.5)
-    right_arrow(d, 51.5, 49, 9, head=4.5, shaft=2.5)
+    disc(d, BLUE)
+    d.rounded_rectangle((px(30.5), px(16), px(33.5), px(48)), radius=px(1), fill=WHITE)
+    right_arrow(d, 27, 32, -16, head=8, shaft=5)
+    right_arrow(d, 37, 32, 16, head=8, shaft=5)
     return im
 
 
 def ic_merge():
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d); igt(d)
-    badge(d, BLUE)
-    right_arrow(d, 38.5, 49, 9.5, head=4.5, shaft=2.5)
-    right_arrow(d, 59.5, 49, -9.5, head=4.5, shaft=2.5)
+    disc(d, BLUE)
+    right_arrow(d, 11, 32, 18, head=8, shaft=5)
+    right_arrow(d, 53, 32, -18, head=8, shaft=5)
     return im
 
 
 def ic_by_word():
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d)
-    fb = font(F_BOLD, 16)
-    text(d, 11, 11, "kami", fb, SOURCE)
-    underline(d, 11, 31, width(fb, "kami"), BLUE, 2.5)
-    text(d, 11, 37, "1SG", font(F_REG, 13), GLOSS)
+    chip(d)
+    fb = font(F_BOLD, 19)
+    w = width(fb, "kami")
+    x = 32 - w / 2
+    d.text((px(x), px(38)), "kami", font=fb, fill=SOURCE, anchor="ls")
+    underline(d, x, 41, w, BLUE, 3.5)
     return im
 
 
 def ic_by_morpheme():
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d)
-    fb = font(F_BOLD, 16)
-    text(d, 11, 11, "ka-mi", fb, SOURCE)
-    underline(d, 11, 31, width(fb, "ka"), BLUE, 2.5)
-    underline(d, 11 + width(fb, "ka-"), 31, width(fb, "mi"), BLUE, 2.5)
-    text(d, 11, 37, "1-SG", font(F_REG, 13), GLOSS)
+    chip(d)
+    fb = font(F_BOLD, 19)
+    w = width(fb, "ka-mi")
+    x = 32 - w / 2
+    d.text((px(x), px(38)), "ka-mi", font=fb, fill=SOURCE, anchor="ls")
+    underline(d, x, 41, width(fb, "ka"), BLUE, 3.5)
+    underline(d, x + width(fb, "ka-"), 41, width(fb, "mi"), BLUE, 3.5)
     return im
 
 
 def ic_rewrap_on_save():
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d); igt(d, source="ka-mi", gloss="1-ERG", free="\u2018I\u2019")
-    d.text((px(41), px(2)), "\u21bb", font=font(F_SYM, 19), fill=BLUE)
-    badge(d, GREEN)
-    down_arrow(d, 49, 40, 11, head=5, shaft=3)                   # saved: into the tray
-    d.rounded_rectangle((px(41), px(52), px(57), px(56)), radius=px(1), fill=WHITE)
+    disc(d, BLUE)
+    glyph(d, "\u21bb", F_SYM, 46, 32, 32, dy=-1)
+    mark(d, GREEN)
+    down_arrow(d, 51, 43, 10, head=4.5, shaft=2.5)   # saved: into the tray
+    d.rounded_rectangle((px(44.5), px(54), px(57.5), px(57)), radius=px(1), fill=WHITE)
     return im
 
 
 def ic_rewrap_on_leave():
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d); igt(d, source="ka-mi", gloss="1-ERG", free="\u2018I\u2019")
-    d.text((px(41), px(2)), "\u21bb", font=font(F_SYM, 19), fill=BLUE)
-    badge(d, GREEN)
-    d.rectangle((px(40), px(41), px(42), px(57)), fill=WHITE)   # the example's edge
-    right_arrow(d, 44, 49, 14, head=5, shaft=3)                  # the cursor leaving it
+    disc(d, BLUE)
+    glyph(d, "\u21bb", F_SYM, 46, 32, 32, dy=-1)
+    mark(d, GREEN)
+    d.rectangle((px(43.5), px(44), px(45.5), px(58)), fill=WHITE)   # the example's edge
+    right_arrow(d, 47, 51, 11, head=4.5, shaft=2.5)                 # the cursor leaving it
     return im
 
 
 def ic_numbers():
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d)
-    text(d, 8, 6, "(1)", font(F_BOLD, 14), BLUE)
-    igt(d, x=31, y=8, lines=3, source="ka-mi", gloss="1-ERG", free="‘I’")
+    disc(d, BLUE)
+    glyph(d, "(1)", F_BOLD, 27, 32, 32, dy=-0.5)
     return im
 
 
 def ic_initial_cap():
+    """Erg: a full capital, then small capitals."""
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d)
-    text(d, 11, 7, "ka-mi", font(F_BOLD, 13), SOURCE)
-    base = 37
-    f1, f2, f3 = font(F_REG, 12), font(F_REG, 18), font(F_REG, 12)
-    x = 11
-    d.text((px(x), px(base)), "1-", font=f1, fill=GLOSS, anchor="ls")
-    x += width(f1, "1-")
-    d.text((px(x), px(base)), "E", font=f2, fill=BLUE, anchor="ls")
-    x += width(f2, "E")
-    d.text((px(x), px(base)), "RG", font=f3, fill=BLUE, anchor="ls")
-    text(d, 11, 42, "\u2018I\u2019", font(F_ITAL, 12), FREE)
+    chip(d)
+    f1, f2 = font(F_BOLD, 27), font(F_BOLD, 17)
+    w = width(f1, "E") + width(f2, "RG")
+    x = 32 - w / 2
+    d.text((px(x), px(41)), "E", font=f1, fill=BLUE, anchor="ls")
+    d.text((px(x + width(f1, "E")), px(41)), "RG", font=f2, fill=BLUE, anchor="ls")
     return im
 
 
 def ic_settings():
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d); igt(d)
-    badge(d, SLATE)
-    badge_text(d, "⚙", F_SYM, 22, 49, 49, dy=-0.5)
+    disc(d, SLATE)
+    glyph(d, "\u2699", F_SYM, 44, 32, 32, dy=-1)
     return im
 
 
 def ic_start():
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d); igt(d)
-    badge(d, GREEN)
-    arrow(d, [(44, 41), (44, 57), (57, 49)], WHITE)
+    disc(d, GREEN)
+    arrow(d, [(23, 17), (23, 47), (48, 32)], WHITE)
     return im
 
 
 def ic_reset_styles():
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d); igt(d)
-    badge(d, ORANGE)
-    badge_text(d, "¶", F_BOLD, 18, 49, 49, dy=-0.5)
+    disc(d, ORANGE)
+    glyph(d, "\u00b6", F_BOLD, 36, 32, 32, dy=-1)
     return im
 
 
 def ic_install_keys():
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d, 6, 4, 58, 60)
-    igt(d, lines=2, y=8, gap=14, src_px=12, gloss_px=10)
-    keycap(d, 10, 36, 30, 56, "I")
-    badge(d, BLUE, 47, 47, 12)
-    d.rounded_rectangle((px(41), px(45.5), px(53), px(48.5)), radius=px(1), fill=WHITE)
-    d.rounded_rectangle((px(45.5), px(41), px(48.5), px(53)), radius=px(1), fill=WHITE)
+    keycap(d, 8, 8, 52, 52, "I")
+    mark(d, GREEN, 50, 50, 12)
+    d.rounded_rectangle((px(43.5), px(48.5), px(56.5), px(51.5)), radius=px(1), fill=WHITE)
+    d.rounded_rectangle((px(48.5), px(43.5), px(51.5), px(56.5)), radius=px(1), fill=WHITE)
     return im
 
 
 def ic_show_keys():
+    """A keyboard."""
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d, 6, 4, 58, 60)
-    igt(d, lines=2, y=8, gap=14, src_px=12, gloss_px=10)
-    keycap(d, 10, 36, 30, 56, "I")
-    keycap(d, 34, 36, 54, 56, "R")
+    d.rounded_rectangle((px(3), px(14), px(61), px(50)), radius=px(4),
+                        fill=PAGE, outline=SLATE, width=px(2))
+    for row, (y, n, off) in enumerate(((19, 8, 7), (26, 7, 10.5), (33, 6, 14))):
+        for k in range(n):
+            x = off + k * 7
+            d.rounded_rectangle((px(x), px(y), px(x + 5), px(y + 5)), radius=px(1), fill=SLATE)
+    d.rounded_rectangle((px(17.5), px(40), px(46.5), px(45)), radius=px(1), fill=SLATE)
     return im
 
 
 def ic_check():
+    """The glossing, checked."""
     im = canvas(); d = ImageDraw.Draw(im)
-    page(d); igt(d)
-    badge(d, GREEN)
-    d.line([(px(42), px(49.5)), (px(47), px(54.5)), (px(56.5), px(43.5))],
-           fill=WHITE, width=px(3.2), joint="curve")
+    chip(d, 4, 4, 60, 40)
+    f1, f2 = font(F_BOLD, 24), font(F_BOLD, 15)
+    w = width(f1, "E") + width(f2, "RG")
+    x = 32 - w / 2 - 2
+    d.text((px(x), px(30)), "E", font=f1, fill=BLUE, anchor="ls")
+    d.text((px(x + width(f1, "E")), px(30)), "RG", font=f2, fill=BLUE, anchor="ls")
+    badge(d, GREEN, 47, 47, 15)
+    d.line([(px(39), px(47.5)), (px(44.5), px(53)), (px(55.5), px(41))],
+           fill=WHITE, width=px(3.6), joint="curve")
     return im
 
 
