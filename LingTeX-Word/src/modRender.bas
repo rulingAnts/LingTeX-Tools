@@ -268,6 +268,11 @@ Private Function DrawExample(ex As IgtExample, target As Range, doc As Document,
     WriteFreeLines ex, tbl, doc, indent + numW
     SetRowKeeps tbl, (ex.FreeCount > 0)
 
+    ' Not proofed, cell by cell as well as by style, so an example in a
+    ' document whose tier styles predate the style-level setting gets it too.
+    ' The translation, outside the table, is checked as ordinary text.
+    SetNoProofing tbl.Range
+
     ' Numbering never belongs in a content cell; a paragraph that carried list
     ' formatting can leak it into the first one when the table is added there.
     StripStrayNumber tbl, 1 + nNum

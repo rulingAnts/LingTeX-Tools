@@ -199,6 +199,13 @@ SetSettingRewrapOnSave ActiveDocument, False
 SetSettingRewrapOnSelectionChange ActiveDocument, True   ' off by default
 ```
 
+### Spelling
+
+The interlinear tier styles are marked *do not check spelling or grammar*, and
+every drawn cell is marked the same way directly, so the checker never
+underlines a vernacular form or a gloss; the free translation, outside the
+table, is checked as ordinary text.
+
 ### The styles are yours
 
 The add-in creates these on first use and then **never overwrites them**, so
