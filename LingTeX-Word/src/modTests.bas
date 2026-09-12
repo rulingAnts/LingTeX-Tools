@@ -168,7 +168,7 @@ Private Sub DeliverResults()
     Dim msg As String
 
     If mQuietRun Then
-        If WriteReportFile("RunAllTests.txt", mRpt) Then Exit Sub
+        If WriteReportFile("RunAllTests." & PlatformTag() & ".txt", mRpt) Then Exit Sub
         ' Could not write: fall through and deliver the ordinary way.
     End If
 
@@ -249,107 +249,8 @@ End Sub
 
 
 '=============================================================================
-' -- WRAP DIAGNOSTIC --------------------------------------------------------
+' -- DIAGNOSTICS -----------------------------------------------------------
 '=============================================================================
-
-'-----------------------------------------------------------------------------
-' Run this when the wrap section crashes: DiagnoseWrap
-'
-' Performs the same work as the first wrap assertion, one step at a time, and
-' prints a marker before each. Whatever the last marker is, the step after it is
-' what failed -- so the output names the exact statement rather than the section.
-'
-' It builds the arrays by hand as well as by parsing, so it separates "the test
-' harness cannot parse its own input" from "ComputeWrapLines itself fails".
-'-----------------------------------------------------------------------------
-Public Sub DiagnoseWrap()
-    Dim wParts() As String, fParts() As String
-    Dim parsedW() As Double, parsedF() As Boolean
-    Dim fixedW(0 To 2) As Double
-    Dim fixedF(0 To 2) As Boolean
-    Dim lineStarts() As Long
-    Dim i As Long
-    Dim stepNo As Long
-    Dim s As String
-
-    mRpt = ""
-    Emit "DiagnoseWrap"
-    Emit "============"
-
-    On Error GoTo Crashed
-
-    stepNo = 1
-    Emit "step 1  build fixed-size arrays by hand"
-    fixedW(0) = 10
-    fixedW(1) = 10
-    fixedW(2) = 10
-    fixedF(0) = False
-    fixedF(1) = False
-    fixedF(2) = False
-
-    stepNo = 2
-    Emit "step 2  call ComputeWrapLines with the hand-built arrays"
-    lineStarts = ComputeWrapLines(fixedW, fixedF, 30, 0, 0)
-
-    stepNo = 3
-    Emit "step 3  read its bounds"
-    Emit "        LBound=" & CStr(LBound(lineStarts)) & _
-         "  UBound=" & CStr(UBound(lineStarts))
-
-    stepNo = 4
-    Emit "step 4  render the line starts"
-    s = ""
-    For i = LBound(lineStarts) To UBound(lineStarts)
-        If s <> "" Then s = s & ","
-        s = s & CStr(lineStarts(i))
-    Next i
-    Emit "        result = " & s & "   (expected 0)"
-
-    stepNo = 5
-    Emit "step 5  Split the width string"
-    wParts = Split("10,10,10", ",")
-    fParts = Split("0,0,0", ",")
-    Emit "        UBound(wParts)=" & CStr(UBound(wParts)) & _
-         "  UBound(fParts)=" & CStr(UBound(fParts))
-
-    stepNo = 6
-    Emit "step 6  ReDim the parsed arrays"
-    ReDim parsedW(0 To UBound(wParts))
-    ReDim parsedF(0 To UBound(wParts))
-
-    stepNo = 7
-    Emit "step 7  parse each width with Val then CSng"
-    For i = 0 To UBound(wParts)
-        Emit "        i=" & CStr(i) & " raw=[" & wParts(i) & "]"
-        parsedW(i) = CDbl(Val(Trim$(wParts(i))))
-        parsedF(i) = False
-        If i <= UBound(fParts) Then parsedF(i) = (Trim$(fParts(i)) = "1")
-    Next i
-
-    stepNo = 8
-    Emit "step 8  call ComputeWrapLines with the parsed arrays"
-    lineStarts = ComputeWrapLines(parsedW, parsedF, 30, 0, 0)
-    Emit "        ok, UBound=" & CStr(UBound(lineStarts))
-
-    stepNo = 9
-    Emit "step 9  call WrapOf end to end"
-    Emit "        result = " & WrapOf(Array(10, 10, 10), Array(0, 0, 0), 30)
-
-    Emit ""
-    Emit "COMPLETED with no error. The crash is somewhere else."
-    GoTo Done
-
-Crashed:
-    Emit ""
-    Emit "CRASHED at the step AFTER marker " & CStr(stepNo) & _
-         " -- run-time error " & CStr(Err.Number) & ": " & Err.Description
-    Err.Clear
-
-Done:
-    Debug.Print mRpt
-    SettleDebugPrint 0#
-    MsgBox mRpt, vbInformation, "LingTeX-Word wrap diagnostic"
-End Sub
 
 '-----------------------------------------------------------------------------
 ' DebugPrintDiagnose -- the reproduction of the Overflow that was blamed on
@@ -391,274 +292,6 @@ Crashed:
     TryPrintSettledThenAssign = "error " & CStr(Err.Number) & " " & Err.Description
     Err.Clear
 End Function
-
-'-----------------------------------------------------------------------------
-' TypeCheck -- which numeric types actually work on this build?
-'
-' MicroDiagnose reported run-time error 6, Overflow, on "s1 = 10" where s1 is
-' declared As Single. That is not a logic error: assigning the literal 10 to a
-' Single cannot overflow on any correct implementation. Long assignment in the
-' step before it worked.
-'
-' So this tests each numeric type in isolation, each in its own trap, and reports
-' every result rather than stopping at the first failure. If Single is broken here
-' and Double is not, the engine should not be using Single -- and this says so
-' with evidence rather than assumption.
-'
-' WHAT CAME OF IT.  Every type passed here, Single included -- each in a one-line
-' function of its own.  Then stage 2's first run died the same way: error 6 at a
-' call passing the literal 0 into a "ByVal ... As Single" parameter, in a different
-' module, before any arithmetic.  Two occurrences, same shape, same Mac build, and
-' both in procedures with more on the stack than these have.  So the conversion
-' of an integer into a Single fails on this build depending on the frame it runs
-' in, which is exactly why a per-type check in tiny functions could not see it.
-' THE ENGINE NOW USES Double EVERYWHERE.  The Single here, and in MicroDiagnose
-' below, is kept deliberately: it is the reproduction.
-'
-' AND THEN THE REAL CAUSE.  Stage 2 died the same way with Double. Bisected in
-' modDocTests (2026-09-12): the trigger is Debug.Print, not the type -- see
-' SettleDebugPrint and DebugPrintDiagnose. Every failure above was the first
-' floating-point statement after an Emit. The Single story was wrong; the move
-' to Double was harmless and stays. TypeCheck, DiagnoseWrap and MicroDiagnose
-' are now historical and go in the next health pass.
-'-----------------------------------------------------------------------------
-Public Sub TypeCheck()
-    mRpt = ""
-    Emit "TypeCheck -- numeric types on this build"
-    Emit "========================================"
-    Emit ""
-
-    Emit TryLong()
-    Emit TryInteger()
-    Emit TrySingle()
-    Emit TrySingleViaCSng()
-    Emit TryDouble()
-    Emit TryCurrency()
-    Emit TryVariant()
-    Emit TrySingleArray()
-    Emit TryDoubleArray()
-    Emit TrySingleArithmetic()
-    Emit TryDoubleArithmetic()
-
-    Emit ""
-    Emit "Send this whole report back."
-
-    Debug.Print mRpt
-    SettleDebugPrint 0#
-    MsgBox mRpt, vbInformation, "LingTeX-Word type check"
-End Sub
-
-Private Function TryLong() As String
-    Dim v As Long
-    On Error GoTo E
-    v = 10
-    TryLong = "  Long             ok    (" & CStr(v) & ")"
-    Exit Function
-E:
-    TryLong = "  Long             FAIL  error " & CStr(Err.Number) & ": " & Err.Description
-End Function
-
-Private Function TryInteger() As String
-    Dim v As Integer
-    On Error GoTo E
-    v = 10
-    TryInteger = "  Integer          ok    (" & CStr(v) & ")"
-    Exit Function
-E:
-    TryInteger = "  Integer          FAIL  error " & CStr(Err.Number) & ": " & Err.Description
-End Function
-
-Private Function TrySingle() As String
-    Dim v As Single
-    On Error GoTo E
-    v = 10
-    TrySingle = "  Single           ok    (" & CStr(v) & ")"
-    Exit Function
-E:
-    TrySingle = "  Single           FAIL  error " & CStr(Err.Number) & ": " & Err.Description
-End Function
-
-Private Function TrySingleViaCSng() As String
-    Dim v As Single
-    On Error GoTo E
-    v = CSng(10)
-    TrySingleViaCSng = "  Single via CSng  ok    (" & CStr(v) & ")"
-    Exit Function
-E:
-    TrySingleViaCSng = "  Single via CSng  FAIL  error " & CStr(Err.Number) & ": " & Err.Description
-End Function
-
-Private Function TryDouble() As String
-    Dim v As Double
-    On Error GoTo E
-    v = 10
-    TryDouble = "  Double           ok    (" & CStr(v) & ")"
-    Exit Function
-E:
-    TryDouble = "  Double           FAIL  error " & CStr(Err.Number) & ": " & Err.Description
-End Function
-
-Private Function TryCurrency() As String
-    Dim v As Currency
-    On Error GoTo E
-    v = 10
-    TryCurrency = "  Currency         ok    (" & CStr(v) & ")"
-    Exit Function
-E:
-    TryCurrency = "  Currency         FAIL  error " & CStr(Err.Number) & ": " & Err.Description
-End Function
-
-Private Function TryVariant() As String
-    Dim v As Variant
-    On Error GoTo E
-    v = 10
-    TryVariant = "  Variant          ok    (" & CStr(v) & ")"
-    Exit Function
-E:
-    TryVariant = "  Variant          FAIL  error " & CStr(Err.Number) & ": " & Err.Description
-End Function
-
-Private Function TrySingleArray() As String
-    Dim v(0 To 2) As Single
-    On Error GoTo E
-    v(0) = 10
-    TrySingleArray = "  Single array     ok    (" & CStr(v(0)) & ")"
-    Exit Function
-E:
-    TrySingleArray = "  Single array     FAIL  error " & CStr(Err.Number) & ": " & Err.Description
-End Function
-
-Private Function TryDoubleArray() As String
-    Dim v(0 To 2) As Double
-    On Error GoTo E
-    v(0) = 10
-    TryDoubleArray = "  Double array     ok    (" & CStr(v(0)) & ")"
-    Exit Function
-E:
-    TryDoubleArray = "  Double array     FAIL  error " & CStr(Err.Number) & ": " & Err.Description
-End Function
-
-Private Function TrySingleArithmetic() As String
-    Dim a As Single
-    Dim b As Single
-    On Error GoTo E
-    a = 10
-    b = 20
-    a = a + b
-    TrySingleArithmetic = "  Single arithmetic ok   (" & CStr(a) & ")"
-    Exit Function
-E:
-    TrySingleArithmetic = "  Single arithmetic FAIL error " & CStr(Err.Number) & ": " & Err.Description
-End Function
-
-Private Function TryDoubleArithmetic() As String
-    Dim a As Double
-    Dim b As Double
-    On Error GoTo E
-    a = 10
-    b = 20
-    a = a + b
-    TryDoubleArithmetic = "  Double arithmetic ok   (" & CStr(a) & ")"
-    Exit Function
-E:
-    TryDoubleArithmetic = "  Double arithmetic FAIL error " & CStr(Err.Number) & ": " & Err.Description
-End Function
-
-'-----------------------------------------------------------------------------
-' MicroDiagnose -- find which VBA primitive fails.
-'
-' DiagnoseWrap died on a line that merely assigns 10 to a Single array element,
-' which cannot overflow. Two possibilities remain and this separates them: either
-' the colon-separated statement form was mis-parsed (VBA reads a bare number
-' before a colon as an old-style line-number label), or something more basic is
-' wrong on this build.
-'
-' So: one statement per line, no colons anywhere, and a marker string set before
-' each step so the handler can name the exact step rather than a range of them.
-' It starts from the most trivial operation possible and works up.
-'-----------------------------------------------------------------------------
-Public Sub MicroDiagnose()
-    Dim marker As String
-    Dim s1 As Single
-    Dim n1 As Long
-    Dim fixedS(0 To 2) As Single
-    Dim fixedB(0 To 2) As Boolean
-    Dim dynS() As Single
-    Dim dynB() As Boolean
-    Dim starts() As Long
-
-    mRpt = ""
-    Emit "MicroDiagnose"
-    Emit "============="
-
-    On Error GoTo Crashed
-
-    marker = "A  assign a Long variable"
-    n1 = 10
-
-    marker = "B  assign a Single variable"
-    s1 = 10
-
-    marker = "C  assign a Single variable from a Long"
-    s1 = n1
-
-    marker = "D  assign element 0 of a fixed Single array"
-    fixedS(0) = 10
-
-    marker = "E  assign elements 1 and 2"
-    fixedS(1) = 10
-    fixedS(2) = 10
-
-    marker = "F  assign a fixed Boolean array"
-    fixedB(0) = False
-    fixedB(1) = False
-    fixedB(2) = False
-
-    marker = "G  ReDim a dynamic Single array and fill it"
-    ReDim dynS(0 To 2)
-    dynS(0) = 10
-    dynS(1) = 10
-    dynS(2) = 10
-
-    marker = "H  ReDim a dynamic Boolean array and fill it"
-    ReDim dynB(0 To 2)
-    dynB(0) = False
-    dynB(1) = False
-    dynB(2) = False
-
-    marker = "I  read UBound of the fixed arrays"
-    Emit "   UBound(fixedS)=" & CStr(UBound(fixedS))
-    Emit "   UBound(fixedB)=" & CStr(UBound(fixedB))
-
-    marker = "J  call ComputeWrapLines with the FIXED arrays"
-    starts = ComputeWrapLines(fixedS, fixedB, 30, 0, 0)
-
-    marker = "K  read the result bounds"
-    Emit "   LBound(starts)=" & CStr(LBound(starts))
-    Emit "   UBound(starts)=" & CStr(UBound(starts))
-
-    marker = "L  read element 0 of the result"
-    Emit "   starts(0)=" & CStr(starts(0))
-
-    marker = "M  call ComputeWrapLines with the DYNAMIC arrays"
-    starts = ComputeWrapLines(dynS, dynB, 30, 0, 0)
-    Emit "   UBound(starts)=" & CStr(UBound(starts))
-
-    Emit ""
-    Emit "ALL MICRO STEPS COMPLETED with no error."
-    GoTo Done
-
-Crashed:
-    Emit ""
-    Emit "CRASHED at step " & marker
-    Emit "   run-time error " & CStr(Err.Number) & ": " & Err.Description
-    Err.Clear
-
-Done:
-    Debug.Print mRpt
-    SettleDebugPrint 0#
-    MsgBox mRpt, vbInformation, "LingTeX-Word micro diagnostic"
-End Sub
 
 '=============================================================================
 ' -- GOLDEN VECTORS ---------------------------------------------------------
@@ -1028,13 +661,12 @@ End Sub
 ' that blows up shows as a failure with the error number printed inline, next to
 ' the case that caused it, and every other case still runs.
 '
-' That shape is deliberate. The previous version was a single Sub with many
-' locals calling a helper that itself declared four arrays, and it died with
-' run-time error 6 on its first assertion -- while TypeCheck, whose tests are one
-' tiny function apiece with one or two locals, ran all eleven of its cases
-' without trouble on the same build. Whatever the underlying cause, small
-' procedures with few locals work here and large ones did not, and a test harness
-' that cannot survive its own subject is worthless.
+' That shape is deliberate. The previous version was a single Sub that died with
+' run-time error 6 on its first assertion, right after an Emit; splitting it into
+' small functions moved each assertion away from the print and "fixed" it. The
+' cause was Debug.Print (see SettleDebugPrint), understood only later; the shape
+' stays because a case that fails still shows its error inline, next to the case
+' that caused it, and every other case still runs.
 '
 ' Widths and flags come in as Variant arrays from Array(), so there is no string
 ' parsing between the test and the thing under test.
@@ -1132,6 +764,17 @@ End Function
 ' The folder the quiet runners write to, created on demand.  Beside the document
 ' that holds the VBA project -- ThisDocument -- because that path is known to the
 ' script that opened it.  Empty if there is no such path (an unsaved document).
+' "mac" or "win": the reports of the two platforms sit side by side in the
+' repository (RunAllTests.mac.txt, RunAllTests.win.txt) and never overwrite each
+' other, so a run on one can be compared with the other.
+Public Function PlatformTag() As String
+    If Application.PathSeparator = "/" Then
+        PlatformTag = "mac"
+    Else
+        PlatformTag = "win"
+    End If
+End Function
+
 Public Function ReportFolderPath() As String
     Dim base As String, sep As String
     On Error Resume Next

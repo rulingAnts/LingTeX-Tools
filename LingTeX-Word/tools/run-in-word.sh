@@ -15,6 +15,13 @@
 #           --tests all   run RunAllTests only;   --tests doc   RunDocTests only
 #           --macro NAME  run only that macro (after the import), for bisecting;
 #                         every *.txt it leaves in the reports folder is printed
+#           --no-commit   do not commit and push the reports afterwards
+#
+# REPORTS ARE COMMITTED.  Each platform writes its own files (RunAllTests.mac.txt
+# here, RunAllTests.win.txt from the PowerShell twin), so they never overwrite
+# each other, and after a run this commits the reports folder and pushes, so a
+# session on another machine can `git pull` and read them. Nothing else is
+# committed: the commit is limited to that folder.
 #
 # HOW IT WORKS, AND ITS ONE HOLE
 #
@@ -56,13 +63,14 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
 conf="$root/build/runner.conf"
 
-pull=1; import=1; tests=both; doc=""; extra=""; want=""
+pull=1; import=1; tests=both; doc=""; extra=""; want=""; commit=1
 for a in "$@"; do
     if [ "$want" = macro ]; then extra="$extra $a"; want=""; continue; fi
     case "$a" in
         --macro)     want=macro; tests=none ;;
         --no-pull)   pull=0 ;;
         --no-import) import=0 ;;
+        --no-commit) commit=0 ;;
         --tests)     tests=NEXT ;;
         all|doc|both) if [ "$tests" = NEXT ] || [ "$tests" = both ]; then tests=$a; fi ;;
         -h|--help)   sed -n '2,30p' "$0"; exit 0 ;;
@@ -89,7 +97,7 @@ if [ "$pull" = 1 ]; then
     git -C "$root" pull --ff-only || echo "   (pull failed; running on what is checked out)"
 fi
 
-rm -rf "$reports"; mkdir -p "$reports"
+mkdir -p "$reports"; rm -f "$reports"/*.mac.txt "$reports"/ImportModules.txt
 
 macros=""
 [ "$import" = 1 ] && macros="$macros ImportLingTeXModulesQuiet"
@@ -221,21 +229,36 @@ done
 
 echo ""
 status=0
-for p in "$reports"/*.txt; do
+summary=""
+for p in "$reports"/ImportModules.txt "$reports"/*.mac.txt; do
     [ -f "$p" ] || continue
     f=$(basename "$p")
     echo "==================== $f ===================="
-    cat "$reports/$f"
+    cat "$p"
     echo ""
-    if grep -q "FAILURES\|CRASH\|PROBLEM\|FAILED" "$reports/$f"; then status=1; fi
+    if grep -q "FAILURES\|CRASH\|PROBLEM\|FAILED" "$p"; then status=1; fi
+    s=$(grep -o "ALL PASS -- [0-9]* passed\|FAILURES -- .*FAILED" "$p" | head -1)
+    [ -n "$s" ] && summary="$summary ${f%.mac.txt}: $s;"
 done
 
 case "$macros" in
-    *RunAllTestsToFile*) [ -f "$reports/RunAllTests.txt" ] || { echo "no RunAllTests.txt -- the macro ran but wrote nothing; if Word could not write beside the document, the report opened as a document in Word instead"; status=1; } ;;
+    *RunAllTestsToFile*) [ -f "$reports/RunAllTests.mac.txt" ] || { echo "no RunAllTests.mac.txt -- the macro ran but wrote nothing; if Word could not write beside the document, the report opened as a document in Word instead"; status=1; } ;;
 esac
 case "$macros" in
-    *RunDocTestsToFile*) [ -f "$reports/RunDocTests.txt" ] || { echo "no RunDocTests.txt -- see above"; status=1; } ;;
+    *RunDocTestsToFile*) [ -f "$reports/RunDocTests.mac.txt" ] || { echo "no RunDocTests.mac.txt -- see above"; status=1; } ;;
 esac
+
+if [ "$commit" = 1 ]; then
+    # Only this platform's files: ImportModules.txt has the same name on both
+    # platforms and would conflict, so it stays ignored.
+    if git -C "$root" add -- "$reports"/*.mac.txt 2>/dev/null && \
+       git -C "$root" commit -q -m "LingTeX-Word reports (mac):$summary" -- "$reports"/*.mac.txt 2>/dev/null; then
+        echo "== reports committed: $(git -C "$root" log --oneline -1)"
+        git -C "$root" push -q 2>/dev/null && echo "   and pushed" || echo "   (push failed; the commit is local -- push by hand)"
+    else
+        echo "== reports unchanged; nothing committed"
+    fi
+fi
 
 echo "reports: $reports"
 exit $status

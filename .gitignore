@@ -87,6 +87,8 @@ LingTeX-Word/build/
 *.log
 *.tmp
 
-# LingTeX-Word: the developer's working document and the runner's reports
+# LingTeX-Word: the developer's working document (the runner's reports ARE committed,
+# one file per platform, so a run on one machine can be read from another;
+# ImportModules.txt is not, its name being the same on both)
+LingTeX-Word/LingTeX-Word-reports/ImportModules.txt
 LingTeX-Word/*.docm
-LingTeX-Word/LingTeX-Word-reports/
