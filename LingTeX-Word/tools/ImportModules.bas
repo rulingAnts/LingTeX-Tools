@@ -235,14 +235,27 @@ Private Function EnginePath() As String
 End Function
 
 ' Runs when Word loads this dev template from its startup folder: load the
-' engine as a global add-in, so every document has its commands and ribbon.
+' engine as a global add-in, so every document has its commands and ribbon --
+' but ONLY if the last test run left it green. The runner removes
+' build/engine-ok before a run and writes it after a clean one, so an engine
+' whose last import did not compile is never loaded a second time. (Loaded,
+' a module that does not compile raises "Compile error in hidden module" at
+' every load, unload and command, and Word cannot be got past it to repair
+' the file; 2026-09-12.) Without the marker the engine stays unloaded until a
+' run imports fresh modules into it, as a document, and loads it itself.
 Public Sub AutoExec()
     Dim wasQuiet As Boolean
     wasQuiet = mQuiet
     mQuiet = True                         ' never a dialog at Word start
-    If FileExists(EnginePath()) Then LoadEngine
+    If FileExists(EnginePath()) And FileExists(EngineOkMarker()) Then LoadEngine
     mQuiet = wasQuiet
 End Sub
+
+Private Function EngineOkMarker() As String
+    Dim sep As String
+    sep = Application.PathSeparator
+    EngineOkMarker = DevRoot() & sep & "build" & sep & "engine-ok"
+End Function
 
 ' Load the engine template as a global add-in (Templates and Add-ins).
 Public Sub LoadEngine()

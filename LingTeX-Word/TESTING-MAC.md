@@ -33,11 +33,16 @@ no automated suite can reach: what the thing actually looks like on the page.
      `sh LingTeX-Word/tools/install-dev-template.sh`
      (ribbon into the engine, clone location into the dev template, runner
      pointed at the engine).
-   - Start Word: the dev template loads, its `AutoExec` loads the engine, and
-     every document has a **LingTeX** tab. Then
-     `sh LingTeX-Word/tools/run-in-word.sh`: the import log's `from` and
-     `into` lines name the clone's `src` and the engine, then the suites, then
-     the hooks are armed.
+   - Start Word and run `sh LingTeX-Word/tools/run-in-word.sh`. The import
+     log's `from` and `into` lines name the clone's `src` and the engine; the
+     suites run; the hooks are armed; and if everything passed the engine is
+     marked good (`build/engine-ok`), so from the *next* Word start the dev
+     template loads it by itself and every document has a **LingTeX** tab.
+     An engine whose last run was not green is never loaded at Word start:
+     the runner repairs it by importing into it as a document, where nothing
+     compiles until it has been replaced. (That rule exists because a loaded
+     add-in with a module that does not compile raises the same dialog at
+     every load, unload and command, and Word cannot be got past it.)
 
 2. **Make the test document.** ⌘N for a blank one, then save it somewhere
    ordinary — `~/Desktop/lingtex-test.docx`. It has to be saved before the

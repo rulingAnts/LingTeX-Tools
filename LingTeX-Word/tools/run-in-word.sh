@@ -118,6 +118,10 @@ if [ "$pull" = 1 ]; then
 fi
 
 mkdir -p "$reports"; rm -f "$reports"/*.mac.txt "$reports"/ImportModules.txt
+# The engine is loaded at Word start only when its last run was green: the
+# marker goes before a run and comes back after a clean one (see AutoExec in
+# tools/ImportModules.bas). A broken import is therefore never loaded twice.
+rm -f "$root/build/engine-ok"
 
 macros=""
 [ "$import" = 1 ] && macros="$macros ImportLingTeXModulesQuiet"
@@ -309,5 +313,9 @@ if [ "$commit" = 1 ]; then
     fi
 fi
 
+if [ "$status" -eq 0 ] && [ -n "$summary" ]; then
+    mkdir -p "$root/build"; : > "$root/build/engine-ok"
+    echo "== engine marked good: it will load at the next Word start"
+fi
 echo "reports: $reports"
 exit $status
