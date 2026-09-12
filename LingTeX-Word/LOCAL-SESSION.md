@@ -89,6 +89,9 @@ requests.
   onLoad keeps the IRibbonUI; DocumentChange and every setting command call
   RefreshRibbon). Silent on the ribbon; the macro-list commands still report.
   Unproven on Mac (whether getPressed/onLoad callbacks fire there).
+- Icons: our own PNGs in src/icons (tools/make-icons.py, Pillow + macOS
+  fonts), embedded by build-dotm.sh with a part-level .rels; check-dotm.sh
+  guards them. Unproven on Mac (embedded ribbon images from STARTUP).
 - **The two-template loop works end to end** (2026-09-12 evening): import
   14/14 into the engine as a document, saved, loaded as a global add-in, 79
   and 271/272 -- every numbering check green. The one failure: after

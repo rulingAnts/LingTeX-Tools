@@ -122,7 +122,10 @@ Commands run from **Alt+F8** (Windows) or **Tools → Macro → Macros** (Mac):
 `LingTeXConvertTableToIgt`.
 
 `src/customUI14.xml` is the ribbon; it only takes effect once the modules are
-packaged into `LingTeX-Word.dotm`.
+packaged into `LingTeX-Word.dotm`. Its icons are our own, `src/icons/*.png`,
+drawn by `tools/make-icons.py`: a small page carrying an interlinear example,
+with a badge for what the button does. Nothing in them is a grid, because the
+examples are tables to Word but not to the user.
 
 ---
 
@@ -447,10 +450,11 @@ A VBA project is a binary stream that cannot be authored without Word, and
 GitHub's runners have no Word installed, so **CI can never build the `.dotm`**.
 `src/` stays the source of truth: the template is built once in Mac Word (import
 the modules, Save As a macro-enabled template), then `tools/build-dotm.sh` — bash,
-no Word — injects the ribbon XML and writes a SHA-256 manifest of every source
-file. CI verifies rather than builds: it unzips the `.dotm`, diffs the embedded
-ribbon against `src/customUI14.xml`, and checks the manifest, so a template that
-has drifted from the sources fails the release.
+no Word — injects the ribbon XML and its icons and writes a SHA-256 manifest of
+every source file. CI verifies rather than builds: it unzips the `.dotm`, diffs
+the embedded ribbon against `src/customUI14.xml` and the embedded icons against
+`src/icons/`, and checks the manifest, so a template that has drifted from the
+sources fails the release.
 
 **Later — convert-table, finished.** `LingTeXConvertTableToIgt` adopts a hand-made
 or pasted table: one row per tier, and **a row whose cells are merged into a

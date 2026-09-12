@@ -9,8 +9,9 @@
 #
 #   * someone fixes a module in the VBA editor and never exports it back to src/,
 #     so the shipped template contains code that is nowhere in the repository;
-#   * someone edits src/customUI14.xml and does not re-run build-dotm.sh, so the
-#     reviewable ribbon is not the ribbon that ships.
+#   * someone edits src/customUI14.xml, or redraws an icon in src/icons/, and
+#     does not re-run build-dotm.sh, so the reviewable ribbon is not the ribbon
+#     that ships.
 #
 # Neither shows up in a diff. Both show up here.
 #
@@ -25,6 +26,8 @@ dotm=${1:-$root/LingTeX-Word.dotm}
 ribbon="$src/customUI14.xml"
 manifest="$src/MANIFEST.sha256"
 PART="customUI/customUI14.xml"
+IMG_RELS="customUI/_rels/customUI14.xml.rels"
+icons="$src/icons"
 
 fails=0
 
@@ -84,6 +87,43 @@ else
     fail "$PART differs from src/customUI14.xml -- re-run build-dotm.sh"
     echo "        embedded: $(sha_of "$work/$PART")"
     echo "        src/:     $(sha_of "$ribbon")"
+fi
+
+#-- 2b. every icon the ribbon names is in there, byte for byte, and related --
+# image="X" is the Id of an image relationship of the ribbon PART, so three
+# things must agree: src/icons/X.png, customUI/images/X.png, and an Id="X" in
+# customUI/_rels/customUI14.xml.rels. A miss anywhere is a blank button.
+named=$(sed -n 's/.*[^A-Za-z]image="\([A-Za-z_][A-Za-z0-9_]*\)".*/\1/p' "$ribbon" | sort -u)
+if [ -n "$named" ]; then
+    bad=""
+    n=0
+    for id in $named; do
+        n=$((n + 1))
+        if [ ! -f "$icons/$id.png" ]; then
+            bad="$bad
+        $id: no src/icons/$id.png"
+        elif [ ! -f "$work/customUI/images/$id.png" ]; then
+            bad="$bad
+        $id: not embedded"
+        elif ! cmp -s "$work/customUI/images/$id.png" "$icons/$id.png"; then
+            bad="$bad
+        $id: the embedded icon differs from src/icons/$id.png"
+        fi
+        if ! grep -q "Id=\"$id\"" "$work/$IMG_RELS" 2>/dev/null; then
+            bad="$bad
+        $id: no relationship in $IMG_RELS"
+        fi
+    done
+    if [ -z "$bad" ]; then
+        pass "all $n icons the ribbon names are embedded, related and identical to src/icons/"
+    else
+        fail "icons out of step with the ribbon -- re-run build-dotm.sh:$bad"
+    fi
+    if grep -q 'Extension="png"' "$work/[Content_Types].xml" 2>/dev/null; then
+        pass "[Content_Types].xml covers the icons"
+    else
+        fail "[Content_Types].xml has no Default for png -- the icons will not load"
+    fi
 fi
 
 #-- 3. the root relationship points at it, with the type the namespace needs --
@@ -167,8 +207,8 @@ else
     done < "$manifest"
 
     # And the other direction: a source added to src/ and never built in.
-    for f in $(ls "$src" | sort); do
-        case "$f" in *.bas|*.cls|customUI14.xml) ;; *) continue ;; esac
+    for f in $(ls "$src" | sort) $(ls "$icons" 2>/dev/null | sed 's|^|icons/|' | sort); do
+        case "$f" in *.bas|*.cls|customUI14.xml|icons/*.png) ;; *) continue ;; esac
         if ! grep -q "  $f\$" "$manifest"; then
             drift="$drift
         $f is in src/ but not in the manifest"

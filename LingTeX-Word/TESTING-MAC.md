@@ -116,7 +116,9 @@ sh LingTeX-Word/tools/add-ribbon.sh "<startup folder>/LingTeX.dotm"
   on every document's ribbon, with every command and setting as a button.
   This is the same ribbon the packaged template will carry, so if a button
   comes through blank or does nothing on Mac, that is a finding for the
-  packaging step as well.
+  packaging step as well. The icons are embedded PNGs (`src/icons/`), a path
+  unproven on Mac: every button blank means Mac Word ignores embedded images
+  from a startup template, and the fallback is built-in `imageMso` names.
 
 ### Settings are commands too
 
@@ -339,8 +341,9 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
 
 ## After a ribbon change
 
-The ribbon lives in the engine file, injected from `src/customUI14.xml`, so a
-change to that file reaches Word only by re-injection with Word quit:
+The ribbon lives in the engine file, injected from `src/customUI14.xml` with
+its icons from `src/icons/`, so a change to either reaches Word only by
+re-injection with Word quit:
 
 ```bash
 sh LingTeX-Word/tools/install-dev-template.sh
