@@ -61,8 +61,12 @@ Cmd+Option+Shift. Put the dev template back afterwards.
 
 ## What the first run does
 
-`AutoExec` in `modLingTeX` runs `FirstRunSetup` when the template is loaded
-from Word's STARTUP folder (never from a clone): it installs the shortcuts,
-records the setup version in the Normal template, and shows one message. Bump
+`AutoExec` in `modLingTeX` books `LingTeXFirstRun` for three seconds after
+startup (`Application.OnTime`) when the template is loaded from Word's STARTUP
+folder (never from a clone): it installs the shortcuts, records the setup
+version in the Normal template, and shows one message. Not from `AutoExec`
+itself: Word times each STARTUP template's load, a modal message counts for
+as long as it is on screen, and the result was an add-in alert on Windows
+offering to disable the add-in. Bump
 `SETUP_VERSION` in `modLingTeX` to make every machine do it again at the next
 start (for instance after the shortcut table changes).

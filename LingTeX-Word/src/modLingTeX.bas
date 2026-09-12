@@ -77,7 +77,7 @@ Private Const INDENT_STEP As Double = 36
 ' The first run: what the add-in does for itself the first time Word loads
 ' it from STARTUP, recorded in the Normal template so it happens once. Bump
 ' to run it again on every machine at the next start.
-Private Const SETUP_VERSION As String = "1"
+Private Const SETUP_VERSION As String = "2"      ' 2: the first run moved out of AutoExec
 Private Const SETUP_VAR As String = "LingTeX_Setup"
 
 '-----------------------------------------------------------------------------
@@ -136,7 +136,7 @@ Public Sub AutoExec()
     mEvents.Attach
     Err.Clear
     On Error GoTo 0
-    FirstRunSetup
+    ScheduleFirstRun
 End Sub
 
 '-----------------------------------------------------------------------------
@@ -147,8 +147,29 @@ End Sub
 ' where the installer puts it: the dev rig loads it from the clone and must
 ' see no dialog at Word start, or the test runner hangs on it. Recorded in
 ' Normal, which Word saves at quit; done again only when SETUP_VERSION moves.
+'
+' NOT DONE INSIDE AUTOEXEC. Word times how long each STARTUP template takes
+' to load, and a modal message shown from AutoExec counts for as long as it is
+' on screen: on Windows the first run earned an "add-in alert: it caused Word
+' to start slowly", offering to disable us (Seth, 2026-09-12). So AutoExec only
+' books the first run for a moment after startup is over, with OnTime, and
+' LingTeXFirstRun does the work then.
 '-----------------------------------------------------------------------------
-Private Sub FirstRunSetup()
+Private Sub ScheduleFirstRun()
+    Dim app As Object
+    Dim done As String
+    On Error Resume Next
+    Set app = Application
+    If Not LoadedFromStartup() Then Exit Sub
+    done = app.NormalTemplate.Variables(SETUP_VAR).Value
+    Err.Clear
+    If done = SETUP_VERSION Then Exit Sub
+    app.OnTime When:=Now + TimeValue("00:00:03"), Name:="LingTeXFirstRun"
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+Public Sub LingTeXFirstRun()
     Dim app As Object
     Dim summary As String
     Dim done As String
