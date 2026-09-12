@@ -202,6 +202,24 @@ Open documents at start: 1
   PASS   and its first row does not
   PASS   a known role is passed through
 
+-- adjacent --------------------------------------------------
+  PASS   adjacent A: first example drawn
+  PASS   adjacent A: second example drawn with an empty Free-styled paragraph between
+  PASS   adjacent A: two tables before re-wrap
+  PASS   adjacent A: re-wrap all keeps both examples
+  PASS   adjacent A: both are still interlinear
+  PASS   adjacent A: a paragraph still separates them
+  PASS   adjacent A: the first example keeps one translation
+  PASS   adjacent A: the second example reads back whole
+  PASS   adjacent B: first example drawn
+  PASS   adjacent B: second example drawn with only the translation between
+  PASS   adjacent B: two tables before re-wrap
+  PASS   adjacent B: re-wrap all keeps both examples
+  PASS   adjacent B: both are still interlinear
+  PASS   adjacent B: a paragraph still separates them
+  PASS   adjacent B: the first example keeps one translation
+  PASS   adjacent B: the second example reads back whole
+
 -- commands --------------------------------------------------
   PASS   LingTeXPing answers (so the project compiled)
   PASS   LingTeXRewrapCurrent outside an example changes no text
@@ -274,5 +292,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 228 passed
+ALL PASS -- 244 passed
 
