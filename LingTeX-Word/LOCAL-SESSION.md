@@ -85,6 +85,12 @@ requests.
 
 ## State of play
 
+- **The ribbon loads on Mac** (2026-09-12, screenshot): LingTeX.dotm in the
+  startup folder, injected with add-ribbon.sh, shows the full LingTeX tab over
+  a new document -- Interlinear, Layout, Alignment, Settings, Setup, Keys,
+  Check, icons and all. Seth stopped there (appointment); next: the runner
+  against the template (does the loaded template save itself after the
+  import?), Install Shortcuts, then the page from `numbered` onward.
 - **Stage 1 and stage 2 pass on both platforms** (2026-09-12): `RunAllTests`
   79/79 and `RunDocTests` 224/224 on Mac Word 16.112 and on Word for Windows.
   Reports in `LingTeX-Word-reports/*.mac.txt` and `*.win.txt`.

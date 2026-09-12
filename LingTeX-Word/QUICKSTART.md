@@ -587,7 +587,8 @@ available on both once the trust setting is on.) Two things it cannot cover, for
 one pass on Windows later:
 
 - The **NSIS installer**, which does not exist yet and is Windows-only.
-- Whether custom **ribbon XML** in a STARTUP `.dotm` loads.
+- ~~Whether custom **ribbon XML** in a STARTUP `.dotm` loads.~~ It does, on Mac
+  Word 16.112 (2026-09-12): the whole LingTeX tab over a new document.
 
 Single-step undo is no longer on that list. An earlier version assumed
 `Application.UndoRecord` was Windows-only and compiled it out on Mac; the probe
