@@ -1418,6 +1418,62 @@ Public Sub LingTeXInstallShortcuts()
     End If
 End Sub
 
+'-----------------------------------------------------------------------------
+' LingTeXProbeShortcuts: which parameter Mac Word refuses in KeyBindings.Add.
+'
+' Install Shortcuts fails there with 5853 "Invalid parameter" in every home and
+' under every name (Seth, 2026-09-12), so the fault is the key code or the
+' category. This tries one binding at a time, each differing in one thing,
+' clears every one that succeeds, and reports the lot. Run it from the macro
+' list (it is in modLingTeX because modTests may not name a command); it changes nothing that it does not put back.
+'-----------------------------------------------------------------------------
+Public Sub LingTeXProbeShortcuts()
+    Dim app As Object
+    Dim msg As String
+
+    On Error Resume Next
+    Set app = Application
+    app.CustomizationContext = app.NormalTemplate
+    msg = "KeyBindings.Add, in the Normal template, one thing changed at a time:" & vbCr
+    msg = msg & Probe(app, "built-in FileSave, Cmd+Opt+I", 1, "FileSave", 512 + 1024 + 73)
+    msg = msg & Probe(app, "built-in FileSave, Cmd+Shift+I", 1, "FileSave", 512 + 256 + 73)
+    msg = msg & Probe(app, "macro, Cmd+Opt+I", 2, "LingTeXInsertInterlinear", 512 + 1024 + 73)
+    msg = msg & Probe(app, "macro, Cmd+Shift+I", 2, "LingTeXInsertInterlinear", 512 + 256 + 73)
+    msg = msg & Probe(app, "macro, Cmd+I", 2, "LingTeXInsertInterlinear", 512 + 73)
+    msg = msg & Probe(app, "macro, Opt+Shift+I", 2, "LingTeXInsertInterlinear", 1024 + 256 + 73)
+    msg = msg & Probe(app, "macro, F7", 2, "LingTeXInsertInterlinear", 118)
+    msg = msg & Probe(app, "macro, BuildKeyCode(Cmd, Opt, I)", 2, "LingTeXInsertInterlinear", _
+                      app.BuildKeyCode(512, 1024, 73))
+    msg = msg & Probe(app, "module-qualified macro, Cmd+Opt+I", 2, _
+                      "modLingTeX.LingTeXInsertInterlinear", 512 + 1024 + 73)
+    msg = msg & Probe(app, "macro RunAllTests (this module), Cmd+Opt+I", 2, "RunAllTests", _
+                      512 + 1024 + 73)
+    msg = msg & "BuildKeyCode(512, 1024, 73) = " & CStr(app.BuildKeyCode(512, 1024, 73)) & vbCr
+    msg = msg & "KeyBindings.Count = " & CStr(app.KeyBindings.Count) & vbCr
+    Err.Clear
+    On Error GoTo 0
+    Report msg, vbInformation
+End Sub
+
+' One binding: added, then cleared again if it took.
+Private Function Probe(app As Object, ByVal what As String, ByVal category As Long, _
+        ByVal cmd As String, ByVal code As Long) As String
+    Dim kb As Object
+    On Error Resume Next
+    Err.Clear
+    app.KeyBindings.Add category, cmd, code
+    If Err.Number = 0 Then
+        Probe = "  " & what & ": OK" & vbCr
+        Err.Clear
+        Set kb = app.FindKey(code)
+        If Not kb Is Nothing Then kb.Clear
+    Else
+        Probe = "  " & what & ": " & CStr(Err.Number) & " " & Err.Description & vbCr
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Function
+
 ' One attempt: the customization context, then the binding. Empty on success,
 ' else what Word said, prefixed "context" when it was the context that failed.
 Private Function TryBindKey(app As Object, home As Object, ByVal cmd As String, _
