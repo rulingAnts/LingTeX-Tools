@@ -732,6 +732,109 @@ def check_stage1_independence(files):
     return problems
 
 
+def _code_only(t):
+    """A logical line with strings masked and any trailing comment removed."""
+    return mask_strings(t).split("'")[0]
+
+
+def check_debug_print_settled(files):
+    """Every Debug.Print in the engine is followed, on the very next logical line,
+    by SettleDebugPrint. On Mac Word 16.112 a Debug.Print leaves the interpreter
+    in a state where the next floating-point assignment or comparison in that
+    frame -- or in the frame that called the printing procedure -- raises
+    run-time error 6, Overflow; any call in between clears it (modTests,
+    SettleDebugPrint). A line marked 'unsettled on purpose' is the reproduction."""
+    problems = []
+    for f in files:
+        if f.name in STANDALONE:
+            continue  # pasted alone; their Debug.Prints are each followed by MsgBox
+        text = f.read_text(encoding="utf-8")
+        raw = text.splitlines()
+        lines = logical_lines(text)
+        for i, (n, t) in enumerate(lines):
+            if not re.match(r"Debug\.Print\b", _code_only(t).strip()):
+                continue
+            if "unsettled on purpose" in raw[n - 1]:
+                continue
+            nxt = _code_only(lines[i + 1][1]).strip() if i + 1 < len(lines) else ""
+            if not nxt.startswith("SettleDebugPrint"):
+                problems.append(
+                    f"{f.name}:{n}: Debug.Print must be followed by 'SettleDebugPrint 0#' "
+                    f"on the next line -- on Mac it arms an Overflow in the next "
+                    f"floating-point statement, in this frame or the caller's")
+    return problems
+
+
+def check_no_single(files):
+    """No Single anywhere in the engine: every measurement is a Double. The type
+    was once blamed for the Overflow above; it was not the cause, but Double is
+    what the JavaScript reference uses and mixing the two invites rounding drift.
+    modTests keeps Single in its historical diagnostics until the health pass."""
+    problems = []
+    for f in files:
+        if f.name in STANDALONE or f.name == "modTests.bas":
+            continue
+        for n, t in logical_lines(f.read_text(encoding="utf-8")):
+            c = _code_only(t)
+            if re.search(r"\bAs Single\b|\bCSng\s*\(", c):
+                problems.append(f"{f.name}:{n}: Single is not used in the engine; use Double")
+    return problems
+
+
+# Word enumeration constants the engine may use. VBA compiles a procedure when it
+# is first reached, so a constant missing from Mac Word's type library is a
+# "Variable not defined" dialog half-way through a run (wdStyleTableGrid, 2026-09-12).
+# Every name here is a long-standing member of its enumeration, and those the
+# suites reach have compiled on Mac Word 16.112. Add to it deliberately; prefer a
+# style's name to a wdStyle* enum.
+WD_CONSTANTS = {
+    "wdAdjustNone",
+    "wdAlignParagraphLeft",
+    "wdAlignRowLeft",
+    "wdAutoFitContent",
+    "wdBorderBottom",
+    "wdBorderHorizontal",
+    "wdBorderLeft",
+    "wdBorderRight",
+    "wdBorderTop",
+    "wdBorderVertical",
+    "wdCellAlignVerticalTop",
+    "wdCharacter",
+    "wdCollapseEnd",
+    "wdCollapseStart",
+    "wdDeleteCellsShiftLeft",
+    "wdDoNotSaveChanges",
+    "wdHorizontalPositionRelativeToTextBoundary",
+    "wdLineSpaceSingle",
+    "wdLineStyleNone",
+    "wdPasteText",
+    "wdSelectionIP",
+    "wdStyleDefaultParagraphFont",
+    "wdStyleNormal",
+    "wdStyleTypeCharacter",
+    "wdStyleTypeParagraph",
+    "wdStyleTypeTable",
+    "wdUndefined",
+    "wdWithInTable",
+}
+
+
+def check_wd_constants(files):
+    """Every wd* identifier in the engine is in WD_CONSTANTS."""
+    problems = []
+    for f in files:
+        if f.name in STANDALONE:
+            continue
+        for n, t in logical_lines(f.read_text(encoding="utf-8")):
+            for m in re.finditer(r"\bwd[A-Z][A-Za-z0-9]*", _code_only(t)):
+                if m.group(0) not in WD_CONSTANTS:
+                    problems.append(
+                        f"{f.name}:{n}: '{m.group(0)}' is not in the linter's WD_CONSTANTS "
+                        f"allowlist; confirm it exists in Mac Word's type library "
+                        f"(or use a name instead of a wdStyle* enum), then add it")
+    return problems
+
+
 def main():
     files = []
     for d in SRC_DIRS:
@@ -811,6 +914,33 @@ def main():
             print("          " + msg)
     else:
         print("  OK    stage-1 independence (QUICKSTART.md staged install)")
+
+    dbg = check_debug_print_settled(files)
+    if dbg:
+        total += len(dbg)
+        print("  FAIL  Debug.Print settled")
+        for msg in dbg:
+            print("          " + msg)
+    else:
+        print("  OK    every Debug.Print is followed by SettleDebugPrint")
+
+    sng = check_no_single(files)
+    if sng:
+        total += len(sng)
+        print("  FAIL  no Single")
+        for msg in sng:
+            print("          " + msg)
+    else:
+        print("  OK    no Single in the engine")
+
+    wdc = check_wd_constants(files)
+    if wdc:
+        total += len(wdc)
+        print("  FAIL  wd constants")
+        for msg in wdc:
+            print("          " + msg)
+    else:
+        print("  OK    every wd* constant is on the allowlist")
 
     print()
     print("ALL PASS" if total == 0 else f"{total} problem(s)")

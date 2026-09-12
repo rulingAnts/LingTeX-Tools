@@ -132,7 +132,23 @@ End Sub
 '-----------------------------------------------------------------------------
 Private Sub Emit(ByVal s As String)
     Debug.Print s
+    SettleDebugPrint 0#
     mRpt = mRpt & s & vbCr
+End Sub
+
+'-----------------------------------------------------------------------------
+' Call this immediately after EVERY Debug.Print. The linter enforces it.
+'
+' On Mac Word 16.112 (Apple silicon), Debug.Print leaves the VBA interpreter in
+' a state where the next floating-point assignment or comparison -- in the same
+' frame, OR in the frame that called the printing procedure -- raises run-time
+' error 6, Overflow. Any procedure call made after the print clears that state;
+' Long arithmetic does not. An empty Sub taking one Double argument is the form
+' that was proven (modDocTests, bisected across some fifty variants, 2026-09-12)
+' to protect the printing procedure's callers as well as itself.
+' Full account: DebugPrintDiagnose below, and QUICKSTART.md.
+'-----------------------------------------------------------------------------
+Public Sub SettleDebugPrint(ByVal d As Double)
 End Sub
 
 '-----------------------------------------------------------------------------
@@ -331,8 +347,50 @@ Crashed:
 
 Done:
     Debug.Print mRpt
+    SettleDebugPrint 0#
     MsgBox mRpt, vbInformation, "LingTeX-Word wrap diagnostic"
 End Sub
+
+'-----------------------------------------------------------------------------
+' DebugPrintDiagnose -- the reproduction of the Overflow that was blamed on
+' Single. Expected on Mac Word 16.112: A crashes with error 6, B passes. If A
+' passes too, this build does not have the fault (Windows is expected not to).
+' See SettleDebugPrint for the rule that follows from it.
+'-----------------------------------------------------------------------------
+Public Sub DebugPrintDiagnose()
+    Dim rpt As String
+    rpt = "DebugPrintDiagnose" & vbCr
+    rpt = rpt & "A  Debug.Print, then a Double assignment:   " & _
+          TryPrintThenAssign() & vbCr
+    rpt = rpt & "B  the same, with SettleDebugPrint between: " & _
+          TryPrintSettledThenAssign() & vbCr
+    MsgBox rpt, vbInformation, "LingTeX-Word Debug.Print diagnostic"
+End Sub
+
+Private Function TryPrintThenAssign() As String
+    Dim d As Double
+    On Error GoTo Crashed
+    Debug.Print "DebugPrintDiagnose A"   ' unsettled on purpose: the reproduction
+    d = -1
+    TryPrintThenAssign = "ok"
+    Exit Function
+Crashed:
+    TryPrintThenAssign = "error " & CStr(Err.Number) & " " & Err.Description
+    Err.Clear
+End Function
+
+Private Function TryPrintSettledThenAssign() As String
+    Dim d As Double
+    On Error GoTo Crashed
+    Debug.Print "DebugPrintDiagnose B"
+    SettleDebugPrint 0#
+    d = -1
+    TryPrintSettledThenAssign = "ok"
+    Exit Function
+Crashed:
+    TryPrintSettledThenAssign = "error " & CStr(Err.Number) & " " & Err.Description
+    Err.Clear
+End Function
 
 '-----------------------------------------------------------------------------
 ' TypeCheck -- which numeric types actually work on this build?
@@ -356,6 +414,13 @@ End Sub
 ' in, which is exactly why a per-type check in tiny functions could not see it.
 ' THE ENGINE NOW USES Double EVERYWHERE.  The Single here, and in MicroDiagnose
 ' below, is kept deliberately: it is the reproduction.
+'
+' AND THEN THE REAL CAUSE.  Stage 2 died the same way with Double. Bisected in
+' modDocTests (2026-09-12): the trigger is Debug.Print, not the type -- see
+' SettleDebugPrint and DebugPrintDiagnose. Every failure above was the first
+' floating-point statement after an Emit. The Single story was wrong; the move
+' to Double was harmless and stays. TypeCheck, DiagnoseWrap and MicroDiagnose
+' are now historical and go in the next health pass.
 '-----------------------------------------------------------------------------
 Public Sub TypeCheck()
     mRpt = ""
@@ -379,6 +444,7 @@ Public Sub TypeCheck()
     Emit "Send this whole report back."
 
     Debug.Print mRpt
+    SettleDebugPrint 0#
     MsgBox mRpt, vbInformation, "LingTeX-Word type check"
 End Sub
 
@@ -590,6 +656,7 @@ Crashed:
 
 Done:
     Debug.Print mRpt
+    SettleDebugPrint 0#
     MsgBox mRpt, vbInformation, "LingTeX-Word micro diagnostic"
 End Sub
 
