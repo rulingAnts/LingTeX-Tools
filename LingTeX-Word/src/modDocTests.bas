@@ -88,6 +88,7 @@ Public Sub RunDocTests()
     RunSection "geometry"
     RunSection "scratch"
     RunSection "roundtrip"
+    RunSection "adjacent"
     RunSection "commands"
     RunSection "events"
 
@@ -125,6 +126,7 @@ Private Sub RunSection(ByVal which As String)
         Case "geometry":     TestAvailableWidth
         Case "scratch":      TestScratchLifecycle
         Case "roundtrip":    TestRoundTrip
+        Case "adjacent":     TestAdjacentExamples
         Case "commands":     TestCommands
         Case "events":       TestEvents
         Case Else
@@ -2223,6 +2225,79 @@ Private Function ThreeTierExample() As IgtExample
     AddFreeLine ex, "A pig attacked her, is what I am talking about."
     ThreeTierExample = ex
 End Function
+
+
+'=============================================================================
+' -- ADJACENT EXAMPLES ------------------------------------------------------
+'=============================================================================
+' Two examples close together, and re-wrap-all over both. Found by hand
+' (2026-09-12): with one empty paragraph between them -- what Enter leaves
+' after a translation, and it inherits LingTeX Free -- re-wrap-all deleted the
+' second example. The empty paragraph was absorbed as a translation and
+' deleted, the two tables touched, Word merged them, and tbl.Delete took both.
+' Two layouts here: A has that empty paragraph, B has nothing but the
+' translation between the tables, which is what two inserts in a row produce.
+Private Sub TestAdjacentExamples()
+    Dim savedQuiet As Boolean
+    savedQuiet = gQuiet
+    gQuiet = True
+    CheckAdjacentPair "A", True
+    CheckAdjacentPair "B", False
+    gQuiet = savedQuiet
+End Sub
+
+Private Sub CheckAdjacentPair(ByVal tag As String, ByVal emptyBetween As Boolean)
+    Dim doc As Document
+    Dim ex As IgtExample, back As IgtExample
+    Dim where As Range
+    Dim t1 As Table, t2 As Table
+    Dim para As Paragraph
+    Dim between As Long
+    Dim what As String
+
+    what = IIf(emptyBetween, "an empty Free-styled paragraph between", _
+                             "only the translation between")
+
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "adjacent " & tag & ": could create a blank document", False
+        Exit Sub
+    End If
+    EnsureStyles doc, True
+    ex = ThreeTierExample()
+
+    Set t1 = RenderExample(ex, doc.Content)
+    Ok "adjacent " & tag & ": first example drawn", (Not t1 Is Nothing)
+    If emptyBetween Then
+        doc.Content.InsertParagraphAfter
+        Set para = doc.Paragraphs(doc.Paragraphs.Count)
+        ApplyParaStyle para.Range, doc, ROLE_FREE      ' as Enter would leave it
+    End If
+    Set where = doc.Content
+    where.Collapse wdCollapseEnd
+    Set t2 = RenderExample(ex, where)
+    Ok "adjacent " & tag & ": second example drawn with " & what, (Not t2 Is Nothing)
+    Ok "adjacent " & tag & ": two tables before re-wrap", (doc.Tables.Count = 2)
+
+    RewrapDocument doc, False
+
+    Ok "adjacent " & tag & ": re-wrap all keeps both examples", (doc.Tables.Count = 2)
+    If doc.Tables.Count = 2 Then
+        Ok "adjacent " & tag & ": both are still interlinear", _
+            (AllInterlinearTables(doc).Count = 2)
+        between = doc.Range(doc.Tables(1).Range.End, _
+                            doc.Tables(2).Range.Start).Paragraphs.Count
+        Ok "adjacent " & tag & ": a paragraph still separates them", (between >= 1)
+        back = ReadExampleFromTable(doc.Tables(1))
+        AbsorbFreeParagraphs back, doc.Tables(1)
+        Eq "adjacent " & tag & ": the first example keeps one translation", _
+            CStr(back.FreeCount), "1"
+        back = ReadExampleFromTable(doc.Tables(2))
+        Ok "adjacent " & tag & ": the second example reads back whole", _
+            (back.ColCount = ex.ColCount)
+    End If
+    CloseNoSave doc
+End Sub
 
 
 '=============================================================================
