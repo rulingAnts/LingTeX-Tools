@@ -146,10 +146,26 @@ examples are tables to Word but not to the user.
 |---|---|
 | **Insert Interlinear** | With nothing selected, reads the clipboard; with text selected, replaces it. Accepts FLEx interlinear text (tab-separated, with tier labels) or plain tab-separated rows. |
 | **Convert Table** | Adopts an ordinary Word table as an auto-wrapping example. |
+| **Text to Interlinear** | Select lines you typed, the words on one line and their glosses on the next with the translation under them, and they become an example. Blank lines are ignored, a leading `(1)` is dropped, and you are asked how many of the last lines are translations. Aligned by word or by morpheme as the document is set. Insert Interlinear takes the same road when its selection is plain lines. |
 | **Re-wrap This** / **Re-wrap All** | Recompute the wrap. Also runs on save. A space typed into an interlinear cell becomes the document's replacement character (`.` or `_`), as on insert; a space would let Word wrap the text inside the cell. |
 | **Split Column** | Pulls an affix, clitic or reduplicant into its own column, carrying the break character onto every interlinear tier. |
 | **Merge Columns** | Select across cells to merge those; with one cell selected, merges it with the next column. |
 | **Check Glossing** | Reports and optionally repairs, as above. |
+
+### Text to Interlinear
+
+For an example that exists only as typed lines, not FLEx output: select the
+lines and click **Text to Interlinear**. The words of each tier line become
+the columns (any run of spaces separates them, and a manual line break inside
+a line is just a space), blank lines are skipped, and a leading example number
+such as `(1)`, `(12a)` or `1.` is dropped because the document numbers its
+examples itself. The one thing the text cannot say is which of its last lines
+are free translations, so you are asked, with a guess already filled in: the
+trailing lines whose word count differs from the first line's. With the
+document set to morpheme alignment, every column whose form and gloss both
+carry a morpheme boundary is split at it, tier by tier, so `Akwal-mam` over
+`Neck-3.POSS` becomes two columns while `nalami` over `what-PP` stays one
+(Check Glossing reports that mismatch, as it always has).
 
 ### The ribbon's toggles
 

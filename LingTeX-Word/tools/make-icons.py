@@ -345,6 +345,20 @@ def ic_show_keys():
     return im
 
 
+def ic_from_text():
+    """Lines of typed text becoming interlinear lines: a plain chip of two
+    unaligned lines, the arrow, the aligned pair."""
+    im = canvas(); d = ImageDraw.Draw(im)
+    chip(d, 5, 3, 59, 25)
+    text(d, 10, 4, "ka-mi na", font(F_REG, 8.5), SOURCE)
+    text(d, 10, 14, "1-ERG go", font(F_REG, 8.5), SOURCE)
+    down_arrow(d, 32, 27, 12, head=7, shaft=4, colour=BLUE)
+    chip(d, 5, 40, 59, 62)
+    text(d, 10, 41, "ka-mi na", font(F_BOLD, 9.5), SOURCE)
+    text(d, 10, 51, "1-ERG go", font(F_REG, 8.5), GLOSS)
+    return im
+
+
 def ic_check():
     """The glossing, checked."""
     im = canvas(); d = ImageDraw.Draw(im)
@@ -381,6 +395,7 @@ ICONS = [
     ("igtInstallKeys", ic_install_keys, 32),
     ("igtShowKeys", ic_show_keys, 32),
     ("igtCheck", ic_check, 64),
+    ("igtFromText", ic_from_text, 64),
 ]
 
 

@@ -99,6 +99,19 @@ requests.
   (with 9pt set above the example, by the test) and half-repainted; the
   "janked" screenshot was that document, and the `rows` test now checks
   every cell of the first row starts at the same height.
+- **Text to Interlinear** (2026-09-14, Seth): select typed lines (words /
+  glosses / translation, blank lines anywhere) and draw them. Not Word's
+  text-to-table: the lines become the model directly (modIgtModel, PLAIN
+  TEXT LINES: TextLines, StripExampleNumber, GuessFreeLineCount,
+  ModelFromLines) and ProjectToMorphemes -- SplitColumn over every column
+  whose interlinear cells all have a boundary -- gives the document's
+  morpheme alignment, which plain rows never had. One question (Ask, an
+  InputBox; gQuietText answers it in tests): how many of the last lines are
+  translations, guessed from word counts. Insert Interlinear falls back to
+  it for plain lines. The draw tail of Insert is DrawParsedExample, shared.
+  Ribbon: Text to Interlinear (igtFromText) in the Interlinear group; no
+  shortcut yet (a letter would mean a SETUP_VERSION bump). Doc-test section
+  `fromtext`. modIgtModel is stage 1: RunAllTests must stay 79.
 - **The review of the day's changes** (2026-09-14, four lenses, two
   skeptics per finding; 19 found, 7 confirmed, every Mac-compile candidate
   refuted as already proven in baseline code). Fixed, one commit each, on

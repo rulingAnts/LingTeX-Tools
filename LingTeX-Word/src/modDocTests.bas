@@ -90,6 +90,7 @@ Public Sub RunDocTests()
     RunSection "dialog"
     RunSection "spacefix"
     RunSection "rows"
+    RunSection "fromtext"
     RunSection "measure"
     RunSection "agreement"
     RunSection "rendering"
@@ -133,6 +134,7 @@ Private Sub RunSection(ByVal which As String)
         Case "dialog":       TestDialog
         Case "spacefix":     TestSpaceFix
         Case "rows":         TestRowGeometry
+        Case "fromtext":     TestTextToInterlinear
         Case "measure":      TestMeasure
         Case "agreement":    TestRenderMeasureAgreement
         Case "rendering":    TestRendering
@@ -1105,6 +1107,133 @@ Private Sub TestRowGeometry()
     ClearSetting doc, "PadLeft"
     ClearSetting doc, "PadRight"
     ClearSetting doc, "PadTop"
+    CloseNoSave doc
+End Sub
+
+
+'=============================================================================
+' -- TEXT TO INTERLINEAR: TYPED LINES BECOME AN EXAMPLE ---------------------
+'=============================================================================
+' Seth's own example (2026-09-14): a numbered sentence, its glosses on the
+' next line (soft-wrapped in the source), a blank line, the Indonesian free
+' translation in brackets. The pure steps first, then the command end to
+' end, by word and by morpheme, the Cancel path, and Insert's fallback.
+
+Private Sub TestTextToInterlinear()
+    Dim doc As Document
+    Dim lines() As String
+    Dim ex As IgtExample, back As IgtExample
+    Dim raw As String
+    Dim savedQuiet As Boolean, savedText As String
+    Dim docsBefore As Long
+
+    raw = "(1) Ewaub  pe. [...] Akwal-mam pe auk-nu as truko, nalami weto numuhe." & vbCr & vbCr
+    raw = raw & "Egret/heron/stork/crane DET [...] Neck-3.POSS DET long.SG-and can" & Chr(11) & _
+          "make.long, what-PP sees.something if" & vbCr
+    raw = raw & vbCr & "(Bebas: Burung bangau itu. Lehernya itu panjang dan bisa kasi " & _
+          "panjang kalau dia lihat sesuatu.)" & vbCr
+
+    '-- the pure steps -----------------------------------------------------
+    lines = TextLines(raw)
+    Ok "TextLines drops the blank lines and keeps three", (UBound(lines) = 2)
+    Ok "  a manual line break inside a line is a space", (InStr(lines(1), "can make.long") > 0)
+    Ok "  a double space is one", (InStr(lines(0), "  ") = 0)
+    Eq "StripExampleNumber drops (1)", StripExampleNumber(lines(0)), _
+        "Ewaub pe. [...] Akwal-mam pe auk-nu as truko, nalami weto numuhe."
+    Eq "  and 12a.", StripExampleNumber("12a. Ewaub pe."), "Ewaub pe."
+    Eq "  and 3)", StripExampleNumber("3) Ewaub"), "Ewaub"
+    Eq "  but not a bare number, which is a word", StripExampleNumber("3 Ewaub"), "3 Ewaub"
+    Eq "  nor a word", StripExampleNumber("Ewaub pe."), "Ewaub pe."
+    Ok "IsExampleNumberToken knows (1), (12a), 1), 1.", _
+        (IsExampleNumberToken("(1)") And IsExampleNumberToken("(12a)") And _
+         IsExampleNumberToken("1)") And IsExampleNumberToken("1."))
+    Ok "  and refuses a, (a), 1, pe.", _
+        (Not IsExampleNumberToken("a") And Not IsExampleNumberToken("(a)") And _
+         Not IsExampleNumberToken("1") And Not IsExampleNumberToken("pe."))
+    lines(0) = StripExampleNumber(lines(0))
+    Ok "eleven words on the first line", (WordCount(lines(0)) = 11)
+    Ok "the guess is one translation: the last line's count differs, the gloss line's does not", _
+        (GuessFreeLineCount(lines) = 1)
+    ex = ModelFromLines(lines, 1)
+    Ok "ModelFromLines: two tiers, eleven columns, one translation", _
+        (ex.TierCount = 2 And ex.ColCount = 11 And ex.FreeCount = 1)
+    Eq "  the first cell is the first word", ex.Cells(0, 0), "Ewaub"
+    Eq "  the placeholder is a column of its own", ex.Cells(1, 2), "[...]"
+    Eq "  the tiers are Vernacular and Gloss", ex.Tiers(0) & "|" & ex.Tiers(1), _
+        ROLE_VERNACULAR & "|" & ROLE_GLOSS
+    Ok "  the translation is verbatim", (Left$(ex.FreeLines(0), 7) = "(Bebas:")
+
+    '-- the morpheme projection ---------------------------------------------
+    ProjectToMorphemes ex
+    Ok "ProjectToMorphemes splits the two columns whose form AND gloss have a boundary", _
+        (ex.ColCount = 13)
+    Eq "  Akwal-mam becomes Akwal, -mam", ex.Cells(0, 3) & "|" & ex.Cells(0, 4), "Akwal|-mam"
+    Eq "  over Neck, -3.POSS", ex.Cells(1, 3) & "|" & ex.Cells(1, 4), "Neck|-3.POSS"
+    Eq "  nalami over what-PP is left whole: the form has no boundary", _
+        ex.Cells(0, 10) & "|" & ex.Cells(1, 10), "nalami|what-PP"
+    ex = ThreeTierExample()
+    ProjectToMorphemes ex
+    Ok "the sample's di=de and deda=di split, bujo does not: five columns", (ex.ColCount = 5)
+    Eq "  =de over =ERG", ex.Cells(0, 1) & "|" & ex.Cells(1, 1), "=de|=ERG"
+    ProjectToMorphemes ex
+    Ok "  projecting again changes nothing", (ex.ColCount = 5)
+
+    '-- the command, end to end --------------------------------------------
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "fromtext: could create a blank document", False
+        Exit Sub
+    End If
+    EnsureStyles doc, True
+    ClearCache
+    savedQuiet = gQuiet
+    savedText = gQuietText
+    gQuiet = True
+    gQuietText = "1"
+
+    doc.Content.Text = raw
+    doc.Content.Select
+    ReleaseScratch
+    docsBefore = Documents.Count
+    gLastMessage = ""
+    RunCommandByName "LingTeXTextToInterlinear"
+    Ok "Text to Interlinear draws an example from the selected lines", (doc.Tables.Count = 1)
+    If doc.Tables.Count = 1 Then
+        back = ReadExampleFromTable(doc.Tables(1))
+        Ok "  two tiers, eleven columns: by word", (back.TierCount = 2 And back.ColCount = 11)
+        Eq "  the number is dropped: the first cell is the first word", back.Cells(0, 0), "Ewaub"
+        Ok "  the translation is under it", _
+            (InStr(ParagraphAfterTable(doc.Tables(1)).Range.Text, "Bebas") > 0)
+    Else
+        Emit "         said: " & gLastMessage
+    End If
+    CheckStateIsClean "LingTeXTextToInterlinear", docsBefore
+
+    SetSettingGranularity doc, igtMorphemeAligned
+    doc.Content.Text = raw
+    doc.Content.Select
+    RunCommandByName "LingTeXTextToInterlinear"
+    Ok "by morpheme: the same lines draw with thirteen columns", (doc.Tables.Count = 1)
+    If doc.Tables.Count = 1 Then
+        back = ReadExampleFromTable(doc.Tables(1))
+        Ok "  thirteen", (back.ColCount = 13)
+        Emit "         " & CStr(back.ColCount) & " columns"
+    End If
+    SetSettingGranularity doc, igtWordAligned
+
+    gQuietText = ""
+    doc.Content.Text = raw
+    doc.Content.Select
+    RunCommandByName "LingTeXTextToInterlinear"
+    Ok "Cancel at the question draws nothing", (doc.Tables.Count = 0)
+
+    gQuietText = "1"
+    doc.Content.Select
+    RunCommandByName "LingTeXInsertInterlinear"
+    Ok "Insert Interlinear on the same plain lines takes the same road", (doc.Tables.Count = 1)
+
+    gQuiet = savedQuiet
+    gQuietText = savedText
     CloseNoSave doc
 End Sub
 
@@ -2563,6 +2692,7 @@ Private Sub RunCommandByName(ByVal name As String)
         Case "LingTeXCheckExample":     LingTeXCheckExample
         Case "LingTeXConvertTableToIgt": LingTeXConvertTableToIgt
         Case "LingTeXInsertInterlinear": LingTeXInsertInterlinear
+        Case "LingTeXTextToInterlinear": LingTeXTextToInterlinear
         Case "LingTeXIndentExample":    LingTeXIndentExample
         Case "LingTeXOutdentExample":   LingTeXOutdentExample
     End Select

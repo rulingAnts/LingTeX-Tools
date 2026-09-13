@@ -818,3 +818,224 @@ Public Sub DeleteTierRow(ByRef ex As IgtExample, ByVal atIdx As Long)
     Next t
     KeepTiers ex, keep, nKeep
 End Sub
+
+
+'=============================================================================
+' -- PLAIN TEXT LINES: WHAT A PERSON TYPES ----------------------------------
+'=============================================================================
+' The words of a sentence on one line, their glosses on the next, a
+' translation under them, blank lines anywhere (Seth, 2026-09-14): the input
+' of LingTeXTextToInterlinear. These turn it into an example -- the tier lines
+' split at spaces into columns, positional roles as ModelFromTsv gives them,
+' the trailing lines the user names as translations -- and morpheme-align the
+' result when the document says so. Pure string work, so it lives with the
+' model and the doc tests drive it without a document.
+'
+' Word's own "convert text to table" was the first idea. It would have made an
+' empty cell of every second space, needed the translation rows merged, and
+' then been read back as a table; the model is the shorter road, and the
+' tested one.
+
+' The non-empty lines of a text, cleaned: a paragraph mark or line feed ends
+' a line; a manual line break (Chr 11), a tab or a non-breaking space is a
+' space; runs of spaces are one; invisible marks are gone; ends are trimmed.
+' 0-based, or (-1 To -1) when there is none, as ModelsFromText returns.
+Public Function TextLines(ByVal raw As String) As String()
+    Dim parts() As String
+    Dim out() As String
+    Dim i As Long, n As Long
+    Dim ln As String
+
+    raw = Replace(Replace(raw, vbCrLf, vbLf), vbCr, vbLf)
+    parts = Split(raw, vbLf)
+    ReDim out(0 To UBound(parts))
+    For i = 0 To UBound(parts)
+        ln = CleanTextLine(parts(i))
+        If ln <> "" Then
+            out(n) = ln
+            n = n + 1
+        End If
+    Next i
+    If n = 0 Then
+        ReDim out(-1 To -1)
+    Else
+        ReDim Preserve out(0 To n - 1)
+    End If
+    TextLines = out
+End Function
+
+' One line as TextLines wants it.
+Public Function CleanTextLine(ByVal s As String) As String
+    s = StripInvisible(s)
+    s = Replace(s, Chr(11), " ")           ' manual line break: the same line
+    s = Replace(s, Chr(12), " ")           ' page break
+    s = Replace(s, vbTab, " ")
+    s = Replace(s, ChrW(&HA0), " ")        ' non-breaking space
+    Do While InStr(s, "  ") > 0
+        s = Replace(s, "  ", " ")
+    Loop
+    CleanTextLine = Trim$(s)
+End Function
+
+' Words in a cleaned line.
+Public Function WordCount(ByVal ln As String) As Long
+    ln = Trim$(ln)
+    If ln = "" Then Exit Function
+    WordCount = UBound(Split(ln, " ")) + 1
+End Function
+
+' A leading example number -- (1), (12a), 1), 1. -- dropped from a line: the
+' document numbers its examples itself, and the token would otherwise become
+' a column. The line unchanged when it does not begin with one.
+Public Function StripExampleNumber(ByVal ln As String) As String
+    Dim sp As Long
+    StripExampleNumber = ln
+    sp = InStr(ln, " ")
+    If sp = 0 Then Exit Function           ' one word is never a number to drop
+    If IsExampleNumberToken(Left$(ln, sp - 1)) Then
+        StripExampleNumber = Trim$(Mid$(ln, sp + 1))
+    End If
+End Function
+
+' (1) (12a) 1) 1. 1a. -- digits, an optional letter, in brackets or before a
+' closing bracket or a full stop. A bare 1 is a word.
+Public Function IsExampleNumberToken(ByVal tok As String) As Boolean
+    Dim t As String, ch As String
+    Dim i As Long
+    Dim bracketed As Boolean
+
+    t = tok
+    If Left$(t, 1) = "(" Then
+        bracketed = True
+        t = Mid$(t, 2)
+    End If
+    If Right$(t, 1) = ")" Or Right$(t, 1) = "." Then
+        t = Left$(t, Len(t) - 1)
+    ElseIf Not bracketed Then
+        Exit Function
+    End If
+    If t = "" Then Exit Function
+    ch = Right$(t, 1)
+    If ch < "0" Or ch > "9" Then           ' an optional letter: (12a)
+        If LCase$(ch) < "a" Or LCase$(ch) > "z" Then Exit Function
+        t = Left$(t, Len(t) - 1)
+        If t = "" Then Exit Function
+    End If
+    For i = 1 To Len(t)
+        ch = Mid$(t, i, 1)
+        If ch < "0" Or ch > "9" Then Exit Function
+    Next i
+    IsExampleNumberToken = True
+End Function
+
+' How many of the last lines look like translations: counted from the end,
+' every line whose word count differs from the first line's, until one
+' matches. Never every line: the first is the example. A guess for the user
+' to confirm, not a decision.
+Public Function GuessFreeLineCount(lines() As String) As Long
+    Dim n As Long, i As Long, first As Long, k As Long
+    n = UBound(lines) - LBound(lines) + 1
+    If n < 2 Then Exit Function
+    first = WordCount(lines(LBound(lines)))
+    For i = UBound(lines) To LBound(lines) + 1 Step -1
+        If WordCount(lines(i)) = first Then Exit For
+        k = k + 1
+    Next i
+    If k > n - 1 Then k = n - 1
+    GuessFreeLineCount = k
+End Function
+
+' The example: the first n - nFree lines are tiers, one column per word, with
+' the positional roles ModelFromTsv gives (Vernacular, Gloss, Word Gloss,
+' Category); the last nFree lines are translations, verbatim. Short tier
+' lines leave their trailing columns empty, which Check Glossing reports.
+Public Function ModelFromLines(lines() As String, ByVal nFree As Long) As IgtExample
+    Dim ex As IgtExample
+    Dim n As Long, nTiers As Long, i As Long, c As Long, maxCols As Long
+    Dim words() As String
+
+    n = UBound(lines) - LBound(lines) + 1
+    If n <= 0 Then Exit Function
+    If nFree < 0 Then nFree = 0
+    If nFree > n - 1 Then nFree = n - 1
+    nTiers = n - nFree
+    For i = 0 To nTiers - 1
+        c = WordCount(lines(LBound(lines) + i))
+        If c > maxCols Then maxCols = c
+    Next i
+    If maxCols = 0 Then Exit Function
+
+    ex = NewExample(nTiers, maxCols)
+    For i = 0 To nTiers - 1
+        ex.Tiers(i) = PositionalRole(i)
+        words = Split(lines(LBound(lines) + i), " ")
+        For c = 0 To UBound(words)
+            If c < maxCols Then ex.Cells(i, c) = words(c)
+        Next c
+    Next i
+    For i = nTiers To n - 1
+        AddFreeLine ex, lines(LBound(lines) + i)
+    Next i
+    ModelFromLines = ex
+End Function
+
+'-----------------------------------------------------------------------------
+' Morpheme-align a word-aligned example in place: split every column at every
+' morpheme boundary, on every interlinear tier at once, so a column holds one
+' morpheme and a wrap line never starts on a continuation. What Split Column
+' does for the column at the cursor, for the whole example -- how text typed
+' word by word gets the document's morpheme alignment, since the FLEx path
+' applies it while parsing and plain rows have nothing to say until now.
+'
+' A column is split only when EVERY non-empty interlinear cell in it has a
+' boundary to split at. A form with two morphemes over a gloss with one is
+' the linguist's to decide (Check Glossing reports it), not this routine's to
+' guess -- and SplitColumn would grow the example and leave the short tier's
+' new cell empty. Boundaries are IsBoundary's (- = ~ < >), never a leading one.
+' Idempotent: an example already by morpheme has no column left to split.
+'-----------------------------------------------------------------------------
+Public Sub ProjectToMorphemes(ByRef ex As IgtExample)
+    Dim c As Long
+    Dim shortTiers As String
+    Dim guard As Long
+
+    c = 0
+    Do While c < ex.ColCount
+        guard = guard + 1
+        If guard > 4000 Then Exit Do
+        If ColumnSplitsEverywhere(ex, c) Then
+            ' Cannot fail after the check; if it somehow did, stop rather than
+            ' loop on the same column.
+            If Not SplitColumn(ex, c, 1, shortTiers) Then Exit Do
+            ' The right part now sits in c + 1 and is looked at next; c is done.
+        End If
+        c = c + 1
+    Loop
+End Sub
+
+' Does every non-empty interlinear cell of the column have a morpheme boundary
+' after its first character? False for an all-empty column.
+Public Function ColumnSplitsEverywhere(ex As IgtExample, ByVal colIdx As Long) As Boolean
+    Dim t As Long, i As Long
+    Dim cell As String
+    Dim found As Boolean, anyCell As Boolean
+
+    If colIdx < 0 Or colIdx >= ex.ColCount Then Exit Function
+    For t = 0 To ex.TierCount - 1
+        If IsInterlinearTier(ex.Tiers(t)) Then
+            cell = ex.Cells(t, colIdx)
+            If cell <> "" Then
+                anyCell = True
+                found = False
+                For i = 2 To Len(cell)
+                    If IsBoundary(Mid$(cell, i, 1)) Then
+                        found = True
+                        Exit For
+                    End If
+                Next i
+                If Not found Then Exit Function
+            End If
+        End If
+    Next t
+    ColumnSplitsEverywhere = anyCell
+End Function
