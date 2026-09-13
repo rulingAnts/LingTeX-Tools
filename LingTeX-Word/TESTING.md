@@ -161,7 +161,8 @@ Free Eng (When) she picked her yams early.
 | Run `LingTeXToggleRewrapOnSelectionChange`, then click in and out of an example → it re-wraps, does not recurse, and typing stays responsive | ☐ | ☐ |
 | Type a space into a gloss cell (`follow CMP=REL`), **Re-wrap This** → it reads `follow.CMP=REL` (or `_` if the document says so); the translation keeps its spaces | ☐ | ☐ |
 | **Settings** opens the dialog, centred on Word, every control drawn and legible, the current values shown; Escape closes it, Enter is OK | ☐ | ☐ |
-| **Settings:** *Tier gap* `12`, Apply → the tiers of every example move apart with the dialog still up; clear the box, OK → they close up. `abc` → a clear message naming the box, nothing stored | ☐ | ☐ |
+| **Settings:** *Tier gap* `12`, Apply → the tiers of every example move apart with the dialog still up; clear the box, OK → they close up. `abc` → a clear message naming the box, nothing stored. `50%` → half a line | ☐ | ☐ |
+| **Settings:** *Restore Defaults* empties every box and re-ticks the defaults without changing the page until OK | ☐ | ☐ |
 | **Settings:** *Before* 12, *After* 12, *Right* 72, OK → air above and below each example, wrap lines and translation stop an inch short of the margin; one Undo takes it back | ☐ | ☐ |
 | **Settings:** select *Gloss*, *Modify in Word* → the dialog steps aside and Word's Style dialog opens on `LingTeX Gloss`; set 9 pt there → glosses shrink and columns re-wrap, and the Settings dialog comes back. *Reset This Style* asks first | ☐ | ☐ |
 

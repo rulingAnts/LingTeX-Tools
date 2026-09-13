@@ -222,18 +222,21 @@ numbered, and on which list level; grammatical glosses in small capitals, and
 whether with a full-size first capital; the two re-wrap triggers; and what a
 space inside a cell becomes.
 
-**Spacing**, one box per spacing, in points, by level. **An empty box is a
-state**: the spacing is not set, and the default (shown in brackets) or the
-style applies. OK and Apply store the values and re-wrap every example in the
-document at once, so the page shows the change; Cancel stores nothing. A box
-that is not a number is refused by name before anything is stored.
+**Spacing**, one box per spacing, by level, in points (`6`) or as a
+percentage of the example's font size (`50%` is half a line, and grows with
+the text). **An empty box is a state**: the spacing is not set and the default
+in brackets applies. OK and Apply store the values and re-wrap every example
+in the document at once, so the page shows the change; Cancel stores nothing;
+**Restore Defaults** puts every box and tick back to a fresh document's values
+without storing them. A box that is not a number is refused by name before
+anything is stored.
 
 | Row | Box | What it sets | Empty means |
 |---|---|---|---|
-| Example | Before | Space above the example, on its first row | none |
-| | After | Space after the translation, or after the last row when there is none | the translation style's own 3 pt |
+| Example | Before | Space above the example, on its first row | 0 |
+| | After | Space after the translation, or after the last row when there is none | 3 |
 | | Left | Left indent of every *new* example | the indent of the paragraph it is inserted into |
-| | Right | Right indent: the wrap lines and translation stop this far short of the margin | none |
+| | Right | Right indent: the wrap lines and translation stop this far short of the margin | 0 |
 | Wrap lines | Line gap | Space between the wrap lines of an example | 6 |
 | | Continuation | Extra indent of every wrap line after the first | 0 |
 | | Tier gap | Space between the tiers of one wrap line | 0 |
@@ -241,8 +244,8 @@ that is not a number is refused by name before anything is stored.
 | | Number column | Width of the number column | 36 |
 | Cell padding | Left, Right | Padding inside every cell; the columns are widened to match, and the table's edge moves left by the left padding so the text stays at the example's indent, level with the translation | 0 |
 | | Top, Bottom | Padding inside every cell of every row | 0 |
-| Translation | Above | Space between the last row and the first translation | none |
-| | Between | Space between two translations | the style's own 3 pt |
+| Translation | Above | Space between the last row and the first translation | 6, half a line |
+| | Between | Space between two translations | 0 |
 
 **Styles**: the add-in's eight styles listed (Vernacular, Morphemes, Gloss,
 Word Gloss, Category, Free Translation, Grammatical Gloss, Example Number),
@@ -255,13 +258,12 @@ Style shows the same thing. **Reset This Style** puts one style back to what a
 fresh document gets, following the Normal style; **Reset the Six Tier Styles**
 does the tier styles together (also **Reset Styles** on the ribbon).
 
-Where a spacing lives follows from what it depends on. Everything that depends
-on the layout, and so has to be written per row or per paragraph when the
-example is drawn (which row is first, which is the last of a wrap line, where
-the translation starts), is a document setting written by the renderer. The
-appearance of the text is style-borne, because that is what a Word style is
-for, and because it keeps the escape hatch: a document restyled by hand and
-one set from the dialog are the same document.
+Every spacing is a document setting written by the renderer per row or per
+paragraph when the example is drawn, because each depends on the layout
+(which row is first, which is the last of a wrap line, where the translation
+starts). The appearance of the text — font, size, colour — is style-borne,
+because that is what a Word style is for; the paragraph spacing on the
+LingTeX styles is not what shows, the settings are.
 
 The dialog is a UserForm with **no controls at design time**: every control is
 built in code when it opens, so its only source is `src/frmLingTeXSettings.frm`,

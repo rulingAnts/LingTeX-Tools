@@ -58,12 +58,20 @@ Private Const DEF_TIER_GAP As Double = 0
 ' paragraphs with no padding, and the column gap is the air between columns;
 ' padding is added ON TOP of the measured width when set.
 Private Const DEF_PAD As Double = 0
-' The spacings that have NO built-in value of their own -- space before and
-' after an example, its default left indent and its right indent, the air above
-' the translation and between translations -- are OPTIONAL: unset, the renderer
-' leaves the paragraph or the style alone, which is what every document drawn
-' before these settings existed gets. Read them with SettingOptional; a negative
-' answer means "not set".
+' Space above an example (on its first row) and below it (after the
+' translation, or after the last row when there is none), in points.
+Private Const DEF_EXAMPLE_BEFORE As Double = 0
+Private Const DEF_EXAMPLE_AFTER As Double = 3
+' How far short of the right margin an example's wrap lines and translation
+' stop, in points.
+Private Const DEF_EXAMPLE_RIGHT As Double = 0
+' Air between the last row and the translation -- half a line (Seth,
+' 2026-09-14) -- and between two translations, in points.
+Private Const DEF_FREE_ABOVE As Double = 6
+Private Const DEF_FREE_BETWEEN As Double = 0
+' The one spacing with NO number of its own: the left indent of a new example,
+' which unset is the indent of the paragraph it is inserted into. Read it with
+' SettingOptional; a negative answer means "not set".
 Public Const SETTING_UNSET As Double = -1
 ' Every spacing key the Settings dialog shows (SpacingText and
 ' SetSpacingText below), for the settings report and the tests. The key is the
@@ -142,23 +150,78 @@ Public Function SettingCellPadding(doc As Document, ByVal side As String) As Dou
     SettingCellPadding = ReadDouble(doc, "Pad" & side, DEF_PAD)
 End Function
 
+Public Function SettingExampleBefore(doc As Document) As Double
+    SettingExampleBefore = ReadDouble(doc, "ExampleBefore", DEF_EXAMPLE_BEFORE)
+End Function
+
+Public Function SettingExampleAfter(doc As Document) As Double
+    SettingExampleAfter = ReadDouble(doc, "ExampleAfter", DEF_EXAMPLE_AFTER)
+End Function
+
+Public Function SettingExampleRight(doc As Document) As Double
+    SettingExampleRight = ReadDouble(doc, "ExampleRight", DEF_EXAMPLE_RIGHT)
+End Function
+
+Public Function SettingFreeAbove(doc As Document) As Double
+    SettingFreeAbove = ReadDouble(doc, "FreeAbove", DEF_FREE_ABOVE)
+End Function
+
+Public Function SettingFreeBetween(doc As Document) As Double
+    SettingFreeBetween = ReadDouble(doc, "FreeBetween", DEF_FREE_BETWEEN)
+End Function
+
 '-----------------------------------------------------------------------------
-' An OPTIONAL spacing, by key: "ExampleBefore", "ExampleAfter", "ExampleLeft",
-' "ExampleRight", "FreeAbove" or "FreeBetween". SETTING_UNSET (negative) when
-' the document does not set it, in which case the renderer does not touch the
-' property and the style's own value shows through.
+' An OPTIONAL spacing, by key -- "ExampleLeft" is the one there is. SETTING_UNSET
+' (negative) when the document does not set it, in which case the renderer
+' leaves the matter to the page.
 '-----------------------------------------------------------------------------
 Public Function SettingOptional(doc As Document, ByVal key As String) As Double
     Dim s As String
     SettingOptional = SETTING_UNSET
     s = ReadString(doc, key, "")
     If s = "" Then Exit Function
+    SettingOptional = ResolveSpacing(doc, s, SETTING_UNSET)
+    If SettingOptional < 0 Then SettingOptional = SETTING_UNSET
+End Function
+
+'-----------------------------------------------------------------------------
+' The font size a percentage spacing is relative to: the vernacular tier's,
+' which follows Normal unless pinned, so "50%" is half a line of the example
+' and grows with it.
+'-----------------------------------------------------------------------------
+Public Function SpacingFontSize(doc As Document) As Double
+    Dim sz As Double
+    If doc Is Nothing Then
+        SpacingFontSize = 12
+        Exit Function
+    End If
     On Error Resume Next
-    SettingOptional = CDbl(s)
-    If Err.Number <> 0 Then SettingOptional = SETTING_UNSET
+    sz = doc.Styles(ParaStyleName(ROLE_VERNACULAR)).Font.Size
     Err.Clear
     On Error GoTo 0
-    If SettingOptional < 0 Then SettingOptional = SETTING_UNSET
+    If sz <= 0 Then sz = BodyFontSize(doc)
+    If sz <= 0 Then sz = 12
+    SpacingFontSize = sz
+End Function
+
+' The default of a yes/no setting, by the name the Settings dialog uses, for
+' its Restore Defaults button (which changes the form, not the document).
+Public Function DefaultFlag(ByVal nm As String) As Boolean
+    Select Case nm
+        Case "Word": DefaultFlag = True
+        Case "Morpheme": DefaultFlag = False
+        Case "Number": DefaultFlag = DEF_NUMBER_EXAMPLES
+        Case "SmallCaps": DefaultFlag = DEF_LOWERCASE_GRAM
+        Case "InitialCap": DefaultFlag = DEF_GRAM_INITIAL_CAP
+        Case "RewrapSave": DefaultFlag = DEF_REWRAP_ON_SAVE
+        Case "RewrapLeave": DefaultFlag = DEF_REWRAP_ON_SELECTION
+        Case "Dot": DefaultFlag = (DEF_SPACE_REPL = ".")
+        Case "Underscore": DefaultFlag = (DEF_SPACE_REPL = "_")
+    End Select
+End Function
+
+Public Function DefaultNumberLevel() As Long
+    DefaultNumberLevel = DEF_NUMBER_LEVEL
 End Function
 
 Public Function SettingGramGlossInitialCap(doc As Document) As Boolean
@@ -260,13 +323,19 @@ Public Function IsSpacingKey(ByVal key As String) As Boolean
                           vbTextCompare) > 0)
 End Function
 
-' The stored value as text for an edit box: "" when unset, otherwise the number
-' in the user's locale (CStr writes the decimal separator Word shows).
+' The stored value as text for a box: "" when unset, otherwise the number in
+' the user's locale (CStr writes the decimal separator Word shows), with its
+' "%" when it is a percentage of the font size.
 Public Function SpacingText(doc As Document, ByVal key As String) As String
     Dim s As String
     Dim v As Double
-    s = ReadString(doc, key, "")
+    Dim pct As Boolean
+    s = Trim$(ReadString(doc, key, ""))
     If s = "" Then Exit Function
+    If Right$(s, 1) = "%" Then
+        pct = True
+        s = Trim$(Left$(s, Len(s) - 1))
+    End If
     On Error Resume Next
     v = CDbl(s)
     If Err.Number <> 0 Then
@@ -277,14 +346,17 @@ Public Function SpacingText(doc As Document, ByVal key As String) As String
     Err.Clear
     On Error GoTo 0
     SpacingText = CStr(v)
+    If pct Then SpacingText = SpacingText & "%"
 End Function
 
 '-----------------------------------------------------------------------------
-' Store what was typed into a box. Empty (or only spaces) UNSETS the
-' spacing: the variable is removed, so the default or the style applies again.
-' A number, with either decimal separator and with or without "pt", is stored
-' in points. Returns False, storing nothing, for anything else -- the caller
-' says so and refreshes the box back to the stored value.
+' Store what was typed into a box. Empty (or only spaces) UNSETS the spacing:
+' the variable is removed, so the default applies again. A number, with either
+' decimal separator and with or without "pt", is stored in points; a number
+' followed by "%" is stored as a percentage of the example's font size, which
+' the getters resolve when the example is drawn (Seth, 2026-09-14: "50%" is
+' half a line, whatever the size). Returns False, storing nothing, for
+' anything else -- the caller says so and puts the box back.
 '
 ' Parsed with Val after normalising the separator, because Val is not
 ' locale-aware and CDbl is: "6,5" must mean six and a half on every machine,
@@ -294,6 +366,7 @@ End Function
 Public Function SetSpacingText(doc As Document, ByVal key As String, _
         ByVal text As String) As Boolean
     Dim v As Double
+    Dim pct As Boolean
 
     If doc Is Nothing Then Exit Function
     If Not IsSpacingKey(key) Then Exit Function
@@ -303,8 +376,12 @@ Public Function SetSpacingText(doc As Document, ByVal key As String, _
         SetSpacingText = True
         Exit Function
     End If
-    If Not ParseSpacing(text, v) Then Exit Function
-    WriteVar doc, key, CStr(v)
+    If Not ParseSpacing(text, v, pct) Then Exit Function
+    If pct Then
+        WriteVar doc, key, CStr(v) & "%"
+    Else
+        WriteVar doc, key, CStr(v)
+    End If
     SetSpacingText = True
 End Function
 
@@ -312,22 +389,31 @@ End Function
 ' settings dialog checks every box with this before it stores any of them.
 Public Function IsValidSpacingText(ByVal text As String) As Boolean
     Dim v As Double
+    Dim pct As Boolean
     If Trim$(text) = "" Then
         IsValidSpacingText = True
     Else
-        IsValidSpacingText = ParseSpacing(text, v)
+        IsValidSpacingText = ParseSpacing(text, v, pct)
     End If
 End Function
 
-' A number of points out of what was typed: either decimal separator, an
-' optional "pt", digits with at most one point. Negative clamps to 0, and
-' anything over 22 inches to that (Word's own ceiling). False for the rest.
-Private Function ParseSpacing(ByVal text As String, ByRef v As Double) As Boolean
+' A number out of what was typed: either decimal separator, an optional "pt",
+' or a trailing "%" (pct is True then), digits with at most one point.
+' Negative clamps to 0; points over 22 inches (Word's own ceiling) and
+' percentages over 1000 clamp to those. False for the rest.
+Private Function ParseSpacing(ByVal text As String, ByRef v As Double, _
+        ByRef pct As Boolean) As Boolean
     Dim t As String
     Dim i As Long, ch As String
 
+    pct = False
     t = Trim$(text)
-    If LCase$(Right$(t, 2)) = "pt" Then t = Trim$(Left$(t, Len(t) - 2))
+    If Right$(t, 1) = "%" Then
+        pct = True
+        t = Trim$(Left$(t, Len(t) - 1))
+    ElseIf LCase$(Right$(t, 2)) = "pt" Then
+        t = Trim$(Left$(t, Len(t) - 2))
+    End If
     t = Replace(t, ",", ".")
     If t = "" Or t = "." Or t = "-" Or t = "+" Then Exit Function
     For i = 1 To Len(t)
@@ -339,8 +425,33 @@ Private Function ParseSpacing(ByVal text As String, ByRef v As Double) As Boolea
     If InStr(1, t, ".") <> InStrRev(t, ".") Then Exit Function
     v = Val(t)
     If v < 0 Then v = 0
-    If v > 1584 Then v = 1584
+    If pct Then
+        If v > 1000 Then v = 1000
+    Else
+        If v > 1584 Then v = 1584
+    End If
     ParseSpacing = True
+End Function
+
+' A stored spacing as points: a number, or a percentage of the example's
+' font size, resolved here against SpacingFontSize.
+Private Function ResolveSpacing(doc As Document, ByVal s As String, _
+        ByVal dflt As Double) As Double
+    Dim t As String
+    Dim v As Double
+    ResolveSpacing = dflt
+    t = Trim$(s)
+    If t = "" Then Exit Function
+    On Error Resume Next
+    If Right$(t, 1) = "%" Then
+        v = CDbl(Trim$(Left$(t, Len(t) - 1)))
+        If Err.Number = 0 Then ResolveSpacing = v / 100 * SpacingFontSize(doc)
+    Else
+        v = CDbl(t)
+        If Err.Number = 0 Then ResolveSpacing = v
+    End If
+    Err.Clear
+    On Error GoTo 0
 End Function
 
 ' Is anything stored under this key?
@@ -376,17 +487,15 @@ Private Function ReadString(doc As Document, ByVal nm As String, _
     On Error GoTo 0
 End Function
 
+' A number, in points when it is a spacing: a percentage stored by
+' SetSpacingText is resolved against the font size here.
 Private Function ReadDouble(doc As Document, ByVal nm As String, _
         ByVal dflt As Double) As Double
     Dim s As String
     ReadDouble = dflt
     s = ReadString(doc, nm, "")
     If s = "" Then Exit Function
-    On Error Resume Next
-    ReadDouble = CDbl(s)
-    If Err.Number <> 0 Then ReadDouble = dflt
-    Err.Clear
-    On Error GoTo 0
+    ReadDouble = ResolveSpacing(doc, s, dflt)
     If ReadDouble < 0 Then ReadDouble = 0
 End Function
 
