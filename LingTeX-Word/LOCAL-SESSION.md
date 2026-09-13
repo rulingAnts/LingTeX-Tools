@@ -85,6 +85,8 @@ requests.
 
 ## State of play
 
+- **The ribbon tab is called Interlinear** (2026-09-14, Seth); its id stays
+  LingTeXTab. Needs re-injection (install-dev-template.sh, Word quit).
 - **"Compile error in hidden module: modRender" at the first draw** (07:29
   run): the likeliest cause is the two WdInformation names I put on the
   linter's allowlist unproven (wdHorizontalPositionRelativeToPage,

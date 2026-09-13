@@ -413,7 +413,7 @@ loaded at Word start when the last run got as far as running the suites
 (`build/engine-ok`, written once reports exist; a failed assertion still
 writes it, a compile error never does).
 
-**If the LingTeX tab and the macros are simply missing after a Word start**,
+**If the Interlinear tab and the macros are simply missing after a Word start**,
 that is this marker: the last runner run produced no report (it was
 interrupted, or a dialog blocked it), so the engine was not loaded. Run the
 runner once and it is back.

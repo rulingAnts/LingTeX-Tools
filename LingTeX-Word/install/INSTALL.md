@@ -17,7 +17,7 @@ check the glossing, indent, number.
    `install.bat`, which does the same copy and clears the "downloaded from
    the internet" mark that would otherwise make Word block the macros.)
 2. Start Word. A message says LingTeX-Word is installed and lists its keyboard
-   shortcuts (**Ctrl+Alt+Shift** + a letter). The LingTeX tab is on the ribbon.
+   shortcuts (**Ctrl+Alt+Shift** + a letter). The Interlinear tab is on the ribbon.
 
 To remove it: Settings → Apps → LingTeX-Word → Uninstall (or `install.bat
 -Uninstall`, or delete the file from the STARTUP folder).
@@ -31,7 +31,7 @@ To remove it: Settings → Apps → LingTeX-Word → Uninstall (or `install.bat
 3. Start Word. If Word asks whether to enable macros in `LingTeX-Word.dotm`,
    choose **Enable Macros** (Word → Preferences → Security can make that
    permanent). A message then says LingTeX-Word is installed and lists its
-   keyboard shortcuts (**Cmd+Option+Shift** + a letter). The LingTeX tab is on
+   keyboard shortcuts (**Cmd+Option+Shift** + a letter). The Interlinear tab is on
    the ribbon.
 
 To remove it: `sh install.sh --uninstall`, or delete the file from
@@ -42,7 +42,7 @@ To remove it: `sh install.sh --uninstall`, or delete the file from
 The add-in never takes a key that already does something in Word, so a
 shortcut may land on an alternate letter (on Mac, Insert is usually
 Cmd+Option+Shift+**E**, because +I is Mark Citation). **Shortcuts** on the
-LingTeX tab lists what is actually bound on your machine; **Install
+Interlinear tab lists what is actually bound on your machine; **Install
 Shortcuts** runs the installation again.
 
 ## Upgrading

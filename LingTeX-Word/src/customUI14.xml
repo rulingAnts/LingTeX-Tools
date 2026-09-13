@@ -31,7 +31,7 @@
 <customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui" onLoad="RbnOnLoad">
   <ribbon>
     <tabs>
-      <tab id="LingTeXTab" label="LingTeX">
+      <tab id="LingTeXTab" label="Interlinear">
 
         <group id="LingTeXInterlinearGroup" label="Interlinear">
           <button id="LingTeXInsert"
