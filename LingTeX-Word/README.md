@@ -197,7 +197,7 @@ Any multilevel scheme Word can express works the same way.
 
 Stored as **document variables**, so they travel inside the `.docx` and a
 colleague re-wrapping the file gets the same layout. The toggles are on the
-LingTeX tab; **Settings** opens a dialog over all of them (below). The typed
+Interlinear tab; **Settings** opens a dialog over all of them (below). The typed
 setters still work from the Immediate window:
 
 ```vba
