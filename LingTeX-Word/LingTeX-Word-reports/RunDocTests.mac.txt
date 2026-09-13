@@ -65,6 +65,85 @@ Open documents at start: 1
   PASS   a non-numeric Gap falls back to the default
   PASS   LowercaseGramGloss reads the target document
 
+-- spacing ---------------------------------------------------
+  PASS   fifteen spacing keys
+  PASS   every listed key is a spacing key
+  PASS   an unknown key is not
+  PASS   SetSpacingText refuses an unknown key
+  PASS   a virgin document sets no spacing
+  PASS   an unset optional spacing reads as SETTING_UNSET
+  PASS   SetSpacingText accepts 6.5
+  PASS     and the typed getter sees 6.5
+  PASS     and the box text is a number again
+  PASS   SetSpacingText accepts a comma decimal
+  PASS     as four and a half, not forty-five
+  PASS   SetSpacingText accepts a pt suffix
+  PASS     as eight
+  PASS   SetSpacingText refuses letters
+  PASS     and leaves the stored value alone
+  PASS   SetSpacingText refuses two decimal points
+  PASS   a negative spacing clamps to 0
+  PASS   empty text unsets
+  PASS     so the box is empty again
+  PASS     and the typed getter is back at its default
+  PASS     and SettingDefined says so
+  PASS   an optional spacing round-trips
+  PASS   an optional spacing can be 0, which is not unset
+  PASS   ClearSetting unsets
+  PASS   cell padding defaults to 0 on every side
+  PASS   tier gap defaults to 0
+  PASS   eight style slots
+  PASS   slot 0 is the vernacular style
+  PASS   slot 5 is the translation style
+  PASS   slot 6 is the grammatical-gloss character style
+  PASS   slot 7 is the number-cell style
+  PASS   slot 7's label
+  PASS   a slot out of range has no name
+  PASS     nor a label
+  PASS   a fresh tier style shows no font of its own (follows Normal)
+  PASS     nor a size of its own
+  PASS   Vernacular starts italic
+  PASS   Gloss starts upright
+  PASS   Grammatical Gloss starts in small capitals
+  PASS   a size can be set on a slot
+  PASS     and the Word style has it
+  PASS     and the box shows it
+  PASS   a size with a comma decimal is accepted
+  PASS     as ten and a half
+  PASS   letters are refused as a size
+  PASS     and the size is unchanged
+  PASS   an empty size follows Normal again
+  PASS     so the box is empty
+  PASS     and the style is the body size
+  PASS   a font can be set on a slot
+  PASS     and the box shows it
+  PASS   an empty font follows Normal again
+  PASS     so the box is empty
+  PASS   a flag can be switched on
+  PASS     and off
+  PASS   Reset This Style takes the flag off again
+  PASS     and puts Vernacular back to italic
+  PASS     and Grammatical Gloss back to small capitals
+  PASS   an example draws with every spacing set
+  PASS   space before goes on the first row
+  FAIL   the tier gap goes under the first tier of the wrap line
+  PASS   the last row carries no space after (the translation follows)
+  PASS   left padding is 2
+  PASS   right padding is 3
+  PASS   top padding is 1
+  PASS   bottom padding is 1.5
+  PASS   no row runs past the example's right indent
+         widest row 207.75pt, room 396pt
+  PASS   the translation paragraph is there
+  PASS   space above the translation
+  PASS   space after the example, on the translation
+  PASS   the example's right indent, on the translation
+  PASS   the example re-wraps with every spacing unset
+  PASS   no space before on the first row
+  PASS   no tier gap
+  PASS   padding is back to 0
+  PASS   the translation has the style's own spacing again
+
 -- measure ---------------------------------------------------
   PASS   widths are strictly increasing for i < iii < WWW
          i=3  iii=8.25  WWW=27.75
@@ -368,5 +447,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 314 passed
+FAILURES -- 389 passed, 1 FAILED
 
