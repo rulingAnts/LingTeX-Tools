@@ -882,7 +882,13 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
             ' except the final group, which is followed by the free translation
             ' (or by ApplyExampleSpacing). Air between the tiers of one wrap
             ' line -- the tier gap, zero unless set -- goes on every other row.
+            ' Space before is written too, as 0: the settings carry the
+            ' layout, so a Space Before a user put on a tier style through
+            ' Word's dialog must not add to every tier gap and line gap
+            ' behind the dialog's back (the review, 2026-09-14). The first
+            ' row's is set afterwards by ApplyExampleSpacing.
             On Error Resume Next
+            tbl.Rows(r).Range.ParagraphFormat.SpaceBefore = 0
             If i = nInter - 1 Then
                 If g < nLines - 1 Then
                     tbl.Rows(r).Range.ParagraphFormat.SpaceAfter = lineGap
