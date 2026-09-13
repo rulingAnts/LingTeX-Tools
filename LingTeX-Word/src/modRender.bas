@@ -300,7 +300,88 @@ Private Function DrawExample(ex As IgtExample, target As Range, doc As Document,
     ' formatting can leak it into the first one when the table is added there.
     StripStrayNumber tbl, 1 + nNum
 
+    ' Last, with everything in place: line the rows and the translation up by
+    ' measuring where Word actually put them.
+    AlignRowsToFirst tbl, doc, nInter, nNum
+
     Set DrawExample = tbl
+End Function
+
+'-----------------------------------------------------------------------------
+' Line the rows up by MEASURING them (Seth, 2026-09-14). Word is asked where
+' each row's first content cell actually starts on the page; any row that does
+' not start where the first row's does -- allowing for the continuation indent
+' on later wrap lines -- has its indent nudged by the difference, and the
+' translation is lined up with the first row's content the same way. The page
+' is the arbiter, not the model: this holds whatever a given Word makes of a
+' table indent (to the edge or to the text, which changed with compatibility
+' mode 15), whatever cell padding does to it, and whatever the next surprise is.
+' FillTable's own placement is the first guess; this is the check.
+'
+' Bounded: a position Word cannot give (zero or less) skips that row, and a
+' correction over an inch is not believed. One pass: the position is linear in
+' the indent, so one nudge lands. Row 1 is the reference and is never moved,
+' which keeps ExampleIndent, and so the next re-wrap, stable.
+'-----------------------------------------------------------------------------
+Private Sub AlignRowsToFirst(tbl As Table, doc As Document, ByVal nInter As Long, _
+        ByVal nNum As Long)
+    Dim r As Long, g As Long
+    Dim x0 As Double, xr As Double, want As Double, delta As Double
+    Dim contIndent As Double
+    Dim para As Paragraph
+    Dim guard As Long
+
+    If nInter < 1 Then Exit Sub
+    contIndent = SettingContIndent(doc)
+    x0 = PageX(tbl.Cell(1, 1 + nNum).Range)
+    If x0 <= 0 Then Exit Sub
+
+    On Error Resume Next
+    For r = 2 To tbl.Rows.Count
+        g = (r - 1) \ nInter
+        want = x0
+        If g > 0 Then want = x0 + contIndent
+        xr = PageX(tbl.Cell(r, 1 + nNum).Range)
+        If xr > 0 Then
+            delta = xr - want
+            If Abs(delta) > 0.25 And Abs(delta) <= 72 Then
+                tbl.Rows(r).LeftIndent = tbl.Rows(r).LeftIndent - delta
+            End If
+        End If
+    Next r
+    Err.Clear
+    On Error GoTo 0
+
+    ' The translation paragraphs, all of them, moved by the first one's error.
+    Set para = ParagraphAfterTable(tbl)
+    If para Is Nothing Then Exit Sub
+    If Not IsFreeParagraph(para) Then Exit Sub
+    xr = PageX(para.Range)
+    If xr <= 0 Then Exit Sub
+    delta = xr - x0
+    If Abs(delta) <= 0.25 Or Abs(delta) > 72 Then Exit Sub
+    On Error Resume Next
+    Do While Not para Is Nothing
+        guard = guard + 1
+        If guard > 16 Then Exit Do
+        If Not IsFreeParagraph(para) Then Exit Do
+        para.LeftIndent = para.LeftIndent - delta
+        Set para = NextParagraph(para)
+    Loop
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' Where a range starts, in points from the page's left edge; -1 when Word
+' cannot say.
+Private Function PageX(rng As Range) As Double
+    Dim v As Double
+    On Error Resume Next
+    v = rng.Information(wdHorizontalPositionRelativeToPage)
+    If Err.Number <> 0 Then v = -1
+    Err.Clear
+    On Error GoTo 0
+    PageX = v
 End Function
 
 '-----------------------------------------------------------------------------
@@ -844,7 +925,9 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
             ' padding to the right of where the translation starts, which
             ' reads as a hanging indent (Seth, 2026-09-14). Word's own tables
             ' do the same: their edge sits in the margin so the text aligns.
-            ' ExampleIndent adds the padding back when it reads this.
+            ' ExampleIndent adds the padding back when it reads this. This is
+            ' the first guess; AlignRowsToFirst measures the result and fixes
+            ' any residue.
             On Error Resume Next
             If g = 0 Or nNum = 1 Then
                 tbl.Rows(r).LeftIndent = indent - padL

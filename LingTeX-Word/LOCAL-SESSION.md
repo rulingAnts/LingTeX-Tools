@@ -85,6 +85,13 @@ requests.
 
 ## State of play
 
+- **Alignment is measured** (2026-09-14, Seth's idea): AlignRowsToFirst at
+  the end of DrawExample asks Word (Information, page x) where every row's
+  first content cell starts and nudges each row's LeftIndent by its error
+  (later wrap lines allow for ContIndent), then moves the translation
+  paragraphs to the first row's content. Bounded (skips unreadable
+  positions, disbelieves > 72pt); row 1 never moves, so ExampleIndent is
+  stable. Doc-test `rows` is now the check that it works, not a guess.
 - **Spacing defaults, percentages, Restore Defaults, row geometry**
   (2026-09-14, Seth): every spacing is a document setting with a numeric
   default now (Before 0, After 3, Right 0, Above 6 = half a line, Between 0;
