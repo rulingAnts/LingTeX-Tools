@@ -4,13 +4,14 @@ Option Explicit
 ' Word's hard limit on table columns. Tables.Add raises rather than clamping, so
 ' the plan is checked against it before anything is drawn.
 Private Const MAX_TABLE_COLUMNS As Long = 63
-' Range.Information types, as numbers. The WdInformation names for these two
-' (wdHorizontalPositionRelativeToPage, wdVerticalPositionRelativeToPage) had
-' never compiled on Mac Word when they were first used, and the first draw
-' after that gave "Compile error in hidden module: modRender" (2026-09-14);
-' a constant missing from Mac Word's type library is exactly that error, and
-' the one this project has met before (wdStyleTableGrid). Numbers cannot be
-' missing. The text-boundary one, 7, has compiled on Mac and keeps its name.
+' Range.Information types, as numbers, for the doc tests' geometry checks.
+' The WdInformation names for these (wdHorizontalPositionRelativeToPage,
+' wdVerticalPositionRelativeToPage) had never compiled on Mac Word when they
+' were first used, and the first draw after that gave "Compile error in hidden
+' module: modRender" (2026-09-14); a constant missing from Mac Word's type
+' library is exactly that error (wdStyleTableGrid, before). Numbers cannot be
+' missing. The vertical one is trustworthy on a cell (row heights come out
+' right); the horizontal one is NOT inside a table -- see DrawExample.
 Public Const INFO_X_PAGE As Long = 5
 Public Const INFO_Y_PAGE As Long = 6
 
@@ -309,89 +310,16 @@ Private Function DrawExample(ex As IgtExample, target As Range, doc As Document,
     ' formatting can leak it into the first one when the table is added there.
     StripStrayNumber tbl, 1 + nNum
 
-    ' Last, with everything in place: line the rows and the translation up by
-    ' measuring where Word actually put them.
-    AlignRowsToFirst tbl, doc, nInter, nNum
-
     Set DrawExample = tbl
 End Function
 
-'-----------------------------------------------------------------------------
-' Line the rows up by MEASURING them (Seth, 2026-09-14). Word is asked where
-' each row's first content cell actually starts on the page; any row that does
-' not start where the first row's does -- allowing for the continuation indent
-' on later wrap lines -- has its indent nudged by the difference, and the
-' translation is lined up with the first row's content the same way. The page
-' is the arbiter, not the model: this holds whatever a given Word makes of a
-' table indent (to the edge or to the text, which changed with compatibility
-' mode 15), whatever cell padding does to it, and whatever the next surprise is.
-' FillTable's own placement is the first guess; this is the check.
-'
-' Bounded: a position Word cannot give (zero or less) skips that row, and a
-' correction over an inch is not believed. One pass: the position is linear in
-' the indent, so one nudge lands. Row 1 is the reference and is never moved,
-' which keeps ExampleIndent, and so the next re-wrap, stable.
-'-----------------------------------------------------------------------------
-Private Sub AlignRowsToFirst(tbl As Table, doc As Document, ByVal nInter As Long, _
-        ByVal nNum As Long)
-    Dim r As Long, g As Long
-    Dim x0 As Double, xr As Double, want As Double, delta As Double
-    Dim contIndent As Double
-    Dim para As Paragraph
-    Dim guard As Long
-
-    If nInter < 1 Then Exit Sub
-    contIndent = SettingContIndent(doc)
-    x0 = PageX(tbl.Cell(1, 1 + nNum).Range)
-    If x0 <= 0 Then Exit Sub
-
-    On Error Resume Next
-    For r = 2 To tbl.Rows.Count
-        g = (r - 1) \ nInter
-        want = x0
-        If g > 0 Then want = x0 + contIndent
-        xr = PageX(tbl.Cell(r, 1 + nNum).Range)
-        If xr > 0 Then
-            delta = xr - want
-            If Abs(delta) > 0.25 And Abs(delta) <= 72 Then
-                tbl.Rows(r).LeftIndent = tbl.Rows(r).LeftIndent - delta
-            End If
-        End If
-    Next r
-    Err.Clear
-    On Error GoTo 0
-
-    ' The translation paragraphs, all of them, moved by the first one's error.
-    Set para = ParagraphAfterTable(tbl)
-    If para Is Nothing Then Exit Sub
-    If Not IsFreeParagraph(para) Then Exit Sub
-    xr = PageX(para.Range)
-    If xr <= 0 Then Exit Sub
-    delta = xr - x0
-    If Abs(delta) <= 0.25 Or Abs(delta) > 72 Then Exit Sub
-    On Error Resume Next
-    Do While Not para Is Nothing
-        guard = guard + 1
-        If guard > 16 Then Exit Do
-        If Not IsFreeParagraph(para) Then Exit Do
-        para.LeftIndent = para.LeftIndent - delta
-        Set para = NextParagraph(para)
-    Loop
-    Err.Clear
-    On Error GoTo 0
-End Sub
-
-' Where a range starts, in points from the page's left edge; -1 when Word
-' cannot say.
-Private Function PageX(rng As Range) As Double
-    Dim v As Double
-    On Error Resume Next
-    v = rng.Information(INFO_X_PAGE)
-    If Err.Number <> 0 Then v = -1
-    Err.Clear
-    On Error GoTo 0
-    PageX = v
-End Function
+' NOT lining the rows up by measuring them. It was tried (2026-09-14):
+' Range.Information(wdHorizontalPositionRelativeToPage) on a cell's range
+' reports the same value for every cell of a row on Mac Word -- 83.25 for the
+' number cell and for the first content cell alike, on every row -- so it does
+' not say where a cell's text starts, and a correction computed from it moved
+' every translation to the margin (three numbering tests red). The rows are
+' placed by the model (FillTable) and the doc tests read the indents back.
 
 '-----------------------------------------------------------------------------
 ' The Translation row of the Settings dialog, and the Example row's After and
@@ -940,9 +868,7 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
             ' padding to the right of where the translation starts, which
             ' reads as a hanging indent (Seth, 2026-09-14). Word's own tables
             ' do the same: their edge sits in the margin so the text aligns.
-            ' ExampleIndent adds the padding back when it reads this. This is
-            ' the first guess; AlignRowsToFirst measures the result and fixes
-            ' any residue.
+            ' ExampleIndent adds the padding back when it reads this.
             On Error Resume Next
             If g = 0 Or nNum = 1 Then
                 tbl.Rows(r).LeftIndent = indent - padL
