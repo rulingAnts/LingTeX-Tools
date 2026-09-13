@@ -87,6 +87,7 @@ Public Sub RunDocTests()
     RunSection "stylecollide"
     RunSection "settings"
     RunSection "spacing"
+    RunSection "dialog"
     RunSection "measure"
     RunSection "agreement"
     RunSection "rendering"
@@ -127,6 +128,7 @@ Private Sub RunSection(ByVal which As String)
         Case "stylecollide": TestStyleCollision
         Case "settings":     TestSettings
         Case "spacing":      TestSpacing
+        Case "dialog":       TestDialog
         Case "measure":      TestMeasure
         Case "agreement":    TestRenderMeasureAgreement
         Case "rendering":    TestRendering
@@ -536,12 +538,11 @@ End Sub
 
 
 '=============================================================================
-' -- SPACING AND THE STYLE SLOTS (the LingTeX Styles tab) -------------------
+' -- SPACING AND THE STYLE SLOTS (what the Settings dialog reads and writes) -
 '=============================================================================
-' What the tab's edit boxes read and write, and what the renderer does with
-' it: the by-name text API in modSettings, the optional (tri-state) spacings,
-' and the style slots in modStyles. Then one example drawn with every spacing
-' set, checked row by row.
+' The by-name text API in modSettings, the optional (tri-state) spacings, and
+' the style slots in modStyles. Then one example drawn with every spacing set,
+' checked row by row. The dialog itself is the next section.
 
 Private Sub TestSpacing()
     Dim doc As Document
@@ -624,26 +625,22 @@ Private Sub TestSpacing()
     Ok "Gloss starts upright", (Not StyleFlag(doc, 2, "Italic"))
     Ok "Grammatical Gloss starts in small capitals", StyleFlag(doc, 6, "SmallCaps")
 
-    Ok "a size can be set on a slot", SetStyleSizeText(doc, 2, "19")
-    Ok "  and the Word style has it", (doc.Styles(ParaStyleName(ROLE_GLOSS)).Font.Size = 19)
-    Eq "  and the box shows it", StyleSizeText(doc, 2), CStr(19)
-    Ok "a size with a comma decimal is accepted", SetStyleSizeText(doc, 2, "10,5")
-    Ok "  as ten and a half", (doc.Styles(ParaStyleName(ROLE_GLOSS)).Font.Size = 10.5)
-    Ok "letters are refused as a size", (Not SetStyleSizeText(doc, 2, "big"))
-    Ok "  and the size is unchanged", (doc.Styles(ParaStyleName(ROLE_GLOSS)).Font.Size = 10.5)
-    Ok "an empty size follows Normal again", SetStyleSizeText(doc, 2, "")
-    Ok "  so the box is empty", (StyleSizeText(doc, 2) = "")
-    Ok "  and the style is the body size", _
-        (doc.Styles(ParaStyleName(ROLE_GLOSS)).Font.Size = BodyFontSize(doc))
+    Ok "IsValidSpacingText accepts empty", IsValidSpacingText("")
+    Ok "  and a number", IsValidSpacingText("4.5")
+    Ok "  and refuses letters", (Not IsValidSpacingText("abc"))
 
-    Ok "a font can be set on a slot", SetStyleFontText(doc, 3, "Courier New")
-    Eq "  and the box shows it", StyleFontText(doc, 3), "Courier New"
-    Ok "an empty font follows Normal again", SetStyleFontText(doc, 3, "")
-    Ok "  so the box is empty", (StyleFontText(doc, 3) = "")
+    doc.Styles(ParaStyleName(ROLE_GLOSS)).Font.Size = 19
+    Eq "a size set on a style shows as its own", StyleSizeText(doc, 2), CStr(19)
+    doc.Styles(ParaStyleName(ROLE_GLOSS)).Font.Size = BodyFontSize(doc)
+    Ok "  and the body size shows as none of its own", (StyleSizeText(doc, 2) = "")
+    doc.Styles(ParaStyleName(ROLE_WORDGLOSS)).Font.Name = "Courier New"
+    Eq "a font set on a style shows as its own", StyleFontText(doc, 3), "Courier New"
+    doc.Styles(ParaStyleName(ROLE_WORDGLOSS)).Font.Name = BodyFontName(doc)
+    Ok "  and the body font shows as none of its own", (StyleFontText(doc, 3) = "")
 
-    SetStyleFlag doc, 2, "Bold", True
-    Ok "a flag can be switched on", StyleFlag(doc, 2, "Bold")
-    SetStyleFlag doc, 0, "Italic", False
+    doc.Styles(ParaStyleName(ROLE_GLOSS)).Font.Bold = True
+    Ok "a flag set on a style reads back", StyleFlag(doc, 2, "Bold")
+    doc.Styles(ParaStyleName(ROLE_VERNACULAR)).Font.Italic = False
     Ok "  and off", (Not StyleFlag(doc, 0, "Italic"))
     ResetStyleSlot doc, 2
     Ok "Reset This Style takes the flag off again", (Not StyleFlag(doc, 2, "Bold"))
@@ -744,6 +741,90 @@ Private Sub CheckRowsFitWithin(tbl As Table, doc As Document, ByVal rightIndent 
     Ok "no row runs past the example's right indent", (bad = "")
     Emit "         widest row " & CStr(worst) & "pt, room " & CStr(avail) & "pt"
     If bad <> "" Then Emit "        " & bad
+End Sub
+
+
+'=============================================================================
+' -- THE SETTINGS DIALOG (frmLingTeXSettings) -------------------------------
+'=============================================================================
+' The form is driven WITHOUT being shown. New runs UserForm_Initialize, which
+' builds every control in code, and the form's public accessors read and
+' write them. That proves the form is a form (New compiles only against one),
+' that MSForms is there to build controls with, and that LoadFrom and ApplyNow
+' round-trip the document's settings -- everything but the pixels, which the
+' by-hand pass looks at (TESTING.md).
+
+Private Sub TestDialog()
+    Dim doc As Document
+    Dim frm As frmLingTeXSettings
+    Dim savedQuiet As Boolean
+    Dim n As Long
+
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "dialog: could create a blank document", False
+        Exit Sub
+    End If
+
+    Set frm = New frmLingTeXSettings
+    Ok "the settings form really is a form (New compiled against it)", _
+        (TypeName(frm) = "frmLingTeXSettings")
+    On Error Resume Next
+    n = frm.Controls.Count
+    Err.Clear
+    On Error GoTo 0
+    Ok "it built its controls without being shown", (n >= 50)
+    Emit "         " & CStr(n) & " controls"
+    Ok "the styles list has one entry per style slot", (frm.StyleCount() = STYLE_SLOT_COUNT)
+    Ok "the first style is selected", (frm.SelectedSlot() = 0)
+
+    frm.LoadFrom doc
+    Ok "a virgin document loads an empty spacing box", (frm.BoxText("TierGap") = "")
+    Ok "  and the default list level", (frm.BoxText("NumberLevel") = "1")
+    Ok "  numbering ticked", frm.FlagValue("Number")
+    Ok "  word alignment chosen", frm.FlagValue("Word")
+    Ok "  and not morpheme", (Not frm.FlagValue("Morpheme"))
+    Ok "  full stop as the space replacement", frm.FlagValue("Dot")
+
+    savedQuiet = gQuiet
+    gQuiet = True
+
+    frm.SetBoxText "TierGap", "4"
+    frm.SetBoxText "Gap", "7,5"
+    frm.SetFlag "Number", False
+    frm.SetFlag "Morpheme", True
+    frm.SetFlag "Underscore", True
+    frm.SetBoxText "NumberLevel", "2"
+    Ok "Apply accepts the boxes", frm.ApplyNow()
+    Ok "  tier gap stored as 4", (SettingTierGap(doc) = 4)
+    Ok "  column gap stored as 7.5 (comma decimal)", (SettingGap(doc) = 7.5)
+    Ok "  numbering off", (Not SettingNumberExamples(doc))
+    Ok "  morpheme alignment", (SettingGranularity(doc) = igtMorphemeAligned)
+    Ok "  underscore replaces a space", (SettingSpaceReplacement(doc) = "_")
+    Ok "  list level 2", (SettingNumberLevel(doc) = 2)
+
+    frm.SetBoxText "LineGap", "abc"
+    frm.SetBoxText "TierGap", "5"
+    Ok "Apply refuses a box that is not a number", (Not frm.ApplyNow())
+    Ok "  and names the box", (InStr(1, gLastMessage, "Line gap") > 0)
+    Ok "  storing nothing from that pass", (SettingTierGap(doc) = 4)
+    frm.SetBoxText "LineGap", ""
+    frm.SetBoxText "NumberLevel", "0"
+    Ok "Apply refuses a list level of 0", (Not frm.ApplyNow())
+    frm.SetBoxText "NumberLevel", "1"
+    Ok "Apply accepts them again", frm.ApplyNow()
+    Ok "  and the tier gap is 5 now", (SettingTierGap(doc) = 5)
+
+    frm.LoadFrom doc
+    Ok "LoadFrom shows what was stored", _
+        (Val(Replace(frm.BoxText("TierGap"), ",", ".")) = 5)
+    Ok "  and an unset box stays empty", (frm.BoxText("LineGap") = "")
+    Ok "  and the flags", (frm.FlagValue("Morpheme") And Not frm.FlagValue("Number"))
+    Ok "Result is empty until a button is pressed", (frm.Result = "")
+
+    gQuiet = savedQuiet
+    Unload frm
+    CloseNoSave doc
 End Sub
 
 '=============================================================================

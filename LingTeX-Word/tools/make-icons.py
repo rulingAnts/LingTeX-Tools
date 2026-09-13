@@ -345,55 +345,6 @@ def ic_show_keys():
     return im
 
 
-def ic_styles():
-    """The Spacing and Styles button on the Setup group: a page whose lines are
-    spaced apart, with a purple badge carrying a paragraph mark."""
-    im = canvas(); d = ImageDraw.Draw(im)
-    page(d)
-    igt(d, gap=17, y=7)
-    badge(d, PURPLE)
-    badge_text(d, "\u00b6", F_BOLD, 22, dy=-1)
-    return im
-
-
-def ic_modify_style():
-    """Word's own Style dialog: a pencil over a disc."""
-    im = canvas(); d = ImageDraw.Draw(im)
-    disc(d, SLATE)
-    # pencil body, drawn along the diagonal from lower left to upper right
-    body = [(17, 43), (39, 21), (45, 27), (23, 49)]
-    d.polygon([(px(x), px(y)) for x, y in body], fill=WHITE)
-    # tip
-    d.polygon([(px(17), px(43)), (px(23), px(49)), (px(14), px(52))], fill=ORANGE)
-    # eraser end
-    d.polygon([(px(39), px(21)), (px(43), px(17)), (px(49), px(23)), (px(45), px(27))],
-              fill=(200, 200, 200, 255))
-    return im
-
-
-def ic_bold():
-    im = canvas(); d = ImageDraw.Draw(im)
-    chip(d, 8, 8, 56, 56)
-    glyph(d, "B", F_BOLD, 40, 32, 32, colour=SOURCE, dy=-1)
-    return im
-
-
-def ic_italic():
-    im = canvas(); d = ImageDraw.Draw(im)
-    chip(d, 8, 8, 56, 56)
-    glyph(d, "I", F_ITAL, 40, 32, 32, colour=SOURCE, dy=-1)
-    return im
-
-
-def ic_small_caps():
-    """A full capital beside a small one: what the style does to ERG."""
-    im = canvas(); d = ImageDraw.Draw(im)
-    chip(d, 6, 8, 58, 56)
-    glyph(d, "A", F_REG, 36, 23, 33, colour=SOURCE, dy=-1)
-    glyph(d, "A", F_REG, 24, 45, 37, colour=SOURCE, dy=-1)
-    return im
-
-
 def ic_check():
     """The glossing, checked."""
     im = canvas(); d = ImageDraw.Draw(im)
@@ -430,11 +381,6 @@ ICONS = [
     ("igtInstallKeys", ic_install_keys, 32),
     ("igtShowKeys", ic_show_keys, 32),
     ("igtCheck", ic_check, 64),
-    ("igtStyles", ic_styles, 32),
-    ("igtModifyStyle", ic_modify_style, 32),
-    ("igtBold", ic_bold, 32),
-    ("igtItalic", ic_italic, 32),
-    ("igtSmallCaps", ic_small_caps, 32),
 ]
 
 

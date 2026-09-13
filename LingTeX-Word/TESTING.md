@@ -159,9 +159,10 @@ Free Eng (When) she picked her yams early.
 | After any command, `Application.ScreenUpdating` is back on (the screen is not frozen) | ☐ | ☐ |
 | No hidden scratch document is left open — check the Window menu | ☐ | ☐ |
 | Run `LingTeXToggleRewrapOnSelectionChange`, then click in and out of an example → it re-wraps, does not recurse, and typing stays responsive | ☐ | ☐ |
-| **LingTeX Styles tab:** type `12` into *Tier gap*, Return → the tiers of every example move apart at once; clear the box → they close up. `abc` → a clear message, the box reverts | ☐ | ☐ |
-| **LingTeX Styles tab:** *Before* 12, *After* 12, *Right* 72 → air above and below each example, wrap lines and translation stop an inch short of the margin; one Undo takes back one change | ☐ | ☐ |
-| **LingTeX Styles tab:** Style → *Gloss*, Size `9`, Return → glosses shrink and the columns re-wrap; empty the box → they follow Normal again. *Modify in Word* opens Word's Style dialog on `LingTeX Gloss`; *Reset This Style* asks first | ☐ | ☐ |
+| **Settings** opens the dialog, centred on Word, every control drawn and legible, the current values shown; Escape closes it, Enter is OK | ☐ | ☐ |
+| **Settings:** *Tier gap* `12`, Apply → the tiers of every example move apart with the dialog still up; clear the box, OK → they close up. `abc` → a clear message naming the box, nothing stored | ☐ | ☐ |
+| **Settings:** *Before* 12, *After* 12, *Right* 72, OK → air above and below each example, wrap lines and translation stop an inch short of the margin; one Undo takes it back | ☐ | ☐ |
+| **Settings:** select *Gloss*, *Modify in Word* → the dialog steps aside and Word's Style dialog opens on `LingTeX Gloss`; set 9 pt there → glosses shrink and columns re-wrap, and the Settings dialog comes back. *Reset This Style* asks first | ☐ | ☐ |
 
 ---
 

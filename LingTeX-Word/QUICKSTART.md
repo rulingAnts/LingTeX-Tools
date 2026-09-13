@@ -46,7 +46,7 @@ The two findings that matter most:
   and build the template. If it says `BLOCKED`, **check the VBA trust setting
   before resigning yourself** — `BLOCKED` almost always means it is not on yet, on
   either platform, rather than that the machine cannot do it. See *The shortcut*
-  below. Genuinely blocked, it is fourteen File → Import File… picks instead —
+  below. Genuinely blocked, it is fifteen File → Import File… picks instead —
   dull but completely reliable.
 
 ### Also worth 60 seconds: the AppleScript bridge
@@ -56,7 +56,7 @@ VBA to AppleScript. Double-click it — it opens in Script Editor as plain text 
 and press Run. It creates and changes nothing; it only asks.
 
 If Word answers yes, two things get better: building the template becomes fully
-scripted instead of fourteen manual imports, and the Mac installer can verify
+scripted instead of fifteen manual imports, and the Mac installer can verify
 itself by running a macro after installing rather than copying a file and hoping.
 That second one matters, because the known silent failure is macOS quarantining a
 `.dotm` that arrived inside a downloaded zip — Word then refuses to load it and
@@ -259,7 +259,7 @@ path included. If the Window menu shows a stray blank document, type
 ## The shortcut: import them automatically
 
 VBA is allowed to rewrite its own project once one setting is on, and then a single
-pasted macro can import all fourteen modules and save the template. **This works on
+pasted macro can import all fifteen modules and save the template. **This works on
 both platforms** — see the note below if you have read otherwise here before.
 
 1. Turn on the VBA trust setting and restart Word:
@@ -282,7 +282,7 @@ both platforms** — see the note below if you have read otherwise here before.
 > way it went wrong is worth knowing: the probe reported `BLOCKED` **accurately**,
 > on a machine where the setting had not been ticked yet, and that one measurement
 > was written down as a fact about the platform. Confirmed working on Mac Word:
-> both `ImportLingTeXModules` and `VerifyLingTeXModules`, with all fourteen modules
+> both `ImportLingTeXModules` and `VerifyLingTeXModules`, with all fifteen modules
 > and both class modules correct.
 
 Because it works on both, there is no build-here-test-there split any more. Import,
@@ -348,7 +348,7 @@ but it has no way to put a **custom ribbon** in one — the ribbon is a plain-XM
 part its interface does not expose. So Word does the macros and a script does the
 ribbon.
 
-**1. In Word** — with all fourteen modules imported:
+**1. In Word** — with all fifteen modules imported:
 
 ```
 File → Save As → Word Macro-Enabled Template (.dotm)
@@ -398,8 +398,9 @@ Keep `src/` authoritative: any fix made in the VBA editor goes back out with
 
 ## Class modules are pasted, never imported
 
-`clsIgtWarning.cls` and `clsAppEvents.cls` are the two class modules, and they are
-the one part of this that does **not** go through File → Import File…
+`clsIgtWarning.cls` and `clsAppEvents.cls` are the two class modules, and with
+`frmLingTeXSettings.frm`, the one form, they are the part of this that does
+**not** go through File → Import File…
 
 The VBA editor decides what kind of component an imported file becomes by parsing
 its header. When it misreads the `.cls` preamble it creates a **standard module**
@@ -447,11 +448,18 @@ That prints `clsIgtWarning`. If it errors, the module is still a standard module
 
 `tools/ImportModules.bas` splits the job the same way. The twelve `.bas` files go
 through `Import`, which is reliable for those and names them for you. The two
-`.cls` files it never imports: it creates the components explicitly with
-`VBComponents.Add`, and if that does not work on your machine it **names the two
-files to paste and the four steps** rather than failing and leaving you to work it
-out. So the worst case is still "twelve automatic, two by hand", never fourteen by
-hand.
+`.cls` files and the `.frm` it never imports: it creates the components explicitly
+with `VBComponents.Add` (a class, or a UserForm), and if that does not work on your
+machine it **names the files to paste and the four steps** rather than failing and
+leaving you to work it out. So the worst case is still "twelve automatic, three by
+hand", never fifteen by hand.
+
+The form is the odd one: `frmLingTeXSettings` has **no controls at design time**.
+Every control is built in code when it opens, so there is no `.frx` and its code
+is the whole of it. By hand that is Insert → UserForm, name it, View → Code,
+paste — and leave the designer empty. Its code declares `MSForms.CommandButton`,
+so the project needs the Microsoft Forms 2.0 Object Library reference, which
+inserting a UserForm adds by itself; the bootstrap checks and says so if not.
 
 Then run `VerifyLingTeXModules`. It reads each component's *type* out of the VBA
 project and reports anything missing or of the wrong kind — which is the check
@@ -528,7 +536,7 @@ any of the document-rendering work is built on top. A discrepancy found now is a
 type declaration; found later it is a mis-rendered table with no obvious cause.
 
 `tools/ImportModules.bas` makes this cheap on either platform — one paste imports all
-fourteen modules, and re-running re-syncs them after any pull.
+fifteen modules, and re-running re-syncs them after any pull.
 
 ---
 

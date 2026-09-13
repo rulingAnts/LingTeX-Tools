@@ -179,6 +179,18 @@ def check(path):
         problems.append((1, "missing the Attribute VB_Name header line needed by File > Import"))
     if path.suffix.lower() == ".cls" and not text.startswith("VERSION 1.0 CLASS"):
         problems.append((1, "a .cls must begin with the VERSION 1.0 CLASS preamble"))
+    if path.suffix.lower() == ".frm":
+        # A form here is code alone: its controls are built when it opens, the
+        # bootstrap installs the code the way it installs a class, and there is
+        # no .frx. A header that references one would make File > Import fail
+        # and would mean someone designed controls in the editor.
+        if not text.startswith("VERSION 5.00"):
+            problems.append((1, "a .frm must begin with the VERSION 5.00 header"))
+        if not re.search(r"^Begin \{C62A69F0-16DC-11CE-9E8B-00AA00574A4F\} \w+", text, re.M):
+            problems.append((1, "a .frm must carry the UserForm header block, Begin {C62A69F0-...} name ... End"))
+        if re.search(r"^\s*OleObjectBlob\s*=", text, re.M):
+            problems.append((1, "a .frm must not reference an .frx (an OleObjectBlob line): the form's "
+                                "controls are built in code and the bootstrap installs the code alone"))
     if not any(re.match(r"^Option\s+Explicit\b", t, re.I) for t in body):
         problems.append((1, "missing Option Explicit"))
 
@@ -584,18 +596,20 @@ def check_declarations_before_procedures(files):
 def check_module_lists(files):
     """Every module in src/ must appear in both install paths, and vice versa.
 
-    THREE places list the modules: src/ itself, MODULE_LIST + CLASS_LIST in
-    ImportModules.bas, and STAGE1 + STAGE2 in make-paste-bundle.sh. Add a module and
+    THREE places list the modules: src/ itself, MODULE_LIST + CLASS_LIST +
+    FORM_LIST in ImportModules.bas, and STAGE1 + STAGE2 in make-paste-bundle.sh. Add a module and
     forget one of them, and the user installs all but that one -- after which the
     project fails to compile on a name that is simply absent, which reads as a bug in
     whichever module calls it rather than as a missing file.
 
-    Also checks the .bas/.cls split: ImportModules must not try to Import a class.
+    Also checks the .bas/.cls/.frm split: ImportModules must not try to Import a
+    class or a form, and must create each as the kind it is.
     """
     root = SRC_DIRS[0].parent
     src_dir = SRC_DIRS[0]
     on_disk = {f.name for f in src_dir.glob("*.bas")} | \
-              {f.name for f in src_dir.glob("*.cls")}
+              {f.name for f in src_dir.glob("*.cls")} | \
+              {f.name for f in src_dir.glob("*.frm")}
     if not on_disk:
         return []
 
@@ -604,8 +618,8 @@ def check_module_lists(files):
     imp = root / "tools" / "ImportModules.bas"
     if imp.exists():
         text = imp.read_text(encoding="utf-8")
-        mods, classes = set(), set()
-        for const, into in (("MODULE_LIST", mods), ("CLASS_LIST", classes)):
+        mods, classes, forms = set(), set(), set()
+        for const, into in (("MODULE_LIST", mods), ("CLASS_LIST", classes), ("FORM_LIST", forms)):
             # The constant's value runs to the first blank line or comment line.
             pat = const + r"\s+As String\s*=\s*_?(.*?)\n\s*(?:\n|')"
             m = re.search(pat, text, re.S)
@@ -614,20 +628,23 @@ def check_module_lists(files):
                 continue
             joined = "".join(re.findall(r'"([^"]*)"', m.group(1)))
             into.update(x for x in joined.split("|") if x)
-        listed = mods | classes
+        listed = mods | classes | forms
         missing = on_disk - listed
         extra = listed - on_disk
         for n in sorted(missing):
-            problems.append(f"ImportModules.bas: {n} is in src/ but in neither "
-                            f"MODULE_LIST nor CLASS_LIST")
+            problems.append(f"ImportModules.bas: {n} is in src/ but in none of "
+                            f"MODULE_LIST, CLASS_LIST and FORM_LIST")
         for n in sorted(extra):
             problems.append(f"ImportModules.bas: {n} is listed but not in src/")
-        for n in sorted(x for x in mods if x.endswith(".cls")):
+        for n in sorted(x for x in mods if not x.endswith(".bas")):
             problems.append(f"ImportModules.bas: {n} is in MODULE_LIST, which is "
-                            f"imported -- a .cls must be in CLASS_LIST")
-        for n in sorted(x for x in classes if x.endswith(".bas")):
+                            f"imported -- a .cls goes in CLASS_LIST, a .frm in FORM_LIST")
+        for n in sorted(x for x in classes if not x.endswith(".cls")):
             problems.append(f"ImportModules.bas: {n} is in CLASS_LIST, which creates "
-                            f"class modules -- a .bas must be in MODULE_LIST")
+                            f"class modules -- only a .cls belongs there")
+        for n in sorted(x for x in forms if not x.endswith(".frm")):
+            problems.append(f"ImportModules.bas: {n} is in FORM_LIST, which creates "
+                            f"UserForms -- only a .frm belongs there")
 
     bundle = root / "tools" / "make-paste-bundle.sh"
     if bundle.exists():
@@ -841,28 +858,28 @@ def check_wd_constants(files):
 
 
 def check_no_continuation_in_classes(files):
-    """No line continuation in a .cls. The classes are installed by the bootstrap
+    """No line continuation in a .cls or a .frm. The classes are installed by the bootstrap
     from a string, and on Mac Word that arrives double-spaced (see ReadTextFile in
     ImportModules.bas), so a "_" followed by a blank line is a compile error that
     surfaces only when the class is first used -- the events section, after
     everything else passed (clsAppEvents, 2026-09-12). Build long strings with
-    several statements instead."""
+    several statements instead. The form's code goes in the same way."""
     problems = []
     for f in files:
-        if f.suffix.lower() != ".cls":
+        if f.suffix.lower() not in (".cls", ".frm"):
             continue
         for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
             if _code_only(line).rstrip().endswith(" _"):
                 problems.append(
-                    f"{f.name}:{n}: line continuation in a class module; put the statement "
-                    f"on one line or build it in several statements")
+                    f"{f.name}:{n}: line continuation in a class module or form; put the "
+                    f"statement on one line or build it in several statements")
     return problems
 
 
 def main():
     files = []
     for d in SRC_DIRS:
-        files += sorted(list(d.glob("*.bas")) + list(d.glob("*.cls")))
+        files += sorted(list(d.glob("*.bas")) + list(d.glob("*.cls")) + list(d.glob("*.frm")))
     if not files:
         print("no VBA sources found in " + ", ".join(str(d) for d in SRC_DIRS))
         return 1

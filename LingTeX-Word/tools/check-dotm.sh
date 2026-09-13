@@ -217,7 +217,7 @@ else
 
     # And the other direction: a source added to src/ and never built in.
     for f in $(ls "$src" | sort) $(ls "$icons" 2>/dev/null | sed 's|^|icons/|' | sort); do
-        case "$f" in *.bas|*.cls|customUI14.xml|icons/*.png) ;; *) continue ;; esac
+        case "$f" in *.bas|*.cls|*.frm|customUI14.xml|icons/*.png) ;; *) continue ;; esac
         if ! grep -q "  $f\$" "$manifest"; then
             drift="$drift
         $f is in src/ but not in the manifest"
