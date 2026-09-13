@@ -85,6 +85,17 @@ requests.
 
 ## State of play
 
+- **The second import could not name the form** (2026-09-14, 06:55 run):
+  ImportGroup removed the existing frmLingTeXSettings and ImportOne added a
+  new UserForm, and `comp.Name = "frmLingTeXSettings"` raised 50132 -- the
+  VBE keeps a removed FORM's name reserved until the file is saved and
+  reopened. 14 of 15; modLingTeX and modDocTests (which name the form)
+  then failed to compile whole: "Compile error in hidden module" on Settings,
+  on every toggle, and in RunDocTests. modImport now REUSES a form that is
+  already a form (only its code is replaced), and when a name is refused it
+  removes the nameless form, saves the engine and tries once more;
+  RemoveStrayForms clears any UserForm1 a failed attempt left. **Seth must
+  re-paste modImport again** for this.
 - **Left cell padding no longer reads as a hanging indent** (2026-09-14,
   Seth saw it): Word measures Rows.LeftIndent to the table's EDGE and sets
   the text in by the padding, so a padded table put its text a padding right
