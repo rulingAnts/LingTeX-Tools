@@ -101,6 +101,12 @@ Open documents at start: 1
   PASS   letters before the sign are refused
   PASS   IsValidSpacingText accepts a percentage
   PASS     and the line gap is back at 6
+  PASS   SetSpacingText accepts 6,5
+  PASS     and stores it with a full stop
+  PASS   a comma-decimal value written by another machine reads as six and a half
+  PASS     and shows in the box as six and a half
+  PASS     and a comma-decimal percentage resolves
+  PASS   the typed setters store with a full stop too
   PASS   cell padding defaults to 0 on every side
   PASS   tier gap defaults to 0
   PASS   eight style slots
@@ -202,7 +208,8 @@ Open documents at start: 1
          translation indent 36, number column 36
   PASS   every cell of the first row starts at the same height, number included
          cell 1 at 72
-         row heights 15 / 20.25 / 15 / 14.25
+  PASS   the number paragraph has the row's space before and after, single-spaced
+         4 rows; heights 15 / 20.25 / 15 ... last 14.25
   PASS   rows: Word reported positions
   PASS   the numbered first row is as tall as the later vernacular row
   PASS   the gloss row before the wrap is the last gloss row plus the line gap
@@ -510,5 +517,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 441 passed
+ALL PASS -- 448 passed
 
