@@ -72,6 +72,8 @@ Open documents at start: 1
   PASS   SetSpacingText refuses an unknown key
   PASS   a virgin document sets no spacing
   PASS   an unset optional spacing reads as SETTING_UNSET
+  PASS   the defaults: before 0, after 3, right 0
+  PASS     above the translation 6, between translations 0
   PASS   SetSpacingText accepts 6.5
   PASS     and the typed getter sees 6.5
   PASS     and the box text is a number again
@@ -90,6 +92,15 @@ Open documents at start: 1
   PASS   an optional spacing round-trips
   PASS   an optional spacing can be 0, which is not unset
   PASS   ClearSetting unsets
+  PASS   a percentage is accepted
+  PASS     and stored as one
+  PASS     and resolves against the example's font size
+         font size 12, 50% = 6
+  PASS   a percentage with a space before the sign
+  PASS     resolves too
+  PASS   letters before the sign are refused
+  PASS   IsValidSpacingText accepts a percentage
+  PASS     and the line gap is back at 6
   PASS   cell padding defaults to 0 on every side
   PASS   tier gap defaults to 0
   PASS   eight style slots
@@ -128,7 +139,7 @@ Open documents at start: 1
   PASS   top padding is 1
   PASS   bottom padding is 1.5
   PASS   no row runs past the example's right indent
-         widest row 205.75pt, room 396pt
+         widest row 219.25pt, room 396pt
   PASS   the translation paragraph is there
   PASS   space above the translation
   PASS   space after the example, on the translation
@@ -138,12 +149,12 @@ Open documents at start: 1
   PASS   no tier gap
   PASS   padding is back to 0
   PASS     and the rows are back at the indent, not a padding left of it
-  PASS   the translation has the style's own spacing again
+  PASS   the translation has the defaults again: 6 above, 3 after, no right indent
 
 -- dialog ----------------------------------------------------
   PASS   the settings form really is a form (New compiled against it)
   PASS   it built its controls without being shown
-         58 controls
+         59 controls
   PASS   the styles list has one entry per style slot
   PASS   the first style is selected
   PASS   a virgin document loads an empty spacing box
@@ -165,6 +176,11 @@ Open documents at start: 1
   PASS   Apply refuses a list level of 0
   PASS   Apply accepts them again
   PASS     and the tier gap is 5 now
+  PASS   Restore Defaults empties the boxes
+  PASS     and ticks the defaults
+  PASS     and unticks the rest
+  PASS     and the list level is 1
+  PASS     without storing anything
   PASS   LoadFrom shows what was stored
   PASS     and an unset box stays empty
   PASS     and the flags
@@ -174,8 +190,24 @@ Open documents at start: 1
   PASS   the typed space is in the cell before the re-wrap
   PASS   re-wrap replaces the space with the document's full stop
   PASS   the vernacular cell above it is untouched
-  FAIL   the translation keeps its spaces
+  PASS   the translation keeps its spaces
   PASS   re-wrap uses an underscore when the document says so
+
+-- rows ------------------------------------------------------
+  PASS   rows: a numbered example draws on the narrow page
+  PASS   rows: it wrapped onto a second line
+  FAIL   the number sits at the left margin (the table's edge is the padding to its left)
+         number at 83.25, margin 72
+  PASS   no hanging indent: every row's first content cell starts where row 1's does
+         row 1 content at 83.25
+  FAIL   the translation starts where the content does
+         translation at 72
+  PASS   every cell of the first row starts at the same height, number included
+         cell 1 at 72
+         row heights 15 / 20.25 / 15 / 14.25
+  PASS   rows: Word reported positions
+  PASS   the numbered first row is as tall as the later vernacular row
+  PASS   the gloss row before the wrap is the last gloss row plus the line gap
 
 -- measure ---------------------------------------------------
   PASS   widths are strictly increasing for i < iii < WWW
@@ -232,7 +264,7 @@ Open documents at start: 1
   PASS   bottom padding is 0
   PASS   every form sits directly above its gloss (equal column widths)
   PASS   no row is wider than the text area
-         widest row 192.75pt, text area 468pt
+         widest row 206.25pt, text area 468pt
   PASS   every row's first cell carries its tier's paragraph style
   PASS   interlinear cells are not spell-checked
   PASS   the translation still is
@@ -354,7 +386,7 @@ Open documents at start: 1
          number cell 36pt, hang 36pt
   PASS   every row has one
   PASS   the rows themselves are not indented
-  PASS   the translation is indented past the number column
+  FAIL   the translation is indented past the number column
   PASS   the cursor on the number is inside the example
   PASS   the first cell's text is just the form
   PASS   and the read-back counts no number column
@@ -367,7 +399,7 @@ Open documents at start: 1
   PASS   and each still has exactly one number paragraph
   PASS   an indent on the rows survives a re-wrap
          rows at 72pt
-  PASS   and the translation sits past the indent and the number
+  FAIL   and the translation sits past the indent and the number
   PASS   and the number is still (1)
   PASS   deleting the first example leaves one table
   PASS   and one number paragraph
@@ -457,7 +489,7 @@ Open documents at start: 1
   PASS   LingTeXConvertTableToIgt leaves no undo record open
   PASS   Indent moves the example half an inch
          rows at 36pt
-  PASS   and the translation with it, past the number
+  FAIL   and the translation with it, past the number
   PASS   the number is still (1)
   PASS   a second Indent makes an inch
   PASS   Outdent takes half of it back
@@ -480,5 +512,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-FAILURES -- 417 passed, 1 FAILED
+FAILURES -- 437 passed, 5 FAILED
 
