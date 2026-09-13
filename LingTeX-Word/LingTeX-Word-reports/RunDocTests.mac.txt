@@ -105,35 +105,30 @@ Open documents at start: 1
   PASS   Vernacular starts italic
   PASS   Gloss starts upright
   PASS   Grammatical Gloss starts in small capitals
-  PASS   a size can be set on a slot
-  PASS     and the Word style has it
-  PASS     and the box shows it
-  PASS   a size with a comma decimal is accepted
-  PASS     as ten and a half
-  PASS   letters are refused as a size
-  PASS     and the size is unchanged
-  PASS   an empty size follows Normal again
-  PASS     so the box is empty
-  PASS     and the style is the body size
-  PASS   a font can be set on a slot
-  PASS     and the box shows it
-  PASS   an empty font follows Normal again
-  PASS     so the box is empty
-  PASS   a flag can be switched on
+  PASS   IsValidSpacingText accepts empty
+  PASS     and a number
+  PASS     and refuses letters
+  PASS   a size set on a style shows as its own
+  PASS     and the body size shows as none of its own
+  PASS   a font set on a style shows as its own
+  PASS     and the body font shows as none of its own
+  PASS   a flag set on a style reads back
   PASS     and off
   PASS   Reset This Style takes the flag off again
   PASS     and puts Vernacular back to italic
   PASS     and Grammatical Gloss back to small capitals
   PASS   an example draws with every spacing set
   PASS   space before goes on the first row
-  FAIL   the tier gap goes under the first tier of the wrap line
+  PASS   the tier gap goes under the first tier of the wrap line
   PASS   the last row carries no space after (the translation follows)
   PASS   left padding is 2
+  PASS   the rows start the left padding before the indent, so the text sits at it
+  PASS     and ExampleIndent still reads 0
   PASS   right padding is 3
   PASS   top padding is 1
   PASS   bottom padding is 1.5
   PASS   no row runs past the example's right indent
-         widest row 207.75pt, room 396pt
+         widest row 205.75pt, room 396pt
   PASS   the translation paragraph is there
   PASS   space above the translation
   PASS   space after the example, on the translation
@@ -142,7 +137,45 @@ Open documents at start: 1
   PASS   no space before on the first row
   PASS   no tier gap
   PASS   padding is back to 0
+  PASS     and the rows are back at the indent, not a padding left of it
   PASS   the translation has the style's own spacing again
+
+-- dialog ----------------------------------------------------
+  PASS   the settings form really is a form (New compiled against it)
+  PASS   it built its controls without being shown
+         58 controls
+  PASS   the styles list has one entry per style slot
+  PASS   the first style is selected
+  PASS   a virgin document loads an empty spacing box
+  PASS     and the default list level
+  PASS     numbering ticked
+  PASS     word alignment chosen
+  PASS     and not morpheme
+  PASS     full stop as the space replacement
+  PASS   Apply accepts the boxes
+  PASS     tier gap stored as 4
+  PASS     column gap stored as 7.5 (comma decimal)
+  PASS     numbering off
+  PASS     morpheme alignment
+  PASS     underscore replaces a space
+  PASS     list level 2
+  PASS   Apply refuses a box that is not a number
+  PASS     and names the box
+  PASS     storing nothing from that pass
+  PASS   Apply refuses a list level of 0
+  PASS   Apply accepts them again
+  PASS     and the tier gap is 5 now
+  PASS   LoadFrom shows what was stored
+  PASS     and an unset box stays empty
+  PASS     and the flags
+  PASS   Result is empty until a button is pressed
+
+-- spacefix --------------------------------------------------
+  PASS   the typed space is in the cell before the re-wrap
+  PASS   re-wrap replaces the space with the document's full stop
+  PASS   the vernacular cell above it is untouched
+  FAIL   the translation keeps its spaces
+  PASS   re-wrap uses an underscore when the document says so
 
 -- measure ---------------------------------------------------
   PASS   widths are strictly increasing for i < iii < WWW
@@ -447,5 +480,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-FAILURES -- 389 passed, 1 FAILED
+FAILURES -- 417 passed, 1 FAILED
 
