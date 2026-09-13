@@ -48,6 +48,13 @@
                   onAction="RbnConvertTable"
                   screentip="Convert a plain table into an interlinear example"
                   supertip="Turns an ordinary Word table -- typed by hand or pasted from a spreadsheet -- into an auto-wrapping interlinear example. One row per tier."/>
+          <button id="LingTeXFromText"
+                  label="Text to Interlinear"
+                  size="large"
+                  image="igtFromText"
+                  onAction="RbnFromText"
+                  screentip="Turn selected lines of text into an interlinear example"
+                  supertip="Select the lines: the words of the sentence on one line, their glosses on the next, the translation under them. Blank lines are ignored and a leading number such as (1) is dropped. You are asked how many of the last lines are translations. Aligned by word or by morpheme as the document is set."/>
         </group>
 
         <group id="LingTeXLayoutGroup" label="Layout">

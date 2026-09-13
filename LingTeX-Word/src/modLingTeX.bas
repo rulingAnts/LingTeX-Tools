@@ -103,6 +103,7 @@ Private Const DIALOG_TITLE As String = "LingTeX-Word"
 
 Public gQuiet As Boolean            ' suppress dialogs (tests set this)
 Public gQuietAnswer As Boolean      ' what Confirm returns while quiet
+Public gQuietText As String         ' what Ask returns while quiet
 Public gLastMessage As String       ' the last thing reported, dialog or not
 
 Public Sub Report(ByVal msg As String, ByVal kind As Long)
@@ -120,6 +121,18 @@ Public Function Confirm(ByVal msg As String) As Boolean
         Exit Function
     End If
     Confirm = (MsgBox(msg, vbYesNo + vbQuestion, DIALOG_TITLE) = vbYes)
+End Function
+
+' A question with a typed answer. "" is Cancel (InputBox returns "" for it,
+' and for an emptied box, which is treated the same). While quiet it answers
+' gQuietText, so a test can exercise an answer and a cancel.
+Public Function Ask(ByVal prompt As String, ByVal dflt As String) As String
+    gLastMessage = prompt
+    If gQuiet Then
+        Ask = gQuietText
+        Exit Function
+    End If
+    Ask = InputBox(prompt, DIALOG_TITLE, dflt)
 End Function
 
 
@@ -264,14 +277,12 @@ End Sub
 ' nothing is selected.
 '-----------------------------------------------------------------------------
 Public Sub LingTeXInsertInterlinear()
-    Dim errNum As Long, errDesc As String
     Dim doc As Document
     Dim raw As String
     Dim ex As IgtExample
     Dim target As Range
-    Dim tbl As Table
-    Dim warnings As Collection
     Dim fromClipboard As Boolean
+    Dim lines() As String
 
     If gBusy Then
         ' Not silence: a stuck flag would otherwise look like a dead button.
@@ -302,19 +313,52 @@ Public Sub LingTeXInsertInterlinear()
 
     ex = ModelFromText(raw, SettingGranularity(doc))
     If ex.TierCount = 0 Or ex.ColCount = 0 Then
+        ' Not FLEx text and not tab-separated rows. Selected lines of plain
+        ' text -- words on one line, glosses on the next -- take the Text to
+        ' Interlinear road, with its one question (Seth, 2026-09-14).
+        If Not fromClipboard Then
+            If InStr(raw, vbTab) = 0 Then
+                lines = TextLines(raw)
+                If UBound(lines) >= 1 Then
+                    TextToInterlinearCore doc, target, raw
+                    Exit Sub
+                End If
+            End If
+        End If
         Report "That text could not be read as interlinear data." & vbCr & vbCr & _
                "Expected FLEx interlinear text (tab-separated, with tier labels " & _
-               "such as Morphemes and Lex. Gloss), or a plain tab-separated " & _
-               "table with one row per tier.", vbExclamation
+               "such as Morphemes and Lex. Gloss), a plain tab-separated " & _
+               "table with one row per tier, or selected lines of text: the " & _
+               "words on one line, their glosses on the next.", vbExclamation
         Exit Sub
     End If
 
+    DrawParsedExample ex, target, doc, "Insert interlinear"
+    Exit Sub
+
+Fail:
+    Report "Error " & CStr(Err.Number) & ": " & Err.Description, vbCritical
+End Sub
+
+'-----------------------------------------------------------------------------
+' Draw a parsed example at a range, replacing what is there, inside one undo
+' record, and say what needs saying: the drawing failed, or took but not as
+' planned, or the glossing has something only a person can decide. Shared by
+' Insert Interlinear and Text to Interlinear.
+'-----------------------------------------------------------------------------
+Private Sub DrawParsedExample(ByRef ex As IgtExample, target As Range, doc As Document, _
+        ByVal label As String)
+    Dim errNum As Long, errDesc As String
+    Dim tbl As Table
+    Dim warnings As Collection
+
+    On Error GoTo Fail
     ' Repair what has only one right answer before drawing, so the example does
     ' not arrive already violating its own invariants.
     FixCellSpaces ex, SettingSpaceReplacement(doc)
 
     gBusy = True
-    BeginUndo "Insert interlinear"
+    BeginUndo label
     Application.ScreenUpdating = False
 
     Set tbl = RenderExample(ex, target)
@@ -357,6 +401,139 @@ Fail:
     ReleaseScratch
     Report "Error " & errNum & ": " & errDesc, vbCritical
 End Sub
+
+'=============================================================================
+' -- TEXT TO INTERLINEAR ----------------------------------------------------
+'=============================================================================
+' Select lines typed by hand -- the words of a sentence on one line, their
+' glosses on the next, the translation under them, blank lines anywhere --
+' and draw them as an example (Seth, 2026-09-14). The lines become the model
+' directly (modIgtModel, PLAIN TEXT LINES): a leading example number such as
+' (1) is dropped, since the document numbers examples itself; the document's
+' alignment is applied by ProjectToMorphemes when it says morphemes; and the
+' one thing the text cannot say -- which of its last lines are translations
+' -- is asked, with a guess (the trailing lines whose word count differs from
+' the first line's) and every line shown with its count, so the guess is
+' easy to check. Insert Interlinear takes the same road when its selection
+' is plain lines.
+
+Public Sub LingTeXTextToInterlinear()
+    Dim doc As Document
+    Dim target As Range
+    Dim inTable As Boolean
+
+    If gBusy Then
+        Report "LingTeX-Word is busy with another operation." & vbCr & vbCr & _
+               "If this keeps happening, run LingTeXStart from the macro list " & _
+               "(or restart Word) to clear it.", vbInformation
+        Exit Sub
+    End If
+    EnsureHooks
+    On Error Resume Next
+    Set doc = ActiveDocument
+    Err.Clear
+    On Error GoTo 0
+    If doc Is Nothing Then
+        Report "Open a document first.", vbInformation
+        Exit Sub
+    End If
+    If Selection.Type = wdSelectionIP Then
+        Report "Select the lines of the example first: the words on one line, " & _
+               "their glosses on the next, and the translation under them. " & _
+               "Blank lines between them do no harm.", vbInformation
+        Exit Sub
+    End If
+    On Error Resume Next
+    inTable = Selection.Information(wdWithInTable)
+    Err.Clear
+    On Error GoTo 0
+    If inTable Then
+        Report "The selection is inside a table. Convert Table turns a table into " & _
+               "an example; this command wants lines of plain text.", vbInformation
+        Exit Sub
+    End If
+    Set target = SelectedParagraphRange()
+    TextToInterlinearCore doc, target, Selection.Range.Text
+End Sub
+
+' The shared road: lines out of the text, the question, the model, the draw.
+Private Sub TextToInterlinearCore(doc As Document, target As Range, ByVal raw As String)
+    Dim lines() As String
+    Dim n As Long, nFree As Long
+    Dim answer As String
+    Dim ex As IgtExample
+
+    lines = TextLines(raw)
+    n = UBound(lines) + 1
+    If n < 2 Then
+        Report "Select at least two lines: the words of the example on one line " & _
+               "and their glosses on the next, with any translation under them.", _
+               vbInformation
+        Exit Sub
+    End If
+    lines(0) = StripExampleNumber(lines(0))
+    If lines(0) = "" Then
+        Report "The first line holds only an example number. The words of the " & _
+               "example come first; the document numbers it itself.", vbInformation
+        Exit Sub
+    End If
+
+    nFree = GuessFreeLineCount(lines)
+    answer = Trim$(Ask(FreeLinesPrompt(lines, nFree), CStr(nFree)))
+    If answer = "" Then Exit Sub                     ' Cancel
+    If Not IsDigitsOnly(answer) Then
+        Report "A whole number of lines, please: 0, 1, 2...", vbExclamation
+        Exit Sub
+    End If
+    nFree = CLng(Val(answer))
+    If nFree > n - 1 Then
+        Report "At least one line has to be the example itself: " & CStr(n) & _
+               " lines are selected, so at most " & CStr(n - 1) & " of them can be " & _
+               "translations.", vbExclamation
+        Exit Sub
+    End If
+
+    ex = ModelFromLines(lines, nFree)
+    If ex.TierCount = 0 Or ex.ColCount = 0 Then
+        Report "Those lines could not be read as an example.", vbExclamation
+        Exit Sub
+    End If
+    If SettingGranularity(doc) = igtMorphemeAligned Then ProjectToMorphemes ex
+    DrawParsedExample ex, target, doc, "Text to interlinear"
+End Sub
+
+' The question: every line with its word count, then the ask.
+Private Function FreeLinesPrompt(lines() As String, ByVal guess As Long) As String
+    Dim s As String
+    Dim i As Long
+    Dim preview As String
+    s = CStr(UBound(lines) + 1) & " lines selected:" & vbCr & vbCr
+    For i = 0 To UBound(lines)
+        preview = lines(i)
+        If Len(preview) > 60 Then preview = Left$(preview, 57) & "..."
+        s = s & CStr(i + 1) & ".  " & preview & "   (" & CStr(WordCount(lines(i))) & _
+            " words)" & vbCr
+    Next i
+    s = s & vbCr & "How many of the LAST lines are free translations? The lines " & _
+        "before them are the tiers, in order: the words, then their glosses. " & _
+        "Type 0 if there is none."
+    If guess > 0 Then
+        s = s & vbCr & vbCr & "The last " & CStr(guess) & IIf(guess = 1, " line has", _
+            " lines have") & " a different number of words from the first, so " & _
+            IIf(guess = 1, "it looks", "they look") & " like the translation."
+    End If
+    FreeLinesPrompt = s
+End Function
+
+Private Function IsDigitsOnly(ByVal s As String) As Boolean
+    Dim i As Long, ch As String
+    If s = "" Then Exit Function
+    For i = 1 To Len(s)
+        ch = Mid$(s, i, 1)
+        If ch < "0" Or ch > "9" Then Exit Function
+    Next i
+    IsDigitsOnly = True
+End Function
 
 '-----------------------------------------------------------------------------
 ' Adopt a plain Word table as an interlinear example: style it, and wrap it.
@@ -2055,6 +2232,10 @@ End Sub
 
 Public Sub RbnConvertTable(control As Variant)
     LingTeXConvertTableToIgt
+End Sub
+
+Public Sub RbnFromText(control As Variant)
+    LingTeXTextToInterlinear
 End Sub
 
 Public Sub RbnAlignByWord(control As Variant)

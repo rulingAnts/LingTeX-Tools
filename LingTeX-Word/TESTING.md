@@ -159,6 +159,7 @@ Free Eng (When) she picked her yams early.
 | After any command, `Application.ScreenUpdating` is back on (the screen is not frozen) | ☐ | ☐ |
 | No hidden scratch document is left open — check the Window menu | ☐ | ☐ |
 | Run `LingTeXToggleRewrapOnSelectionChange`, then click in and out of an example → it re-wraps, does not recurse, and typing stays responsive | ☐ | ☐ |
+| Type three lines: `(1) vu=ve levo=zi zuvo`, `fox=ERG follow.CMP=REL dream`, `'A fox followed her.'`; select them, **Text to Interlinear**, accept the guess of 1 → a numbered example with three columns and the translation; by morpheme (Settings) the same text gives five columns | ☐ | ☐ |
 | Type a space into a gloss cell (`follow CMP=REL`), **Re-wrap This** → it reads `follow.CMP=REL` (or `_` if the document says so); the translation keeps its spaces | ☐ | ☐ |
 | **Settings** opens the dialog, centred on Word, every control drawn and legible, the current values shown; Escape closes it, Enter is OK | ☐ | ☐ |
 | **Settings:** *Tier gap* `12`, Apply → the tiers of every example move apart with the dialog still up; clear the box, OK → they close up. `abc` → a clear message naming the box, nothing stored. `50%` → half a line | ☐ | ☐ |
