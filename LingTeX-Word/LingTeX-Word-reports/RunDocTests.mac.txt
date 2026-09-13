@@ -139,7 +139,7 @@ Open documents at start: 1
   PASS   top padding is 1
   PASS   bottom padding is 1.5
   PASS   no row runs past the example's right indent
-         widest row 219.25pt, room 396pt
+         widest row 205.75pt, room 396pt
   PASS   the translation paragraph is there
   PASS   space above the translation
   PASS   space after the example, on the translation
@@ -196,12 +196,10 @@ Open documents at start: 1
 -- rows ------------------------------------------------------
   PASS   rows: a numbered example draws on the narrow page
   PASS   rows: it wrapped onto a second line
-  FAIL   the number sits at the left margin (the table's edge is the padding to its left)
-         number at 83.25, margin 72
-  PASS   no hanging indent: every row's first content cell starts where row 1's does
-         row 1 content at 83.25
-  FAIL   the translation starts where the content does
-         translation at 72
+  PASS   no hanging indent: every row has the first row's indent
+         row 1 at -2
+  PASS   the translation is indented by the number column, under the content
+         translation indent 36, number column 36
   PASS   every cell of the first row starts at the same height, number included
          cell 1 at 72
          row heights 15 / 20.25 / 15 / 14.25
@@ -264,7 +262,7 @@ Open documents at start: 1
   PASS   bottom padding is 0
   PASS   every form sits directly above its gloss (equal column widths)
   PASS   no row is wider than the text area
-         widest row 206.25pt, text area 468pt
+         widest row 192.75pt, text area 468pt
   PASS   every row's first cell carries its tier's paragraph style
   PASS   interlinear cells are not spell-checked
   PASS   the translation still is
@@ -386,7 +384,7 @@ Open documents at start: 1
          number cell 36pt, hang 36pt
   PASS   every row has one
   PASS   the rows themselves are not indented
-  FAIL   the translation is indented past the number column
+  PASS   the translation is indented past the number column
   PASS   the cursor on the number is inside the example
   PASS   the first cell's text is just the form
   PASS   and the read-back counts no number column
@@ -399,7 +397,7 @@ Open documents at start: 1
   PASS   and each still has exactly one number paragraph
   PASS   an indent on the rows survives a re-wrap
          rows at 72pt
-  FAIL   and the translation sits past the indent and the number
+  PASS   and the translation sits past the indent and the number
   PASS   and the number is still (1)
   PASS   deleting the first example leaves one table
   PASS   and one number paragraph
@@ -489,7 +487,7 @@ Open documents at start: 1
   PASS   LingTeXConvertTableToIgt leaves no undo record open
   PASS   Indent moves the example half an inch
          rows at 36pt
-  FAIL   and the translation with it, past the number
+  PASS   and the translation with it, past the number
   PASS   the number is still (1)
   PASS   a second Indent makes an inch
   PASS   Outdent takes half of it back
@@ -512,5 +510,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-FAILURES -- 437 passed, 5 FAILED
+ALL PASS -- 441 passed
 
