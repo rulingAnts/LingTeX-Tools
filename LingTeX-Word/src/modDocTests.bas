@@ -944,20 +944,20 @@ End Sub
 '=============================================================================
 ' -- ROW GEOMETRY, AS WORD LAYS IT OUT --------------------------------------
 '=============================================================================
-' Seth saw two things a screenshot cannot settle (2026-09-14): the gap between
-' the tiers looking larger on the first wrap line than on the second, and a
-' hanging indent -- later wrap lines starting to the right of the first --
-' after spacing or padding was set. So ask Word where things are: the page
-' position of every row's first content cell and of the translation, and the
-' height of every row. A numbered example on a narrow page, so it wraps, with
-' cell padding set, since that is where it went wrong.
+' Seth saw the gap between the tiers looking larger on the first wrap line
+' than on the second (2026-09-14), which a screenshot cannot settle. So ask
+' Word: the vertical position of every row, hence its height, and the top of
+' every cell of the first row. A numbered example on a narrow page, so it
+' wraps, with cell padding set. (Horizontal positions were asked for too, and
+' Word answered with one value for every cell of a row -- 83.25 for the number
+' cell and the content cell alike -- so nothing horizontal is checked this way;
+' the indents are read back as properties elsewhere.)
 
 Private Sub TestRowGeometry()
     Dim doc As Document
     Dim ex As IgtExample
     Dim tbl As Table
     Dim r As Long
-    Dim x0 As Double, xr As Double, xNum As Double, xFree As Double
     Dim y(1 To 5) As Double
     Dim h1 As Double, h2 As Double, h3 As Double, h4 As Double
     Dim para As Paragraph
@@ -995,37 +995,26 @@ Private Sub TestRowGeometry()
     End If
     Ok "rows: it wrapped onto a second line", True
 
-    '-- horizontal: every row's text starts where the first row's does ------
-    On Error Resume Next
-    xNum = tbl.Cell(1, 1).Range.Information(INFO_X_PAGE)
-    x0 = tbl.Cell(1, 2).Range.Information(INFO_X_PAGE)
-    Err.Clear
-    On Error GoTo 0
-    Ok "the number sits at the left margin (the table's edge is the padding to its left)", _
-        (Abs(xNum - 72) <= 0.75)
-    Emit "         number at " & CStr(xNum) & ", margin 72"
+    '-- flush left: every row at the same indent, the translation under the content
+    ' Read back as properties, which is what the renderer sets; a hanging
+    ' indent on later wrap lines (Seth, 2026-09-14) is a row whose indent
+    ' differs from the first's.
     allSame = True
+    bad = ""
     For r = 2 To tbl.Rows.Count
-        On Error Resume Next
-        xr = tbl.Cell(r, 2).Range.Information(INFO_X_PAGE)
-        Err.Clear
-        On Error GoTo 0
-        If Abs(xr - x0) > 0.75 Then
+        If Abs(tbl.Rows(r).LeftIndent - tbl.Rows(1).LeftIndent) > 0.5 Then
             allSame = False
-            bad = bad & " row " & CStr(r) & " at " & CStr(xr) & ";"
+            bad = bad & " row " & CStr(r) & " at " & CStr(tbl.Rows(r).LeftIndent) & ";"
         End If
     Next r
-    Ok "no hanging indent: every row's first content cell starts where row 1's does", allSame
-    Emit "         row 1 content at " & CStr(x0) & IIf(bad = "", "", "; off:" & bad)
-
+    Ok "no hanging indent: every row has the first row's indent", allSame
+    Emit "         row 1 at " & CStr(tbl.Rows(1).LeftIndent) & IIf(bad = "", "", "; off:" & bad)
     Set para = ParagraphAfterTable(tbl)
     If Not para Is Nothing Then
-        On Error Resume Next
-        xFree = para.Range.Information(INFO_X_PAGE)
-        Err.Clear
-        On Error GoTo 0
-        Ok "the translation starts where the content does", (Abs(xFree - x0) <= 0.75)
-        Emit "         translation at " & CStr(xFree)
+        Ok "the translation is indented by the number column, under the content", _
+            (Abs(para.LeftIndent - (ExampleIndent(tbl) + SettingNumberHang(doc))) <= 0.5)
+        Emit "         translation indent " & CStr(para.LeftIndent) & ", number column " & _
+             CStr(SettingNumberHang(doc))
     End If
 
     '-- every cell of the first row starts at the same height ----------------
@@ -1051,6 +1040,7 @@ Private Sub TestRowGeometry()
     Emit "         cell 1 at " & CStr(yTop) & IIf(bad = "", "", "; off:" & bad)
 
     '-- vertical: the numbered first row is as tall as the later vernacular row
+    Set para = ParagraphAfterTable(tbl)
     On Error Resume Next
     For r = 1 To 4
         y(r) = tbl.Cell(r, 2).Range.Information(INFO_Y_PAGE)

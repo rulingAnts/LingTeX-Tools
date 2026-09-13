@@ -99,7 +99,18 @@ requests.
   (with 9pt set above the example, by the test) and half-repainted; the
   "janked" screenshot was that document, and the `rows` test now checks
   every cell of the first row starts at the same height.
-- **Alignment is measured** (2026-09-14, Seth's idea): AlignRowsToFirst at
+- **Measured alignment REVERTED** (07:49 run, 437/442): Range.Information(5)
+  on a cell range reports one row-level value for every cell (83.25 for the
+  number cell and the content cell alike), so AlignRowsToFirst nudged rows
+  and translations by nonsense -- three numbering/commands tests red, and
+  Seth's page worse ("hanging indent", rows 2+ shifted, translation moved).
+  Gone; FillTable places every row at the same indent (contIndent 0) and the
+  `rows` test reads Rows(r).LeftIndent back for all rows plus the
+  translation's indent. Vertical Information IS reliable: row heights 15 /
+  20.25 / 15 / 14.25 (row 1 = row 3; gloss row before the wrap = last gloss
+  row + 6). The engine at 07:49 still had the nudge: a re-import fixes it,
+  then Re-wrap All re-places existing examples.
+- **Alignment is measured** (2026-09-14, Seth's idea, tried and reverted above): AlignRowsToFirst at
   the end of DrawExample asks Word (Information, page x) where every row's
   first content cell starts and nudges each row's LeftIndent by its error
   (later wrap lines allow for ContIndent), then moves the translation
