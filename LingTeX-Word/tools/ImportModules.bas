@@ -4,9 +4,9 @@ Option Explicit
 '=============================================================================
 ' modImport  --  LingTeX-Word
 '
-' ONE PASTE, THEN THE OTHER THIRTEEN MODULES IMPORT THEMSELVES.
+' ONE PASTE, THEN THE OTHER FOURTEEN MODULES IMPORT THEMSELVES.
 '
-' Replaces fourteen trips through File > Import File..., and can build the
+' Replaces fifteen trips through File > Import File..., and can build the
 ' distributable template too.
 '
 ' ---------------------------------------------------------------------------
@@ -28,7 +28,7 @@ Option Explicit
 ' because the probe (tools/probe/modProbe.bas section 14) reported BLOCKED on a Mac
 ' where the setting had not been ticked yet, and that one measurement got written
 ' down as a fact about the platform. Confirmed since on Mac Word 16.112: both
-' ImportLingTeXModules and VerifyLingTeXModules, all fourteen modules, both
+' ImportLingTeXModules and VerifyLingTeXModules, all fifteen modules, both
 ' classes as classes. There is no build-on-Windows, test-on-Mac split to make.
 '
 ' NOTE ON SECURITY.  That setting exists for a good reason -- it lets code rewrite
@@ -63,7 +63,7 @@ Option Explicit
 '      suites, EnsureHooks. Or by hand: ImportLingTeXModules, then
 '      VerifyLingTeXModules. SaveAsTemplate writes the release LingTeX-Word.dotm.
 '
-' THE TWELVE STANDARD MODULES AND THE TWO CLASS MODULES ARE NOT THE SAME JOB.
+' THE TWELVE STANDARD MODULES, THE TWO CLASSES AND THE FORM ARE NOT THE SAME JOB.
 '
 ' The .bas files import cleanly and always have. The .cls files are the part that
 ' goes wrong: VBComponents.Import decides a file's component type by parsing its
@@ -110,6 +110,10 @@ Private Const MODULE_LIST As String = _
 ' The two class modules, kept separate because they are the part that goes wrong.
 Private Const CLASS_LIST As String = "clsIgtWarning.cls|clsAppEvents.cls"
 
+' The one UserForm, the Settings dialog: created explicitly (VBComponents.Add,
+' type 3) and its code installed from the file, like a class. No .frx exists.
+Private Const FORM_LIST As String = "frmLingTeXSettings.frm"
+
 '-- Try to create the class modules from code, or leave them to you? ----------
 '
 ' Importing a .cls is the one unreliable step here. VBComponents.Import decides what
@@ -120,7 +124,11 @@ Private Const CLASS_LIST As String = "clsIgtWarning.cls|clsAppEvents.cls"
 ' So this macro never calls Import on a .cls. With this True it creates the
 ' component explicitly instead (VBComponents.Add, set the name, install the source),
 ' which has nothing left to guess at. With it False it skips them entirely and tells
-' you which two files to paste into hand-made Class Modules.
+' you which files to paste into hand-made Class Modules (and one UserForm).
+'
+' The Settings form, src/frmLingTeXSettings.frm, goes the same way as a UserForm
+' (type 3). It has no .frx to import: its controls are built in code when it
+' opens, so its code is the whole of it, installed like a class's.
 '
 ' Either way the twelve standard modules come in the easy way, and the report at the
 ' end says exactly what is left to do.
@@ -370,17 +378,20 @@ Public Sub ImportLingTeXModules()
     ' From the days when this module lived inside the engine: it must not ship.
     RemoveComponent vbp, "modImport"
     '-- the twelve standard modules: Import, which is reliable for these ------
-    ImportGroup vbp, MODULE_LIST, False, log, okCount, failCount, todo, todoCount
+    ImportGroup vbp, MODULE_LIST, 1, log, okCount, failCount, todo, todoCount
 
-    '-- the two class modules: explicitly created, or left to you -------------
+    '-- the two class modules and the form: explicitly created, or left to you
     If IMPORT_CLASS_MODULES Then
-        ImportGroup vbp, CLASS_LIST, True, log, okCount, failCount, todo, todoCount
+        ImportGroup vbp, CLASS_LIST, 2, log, okCount, failCount, todo, todoCount
+        ImportGroup vbp, FORM_LIST, 3, log, okCount, failCount, todo, todoCount
     Else
         log = log & "  skipped  clsIgtWarning.cls   (paste by hand)" & vbCr
         log = log & "  skipped  clsAppEvents.cls    (paste by hand)" & vbCr
-        todo = todo & PasteInstructions("clsIgtWarning", "05") & _
-               PasteInstructions("clsAppEvents", "14")
-        todoCount = todoCount + 2
+        log = log & "  skipped  frmLingTeXSettings.frm  (paste by hand)" & vbCr
+        todo = todo & PasteInstructions("clsIgtWarning", "05", 2) & _
+               PasteInstructions("clsAppEvents", "14", 2) & _
+               PasteInstructions("frmLingTeXSettings", "15", 3)
+        todoCount = todoCount + 3
     End If
 
     msg = "Imported " & CStr(okCount) & " of " & CStr(TotalModuleCount()) & _
@@ -396,8 +407,8 @@ Public Sub ImportLingTeXModules()
     End If
 
     msg = msg & vbCr & "Then:  VerifyLingTeXModules" & vbCr & _
-          "It confirms all fourteen are present and the two classes really are " & _
-          "classes, before you run anything."
+          "It confirms all fifteen are present, the two classes really are " & _
+          "classes and the form is a form, before you run anything."
 
     Report msg, (failCount = 0 And todoCount = 0)
     If Not mBatch Then CloseEngine True
@@ -407,7 +418,7 @@ End Sub
 ' Bring in one group of files, accumulating the log and the counts.
 '-----------------------------------------------------------------------------
 Private Sub ImportGroup(vbp As Object, ByVal fileList As String, _
-        ByVal asClass As Boolean, ByRef log As String, _
+        ByVal kind As Long, ByRef log As String, _
         ByRef okCount As Long, ByRef failCount As Long, _
         ByRef todo As String, ByRef todoCount As Long)
 
@@ -429,17 +440,20 @@ Private Sub ImportGroup(vbp As Object, ByVal fileList As String, _
             ' Replace rather than duplicate, so re-running picks up edits.
             RemoveComponent vbp, compName
 
-            note = ImportOne(vbp, fullPath, compName, asClass)
+            note = ImportOne(vbp, fullPath, compName, kind)
             If note = "" Then
-                log = log & "  ok       " & leaf & _
-                      IIf(asClass, "   (class module, created explicitly)", "") & vbCr
+                log = log & "  ok       " & leaf & KindNote(kind) & vbCr
                 okCount = okCount + 1
-            ElseIf asClass Then
-                ' A class that could not be created from code is not a failure to
-                ' argue with -- it is two minutes of pasting. Say which file.
+            ElseIf Left$(note, 5) = "NOTE:" Then
+                ' In, with something to check (the MSForms reference, below).
+                log = log & "  ok       " & leaf & KindNote(kind) & vbCr
+                log = log & "           " & Mid$(note, 6) & vbCr
+                okCount = okCount + 1
+            ElseIf kind > 1 Then
+                ' A class or form that could not be created from code is not a
+                ' failure to argue with -- it is two minutes of pasting. Say which.
                 log = log & "  by hand  " & leaf & "  (" & note & ")" & vbCr
-                todo = todo & PasteInstructions(compName, _
-                           IIf(compName = "clsIgtWarning", "05", "14"))
+                todo = todo & PasteInstructions(compName, PasteNumber(compName), kind)
                 todoCount = todoCount + 1
             Else
                 log = log & "  FAILED   " & leaf & "  (" & note & ")" & vbCr
@@ -451,20 +465,58 @@ End Sub
 
 Private Function TotalModuleCount() As Long
     TotalModuleCount = UBound(Split(MODULE_LIST, "|")) + 1 + _
-                       UBound(Split(CLASS_LIST, "|")) + 1
+                       UBound(Split(CLASS_LIST, "|")) + 1 + _
+                       UBound(Split(FORM_LIST, "|")) + 1
+End Function
+
+' What the log says after a component that was created rather than imported.
+Private Function KindNote(ByVal kind As Long) As String
+    Select Case kind
+        Case 2: KindNote = "   (class module, created explicitly)"
+        Case 3: KindNote = "   (UserForm, created explicitly; controls built when it opens)"
+    End Select
+End Function
+
+Private Function KindName(ByVal kind As Long) As String
+    Select Case kind
+        Case 2: KindName = "class module"
+        Case 3: KindName = "UserForm"
+        Case Else: KindName = "module"
+    End Select
+End Function
+
+' The paste bundle's number for a component that has to be pasted by hand.
+Private Function PasteNumber(ByVal compName As String) As String
+    Select Case compName
+        Case "clsIgtWarning": PasteNumber = "05"
+        Case "clsAppEvents": PasteNumber = "14"
+        Case "frmLingTeXSettings": PasteNumber = "15"
+        Case Else: PasteNumber = "??"
+    End Select
 End Function
 
 Private Function PasteInstructions(ByVal compName As String, _
-        ByVal num As String) As String
+        ByVal num As String, ByVal kind As Long) As String
 
-    PasteInstructions = _
-        "  " & compName & vbCr & _
-        "    1. Insert > Class Module   (NOT Insert > Module)" & vbCr & _
-        "    2. Open  LingTeX-Word/build/paste/" & num & "-" & compName & ".txt" & _
-        vbCr & _
-        "       and paste the whole thing in" & vbCr & _
-        "    3. Properties pane, (Name) row:  " & compName & vbCr & _
-        "    4. Instancing should read  1 - Private  (the default; check it)" & vbCr
+    If kind = 3 Then
+        PasteInstructions = _
+            "  " & compName & vbCr & _
+            "    1. Insert > UserForm   (NOT Insert > Module)" & vbCr & _
+            "    2. Properties pane, (Name) row:  " & compName & vbCr & _
+            "    3. View > Code, then paste the whole of" & vbCr & _
+            "       LingTeX-Word/build/paste/" & num & "-" & compName & ".txt" & vbCr & _
+            "    4. Leave the form empty in the designer: its controls are built " & _
+            "when it opens" & vbCr
+    Else
+        PasteInstructions = _
+            "  " & compName & vbCr & _
+            "    1. Insert > Class Module   (NOT Insert > Module)" & vbCr & _
+            "    2. Open  LingTeX-Word/build/paste/" & num & "-" & compName & ".txt" & _
+            vbCr & _
+            "       and paste the whole thing in" & vbCr & _
+            "    3. Properties pane, (Name) row:  " & compName & vbCr & _
+            "    4. Instancing should read  1 - Private  (the default; check it)" & vbCr
+    End If
 End Function
 
 '-----------------------------------------------------------------------------
@@ -505,7 +557,7 @@ Public Sub VerifyLingTeXModules()
     Set vbp = GetProject()
     If vbp Is Nothing Then Exit Sub
 
-    names = Split(MODULE_LIST & "|" & CLASS_LIST, "|")
+    names = Split(MODULE_LIST & "|" & CLASS_LIST & "|" & FORM_LIST, "|")
     For i = 0 To UBound(names)
         compName = BaseName(names(i))
         kind = ComponentKind(vbp, compName)
@@ -519,11 +571,19 @@ Public Sub VerifyLingTeXModules()
                     log = log & "  WRONG KIND    " & compName & _
                           "  -- it is a standard module and must be a CLASS" & vbCr
                     problems = problems + 1
+                ElseIf IsFormFile(names(i)) Then
+                    log = log & "  WRONG KIND    " & compName & _
+                          "  -- it is a standard module and must be a USERFORM" & vbCr
+                    problems = problems + 1
                 Else
                     log = log & "  ok            " & compName & vbCr
                 End If
             Case 2                                  ' vbext_ct_ClassModule
-                If Not IsClassFile(names(i)) Then
+                If IsFormFile(names(i)) Then
+                    log = log & "  WRONG KIND    " & compName & _
+                          "  -- it is a class and must be a USERFORM" & vbCr
+                    problems = problems + 1
+                ElseIf Not IsClassFile(names(i)) Then
                     log = log & "  WRONG KIND    " & compName & _
                           "  -- it is a class and must be a standard module" & vbCr
                     problems = problems + 1
@@ -535,10 +595,18 @@ Public Sub VerifyLingTeXModules()
                 Else
                     log = log & "  ok  (class)   " & compName & vbCr
                 End If
-                If False Then
+            Case 3                                  ' vbext_ct_MSForm
+                If Not IsFormFile(names(i)) Then
                     log = log & "  WRONG KIND    " & compName & _
-                          "  -- it is a class and must be a standard module" & vbCr
+                          "  -- it is a UserForm and must not be" & vbCr
                     problems = problems + 1
+                ElseIf LineCount(vbp, compName) < 10 Then
+                    log = log & "  EMPTY         " & compName & "  (" & _
+                          CStr(LineCount(vbp, compName)) & " lines; the form " & _
+                          "exists but has no code)" & vbCr
+                    problems = problems + 1
+                Else
+                    log = log & "  ok  (form)    " & compName & vbCr
                 End If
             Case Else
                 log = log & "  ODD KIND      " & compName & _
@@ -551,13 +619,14 @@ Public Sub VerifyLingTeXModules()
         Report "All " & CStr(UBound(names) + 1) & " modules present and of the " & _
                "right kind." & vbCr & vbCr & log & vbCr & _
                "Next:  RunAllTests    (expect ALL PASS, 79 checks)" & vbCr & _
-               "then:  RunDocTests    (expect ALL PASS, about 270 checks)" & vbCr & _
+               "then:  RunDocTests    (expect ALL PASS, about 400 checks)" & vbCr & _
                "then:  LingTeXStart   (arms the hooks; any command does too)", True
     Else
         Report CStr(problems) & " problem(s) with the project:" & vbCr & vbCr & log & _
                vbCr & "A class module that came in as a standard module is the " & _
-               "usual one. Delete it and redo it with Insert > Class Module and " & _
-               "the matching file in LingTeX-Word/build/paste/.", False
+               "usual one. Delete it and redo it with Insert > Class Module (or " & _
+               "Insert > UserForm for the form) and the matching file in " & _
+               "LingTeX-Word/build/paste/.", False
     End If
     If Not mBatch Then CloseEngine False
 End Sub
@@ -572,6 +641,7 @@ Private Function LineCount(vbp As Object, ByVal compName As String) As Long
 End Function
 
 ' 0 = not present, otherwise the VBComponent Type (1 standard, 2 class, 3 form).
+' Late-bound throughout: vbext_* constants need a reference this module cannot assume.
 Private Function ComponentKind(vbp As Object, ByVal compName As String) As Long
     Dim c As Object
     On Error Resume Next
@@ -660,12 +730,12 @@ End Sub
 ' names them without being told.
 '-----------------------------------------------------------------------------
 Private Function ImportOne(vbp As Object, ByVal fullPath As String, _
-        ByVal compName As String, ByVal asClass As Boolean) As String
+        ByVal compName As String, ByVal kind As Long) As String
 
     Dim comp As Object
     Dim code As String
 
-    If Not asClass Then
+    If kind = 1 Then
         On Error Resume Next
         vbp.VBComponents.Import fullPath
         If Err.Number <> 0 Then
@@ -684,10 +754,10 @@ Private Function ImportOne(vbp As Object, ByVal fullPath As String, _
     code = StripVbaMetadata(code)
 
     On Error Resume Next
-    ' 2 = vbext_ct_ClassModule. The constant is not available late-bound.
-    Set comp = vbp.VBComponents.Add(2)
+    ' 2 = vbext_ct_ClassModule, 3 = vbext_ct_MSForm. Not available late-bound.
+    Set comp = vbp.VBComponents.Add(kind)
     If Err.Number <> 0 Or comp Is Nothing Then
-        ImportOne = "could not add a class module (" & CStr(Err.Number) & ": " & _
+        ImportOne = "could not add a " & KindName(kind) & " (" & CStr(Err.Number) & ": " & _
                     Err.Description & ")"
         Err.Clear
         On Error GoTo 0
@@ -717,14 +787,45 @@ Private Function ImportOne(vbp As Object, ByVal fullPath As String, _
     ElseIf comp.CodeModule.CountOfLines < 10 Then
         ' Created, named, and nothing in it: exactly the failure that is
         ' invisible to a check of the component's TYPE alone.
-        ImportOne = "the class came out with only " & _
+        ImportOne = "the " & KindName(kind) & " came out with only " & _
                     CStr(comp.CodeModule.CountOfLines) & " line(s) of code"
+    ElseIf kind = 3 Then
+        ' The form declares MSForms.CommandButton, so the project needs the
+        ' Microsoft Forms 2.0 Object Library. Inserting a UserForm adds it by
+        ' itself on Windows; whether Add(3) does on Mac is unproven. Look, try,
+        ' and say so, rather than let the form fail to compile on a line in the
+        ' middle of it. The code is in either way, so this is a note, not a
+        ' failure (see ImportGroup).
+        If Not HasReference(vbp, "MSForms") Then
+            vbp.References.AddFromGuid "{0D452EE1-E08F-101A-852E-02608C4D0BB4}", 2, 0
+            Err.Clear
+        End If
+        If Not HasReference(vbp, "MSForms") Then
+            ImportOne = "NOTE: the project has no reference to MSForms (Microsoft " & _
+                        "Forms 2.0 Object Library) and one could not be added; " & _
+                        "add it under Tools > References or the form will not compile"
+        End If
     End If
+    On Error GoTo 0
+End Function
+
+' Does the project reference a library of this name (e.g. "MSForms")?
+Private Function HasReference(vbp As Object, ByVal nm As String) As Boolean
+    Dim r As Object
+    On Error Resume Next
+    For Each r In vbp.References
+        If StrComp(r.Name, nm, vbTextCompare) = 0 Then HasReference = True
+    Next r
+    Err.Clear
     On Error GoTo 0
 End Function
 
 Private Function IsClassFile(ByVal leaf As String) As Boolean
     IsClassFile = (LCase$(Right$(leaf, 4)) = ".cls")
+End Function
+
+Private Function IsFormFile(ByVal leaf As String) As Boolean
+    IsFormFile = (LCase$(Right$(leaf, 4)) = ".frm")
 End Function
 
 '-----------------------------------------------------------------------------
@@ -790,11 +891,14 @@ Private Function StripVbaMetadata(ByVal code As String) As String
         ln = lines(i)
         t = Trim$(ln)
 
-        If Left$(t, 12) = "VERSION 1.0 " Then
+        ' "VERSION 1.0 CLASS" heads a .cls, "VERSION 5.00" a .frm; the .cls
+        ' preamble is BEGIN / MultiUse / END, the .frm's is
+        ' Begin {GUID} name / Caption... / End. Both are skipped whole.
+        If Left$(t, 8) = "VERSION " Then
             ' skip
-        ElseIf t = "BEGIN" And Not started Then
+        ElseIf IsPreambleBegin(t) And Not started Then
             inPre = True
-        ElseIf t = "END" And inPre Then
+        ElseIf UCase$(t) = "END" And inPre Then
             inPre = False
         ElseIf inPre Then
             ' skip the MultiUse line and anything else in the preamble
@@ -813,6 +917,15 @@ Private Function StripVbaMetadata(ByVal code As String) As String
     Next i
 
     StripVbaMetadata = out
+End Function
+
+' "BEGIN" alone (a .cls), or "Begin {C62A69F0-...} frmName" (a .frm).
+Private Function IsPreambleBegin(ByVal t As String) As Boolean
+    If UCase$(t) = "BEGIN" Then
+        IsPreambleBegin = True
+    ElseIf UCase$(Left$(t, 6)) = "BEGIN " Then
+        IsPreambleBegin = True
+    End If
 End Function
 
 Private Function GetProject() As Object

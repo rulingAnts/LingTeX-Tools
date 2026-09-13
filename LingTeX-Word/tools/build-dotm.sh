@@ -206,7 +206,7 @@ fi
     echo "# Checked by tools/check-dotm.sh, which CI runs."
     for f in $(ls "$src" | sort); do
         case "$f" in
-            *.bas|*.cls|customUI14.xml) ;;
+            *.bas|*.cls|*.frm|customUI14.xml) ;;
             *) continue ;;
         esac
         echo "$(sha_of "$src/$f")  $f"

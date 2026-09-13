@@ -65,7 +65,7 @@ Private Const DEF_PAD As Double = 0
 ' before these settings existed gets. Read them with SettingOptional; a negative
 ' answer means "not set".
 Public Const SETTING_UNSET As Double = -1
-' Every spacing key the ribbon's edit boxes can show (SpacingText and
+' Every spacing key the Settings dialog shows (SpacingText and
 ' SetSpacingText below), for the settings report and the tests. The key is the
 ' document-variable name less its prefix; Gap, LineGap, ContIndent and
 ' NumberHang are the names the typed getters have always used.
@@ -245,10 +245,10 @@ End Sub
 '=============================================================================
 ' -- SPACING SETTINGS BY NAME, FOR THE RIBBON -------------------------------
 '=============================================================================
-' The LingTeX Styles tab shows one edit box per spacing, and an edit box holds
-' TEXT: what the document stores, or empty when it stores nothing. Empty is a
-' real state -- "leave it to the default, or to the style" -- so these do not
-' fall back to a default the way the typed getters do; they say what is set.
+' The Settings dialog shows one box per spacing, and a box holds TEXT: what
+' the document stores, or empty when it stores nothing. Empty is a real state
+' -- "leave it to the default, or to the style" -- so these do not fall back
+' to a default the way the typed getters do; they say what is set.
 '
 ' The key is the document-variable name less its prefix. The spacings with a
 ' built-in default (Gap, LineGap, ContIndent, NumberHang, TierGap, Pad*) and
@@ -280,7 +280,7 @@ Public Function SpacingText(doc As Document, ByVal key As String) As String
 End Function
 
 '-----------------------------------------------------------------------------
-' Store what was typed into an edit box. Empty (or only spaces) UNSETS the
+' Store what was typed into a box. Empty (or only spaces) UNSETS the
 ' spacing: the variable is removed, so the default or the style applies again.
 ' A number, with either decimal separator and with or without "pt", is stored
 ' in points. Returns False, storing nothing, for anything else -- the caller
@@ -293,22 +293,42 @@ End Function
 '-----------------------------------------------------------------------------
 Public Function SetSpacingText(doc As Document, ByVal key As String, _
         ByVal text As String) As Boolean
-    Dim t As String
     Dim v As Double
-    Dim i As Long, ch As String
 
     If doc Is Nothing Then Exit Function
     If Not IsSpacingKey(key) Then Exit Function
 
-    t = Trim$(text)
-    If t = "" Then
+    If Trim$(text) = "" Then
         ClearSetting doc, key
         SetSpacingText = True
         Exit Function
     End If
+    If Not ParseSpacing(text, v) Then Exit Function
+    WriteVar doc, key, CStr(v)
+    SetSpacingText = True
+End Function
+
+' Would SetSpacingText accept this? Empty counts as valid (it unsets). The
+' settings dialog checks every box with this before it stores any of them.
+Public Function IsValidSpacingText(ByVal text As String) As Boolean
+    Dim v As Double
+    If Trim$(text) = "" Then
+        IsValidSpacingText = True
+    Else
+        IsValidSpacingText = ParseSpacing(text, v)
+    End If
+End Function
+
+' A number of points out of what was typed: either decimal separator, an
+' optional "pt", digits with at most one point. Negative clamps to 0, and
+' anything over 22 inches to that (Word's own ceiling). False for the rest.
+Private Function ParseSpacing(ByVal text As String, ByRef v As Double) As Boolean
+    Dim t As String
+    Dim i As Long, ch As String
+
+    t = Trim$(text)
     If LCase$(Right$(t, 2)) = "pt" Then t = Trim$(Left$(t, Len(t) - 2))
     t = Replace(t, ",", ".")
-    ' Digits, at most one point, an optional leading sign; nothing else.
     If t = "" Or t = "." Or t = "-" Or t = "+" Then Exit Function
     For i = 1 To Len(t)
         ch = Mid$(t, i, 1)
@@ -319,9 +339,8 @@ Public Function SetSpacingText(doc As Document, ByVal key As String, _
     If InStr(1, t, ".") <> InStrRev(t, ".") Then Exit Function
     v = Val(t)
     If v < 0 Then v = 0
-    If v > 1584 Then v = 1584               ' 22 inches: Word's own ceiling
-    WriteVar doc, key, CStr(v)
-    SetSpacingText = True
+    If v > 1584 Then v = 1584
+    ParseSpacing = True
 End Function
 
 ' Is anything stored under this key?

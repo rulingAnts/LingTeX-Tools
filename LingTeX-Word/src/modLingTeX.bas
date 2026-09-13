@@ -42,12 +42,8 @@ Private mPendingUndoLabel As String
 ' is reset -- an untrapped error, Run > Reset -- after which the toggles stop
 ' following changes until Word restarts; the known cost of this Office design.
 Private mRibbon As Object
-' Which of the add-in's styles the LingTeX Styles tab is showing: an index into
-' modStyles' style slots, chosen in the tab's Style drop-down. Per session, not
-' per document -- it is a view, not a setting.
-Private mStyleSlot As Long
 ' Word's Format > Style dialog (WdWordDialog.wdDialogFormatStyle), as a number:
-' Dialogs is reached late-bound, see LingTeXModifyStyleInWord.
+' Dialogs is reached late-bound, see ModifyStyleInWord.
 Private Const DLG_FORMAT_STYLE As Long = 180
 
 ' Keyboard shortcuts, letter=command, installed by LingTeXInstallShortcuts and
@@ -1419,16 +1415,16 @@ Public Sub LingTeXShowSettings()
     msg = msg & "Re-wrap on save: " & IIf(SettingRewrapOnSave(doc), "on", "off") & vbCr
     msg = msg & "Re-wrap when the cursor leaves an example: " & _
                 IIf(SettingRewrapOnSelectionChange(doc), "on", "off") & vbCr & vbCr
-    msg = msg & "Spacing set in this document (LingTeX Styles tab; the rest " & _
-                "are at their defaults):" & vbCr & SpacingReport(doc) & vbCr
+    msg = msg & "Spacing set in this document (the rest are at their " & _
+                "defaults):" & vbCr & SpacingReport(doc) & vbCr
     msg = msg & "Styles (font, size; blank follows Normal):" & vbCr & _
                 StyleReport(doc) & vbCr
-    msg = msg & "Commands: LingTeXAlignByWord, LingTeXAlignByMorpheme, " & _
+    msg = msg & "Every one of these is set in the Settings dialog " & _
+                "(LingTeXSettings, or Settings on the ribbon). Commands: " & _
+                "LingTeXAlignByWord, LingTeXAlignByMorpheme, " & _
                 "LingTeXToggleRewrapOnSave, LingTeXToggleRewrapOnSelectionChange, " & _
                 "LingTeXToggleGramGlossInitialCap, LingTeXToggleExampleNumbers, " & _
-                "LingTeXShowStylesTab, LingTeXModifyStyleInWord, " & _
-                "LingTeXResetThisStyle, LingTeXResetStyles. The list level is " & _
-                "set from the Immediate window: SetSettingNumberLevel ActiveDocument, 2"
+                "LingTeXResetStyles."
     Report msg, vbInformation
 End Sub
 
@@ -1467,66 +1463,63 @@ End Function
 
 
 '=============================================================================
-' -- THE LINGTEX STYLES TAB -------------------------------------------------
+' -- THE SETTINGS DIALOG ----------------------------------------------------
 '=============================================================================
-' Every spacing a user might set, and the add-in's own styles, behind one
-' interface (Seth, 2026-09-12). The spacings are document settings shown in
-' edit boxes -- empty means "not set", the default or the style applies -- and
-' a change is stored and every example re-wrapped at once, so the page shows
-' it. The styles are edited IN PLACE, on the Word style, through the Style
-' group; nothing is stored beside them, so Format > Style shows the same.
+' One form over every document setting (Seth, 2026-09-14: a pop-up when the
+' user clicks Settings, not a ribbon tab): alignment and numbering of new
+' examples, the small-capitals convention, the re-wrap triggers, every spacing
+' at every level and in every direction, and the LingTeX styles, each of
+' which opens in Word's OWN style dialog. frmLingTeXSettings builds its
+' controls in code and says why.
 '
-' The edit boxes cannot be commands (they take text), so there is no macro-
-' list twin for each; LingTeXShowSettings reports what is set, and the
-' typed setters in modSettings remain for the Immediate window.
-
-' After a spacing changed: draw it. Silent, like the toggles; RewrapDocument
-' says nothing when the document has no examples yet.
-Private Sub ApplySpacingChange(doc As Document)
-    EnsureHooks
-    RewrapDocument doc, False
-End Sub
-
-' After a style changed: widths measured under the old look are stale.
-Private Sub ApplyStyleChange(doc As Document)
-    EnsureHooks
-    ClearCache
-    RewrapDocument doc, False
-End Sub
-
-' Bring the LingTeX Styles tab to the front. IRibbonUI.ActivateTab is Office
-' 2010 and later, late-bound here like everything on the ribbon handle; where
-' it is not available the message says where the tab is.
-Public Sub LingTeXShowStylesTab()
-    Dim ok As Boolean
-    On Error Resume Next
-    If Not mRibbon Is Nothing Then
-        mRibbon.ActivateTab "LingTeXStylesTab"
-        ok = (Err.Number = 0)
-    End If
-    Err.Clear
-    On Error GoTo 0
-    If Not ok Then
-        Report "The spacing and style settings are on the LingTeX Styles tab, " & _
-               "next to the LingTeX tab on the ribbon.", vbInformation
-    End If
-End Sub
-
-' Open Word's own style dialog on the style the tab has selected, for
-' everything the ribbon does not show: colour, borders, language, the
-' paragraph format. Display rather than Show, so the dialog's Apply does not
-' restyle the user's paragraph; changes made through its Modify button are
-' applied all the same, and the examples are re-wrapped for them.
-Public Sub LingTeXModifyStyleInWord()
+' Show is modal and returns when the form hides itself. OK and Apply have
+' written the document and re-wrapped it by then; Cancel has done nothing.
+' Modify in Word hands back "modify", and THIS loop opens Word's Style dialog
+' on the selected style and shows the form again -- Word's own dialog on top
+' of a modal UserForm is unproven on Mac, and a form that steps aside first
+' needs nothing unproven.
+Public Sub LingTeXSettings()
     Dim doc As Document
-    Dim dlg As Object
-    Dim nm As String
-    Dim failed As Boolean
+    Dim frm As frmLingTeXSettings
+
     Set doc = DocForSetting()
     If doc Is Nothing Then Exit Sub
     EnsureHooks
-    nm = StyleSlotName(mStyleSlot)
-    If StyleSlotObject(doc, mStyleSlot, True) Is Nothing Then
+    On Error GoTo Failed
+    Set frm = New frmLingTeXSettings
+    frm.LoadFrom doc
+    Do
+        frm.Show
+        If frm.Result <> "modify" Then Exit Do
+        ModifyStyleInWord doc, frm.SelectedSlot()
+    Loop
+    Unload frm
+    RefreshRibbon
+    Exit Sub
+
+Failed:
+    Report "The settings dialog could not be opened here (" & CStr(Err.Number) & _
+           ": " & Err.Description & ")." & vbCr & vbCr & "LingTeXShowSettings " & _
+           "still lists every setting, and the ribbon toggles still work.", _
+           vbExclamation
+    On Error Resume Next
+    Unload frm
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' Open Word's own Style dialog on one of the add-in's styles, for everything
+' a style can hold: font, size, colour, borders, language, the paragraph
+' format. Display rather than Show, so the dialog's Apply does not restyle
+' the user's paragraph; changes made through its Modify button are applied
+' all the same, and the examples are re-wrapped for them.
+Private Sub ModifyStyleInWord(doc As Document, ByVal slot As Long)
+    Dim dlg As Object
+    Dim nm As String
+    Dim failed As Boolean
+
+    nm = StyleSlotName(slot)
+    If StyleSlotObject(doc, slot, True) Is Nothing Then
         Report "The style " & nm & " could not be found or created in this document." & _
                IIf(gStyleError <> "", vbCr & vbCr & gStyleError, ""), vbExclamation
         Exit Sub
@@ -1549,26 +1542,8 @@ Public Sub LingTeXModifyStyleInWord()
                vbInformation
         Exit Sub
     End If
-    ApplyStyleChange doc
-    RefreshRibbon
-End Sub
-
-' Put the selected style back to what a fresh document gets. A clobber of any
-' tuning on that one style, and it says so; the other styles are untouched
-' (LingTeXResetStyles resets the six tier styles together).
-Public Sub LingTeXResetThisStyle()
-    Dim doc As Document
-    Set doc = DocForSetting()
-    If doc Is Nothing Then Exit Sub
-    EnsureHooks
-    If Not Confirm("Reset the style " & StyleSlotName(mStyleSlot) & " to follow " & _
-                   "this document's Normal style again, and re-wrap every " & _
-                   "example?" & vbCr & vbCr & "Anything you set on this style " & _
-                   "yourself -- font, size, bold, italic, small capitals, " & _
-                   "spacing -- is replaced.") Then Exit Sub
-    ResetStyleSlot doc, mStyleSlot
-    RefreshRibbon
-    ApplyStyleChange doc
+    ClearCache
+    RewrapDocument doc, False
 End Sub
 
 
@@ -1962,12 +1937,6 @@ Public Sub RbnGetPressed(control As Variant, ByRef returnedVal As Variant)
             returnedVal = SettingGramGlossInitialCap(doc)
         Case "LingTeXNumbersToggle"
             returnedVal = SettingNumberExamples(doc)
-        Case "LingTeXStyleBold"
-            returnedVal = StyleFlag(doc, mStyleSlot, "Bold")
-        Case "LingTeXStyleItalic"
-            returnedVal = StyleFlag(doc, mStyleSlot, "Italic")
-        Case "LingTeXStyleSmallCaps"
-            returnedVal = StyleFlag(doc, mStyleSlot, "SmallCaps")
     End Select
     Err.Clear
     On Error GoTo 0
@@ -1992,111 +1961,10 @@ Public Sub RbnToggle(control As Variant, pressed As Boolean)
             SetSettingGramGlossInitialCap doc, pressed
         Case "LingTeXNumbersToggle"
             SetSettingNumberExamples doc, pressed
-        Case "LingTeXStyleBold"
-            SetStyleFlag doc, mStyleSlot, "Bold", pressed
-            ApplyStyleChange doc
-        Case "LingTeXStyleItalic"
-            SetStyleFlag doc, mStyleSlot, "Italic", pressed
-            ApplyStyleChange doc
-        Case "LingTeXStyleSmallCaps"
-            SetStyleFlag doc, mStyleSlot, "SmallCaps", pressed
-            ApplyStyleChange doc
     End Select
     Err.Clear
     On Error GoTo 0
     RefreshRibbon
-End Sub
-
-'-- The LingTeX Styles tab's controls ------------------------------------------
-' Edit boxes: getText fills a box from the active document, onChange stores
-' what was typed. A box whose id begins LingTeXSp_ is a spacing, the rest of
-' the id being its key in modSettings; the two others are the selected style's
-' font and size. Empty text is a real value throughout: not set.
-
-Public Sub RbnGetText(control As Variant, ByRef returnedVal As Variant)
-    Dim doc As Document
-    Dim id As String
-    returnedVal = ""
-    On Error Resume Next
-    Set doc = ActiveDocument
-    id = control.Id
-    Err.Clear
-    On Error GoTo 0
-    If doc Is Nothing Then Exit Sub
-    If Left$(id, 10) = "LingTeXSp_" Then
-        returnedVal = SpacingText(doc, Mid$(id, 11))
-    ElseIf id = "LingTeXStyleFont" Then
-        returnedVal = StyleFontText(doc, mStyleSlot)
-    ElseIf id = "LingTeXStyleSize" Then
-        returnedVal = StyleSizeText(doc, mStyleSlot)
-    End If
-End Sub
-
-Public Sub RbnEditChanged(control As Variant, ByVal text As String)
-    Dim doc As Document
-    Dim id As String
-    Dim ok As Boolean
-    On Error Resume Next
-    Set doc = ActiveDocument
-    id = control.Id
-    Err.Clear
-    On Error GoTo 0
-    If doc Is Nothing Then
-        Report "Open a document first: settings are stored in the document.", vbInformation
-        Exit Sub
-    End If
-    EnsureHooks
-    If Left$(id, 10) = "LingTeXSp_" Then
-        ok = SetSpacingText(doc, Mid$(id, 11), text)
-        If ok Then
-            ApplySpacingChange doc
-        Else
-            Report "Type a number of points, such as 6 or 4.5, or leave the box " & _
-                   "empty for the default.", vbExclamation
-        End If
-    ElseIf id = "LingTeXStyleFont" Then
-        ok = SetStyleFontText(doc, mStyleSlot, text)
-        If ok Then
-            ApplyStyleChange doc
-        Else
-            Report "The font could not be set on " & StyleSlotName(mStyleSlot) & _
-                   "." & IIf(gStyleError <> "", vbCr & vbCr & gStyleError, ""), vbExclamation
-        End If
-    ElseIf id = "LingTeXStyleSize" Then
-        ok = SetStyleSizeText(doc, mStyleSlot, text)
-        If ok Then
-            ApplyStyleChange doc
-        Else
-            Report "Type a size in points, from 1 to 1638, or leave the box empty " & _
-                   "to follow the Normal style.", vbExclamation
-        End If
-    End If
-    RefreshRibbon
-End Sub
-
-' The Style drop-down: which of the add-in's styles the group is showing.
-Public Sub RbnGetStyleIndex(control As Variant, ByRef returnedVal As Variant)
-    returnedVal = mStyleSlot
-End Sub
-
-Public Sub RbnStyleSelected(control As Variant, ByVal selectedId As String, _
-        ByVal selectedIndex As Integer)
-    If selectedIndex >= 0 And selectedIndex < STYLE_SLOT_COUNT Then
-        mStyleSlot = selectedIndex
-    End If
-    RefreshRibbon
-End Sub
-
-Public Sub RbnShowStylesTab(control As Variant)
-    LingTeXShowStylesTab
-End Sub
-
-Public Sub RbnModifyStyle(control As Variant)
-    LingTeXModifyStyleInWord
-End Sub
-
-Public Sub RbnResetThisStyle(control As Variant)
-    LingTeXResetThisStyle
 End Sub
 
 Public Sub RbnInsert(control As Variant)
@@ -2156,7 +2024,7 @@ Public Sub RbnToggleGramGlossInitialCap(control As Variant)
 End Sub
 
 Public Sub RbnShowSettings(control As Variant)
-    LingTeXShowSettings
+    LingTeXSettings
 End Sub
 
 Public Sub RbnInstallShortcuts(control As Variant)

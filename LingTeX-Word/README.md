@@ -155,8 +155,7 @@ examples are tables to Word but not to the user.
 
 By Word / By Morpheme, Re-wrap on Save, Re-wrap on Leave, Numbers and First
 Capital are toggle buttons: they show the active document's setting and flip it
-silently. The edit boxes of the LingTeX Styles tab work the same way: they show
-the active document's value, and a change is stored and drawn at once. The same settings are also commands in the macro list, which report
+silently. The same settings are also commands in the macro list, which report
 what they did. If the toggles stop following changes, the VBA project was reset
 and Word must be restarted for the ribbon to reconnect.
 
@@ -198,8 +197,8 @@ Any multilevel scheme Word can express works the same way.
 
 Stored as **document variables**, so they travel inside the `.docx` and a
 colleague re-wrapping the file gets the same layout. The toggles are on the
-LingTeX tab; every spacing, and the styles, are on the **LingTeX Styles** tab
-(below). The typed setters still work from the Immediate window:
+LingTeX tab; **Settings** opens a dialog over all of them (below). The typed
+setters still work from the Immediate window:
 
 ```vba
 SetSettingGap ActiveDocument, 8              ' points between columns (default 6)
@@ -210,44 +209,49 @@ SetSettingGranularity ActiveDocument, igtMorphemeAligned   ' default igtWordAlig
 SetSettingLowercaseGramGloss ActiveDocument, False   ' keep capitals as typed
 SetSettingRewrapOnSave ActiveDocument, False
 SetSettingRewrapOnSelectionChange ActiveDocument, False  ' on by default
-SetSpacingText ActiveDocument, "TierGap", "2"     ' any key of the Styles tab; "" unsets
+SetSpacingText ActiveDocument, "TierGap", "2"     ' any spacing of the dialog; "" unsets
 ```
 
-### The LingTeX Styles tab: spacing at every level, and the styles
+### The Settings dialog
 
-A second ribbon tab (the **Spacing and Styles** button in Setup opens it) with
-one edit box per spacing, in points, grouped by level. **An empty box is a
-state**: the spacing is not set, and the default, or the style, applies. Type
-a number and every example in the document is re-wrapped at once, so the
-page shows the change; clear the box to go back.
+**Settings** on the ribbon opens one dialog over every setting the document
+holds, in three parts.
 
-| Group | Box | What it sets | Empty means |
+**New examples**: one column per word or per morpheme; whether they are
+numbered, and on which list level; grammatical glosses in small capitals, and
+whether with a full-size first capital; the two re-wrap triggers; and what a
+space inside a cell becomes.
+
+**Spacing**, one box per spacing, in points, by level. **An empty box is a
+state**: the spacing is not set, and the default (shown in brackets) or the
+style applies. OK and Apply store the values and re-wrap every example in the
+document at once, so the page shows the change; Cancel stores nothing. A box
+that is not a number is refused by name before anything is stored.
+
+| Row | Box | What it sets | Empty means |
 |---|---|---|---|
 | Example | Before | Space above the example, on its first row | none |
 | | After | Space after the translation, or after the last row when there is none | the translation style's own 3 pt |
 | | Left | Left indent of every *new* example | the indent of the paragraph it is inserted into |
 | | Right | Right indent: the wrap lines and translation stop this far short of the margin | none |
-| Lines and Tiers | Line gap | Space between the wrap lines of an example | 6 |
+| Wrap lines | Line gap | Space between the wrap lines of an example | 6 |
 | | Continuation | Extra indent of every wrap line after the first | 0 |
 | | Tier gap | Space between the tiers of one wrap line | 0 |
 | Columns | Column gap | Space to the right of every column's widest cell | 6 |
-| | Number | Width of the number column | 36 |
-| Cell Padding | Left, Right | Padding inside every cell; the columns are widened to match | 0 |
+| | Number column | Width of the number column | 36 |
+| Cell padding | Left, Right | Padding inside every cell; the columns are widened to match | 0 |
 | | Top, Bottom | Padding inside every cell of every row | 0 |
 | Translation | Above | Space between the last row and the first translation | none |
 | | Between | Space between two translations | the style's own 3 pt |
 
-The **Style** group edits the add-in's own styles in place, one at a time:
-pick one in the drop-down (Vernacular, Morphemes, Gloss, Word Gloss, Category,
-Free Translation, Grammatical Gloss, Example Number), and its Font and Size
-boxes and Bold / Italic / Small Caps toggles show what it sets. An empty Font
-or Size box means the style **follows the Normal style**, so changing the body
-font changes the examples too; type a value to pin one. Nothing is stored
-beside the style: Format → Style shows the same values, and **Modify in Word**
-opens that dialog on the selected style for what the ribbon does not show
-(colour, borders, the paragraph format). **Reset This Style** puts one style
-back to what a fresh document gets; **Reset Styles** on the LingTeX tab does
-the six tier styles together.
+**Styles**: the add-in's eight styles listed (Vernacular, Morphemes, Gloss,
+Word Gloss, Category, Free Translation, Grammatical Gloss, Example Number),
+and **Modify in Word**, which opens Word's own style dialog on the selected
+one for everything a style can hold: font, size, colour, borders, the
+paragraph format. Nothing of ours sits between you and the style, so Format →
+Style shows the same thing. **Reset This Style** puts one style back to what a
+fresh document gets, following the Normal style; **Reset the Six Tier Styles**
+does the tier styles together (also **Reset Styles** on the ribbon).
 
 Where a spacing lives follows from what it depends on. Everything that depends
 on the layout, and so has to be written per row or per paragraph when the
@@ -255,7 +259,12 @@ example is drawn (which row is first, which is the last of a wrap line, where
 the translation starts), is a document setting written by the renderer. The
 appearance of the text is style-borne, because that is what a Word style is
 for, and because it keeps the escape hatch: a document restyled by hand and
-one set from the ribbon are the same document.
+one set from the dialog are the same document.
+
+The dialog is a UserForm with **no controls at design time**: every control is
+built in code when it opens, so its only source is `src/frmLingTeXSettings.frm`,
+a text file with no `.frx`, which the bootstrap installs the way it installs
+the two class modules. The doc tests drive it without showing it.
 
 ### Spelling
 
@@ -338,6 +347,7 @@ text would over-estimate, because full capitals are wider than small capitals.
 | `modReadBack.bas` | Rendered table → model; locates a column from a cell |
 | `modSettings.bas` | Settings in document variables |
 | `modLingTeX.bas` | The commands, the ribbon callbacks, undo, clipboard |
+| `frmLingTeXSettings.frm` | The Settings dialog; a form with no `.frx`, its controls built in code |
 | `clsAppEvents.cls` | `DocumentBeforeSave` and optional selection-change hooks |
 | `clsIgtWarning.cls` | One finding from a check |
 | `modTests.bas` | Self-tests — run `RunAllTests` |
@@ -494,17 +504,19 @@ where the settings get an interface — column gap, line gap, continuation inden
 the small-caps convention, the styles themselves — instead of a macro list and
 the Immediate window.
 
-No `.frm` ships in Phase 1, deliberately. A Word UserForm exports as a `.frm`
-*plus* a binary `.frx`, and a `.frm` written by hand without its companion does
-not reliably import — it is not something that can be authored or tested outside
-Word. The form will be built in the VBA editor and exported from there. Because
-no grid control exists on Mac, it will be a **virtualised pool** of `TextBox`
-controls (around 14 columns by 8 rows, created once, with a scrollbar rebinding
-which data columns they show, so the control count stays bounded however long the
-example), each wrapped in a class using `Private WithEvents` — dynamically added
-controls raise no events in the form's own module. The engine does not change
-when it arrives: the form will build an `IgtExample` and hand it to
-`RenderExample`.
+One `.frm` ships — the Settings dialog — and it shows the rule the data-sheet
+form will follow. A Word UserForm designed in the VBA editor exports as a
+`.frm` *plus* a binary `.frx` that nothing outside Word can author, review or
+diff. So `frmLingTeXSettings.frm` has **no controls at design time and no
+`.frx`**: every control is built in code when the form opens, the buttons held
+in `WithEvents` variables so their clicks fire (a control added at run time
+raises no events into the form module by name), and the bootstrap installs the
+code the way it installs a class. The data sheet will be built the same way,
+as a **virtualised pool** of `TextBox` controls (around 14 columns by 8 rows,
+created once, with a scrollbar rebinding which data columns they show, so the
+control count stays bounded however long the example), each wrapped in a class
+using `Private WithEvents`. The engine does not change when it arrives: the
+form will build an `IgtExample` and hand it to `RenderExample`.
 
 **Phase 3 — packaging**, as two downloads. Both install `LingTeX-Word.dotm` into
 Word's startup folder, where it is loaded as a **global add-in**: its commands,
@@ -592,11 +604,11 @@ Phase 2 data sheet, where a linguist types the example by hand and the only
 rule is what she typed. FieldWorks data working correctly comes first, and it
 is most of the way there; this is the question to reopen once it is done.
 
-**Done — every space a user might want to set** is on the LingTeX Styles tab
-(*Using it*, above), with the style-borne properties written to the styles
-themselves. Still to prove: that ribbon edit boxes and drop-downs call back on
-Mac Word, as the toggle buttons were before them, and how the tab lays out on
-a narrow window (Word collapses groups it cannot fit).
+**Done — every space a user might want to set** is in the Settings dialog
+(*Using it*, above), with the styles opened in Word's own dialog rather than
+edited by us. Still to prove: that a UserForm whose controls are built in code
+opens and lays out on Mac Word. The doc tests prove it headless — New builds
+the controls, LoadFrom and ApplyNow round-trip — but not the pixels.
 
 **Later — several examples in one paste.** A FLEx text copied whole arrives as
 several interlinear blocks and the parser already returns all of them

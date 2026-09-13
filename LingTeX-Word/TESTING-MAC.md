@@ -133,13 +133,11 @@ LingTeXAlignByMorpheme              LingTeXToggleRewrapOnSelectionChange
 LingTeXToggleGramGlossInitialCap    LingTeXShowSettings
 ```
 
-`LingTeXShowSettings` lists everything the document currently holds. The
-measurements (gap, line gap, continuation indent, and every other spacing) are
-edit boxes on the **LingTeX Styles** tab; from the Immediate window they are
+`LingTeXShowSettings` lists everything the document currently holds;
+`LingTeXSettings` (Settings on the ribbon) is the dialog that sets all of it,
+every spacing included. From the Immediate window a spacing is
 `SetSpacingText ActiveDocument, "LineGap", "8"` (click the test document
 first, then Tools → Macro → Visual Basic Editor, View → Immediate Window).
-The styles' font and size are on the same tab, with `LingTeXModifyStyleInWord`,
-`LingTeXResetThisStyle` and `LingTeXShowStylesTab` in the macro list.
 
 ### What a "clear message" means
 
@@ -361,16 +359,24 @@ whenever a setting or the active document changes. If they stop following
 changes, the VBA project was reset (an untrapped error, Run → Reset) and the
 ribbon handle with it: restart Word.
 
-The **LingTeX Styles** tab is the first use of edit boxes and a drop-down on
-Mac Word, and whether their callbacks fire there (`RbnGetText`,
-`RbnEditChanged`, `RbnGetStyleIndex`, `RbnStyleSelected`) is unproven. The
-check: with an example on the page, type `12` into *Tier gap* and press
-Return — the tiers move apart at once, and `LingTeXShowSettings` lists
-`TierGap: 12 pt`. Clear the box and they close up again. Then pick
-*Grammatical Gloss* in the Style drop-down: Small Caps shows pressed. If a
-box stays empty after a value was stored, `getText` is not being called: the
-fallback is `getLabel`-free static labels plus the Immediate window, and that
-is the finding to record.
+## The Settings dialog, first time on Mac
+
+`frmLingTeXSettings` is the project's first UserForm, and the first one whose
+controls are built in code (`Controls.Add` in `UserForm_Initialize`, the
+buttons in `WithEvents` variables). The doc-test section `dialog` proves it
+headless — `New` builds the controls, `LoadFrom` and `ApplyNow` round-trip —
+so if that section is green the remaining questions are visual: does **Settings**
+open it centred and legible, are the labels wide enough for the Mac font, do
+the boxes take typing, does Escape close it, and does **Modify in Word** step
+aside and bring up Format → Style on the selected style, then come back. A
+compile error at Word start naming `frmLingTeXSettings` means the project has
+no MSForms reference: the import log says so, and Tools → References →
+Microsoft Forms 2.0 Object Library is the fix.
+
+The dev template's `modImport` must be **re-pasted once** for this: it is
+what creates the form component, and the copy in `LingTeX-Dev.dotm` predates
+`FORM_LIST`. Until then the import brings in fourteen, `TestDialog` cannot
+compile, and the whole engine fails to load.
 
 ## If the engine will not compile at Word start
 

@@ -85,21 +85,24 @@ requests.
 
 ## State of play
 
-- **The LingTeX Styles tab** (2026-09-13): a second ribbon tab with one edit
-  box per spacing -- Example Before/After/Left/Right, Line gap, Continuation,
-  Tier gap, Column gap, Number width, Cell padding L/R/T/B, Translation
-  Above/Between -- and a Style group (drop-down over the eight LingTeX
-  styles; Font and Size boxes, Bold/Italic/Small Caps toggles, Modify in
-  Word, Reset This Style). Empty box = not set = default or the style. A
-  change stores the value and re-wraps the document silently. Spacings are
-  document settings (`SpacingText`/`SetSpacingText` in modSettings, keys in
-  `SPACING_KEYS`; the six optional ones read back as `SETTING_UNSET` and the
-  renderer leaves the property alone); style properties are written to the
-  Word style itself (`StyleFontText` and friends, modStyles). Doc-test
-  section `spacing`. UNPROVEN in Word: edit-box/drop-down callbacks on Mac,
-  `Dialogs(180).Display` on Mac, `Variable.Delete`, and the tab's width on
-  a narrow window. The template must be rebuilt (RELEASING.md) -- until then
-  `check-dotm.sh` fails on the ribbon and icon drift, by design.
+- **The Settings dialog** (2026-09-14, Seth's call: a pop-up from Settings,
+  not a ribbon tab; the styles just listed, with Modify in Word). It is
+  `src/frmLingTeXSettings.frm`, the project's first UserForm: NO controls at
+  design time and no .frx -- every control is built in code in
+  UserForm_Initialize, the six buttons in WithEvents variables so their
+  clicks fire. Show is modal; Modify in Word hides the form with Result =
+  "modify" and `LingTeXSettings` opens Word's Style dialog (Dialogs(180)
+  .Display) and shows the form again. modImport creates it with
+  VBComponents.Add(3) and installs the code like a class's (`FORM_LIST`),
+  and checks the MSForms reference. **Seth must re-paste modImport into
+  LingTeX-Dev.dotm once** -- the old copy does not know the form, and
+  without it TestDialog fails to compile and the engine will not load.
+  Doc-test section `dialog` drives the form without showing it. The LingTeX
+  Styles tab and its five icons are gone; the spacing settings and
+  `SpacingText`/`SetSpacingText` stay as the dialog's back end.
+  UNPROVEN in Word: everything about a code-built UserForm on Mac (Controls
+  .Add, WithEvents on MSForms.CommandButton, Show/Hide, InsideWidth), the
+  MSForms reference after Add(3), Dialogs(180).Display, Variable.Delete.
 - Ribbon: the six settings buttons are toggleButtons (getPressed/onAction,
   onLoad keeps the IRibbonUI; DocumentChange and every setting command call
   RefreshRibbon). Silent on the ribbon; the macro-list commands still report.

@@ -22,7 +22,9 @@
 # THE CLASS MODULES ARE THE RELIABLE USE FOR THIS SCRIPT. Importing a .cls is
 # fragile -- the editor decides what kind of component to create by parsing the
 # file header, and gets it wrong often enough that pasting into a hand-created
-# Class Module is the path that always works. The eleven .bas files import
+# Class Module is the path that always works (and Insert > UserForm for the one
+# form, whose controls are built in code, so its code is all there is). The
+# twelve .bas files import
 # cleanly; prefer File > Import File... for those.
 #
 # Output is CRLF, so the .txt files open correctly in any editor on either
@@ -46,7 +48,7 @@ out="$root/build/paste"
 # compile and run RunAllTests on their own, with the Word object model entirely
 # uninvolved. See QUICKSTART.md.
 STAGE1="modFlexParse modIgtModel modLeipzig modWrap clsIgtWarning modTests"
-STAGE2="modStyles modSettings modMeasure modRender modReadBack modLingTeX modDocTests clsAppEvents"
+STAGE2="modStyles modSettings modMeasure modRender modReadBack modLingTeX modDocTests clsAppEvents frmLingTeXSettings"
 
 rm -rf "$out"
 mkdir -p "$out"
@@ -57,6 +59,8 @@ find_source() {
         echo "$src/$1.bas"
     elif [ -f "$src/$1.cls" ]; then
         echo "$src/$1.cls"
+    elif [ -f "$src/$1.frm" ]; then
+        echo "$src/$1.frm"
     elif [ -f "$probe/$1.bas" ]; then
         echo "$probe/$1.bas"
     else
@@ -67,6 +71,13 @@ find_source() {
 is_class() {
     case "$1" in
         *.cls) return 0 ;;
+        *)     return 1 ;;
+    esac
+}
+
+is_form() {
+    case "$1" in
+        *.frm) return 0 ;;
         *)     return 1 ;;
     esac
 }
@@ -94,12 +105,13 @@ instancing_of() {
 #
 # CR is removed FIRST. The .cls preamble lines are matched with end-of-line
 # anchors, and a trailing CR defeats them -- which is how BEGIN / MultiUse / END
-# ended up pasted in as code.
+# ended up pasted in as code. A .frm's header is "Begin {GUID} name" ... "End",
+# mixed case, and is skipped the same way.
 strip_metadata() {
     tr -d '\r' < "$1" | awk '
-        /^VERSION [0-9]/           { next }
-        /^BEGIN[ \t]*$/            { inpre = 1; next }
-        /^END[ \t]*$/              { if (inpre) { inpre = 0; next } }
+        /^VERSION [0-9]/                       { next }
+        /^[Bb][Ee][Gg][Ii][Nn]([ \t].*)?$/     { if (!started) { inpre = 1; next } }
+        /^[Ee][Nn][Dd][ \t]*$/                 { if (inpre) { inpre = 0; next } }
         inpre                      { next }
         /^Attribute[ \t]/          { next }
         !started && /^[ \t]*$/     { next }
@@ -131,6 +143,17 @@ emit() {
             echo "'       normally nothing to change -- check it, do not set it)"
             echo "'"
             echo "' On Mac: View > Properties Window if the pane is not showing."
+        elif is_form "$file"; then
+            echo "' THIS IS A USERFORM. IT WILL NOT WORK AS A MODULE OR A CLASS."
+            echo "'"
+            echo "'   1. Insert > UserForm"
+            echo "'   2. Properties pane, (Name) row:   $name"
+            echo "'   3. View > Code, and paste this whole file into it"
+            echo "'   4. Leave the form EMPTY in the designer: every control is"
+            echo "'      built in code when the form opens, so there is nothing"
+            echo "'      to draw and no .frx to import"
+            echo "'"
+            echo "' On Mac: View > Properties Window if the pane is not showing."
         else
             echo "' PASTE THIS INTO:  Insert > Module"
             echo "'"
@@ -153,6 +176,8 @@ emit() {
 
     if is_class "$file"; then
         echo "  $num-$name.txt   (CLASS MODULE -- $(instancing_of "$file"))"
+    elif is_form "$file"; then
+        echo "  $num-$name.txt   (USERFORM -- controls built in code)"
     else
         echo "  $num-$name.txt   (Module)"
     fi
@@ -182,17 +207,19 @@ LingTeX-Word -- paste bundle
 These are the VBA modules with their metadata stripped so they can be pasted
 directly into the VBA editor. For each file:
 
-  1. Insert > Module   (or Insert > Class Module for the cls* files)
-  2. Paste the whole file
+  1. Insert > Module   (Insert > Class Module for the cls* files, and
+     Insert > UserForm for frmLingTeXSettings)
+  2. Paste the whole file (for the form: View > Code first)
   3. Set the module's name in the Properties pane to the name the header gives
 
 The header of every file says which kind of module to insert, what to name it,
-and for the two class modules, what Instancing should read.
+and for the two class modules, what Instancing should read. The form stays
+empty in the designer: its controls are built in code when it opens.
 
 WHICH PATH TO USE
 -----------------
 
-  The eleven .bas modules   File > Import File... on the files in src/ is
+  The twelve .bas modules   File > Import File... on the files in src/ is
                             easier and sets the names for you.
 
   The two .cls modules      USE THESE PASTE FILES. Importing a .cls is
@@ -237,9 +264,10 @@ Order to add them
   12-modLingTeX
   13-modDocTests
   14-clsAppEvents          CLASS MODULE
+  15-frmLingTeXSettings    USERFORM (Insert > UserForm, name it, View > Code, paste)
 
   Then, in the Immediate window:   RunDocTests
-  Expect ALL PASS again -- around 250 checks against Word's actual behaviour.
+  Expect ALL PASS again -- around 400 checks against Word's actual behaviour.
   See QUICKSTART.md for what to test by hand after that.
 
 VBA compiles the whole project at once, so stage 1 only works because those six
