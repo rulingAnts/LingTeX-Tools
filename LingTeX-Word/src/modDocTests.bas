@@ -622,6 +622,26 @@ Private Sub TestSpacing()
     ClearSetting doc, "LineGap"
     Ok "  and the line gap is back at 6", (SettingLineGap(doc) = 6)
 
+    '-- stored in one form, read from any machine ---------------------------
+    ' A document variable travels inside the .docx, which is why it exists
+    ' (the header of modSettings). A number is stored with a full stop
+    ' whatever this machine's separator, and read with either, so a colleague
+    ' on an Indonesian or German Word gets six and a half, not 65.
+    Ok "SetSpacingText accepts 6,5", SetSpacingText(doc, "Gap", "6,5")
+    Eq "  and stores it with a full stop", RawVariable(doc, "LingTeX_Gap"), "6.5"
+    SetRawVariable doc, "LingTeX_Gap", "6,5"
+    Ok "a comma-decimal value written by another machine reads as six and a half", _
+        (SettingGap(doc) = 6.5)
+    Ok "  and shows in the box as six and a half", _
+        (Val(Replace(SpacingText(doc, "Gap"), ",", ".")) = 6.5)
+    SetRawVariable doc, "LingTeX_Gap", "12,5%"
+    Ok "  and a comma-decimal percentage resolves", _
+        (Abs(SettingGap(doc) - 0.125 * SpacingFontSize(doc)) < 0.01)
+    SetSettingLineGap doc, 6.5
+    Eq "the typed setters store with a full stop too", RawVariable(doc, "LingTeX_LineGap"), "6.5"
+    ClearSetting doc, "Gap"
+    ClearSetting doc, "LineGap"
+
     Ok "cell padding defaults to 0 on every side", _
         (SettingCellPadding(doc, "Left") = 0 And SettingCellPadding(doc, "Right") = 0 _
          And SettingCellPadding(doc, "Top") = 0 And SettingCellPadding(doc, "Bottom") = 0)
@@ -3206,6 +3226,26 @@ End Function
 
 ' A blank document to test in. Visible, unlike the measuring scratch document,
 ' because a test that leaves one behind should be easy to notice.
+' A document variable as stored, "" when absent; and a way to plant one as
+' another machine's build would have written it.
+Private Function RawVariable(doc As Document, ByVal nm As String) As String
+    On Error Resume Next
+    RawVariable = CStr(doc.Variables(nm).Value)
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+Private Sub SetRawVariable(doc As Document, ByVal nm As String, ByVal v As String)
+    On Error Resume Next
+    doc.Variables(nm).Value = v
+    If Err.Number <> 0 Then
+        Err.Clear
+        doc.Variables.Add Name:=nm, Value:=v
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
 Private Function NewBlankDoc() As Document
     Dim d As Document
     On Error Resume Next
