@@ -252,15 +252,15 @@ End Function
 '=============================================================================
 
 Public Sub SetSettingGap(doc As Document, ByVal v As Double)
-    WriteVar doc, "Gap", CStr(v)
+    WriteVar doc, "Gap", NumberToStore(v)
 End Sub
 
 Public Sub SetSettingLineGap(doc As Document, ByVal v As Double)
-    WriteVar doc, "LineGap", CStr(v)
+    WriteVar doc, "LineGap", NumberToStore(v)
 End Sub
 
 Public Sub SetSettingContIndent(doc As Document, ByVal v As Double)
-    WriteVar doc, "ContIndent", CStr(v)
+    WriteVar doc, "ContIndent", NumberToStore(v)
 End Sub
 
 Public Sub SetSettingSpaceReplacement(doc As Document, ByVal v As String)
@@ -277,7 +277,7 @@ Public Sub SetSettingNumberExamples(doc As Document, ByVal v As Boolean)
 End Sub
 
 Public Sub SetSettingNumberHang(doc As Document, ByVal v As Double)
-    WriteVar doc, "NumberHang", CStr(v)
+    WriteVar doc, "NumberHang", NumberToStore(v)
 End Sub
 
 Public Sub SetSettingNumberLevel(doc As Document, ByVal v As Long)
@@ -336,15 +336,8 @@ Public Function SpacingText(doc As Document, ByVal key As String) As String
         pct = True
         s = Trim$(Left$(s, Len(s) - 1))
     End If
-    On Error Resume Next
-    v = CDbl(s)
-    If Err.Number <> 0 Then
-        Err.Clear
-        On Error GoTo 0
-        Exit Function
-    End If
-    Err.Clear
-    On Error GoTo 0
+    v = StoredNumber(s, -1)
+    If v < 0 Then Exit Function
     SpacingText = CStr(v)
     If pct Then SpacingText = SpacingText & "%"
 End Function
@@ -360,8 +353,12 @@ End Function
 '
 ' Parsed with Val after normalising the separator, because Val is not
 ' locale-aware and CDbl is: "6,5" must mean six and a half on every machine,
-' not sixty-five on one and an error on another. Stored with CStr, read back
-' with CDbl -- both locale-aware, and consistent with each other.
+' not sixty-five on one and an error on another. STORED in one form too
+' (NumberToStore: a full stop, always) and read back by StoredNumber, which
+' takes either separator -- a document variable travels inside the .docx, and
+' a value written on an Indonesian or German Word must read the same on an
+' English one (the review, 2026-09-14: CStr and CDbl are both locale-aware,
+' which is consistent on one machine and 65-for-6.5 across two).
 '-----------------------------------------------------------------------------
 Public Function SetSpacingText(doc As Document, ByVal key As String, _
         ByVal text As String) As Boolean
@@ -378,9 +375,9 @@ Public Function SetSpacingText(doc As Document, ByVal key As String, _
     End If
     If Not ParseSpacing(text, v, pct) Then Exit Function
     If pct Then
-        WriteVar doc, key, CStr(v) & "%"
+        WriteVar doc, key, NumberToStore(v) & "%"
     Else
-        WriteVar doc, key, CStr(v)
+        WriteVar doc, key, NumberToStore(v)
     End If
     SetSpacingText = True
 End Function
@@ -442,16 +439,39 @@ Private Function ResolveSpacing(doc As Document, ByVal s As String, _
     ResolveSpacing = dflt
     t = Trim$(s)
     If t = "" Then Exit Function
-    On Error Resume Next
     If Right$(t, 1) = "%" Then
-        v = CDbl(Trim$(Left$(t, Len(t) - 1)))
-        If Err.Number = 0 Then ResolveSpacing = v / 100 * SpacingFontSize(doc)
+        v = StoredNumber(Left$(t, Len(t) - 1), -1)
+        If v >= 0 Then ResolveSpacing = v / 100 * SpacingFontSize(doc)
     Else
-        v = CDbl(t)
-        If Err.Number = 0 Then ResolveSpacing = v
+        v = StoredNumber(t, -1)
+        If v >= 0 Then ResolveSpacing = v
     End If
-    Err.Clear
-    On Error GoTo 0
+End Function
+
+' A number as it is STORED: with a full stop for the decimal separator on
+' every machine (Str$ knows no other), never the locale's.
+Private Function NumberToStore(ByVal v As Double) As String
+    NumberToStore = Trim$(Str$(v))
+End Function
+
+' The number in a stored string, or dflt when it is not one. Either decimal
+' separator is taken -- a full stop from NumberToStore, a comma from a value an
+' older build wrote with CStr on a comma-decimal Word -- and Val, which knows
+' only the full stop, does the reading; nothing here is locale-aware.
+Private Function StoredNumber(ByVal s As String, ByVal dflt As Double) As Double
+    Dim t As String
+    Dim i As Long, ch As String
+    StoredNumber = dflt
+    t = Replace(Trim$(s), ",", ".")
+    If t = "" Or t = "." Or t = "-" Then Exit Function
+    For i = 1 To Len(t)
+        ch = Mid$(t, i, 1)
+        If (ch < "0" Or ch > "9") And ch <> "." Then
+            If Not (i = 1 And ch = "-") Then Exit Function
+        End If
+    Next i
+    If InStr(1, t, ".") <> InStrRev(t, ".") Then Exit Function
+    StoredNumber = Val(t)
 End Function
 
 ' Is anything stored under this key?
