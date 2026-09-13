@@ -1437,7 +1437,14 @@ Private Function SpacingReport(doc As Document) As String
     keys = Split(SPACING_KEYS, "|")
     For i = 0 To UBound(keys)
         t = SpacingText(doc, keys(i))
-        If t <> "" Then s = s & "  " & keys(i) & ": " & t & " pt" & vbCr
+        If t <> "" Then
+            ' A percentage of the font size carries its own unit.
+            If Right$(t, 1) = "%" Then
+                s = s & "  " & keys(i) & ": " & t & vbCr
+            Else
+                s = s & "  " & keys(i) & ": " & t & " pt" & vbCr
+            End If
+        End If
     Next i
     If s = "" Then s = "  (none)" & vbCr
     SpacingReport = s

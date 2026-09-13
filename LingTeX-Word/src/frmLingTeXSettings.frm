@@ -389,7 +389,7 @@ Public Function ApplyNow() As Boolean
     For i = 0 To UBound(keys)
         If Not IsValidSpacingText(BoxText(keys(i))) Then
             msg = "The box " & BoxLabel(keys(i)) & " holds """ & BoxText(keys(i)) & """."
-            msg = msg & vbCr & vbCr & "Type a number of points, such as 6 or 4.5, or leave the box empty for the default."
+            msg = msg & vbCr & vbCr & "Type a number of points, such as 6 or 4.5, a percentage of the font size, such as 50%, or leave the box empty for the default."
             Report msg, vbExclamation
             FocusBox keys(i)
             Exit Function
