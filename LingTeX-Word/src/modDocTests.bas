@@ -804,6 +804,7 @@ Private Sub TestDialog()
     Dim frm As frmLingTeXSettings
     Dim savedQuiet As Boolean
     Dim n As Long
+    Dim li As Long
 
     Set doc = NewBlankDoc()
     If doc Is Nothing Then
@@ -821,7 +822,14 @@ Private Sub TestDialog()
     Ok "it built its controls without being shown", (n >= 50)
     Emit "         " & CStr(n) & " controls"
     Ok "the styles list has one entry per style slot", (frm.StyleCount() = STYLE_SLOT_COUNT)
-    Ok "the first style is selected", (frm.SelectedSlot() = 0)
+    ' Read the list itself: SelectedSlot maps "nothing selected" to 0 as well,
+    ' so asserting on it could not fail (the review, 2026-09-14).
+    li = -2
+    On Error Resume Next
+    li = frm.Controls("lstStyles").ListIndex
+    Err.Clear
+    On Error GoTo 0
+    Ok "the first style is selected", (li = 0)
 
     frm.LoadFrom doc
     Ok "a virgin document loads an empty spacing box", (frm.BoxText("TierGap") = "")
@@ -978,8 +986,9 @@ Private Sub TestRowGeometry()
     Dim ex As IgtExample
     Dim tbl As Table
     Dim r As Long
-    Dim y(1 To 5) As Double
-    Dim h1 As Double, h2 As Double, h3 As Double, h4 As Double
+    Dim y() As Double
+    Dim n As Long
+    Dim h1 As Double, h2 As Double, h3 As Double, hLast As Double
     Dim para As Paragraph
     Dim allSame As Boolean
     Dim bad As String
@@ -1059,27 +1068,38 @@ Private Sub TestRowGeometry()
     Ok "every cell of the first row starts at the same height, number included", allSame
     Emit "         cell 1 at " & CStr(yTop) & IIf(bad = "", "", "; off:" & bad)
 
-    '-- vertical: the numbered first row is as tall as the later vernacular row
+    '-- the number paragraph, by property: what NumberFirstCell and ------------
+    '   ApplyExampleSpacing actually set, checked against the content cell
+    Ok "the number paragraph has the row's space before and after, single-spaced", _
+        (tbl.Cell(1, 1).Range.ParagraphFormat.SpaceBefore = tbl.Cell(1, 2).Range.ParagraphFormat.SpaceBefore _
+         And tbl.Cell(1, 1).Range.ParagraphFormat.SpaceAfter = tbl.Cell(1, 2).Range.ParagraphFormat.SpaceAfter _
+         And tbl.Cell(1, 1).Range.ParagraphFormat.LineSpacingRule = wdLineSpaceSingle)
+
+    '-- vertical: the numbered first row is as tall as the later vernacular row,
+    '   for however many wrap lines the font made (Windows wraps differently)
+    n = tbl.Rows.Count
+    ReDim y(1 To n + 1)
     Set para = ParagraphAfterTable(tbl)
     On Error Resume Next
-    For r = 1 To 4
+    For r = 1 To n
         y(r) = tbl.Cell(r, 2).Range.Information(INFO_Y_PAGE)
     Next r
     If Not para Is Nothing Then
-        y(5) = para.Range.Information(INFO_Y_PAGE) - para.SpaceBefore
+        y(n + 1) = para.Range.Information(INFO_Y_PAGE) - para.SpaceBefore
     End If
     Err.Clear
     On Error GoTo 0
     h1 = y(2) - y(1)                            ' vernacular, with the number
     h2 = y(3) - y(2)                            ' gloss, plus the line gap
     h3 = y(4) - y(3)                            ' vernacular, second wrap line
-    h4 = y(5) - y(4)                            ' gloss, last
-    Emit "         row heights " & CStr(h1) & " / " & CStr(h2) & " / " & CStr(h3) & " / " & CStr(h4)
+    hLast = y(n + 1) - y(n)                     ' gloss, the last row of all
+    Emit "         " & CStr(n) & " rows; heights " & CStr(h1) & " / " & CStr(h2) & " / " & _
+         CStr(h3) & " ... last " & CStr(hLast)
     Ok "rows: Word reported positions", (y(1) > 0 And y(2) > y(1) And y(3) > y(2) And y(4) > y(3))
     Ok "the numbered first row is as tall as the later vernacular row", (Abs(h1 - h3) <= 0.75)
-    If y(5) > y(4) Then
+    If y(n + 1) > y(n) Then
         Ok "the gloss row before the wrap is the last gloss row plus the line gap", _
-            (Abs((h2 - h4) - SettingLineGap(doc)) <= 0.75)
+            (Abs((h2 - hLast) - SettingLineGap(doc)) <= 0.75)
     End If
 
     ClearSetting doc, "PadLeft"

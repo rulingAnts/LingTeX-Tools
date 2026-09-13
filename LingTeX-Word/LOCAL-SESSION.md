@@ -99,6 +99,18 @@ requests.
   (with 9pt set above the example, by the test) and half-repainted; the
   "janked" screenshot was that document, and the `rows` test now checks
   every cell of the first row starts at the same height.
+- **The review of the day's changes** (2026-09-14, four lenses, two
+  skeptics per finding; 19 found, 7 confirmed, every Mac-compile candidate
+  refuted as already proven in baseline code). Fixed, one commit each, on
+  top of tag `lingtex-word-green-441`: (1) spacings were stored with CStr
+  and read with CDbl -- locale-aware both, so 6.5 crossed a comma-decimal
+  machine as 65; NumberToStore/StoredNumber now (full stop always, either
+  read); (2) SpaceBefore is written as 0 on every tier row, so a tier
+  style's own Space Before cannot add to the gaps; (3) the report and the
+  dialog's refusal know percentages; (4) tests: the rows test takes any
+  number of wrap lines, the list selection is read from the control, the
+  number paragraph is checked by property. Refuted and left: the
+  ExampleIndent/tbl.LeftPadding pairing, the 50% test's tautology.
 - **Measured alignment REVERTED** (07:49 run, 437/442): Range.Information(5)
   on a cell range reports one row-level value for every cell (83.25 for the
   number cell and the content cell alike), so AlignRowsToFirst nudged rows
