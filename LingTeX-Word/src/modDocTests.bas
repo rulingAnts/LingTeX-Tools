@@ -86,6 +86,7 @@ Public Sub RunDocTests()
     RunSection "styles"
     RunSection "stylecollide"
     RunSection "settings"
+    RunSection "spacing"
     RunSection "measure"
     RunSection "agreement"
     RunSection "rendering"
@@ -125,6 +126,7 @@ Private Sub RunSection(ByVal which As String)
         Case "styles":       TestStyles
         Case "stylecollide": TestStyleCollision
         Case "settings":     TestSettings
+        Case "spacing":      TestSpacing
         Case "measure":      TestMeasure
         Case "agreement":    TestRenderMeasureAgreement
         Case "rendering":    TestRendering
@@ -531,6 +533,218 @@ Private Sub WriteRawVar(doc As Document, ByVal nm As String, ByVal v As String)
     On Error GoTo 0
 End Sub
 
+
+
+'=============================================================================
+' -- SPACING AND THE STYLE SLOTS (the LingTeX Styles tab) -------------------
+'=============================================================================
+' What the tab's edit boxes read and write, and what the renderer does with
+' it: the by-name text API in modSettings, the optional (tri-state) spacings,
+' and the style slots in modStyles. Then one example drawn with every spacing
+' set, checked row by row.
+
+Private Sub TestSpacing()
+    Dim doc As Document
+    Dim ex As IgtExample
+    Dim tbl As Table
+    Dim para As Paragraph
+    Dim keys() As String
+    Dim i As Long
+    Dim allKeys As Boolean
+
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "spacing: could create a blank document", False
+        Exit Sub
+    End If
+
+    '-- the key list and the text API ---------------------------------------
+    keys = Split(SPACING_KEYS, "|")
+    Ok "fifteen spacing keys", (UBound(keys) = 14)
+    allKeys = True
+    For i = 0 To UBound(keys)
+        If Not IsSpacingKey(keys(i)) Then allKeys = False
+    Next i
+    Ok "every listed key is a spacing key", allKeys
+    Ok "an unknown key is not", (Not IsSpacingKey("Elephant"))
+    Ok "SetSpacingText refuses an unknown key", _
+        (Not SetSpacingText(doc, "Elephant", "3"))
+
+    Ok "a virgin document sets no spacing", (SpacingText(doc, "TierGap") = "")
+    Ok "an unset optional spacing reads as SETTING_UNSET", _
+        (SettingOptional(doc, "ExampleBefore") = SETTING_UNSET)
+
+    Ok "SetSpacingText accepts 6.5", SetSpacingText(doc, "Gap", "6.5")
+    Ok "  and the typed getter sees 6.5", (SettingGap(doc) = 6.5)
+    Ok "  and the box text is a number again", _
+        (SpacingText(doc, "Gap") <> "" And Val(Replace(SpacingText(doc, "Gap"), ",", ".")) = 6.5)
+    Ok "SetSpacingText accepts a comma decimal", SetSpacingText(doc, "Gap", "4,5")
+    Ok "  as four and a half, not forty-five", (SettingGap(doc) = 4.5)
+    Ok "SetSpacingText accepts a pt suffix", SetSpacingText(doc, "Gap", "8 pt")
+    Ok "  as eight", (SettingGap(doc) = 8)
+    Ok "SetSpacingText refuses letters", (Not SetSpacingText(doc, "Gap", "abc"))
+    Ok "  and leaves the stored value alone", (SettingGap(doc) = 8)
+    Ok "SetSpacingText refuses two decimal points", _
+        (Not SetSpacingText(doc, "Gap", "1.2.3"))
+    Ok "a negative spacing clamps to 0", _
+        (SetSpacingText(doc, "Gap", "-4") And SettingGap(doc) = 0)
+    Ok "empty text unsets", SetSpacingText(doc, "Gap", "   ")
+    Ok "  so the box is empty again", (SpacingText(doc, "Gap") = "")
+    Ok "  and the typed getter is back at its default", (SettingGap(doc) = 6)
+    Ok "  and SettingDefined says so", (Not SettingDefined(doc, "Gap"))
+
+    Ok "an optional spacing round-trips", _
+        (SetSpacingText(doc, "ExampleBefore", "9") And SettingOptional(doc, "ExampleBefore") = 9)
+    Ok "an optional spacing can be 0, which is not unset", _
+        (SetSpacingText(doc, "ExampleLeft", "0") And SettingOptional(doc, "ExampleLeft") = 0)
+    ClearSetting doc, "ExampleBefore"
+    Ok "ClearSetting unsets", (SettingOptional(doc, "ExampleBefore") = SETTING_UNSET)
+    ClearSetting doc, "ExampleLeft"
+
+    Ok "cell padding defaults to 0 on every side", _
+        (SettingCellPadding(doc, "Left") = 0 And SettingCellPadding(doc, "Right") = 0 _
+         And SettingCellPadding(doc, "Top") = 0 And SettingCellPadding(doc, "Bottom") = 0)
+    Ok "tier gap defaults to 0", (SettingTierGap(doc) = 0)
+
+    '-- the style slots -----------------------------------------------------
+    Ok "eight style slots", (STYLE_SLOT_COUNT = 8)
+    Eq "slot 0 is the vernacular style", StyleSlotName(0), ParaStyleName(ROLE_VERNACULAR)
+    Eq "slot 5 is the translation style", StyleSlotName(5), ParaStyleName(ROLE_FREE)
+    Eq "slot 6 is the grammatical-gloss character style", StyleSlotName(6), STYLE_GRAM
+    Eq "slot 7 is the number-cell style", StyleSlotName(7), STYLE_EXAMPLE
+    Eq "slot 7's label", StyleSlotLabel(7), "Example Number"
+    Eq "a slot out of range has no name", StyleSlotName(8), ""
+    Eq "  nor a label", StyleSlotLabel(8), ""
+
+    EnsureStyles doc, True
+    Ok "a fresh tier style shows no font of its own (follows Normal)", _
+        (StyleFontText(doc, 2) = "")
+    Ok "  nor a size of its own", (StyleSizeText(doc, 2) = "")
+    Ok "Vernacular starts italic", StyleFlag(doc, 0, "Italic")
+    Ok "Gloss starts upright", (Not StyleFlag(doc, 2, "Italic"))
+    Ok "Grammatical Gloss starts in small capitals", StyleFlag(doc, 6, "SmallCaps")
+
+    Ok "a size can be set on a slot", SetStyleSizeText(doc, 2, "19")
+    Ok "  and the Word style has it", (doc.Styles(ParaStyleName(ROLE_GLOSS)).Font.Size = 19)
+    Eq "  and the box shows it", StyleSizeText(doc, 2), CStr(19)
+    Ok "a size with a comma decimal is accepted", SetStyleSizeText(doc, 2, "10,5")
+    Ok "  as ten and a half", (doc.Styles(ParaStyleName(ROLE_GLOSS)).Font.Size = 10.5)
+    Ok "letters are refused as a size", (Not SetStyleSizeText(doc, 2, "big"))
+    Ok "  and the size is unchanged", (doc.Styles(ParaStyleName(ROLE_GLOSS)).Font.Size = 10.5)
+    Ok "an empty size follows Normal again", SetStyleSizeText(doc, 2, "")
+    Ok "  so the box is empty", (StyleSizeText(doc, 2) = "")
+    Ok "  and the style is the body size", _
+        (doc.Styles(ParaStyleName(ROLE_GLOSS)).Font.Size = BodyFontSize(doc))
+
+    Ok "a font can be set on a slot", SetStyleFontText(doc, 3, "Courier New")
+    Eq "  and the box shows it", StyleFontText(doc, 3), "Courier New"
+    Ok "an empty font follows Normal again", SetStyleFontText(doc, 3, "")
+    Ok "  so the box is empty", (StyleFontText(doc, 3) = "")
+
+    SetStyleFlag doc, 2, "Bold", True
+    Ok "a flag can be switched on", StyleFlag(doc, 2, "Bold")
+    SetStyleFlag doc, 0, "Italic", False
+    Ok "  and off", (Not StyleFlag(doc, 0, "Italic"))
+    ResetStyleSlot doc, 2
+    Ok "Reset This Style takes the flag off again", (Not StyleFlag(doc, 2, "Bold"))
+    ResetStyleSlot doc, 0
+    Ok "  and puts Vernacular back to italic", StyleFlag(doc, 0, "Italic")
+    ResetStyleSlot doc, 6
+    Ok "  and Grammatical Gloss back to small capitals", StyleFlag(doc, 6, "SmallCaps")
+
+    '-- one example, every spacing set -------------------------------------
+    SetSpacingText doc, "ExampleBefore", "9"
+    SetSpacingText doc, "ExampleAfter", "7"
+    SetSpacingText doc, "ExampleRight", "72"
+    SetSpacingText doc, "TierGap", "4"
+    SetSpacingText doc, "FreeAbove", "5"
+    SetSpacingText doc, "PadLeft", "2"
+    SetSpacingText doc, "PadRight", "3"
+    SetSpacingText doc, "PadTop", "1"
+    SetSpacingText doc, "PadBottom", "1.5"
+    ClearCache
+
+    ex = ThreeTierExample()
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then
+        Ok "an example draws with every spacing set", False
+        Emit "         " & gRenderError
+        CloseNoSave doc
+        Exit Sub
+    End If
+    Ok "an example draws with every spacing set", True
+
+    Ok "space before goes on the first row", _
+        (tbl.Rows(1).Range.ParagraphFormat.SpaceBefore = 9)
+    Ok "the tier gap goes under the first tier of the wrap line", _
+        (tbl.Rows(1).Range.ParagraphFormat.SpaceAfter = 4)
+    Ok "the last row carries no space after (the translation follows)", _
+        (tbl.Rows(tbl.Rows.Count).Range.ParagraphFormat.SpaceAfter = 0)
+    Ok "left padding is 2", (tbl.LeftPadding = 2)
+    Ok "right padding is 3", (tbl.RightPadding = 3)
+    Ok "top padding is 1", (tbl.TopPadding = 1)
+    Ok "bottom padding is 1.5", (tbl.BottomPadding = 1.5)
+    CheckRowsFitWithin tbl, doc, 72
+
+    Set para = ParagraphAfterTable(tbl)
+    If para Is Nothing Then
+        Ok "the translation paragraph is there", False
+    Else
+        Ok "the translation paragraph is there", True
+        Ok "space above the translation", (para.SpaceBefore = 5)
+        Ok "space after the example, on the translation", (para.SpaceAfter = 7)
+        Ok "the example's right indent, on the translation", (para.RightIndent = 72)
+    End If
+
+    ' Unset everything and draw again: nothing of the above survives, which is
+    ' the promise an empty box makes.
+    For i = 0 To UBound(keys)
+        ClearSetting doc, keys(i)
+    Next i
+    ClearCache
+    Set tbl = RewrapTable(tbl)
+    If tbl Is Nothing Then
+        Ok "the example re-wraps with every spacing unset", False
+        Emit "         " & gRenderError
+    Else
+        Ok "the example re-wraps with every spacing unset", True
+        Ok "no space before on the first row", _
+            (tbl.Rows(1).Range.ParagraphFormat.SpaceBefore = 0)
+        Ok "no tier gap", (tbl.Rows(1).Range.ParagraphFormat.SpaceAfter = 0)
+        Ok "padding is back to 0", (tbl.LeftPadding = 0 And tbl.RightPadding = 0)
+        Set para = ParagraphAfterTable(tbl)
+        If Not para Is Nothing Then
+            Ok "the translation has the style's own spacing again", _
+                (para.SpaceBefore = 0 And para.SpaceAfter = 3 And para.RightIndent = 0)
+        End If
+    End If
+
+    CloseNoSave doc
+End Sub
+
+' Every row, indent plus cells, fits inside the text area less the example's
+' right indent: what the Right box promises.
+Private Sub CheckRowsFitWithin(tbl As Table, doc As Document, ByVal rightIndent As Double)
+    Dim avail As Double
+    Dim r As Long, c As Long
+    Dim total As Double, worst As Double
+    Dim bad As String
+
+    avail = AvailableTextWidth(RangeAfterTable(tbl), True) - rightIndent
+    For r = 1 To tbl.Rows.Count
+        total = tbl.Rows(r).LeftIndent
+        For c = 1 To tbl.Rows(r).Cells.Count
+            total = total + CellWidthOf(tbl, r, c)
+        Next c
+        If total > worst Then worst = total
+        If total > avail + 1 Then
+            bad = bad & " row " & CStr(r) & " is " & CStr(total) & "pt;"
+        End If
+    Next r
+    Ok "no row runs past the example's right indent", (bad = "")
+    Emit "         widest row " & CStr(worst) & "pt, room " & CStr(avail) & "pt"
+    If bad <> "" Then Emit "        " & bad
+End Sub
 
 '=============================================================================
 ' -- MEASUREMENT (modMeasure) -----------------------------------------------

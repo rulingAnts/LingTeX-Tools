@@ -133,11 +133,13 @@ LingTeXAlignByMorpheme              LingTeXToggleRewrapOnSelectionChange
 LingTeXToggleGramGlossInitialCap    LingTeXShowSettings
 ```
 
-`LingTeXShowSettings` lists everything the document currently holds. Only the
-three measurements (gap, line gap, continuation indent) still need the Immediate
-window — click the test document first, then Tools → Macro → Visual Basic
-Editor, View → Immediate Window: `SetSettingLineGap ActiveDocument, 8`. A
-settings dialog is the Phase 2 form's job.
+`LingTeXShowSettings` lists everything the document currently holds. The
+measurements (gap, line gap, continuation indent, and every other spacing) are
+edit boxes on the **LingTeX Styles** tab; from the Immediate window they are
+`SetSpacingText ActiveDocument, "LineGap", "8"` (click the test document
+first, then Tools → Macro → Visual Basic Editor, View → Immediate Window).
+The styles' font and size are on the same tab, with `LingTeXModifyStyleInWord`,
+`LingTeXResetThisStyle` and `LingTeXShowStylesTab` in the macro list.
 
 ### What a "clear message" means
 
@@ -358,6 +360,17 @@ that show their state; the state is the active document's, refreshed
 whenever a setting or the active document changes. If they stop following
 changes, the VBA project was reset (an untrapped error, Run → Reset) and the
 ribbon handle with it: restart Word.
+
+The **LingTeX Styles** tab is the first use of edit boxes and a drop-down on
+Mac Word, and whether their callbacks fire there (`RbnGetText`,
+`RbnEditChanged`, `RbnGetStyleIndex`, `RbnStyleSelected`) is unproven. The
+check: with an example on the page, type `12` into *Tier gap* and press
+Return — the tiers move apart at once, and `LingTeXShowSettings` lists
+`TierGap: 12 pt`. Clear the box and they close up again. Then pick
+*Grammatical Gloss* in the Style drop-down: Small Caps shows pressed. If a
+box stays empty after a value was stored, `getText` is not being called: the
+fallback is `getLabel`-free static labels plus the Immediate window, and that
+is the finding to record.
 
 ## If the engine will not compile at Word start
 

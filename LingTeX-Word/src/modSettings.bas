@@ -51,6 +51,28 @@ Private Const DEF_NUMBER_HANG As Double = 36
 ' Which level of the "LingTeX Example Number" list style carries the number.
 ' 1 by default; 2 once level 1 is linked to Heading 1 for per-chapter restarts.
 Private Const DEF_NUMBER_LEVEL As Long = 1
+' Vertical air between the tier rows of one wrap line, in points. Zero: the
+' tiers sit as close as the fonts allow, which is how interlinear text is set.
+Private Const DEF_TIER_GAP As Double = 0
+' Cell padding, in points, each side. Zero, because measurement happens in
+' paragraphs with no padding, and the column gap is the air between columns;
+' padding is added ON TOP of the measured width when set.
+Private Const DEF_PAD As Double = 0
+' The spacings that have NO built-in value of their own -- space before and
+' after an example, its default left indent and its right indent, the air above
+' the translation and between translations -- are OPTIONAL: unset, the renderer
+' leaves the paragraph or the style alone, which is what every document drawn
+' before these settings existed gets. Read them with SettingOptional; a negative
+' answer means "not set".
+Public Const SETTING_UNSET As Double = -1
+' Every spacing key the ribbon's edit boxes can show (SpacingText and
+' SetSpacingText below), for the settings report and the tests. The key is the
+' document-variable name less its prefix; Gap, LineGap, ContIndent and
+' NumberHang are the names the typed getters have always used.
+Public Const SPACING_KEYS As String = _
+    "ExampleBefore|ExampleAfter|ExampleLeft|ExampleRight|" & _
+    "LineGap|ContIndent|TierGap|Gap|NumberHang|" & _
+    "PadLeft|PadRight|PadTop|PadBottom|FreeAbove|FreeBetween"
 
 
 '=============================================================================
@@ -109,6 +131,34 @@ Public Function SettingNumberLevel(doc As Document) As Long
     v = ReadDouble(doc, "NumberLevel", DEF_NUMBER_LEVEL)
     If v < 1 Or v > 9 Then v = DEF_NUMBER_LEVEL
     SettingNumberLevel = CLng(v)
+End Function
+
+Public Function SettingTierGap(doc As Document) As Double
+    SettingTierGap = ReadDouble(doc, "TierGap", DEF_TIER_GAP)
+End Function
+
+' Cell padding, one side at a time: side is "Left", "Right", "Top" or "Bottom".
+Public Function SettingCellPadding(doc As Document, ByVal side As String) As Double
+    SettingCellPadding = ReadDouble(doc, "Pad" & side, DEF_PAD)
+End Function
+
+'-----------------------------------------------------------------------------
+' An OPTIONAL spacing, by key: "ExampleBefore", "ExampleAfter", "ExampleLeft",
+' "ExampleRight", "FreeAbove" or "FreeBetween". SETTING_UNSET (negative) when
+' the document does not set it, in which case the renderer does not touch the
+' property and the style's own value shows through.
+'-----------------------------------------------------------------------------
+Public Function SettingOptional(doc As Document, ByVal key As String) As Double
+    Dim s As String
+    SettingOptional = SETTING_UNSET
+    s = ReadString(doc, key, "")
+    If s = "" Then Exit Function
+    On Error Resume Next
+    SettingOptional = CDbl(s)
+    If Err.Number <> 0 Then SettingOptional = SETTING_UNSET
+    Err.Clear
+    On Error GoTo 0
+    If SettingOptional < 0 Then SettingOptional = SETTING_UNSET
 End Function
 
 Public Function SettingGramGlossInitialCap(doc As Document) As Boolean
@@ -189,6 +239,103 @@ Public Sub SetSettingGranularity(doc As Document, ByVal v As IgtGranularity)
     Else
         WriteVar doc, "Granularity", "word"
     End If
+End Sub
+
+
+'=============================================================================
+' -- SPACING SETTINGS BY NAME, FOR THE RIBBON -------------------------------
+'=============================================================================
+' The LingTeX Styles tab shows one edit box per spacing, and an edit box holds
+' TEXT: what the document stores, or empty when it stores nothing. Empty is a
+' real state -- "leave it to the default, or to the style" -- so these do not
+' fall back to a default the way the typed getters do; they say what is set.
+'
+' The key is the document-variable name less its prefix. The spacings with a
+' built-in default (Gap, LineGap, ContIndent, NumberHang, TierGap, Pad*) and
+' the optional ones (see SettingOptional) go through the same two calls.
+
+' Is this a key SetSpacingText accepts?
+Public Function IsSpacingKey(ByVal key As String) As Boolean
+    IsSpacingKey = (InStr(1, "|" & SPACING_KEYS & "|", "|" & key & "|", _
+                          vbTextCompare) > 0)
+End Function
+
+' The stored value as text for an edit box: "" when unset, otherwise the number
+' in the user's locale (CStr writes the decimal separator Word shows).
+Public Function SpacingText(doc As Document, ByVal key As String) As String
+    Dim s As String
+    Dim v As Double
+    s = ReadString(doc, key, "")
+    If s = "" Then Exit Function
+    On Error Resume Next
+    v = CDbl(s)
+    If Err.Number <> 0 Then
+        Err.Clear
+        On Error GoTo 0
+        Exit Function
+    End If
+    Err.Clear
+    On Error GoTo 0
+    SpacingText = CStr(v)
+End Function
+
+'-----------------------------------------------------------------------------
+' Store what was typed into an edit box. Empty (or only spaces) UNSETS the
+' spacing: the variable is removed, so the default or the style applies again.
+' A number, with either decimal separator and with or without "pt", is stored
+' in points. Returns False, storing nothing, for anything else -- the caller
+' says so and refreshes the box back to the stored value.
+'
+' Parsed with Val after normalising the separator, because Val is not
+' locale-aware and CDbl is: "6,5" must mean six and a half on every machine,
+' not sixty-five on one and an error on another. Stored with CStr, read back
+' with CDbl -- both locale-aware, and consistent with each other.
+'-----------------------------------------------------------------------------
+Public Function SetSpacingText(doc As Document, ByVal key As String, _
+        ByVal text As String) As Boolean
+    Dim t As String
+    Dim v As Double
+    Dim i As Long, ch As String
+
+    If doc Is Nothing Then Exit Function
+    If Not IsSpacingKey(key) Then Exit Function
+
+    t = Trim$(text)
+    If t = "" Then
+        ClearSetting doc, key
+        SetSpacingText = True
+        Exit Function
+    End If
+    If LCase$(Right$(t, 2)) = "pt" Then t = Trim$(Left$(t, Len(t) - 2))
+    t = Replace(t, ",", ".")
+    ' Digits, at most one point, an optional leading sign; nothing else.
+    If t = "" Or t = "." Or t = "-" Or t = "+" Then Exit Function
+    For i = 1 To Len(t)
+        ch = Mid$(t, i, 1)
+        If (ch < "0" Or ch > "9") And ch <> "." Then
+            If Not (i = 1 And (ch = "-" Or ch = "+")) Then Exit Function
+        End If
+    Next i
+    If InStr(1, t, ".") <> InStrRev(t, ".") Then Exit Function
+    v = Val(t)
+    If v < 0 Then v = 0
+    If v > 1584 Then v = 1584               ' 22 inches: Word's own ceiling
+    WriteVar doc, key, CStr(v)
+    SetSpacingText = True
+End Function
+
+' Is anything stored under this key?
+Public Function SettingDefined(doc As Document, ByVal key As String) As Boolean
+    SettingDefined = (ReadString(doc, key, "") <> "")
+End Function
+
+' Remove a stored setting, so its default (or the style) applies again.
+Public Sub ClearSetting(doc As Document, ByVal key As String)
+    If doc Is Nothing Then Exit Sub
+    On Error Resume Next
+    doc.Variables(VAR_PREFIX & key).Delete
+    Err.Clear
+    On Error GoTo 0
 End Sub
 
 

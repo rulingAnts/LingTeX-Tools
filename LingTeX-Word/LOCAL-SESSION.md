@@ -85,6 +85,21 @@ requests.
 
 ## State of play
 
+- **The LingTeX Styles tab** (2026-09-13): a second ribbon tab with one edit
+  box per spacing -- Example Before/After/Left/Right, Line gap, Continuation,
+  Tier gap, Column gap, Number width, Cell padding L/R/T/B, Translation
+  Above/Between -- and a Style group (drop-down over the eight LingTeX
+  styles; Font and Size boxes, Bold/Italic/Small Caps toggles, Modify in
+  Word, Reset This Style). Empty box = not set = default or the style. A
+  change stores the value and re-wraps the document silently. Spacings are
+  document settings (`SpacingText`/`SetSpacingText` in modSettings, keys in
+  `SPACING_KEYS`; the six optional ones read back as `SETTING_UNSET` and the
+  renderer leaves the property alone); style properties are written to the
+  Word style itself (`StyleFontText` and friends, modStyles). Doc-test
+  section `spacing`. UNPROVEN in Word: edit-box/drop-down callbacks on Mac,
+  `Dialogs(180).Display` on Mac, `Variable.Delete`, and the tab's width on
+  a narrow window. The template must be rebuilt (RELEASING.md) -- until then
+  `check-dotm.sh` fails on the ribbon and icon drift, by design.
 - Ribbon: the six settings buttons are toggleButtons (getPressed/onAction,
   onLoad keeps the IRibbonUI; DocumentChange and every setting command call
   RefreshRibbon). Silent on the ribbon; the macro-list commands still report.
@@ -202,7 +217,8 @@ requests.
 - Next: Seth re-runs both runners (expect 79 and about 231), then continues the
   by-hand pass from 3c/3e/3f. Then `SaveAsTemplate` + `tools/build-dotm.sh` +
   `tools/check-dotm.sh`, then packaging.
-- Later, wanted by Seth: a settings interface (gaps, styles) -- Phase 2 form.
+- ~~Later, wanted by Seth: a settings interface (gaps, styles) -- Phase 2 form.~~
+  Done as the LingTeX Styles tab (2026-09-13), above.
 - Seth wants the ribbon and macros non-template-specific in the end: that is
   what the startup-folder .dotm already is (a global add-in, applying to every
   document regardless of its own template); packaging installs it there.
@@ -222,11 +238,11 @@ requests.
 - Later, per Seth: revisit the source-agnostic input model for Toolbox/SFM,
   Excel/Numbers pastes and the Phase 2 hand-typed data sheet -- the FLEx-shaped
   assumptions are listed in README, *Later*. FieldWorks data first.
-- Later, wanted by Seth: every spacing a user might set (before/after an
+- ~~Later, wanted by Seth: every spacing a user might set (before/after an
   example, between tiers, rows-to-translation, plus the three existing gaps)
-  behind one interface; and inserting every example of a multi-block FLEx
-  paste (the parser already returns them all; the insert takes the first).
-  Both in README, *Later*.
+  behind one interface~~ -- the LingTeX Styles tab (2026-09-13). Still later:
+  inserting every example of a multi-block FLEx paste (the parser already
+  returns them all; the insert takes the first). README, *Later*.
 - Later, wanted by Seth: re-wrap an example automatically when it is edited.
   Plan (README, *Later*): make the selection-change hook change-aware via a
   text fingerprint taken on entering, so it fires once on leaving an edited
