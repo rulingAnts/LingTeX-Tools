@@ -159,6 +159,7 @@ Free Eng (When) she picked her yams early.
 | After any command, `Application.ScreenUpdating` is back on (the screen is not frozen) | ☐ | ☐ |
 | No hidden scratch document is left open — check the Window menu | ☐ | ☐ |
 | Run `LingTeXToggleRewrapOnSelectionChange`, then click in and out of an example → it re-wraps, does not recurse, and typing stays responsive | ☐ | ☐ |
+| Type a space into a gloss cell (`follow CMP=REL`), **Re-wrap This** → it reads `follow.CMP=REL` (or `_` if the document says so); the translation keeps its spaces | ☐ | ☐ |
 | **Settings** opens the dialog, centred on Word, every control drawn and legible, the current values shown; Escape closes it, Enter is OK | ☐ | ☐ |
 | **Settings:** *Tier gap* `12`, Apply → the tiers of every example move apart with the dialog still up; clear the box, OK → they close up. `abc` → a clear message naming the box, nothing stored | ☐ | ☐ |
 | **Settings:** *Before* 12, *After* 12, *Right* 72, OK → air above and below each example, wrap lines and translation stop an inch short of the margin; one Undo takes it back | ☐ | ☐ |

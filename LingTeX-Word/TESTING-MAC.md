@@ -363,15 +363,26 @@ ribbon handle with it: restart Word.
 
 `frmLingTeXSettings` is the project's first UserForm, and the first one whose
 controls are built in code (`Controls.Add` in `UserForm_Initialize`, the
-buttons in `WithEvents` variables). The doc-test section `dialog` proves it
-headless — `New` builds the controls, `LoadFrom` and `ApplyNow` round-trip —
-so if that section is green the remaining questions are visual: does **Settings**
-open it centred and legible, are the labels wide enough for the Mac font, do
-the boxes take typing, does Escape close it, and does **Modify in Word** step
-aside and bring up Format → Style on the selected style, then come back. A
-compile error at Word start naming `frmLingTeXSettings` means the project has
-no MSForms reference: the import log says so, and Tools → References →
+buttons in `WithEvents` variables). **It opens on Mac** (2026-09-14, first
+run): centred, every control drawn, the values filled; the bootstrap created
+it and the MSForms reference was there. The doc-test section `dialog` proves
+the rest headless — `New` builds the controls, `LoadFrom` and `ApplyNow`
+round-trip. Still to look at by hand: does Apply re-wrap behind the dialog,
+does Escape close it, and does **Modify in Word** land on the selected style.
+On that first run it did not — Word's Style dialog ignores its Name argument
+on Mac and opens on the selection's style — so the command now selects the
+first text in that style before opening the dialog, and puts the cursor back
+after; with no example on the page it says which style to pick instead. A
+compile error at Word start naming `frmLingTeXSettings` would mean the project
+has no MSForms reference: the import log says so, and Tools → References →
 Microsoft Forms 2.0 Object Library is the fix.
+
+**Compile the right file.** Debug → Compile proves the engine only when run
+on the engine, `LingTeX-Word/LingTeX.dotm` in the clone (open it as a
+document, with the loaded copy unloaded, or compile from the VBE while it is
+loaded). Two stale copies from the by-hand phase sit in Word's Templates
+folder and in `~/Documents/Custom Office Templates`; they compile, prove
+nothing, and are worth moving aside.
 
 The dev template's `modImport` must be **re-pasted once** for this: it is
 what creates the form component, and the copy in `LingTeX-Dev.dotm` predates

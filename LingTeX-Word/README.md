@@ -146,7 +146,7 @@ examples are tables to Word but not to the user.
 |---|---|
 | **Insert Interlinear** | With nothing selected, reads the clipboard; with text selected, replaces it. Accepts FLEx interlinear text (tab-separated, with tier labels) or plain tab-separated rows. |
 | **Convert Table** | Adopts an ordinary Word table as an auto-wrapping example. |
-| **Re-wrap This** / **Re-wrap All** | Recompute the wrap. Also runs on save. |
+| **Re-wrap This** / **Re-wrap All** | Recompute the wrap. Also runs on save. A space typed into an interlinear cell becomes the document's replacement character (`.` or `_`), as on insert; a space would let Word wrap the text inside the cell. |
 | **Split Column** | Pulls an affix, clitic or reduplicant into its own column, carrying the break character onto every interlinear tier. |
 | **Merge Columns** | Select across cells to merge those; with one cell selected, merges it with the next column. |
 | **Check Glossing** | Reports and optionally repairs, as above. |
@@ -248,7 +248,9 @@ that is not a number is refused by name before anything is stored.
 Word Gloss, Category, Free Translation, Grammatical Gloss, Example Number),
 and **Modify in Word**, which opens Word's own style dialog on the selected
 one for everything a style can hold: font, size, colour, borders, the
-paragraph format. Nothing of ours sits between you and the style, so Format →
+paragraph format. (It first selects the first text in that style, because
+the dialog opens on the selection's style; with no example on the page yet it
+says which style to pick.) Nothing of ours sits between you and the style, so Format →
 Style shows the same thing. **Reset This Style** puts one style back to what a
 fresh document gets, following the Normal style; **Reset the Six Tier Styles**
 does the tier styles together (also **Reset Styles** on the ribbon).

@@ -528,6 +528,13 @@ Public Function RewrapTable(tbl As Table, _
         Exit Function
     End If
 
+    ' Invariant 2, on every re-wrap as on insert: a space typed into an
+    ' interlinear cell becomes the document's replacement (. or _). A space
+    ' would let Word wrap the text inside the cell behind the planner's back,
+    ' and the column alignment rests on that never happening (Seth,
+    ' 2026-09-14). Free translations are prose and keep theirs.
+    FixCellSpaces ex, SettingSpaceReplacement(tbl.Range.Document)
+
     ' Absorb the free-translation paragraphs that belong to this example, so they
     ' are rewritten rather than duplicated.
     AbsorbFreeParagraphs ex, tbl

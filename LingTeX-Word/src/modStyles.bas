@@ -706,7 +706,8 @@ Public Function StyleFlag(doc As Document, ByVal i As Long, ByVal which As Strin
     StyleFlag = (v <> False)
 End Function
 
- to what a fresh document gets: based on Normal, the body
+'-----------------------------------------------------------------------------
+' Put one slot back to what a fresh document gets: based on Normal, the body
 ' font and size (so it follows Normal from here on), italic for the two
 ' object-language tiers, small capitals for the grammatical-gloss style, and
 ' the tier paragraph format (tight, left-aligned, no indents). It IS a
