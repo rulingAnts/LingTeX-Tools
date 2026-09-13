@@ -1513,10 +1513,18 @@ End Sub
 ' format. Display rather than Show, so the dialog's Apply does not restyle
 ' the user's paragraph; changes made through its Modify button are applied
 ' all the same, and the examples are re-wrapped for them.
+'
+' The dialog opens on the style of the SELECTION. Its Name argument is set as
+' well, but Mac Word does not act on it (2026-09-14: the dialog opened on the
+' paragraph's style), so first something in the style is selected -- Find by
+' style, the first run or paragraph that carries it -- and the cursor is put
+' back afterwards. A document nothing of which uses the style yet cannot be
+' navigated that way, and the message says what to pick.
 Private Sub ModifyStyleInWord(doc As Document, ByVal slot As Long)
     Dim dlg As Object
     Dim nm As String
     Dim failed As Boolean
+    Dim was As Range
 
     nm = StyleSlotName(slot)
     If StyleSlotObject(doc, slot, True) Is Nothing Then
@@ -1524,6 +1532,17 @@ Private Sub ModifyStyleInWord(doc As Document, ByVal slot As Long)
                IIf(gStyleError <> "", vbCr & vbCr & gStyleError, ""), vbExclamation
         Exit Sub
     End If
+
+    On Error Resume Next
+    Set was = Selection.Range.Duplicate
+    Err.Clear
+    On Error GoTo 0
+    If Not SelectTextInStyle(doc, nm) Then
+        Report "Nothing in " & doc.Name & " uses " & nm & " yet, so Word's Style " & _
+               "dialog cannot open on it. In the dialog, set List to All styles, " & _
+               "select " & nm & " and click Modify.", vbInformation
+    End If
+
     On Error Resume Next
     Set dlg = Application.Dialogs(DLG_FORMAT_STYLE)
     If Err.Number <> 0 Or dlg Is Nothing Then
@@ -1535,6 +1554,8 @@ Private Sub ModifyStyleInWord(doc As Document, ByVal slot As Long)
         failed = (Err.Number <> 0)
     End If
     Err.Clear
+    If Not was Is Nothing Then was.Select
+    Err.Clear
     On Error GoTo 0
     If failed Then
         Report "Word's Style dialog could not be opened from here. Use Format > " & _
@@ -1545,6 +1566,32 @@ Private Sub ModifyStyleInWord(doc As Document, ByVal slot As Long)
     ClearCache
     RewrapDocument doc, False
 End Sub
+
+' Select the first text in the document carrying this style (paragraph or
+' character), so a dialog that reads the selection reads that style. False
+' when nothing does.
+Private Function SelectTextInStyle(doc As Document, ByVal nm As String) As Boolean
+    Dim rng As Range
+    Dim hit As Boolean
+    On Error Resume Next
+    Set rng = doc.Content
+    With rng.Find
+        .ClearFormatting
+        .Text = ""
+        .Style = doc.Styles(nm)
+        .Format = True
+        .Forward = True
+        .MatchWildcards = False
+        hit = .Execute
+    End With
+    If Err.Number <> 0 Then hit = False
+    Err.Clear
+    If hit Then rng.Select
+    If Err.Number <> 0 Then hit = False
+    Err.Clear
+    On Error GoTo 0
+    SelectTextInStyle = hit
+End Function
 
 
 '=============================================================================

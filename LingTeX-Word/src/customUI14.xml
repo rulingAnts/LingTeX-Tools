@@ -64,7 +64,7 @@
                     image="igtRewrapThis"
                     onAction="RbnRewrapCurrent"
                     screentip="Re-wrap the example at the cursor"
-                    supertip="Recomputes the wrap from scratch, so columns move down when space runs out and back up when it is freed -- after a margin, font or orientation change, or an edit."/>
+                    supertip="Recomputes the wrap from scratch, so columns move down when space runs out and back up when it is freed -- after a margin, font or orientation change, or an edit. A space typed into an interlinear cell becomes the document's replacement character (. or _)."/>
           </box>
           <box id="LingTeXIndentBox" boxStyle="vertical">
             <button id="LingTeXIndent"

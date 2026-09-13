@@ -16,6 +16,7 @@ error on a user's machine:
   * Windows-only APIs that would break Mac Word
   * ReDim Preserve on any but the last dimension, which is a run-time error 9
   * Exit Sub used inside a Function, and Exit Function inside a Sub
+  * a statement outside any procedure (a comment that lost its apostrophe)
 
 It is a structural check, not a compiler: it does not resolve names or types.
 """
@@ -876,6 +877,60 @@ def check_no_continuation_in_classes(files):
     return problems
 
 
+def check_no_statements_at_module_level(files):
+    """Every logical line outside a procedure is a declaration, a header line or
+    a compiler directive -- never a statement.
+
+    A statement at module level is a compile error for the whole module, and an
+    add-in reports it as "Compile error in hidden module: X" with no line. The one
+    that happened: an edit removed the procedures above a comment banner and took
+    the banner's first line and a half with them, leaving half a sentence of prose
+    in modStyles as code (2026-09-14). Block balance passed, because prose opens
+    and closes nothing; this is the check that would have failed.
+    """
+    DECL = re.compile(
+        r"^(?:Public\s+|Private\s+|Global\s+|Friend\s+)?"
+        r"(?:Type\s+\w+|Enum\s+\w+|Declare\s+|Const\s+|Dim\s+|WithEvents\s+|Event\s+)"
+        r"|^(?:Public|Private|Global)\s+[A-Za-z_]\w*(?:\(\))?\s+As\b"
+        r"|^(?:Public|Private)\s+[A-Za-z_]\w*\s*(?:,|$)"
+        r"|^Option\s+|^Implements\s+|^Def[A-Z][a-z]{2}\s|^#", re.I)
+    PROC = re.compile(r"^(?:Public\s+|Private\s+|Friend\s+)?(?:Static\s+)?"
+                      r"(?:Sub|Function|Property\s+(?:Get|Let|Set))\s+\w+", re.I)
+    ENDPROC = re.compile(r"^End\s+(?:Sub|Function|Property)\b", re.I)
+    HEADER = re.compile(r"^(?:VERSION\s|Attribute\s)", re.I)
+    problems = []
+    for f in files:
+        in_proc = in_type = in_header = False
+        for n, t in logical_lines(f.read_text(encoding="utf-8")):
+            if in_proc:
+                if ENDPROC.match(t):
+                    in_proc = False
+                continue
+            if in_header:                      # a .cls preamble or a .frm header block
+                if re.match(r"^End$", t, re.I):
+                    in_header = False
+                continue
+            if in_type:
+                if re.match(r"^End\s+(?:Type|Enum)\b", t, re.I):
+                    in_type = False
+                continue
+            if PROC.match(t):
+                in_proc = True
+                continue
+            if re.match(r"^(?:Public\s+|Private\s+)?(?:Type|Enum)\s+\w+", t, re.I):
+                in_type = True
+                continue
+            if re.match(r"^Begin(?:\s|$)", t, re.I):
+                in_header = True
+                continue
+            if HEADER.match(t) or DECL.match(t):
+                continue
+            problems.append(f"{f.name}:{n}: statement outside any procedure -- a compile error "
+                            f"for the whole module (a comment that lost its apostrophe?): "
+                            f"'{t[:60]}'")
+    return problems
+
+
 def main():
     files = []
     for d in SRC_DIRS:
@@ -991,6 +1046,15 @@ def main():
             print("          " + msg)
     else:
         print("  OK    no line continuation in the class modules")
+
+    naked = check_no_statements_at_module_level(files)
+    if naked:
+        total += len(naked)
+        print("  FAIL  statements outside procedures")
+        for msg in naked:
+            print("          " + msg)
+    else:
+        print("  OK    nothing but declarations outside the procedures")
 
     print()
     print("ALL PASS" if total == 0 else f"{total} problem(s)")

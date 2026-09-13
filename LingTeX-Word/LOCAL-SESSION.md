@@ -85,6 +85,9 @@ requests.
 
 ## State of play
 
+- **Re-wrap repairs spaces in cells** (2026-09-14, Seth): RewrapTable runs
+  FixCellSpaces with the document's replacement character before redrawing,
+  as Insert always has. Doc-test section `spacefix`.
 - **The Settings dialog** (2026-09-14, Seth's call: a pop-up from Settings,
   not a ribbon tab; the styles just listed, with Modify in Word). It is
   `src/frmLingTeXSettings.frm`, the project's first UserForm: NO controls at
@@ -100,9 +103,19 @@ requests.
   Doc-test section `dialog` drives the form without showing it. The LingTeX
   Styles tab and its five icons are gone; the spacing settings and
   `SpacingText`/`SetSpacingText` stay as the dialog's back end.
-  UNPROVEN in Word: everything about a code-built UserForm on Mac (Controls
-  .Add, WithEvents on MSForms.CommandButton, Show/Hide, InsideWidth), the
-  MSForms reference after Add(3), Dialogs(180).Display, Variable.Delete.
+  PROVEN on Mac (2026-09-14, first run): the bootstrap created the form,
+  15/15 and Verify all ok, the MSForms reference was there, Settings opened
+  the form centred with every control drawn and filled. Two findings from
+  that run: (1) "Compile error in hidden module: modStyles" -- MY edit had
+  eaten a comment banner and left half a sentence as code; vba-lint now has
+  check_no_statements_at_module_level for exactly that. (2) Modify in Word
+  opened Word's Style dialog on the paragraph's style, not the selected one
+  (Dialogs(180).Name is ignored on Mac): ModifyStyleInWord now selects the
+  first text in the style (Find by style) before Display, and restores the
+  cursor. UNPROVEN: that selection trick on Mac; Apply behind the dialog;
+  Variable.Delete. Stale engine copies in Word's Templates folder and in
+  ~/Documents/Custom Office Templates are NOT the engine; do not compile
+  those and conclude anything.
 - Ribbon: the six settings buttons are toggleButtons (getPressed/onAction,
   onLoad keeps the IRibbonUI; DocumentChange and every setting command call
   RefreshRibbon). Silent on the ribbon; the macro-list commands still report.

@@ -75,6 +75,9 @@ Private Const BOX_H As Double = 17
 Private Const BTN_H As Double = 22
 Private Const BTN_W As Double = 72
 Private Const LIST_W As Double = 306
+' Tall enough for all eight styles at the Mac font size (seven showed, with a
+' scrollbar, on the first Mac run).
+Private Const LIST_H As Double = 116
 ' A spacing row: its label at the margin, then up to four label+box pairs
 ' from PAIRS_X on, PAIR_W apart, each box PAIR_BOX_DX into its pair.
 Private Const PAIRS_X As Double = 104
@@ -141,7 +144,7 @@ Private Sub BuildControls()
     y = y + ROW_H
     AddSpacingRow y, "Wrap lines", "LineGap=Line gap (6)|ContIndent=Continuation (0)|TierGap=Tier gap (0)"
     y = y + ROW_H
-    AddSpacingRow y, "Columns", "Gap=Column gap (6)|NumberHang=Number column (36)"
+    AddSpacingRow y, "Columns", "Gap=Column gap (6)|NumberHang=Number col. (36)"
     y = y + ROW_H
     AddSpacingRow y, "Cell padding", "PadLeft=Left (0)|PadRight=Right (0)|PadTop=Top (0)|PadBottom=Bottom (0)"
     y = y + ROW_H
@@ -155,7 +158,7 @@ Private Sub BuildControls()
     lst.Left = MARGIN
     lst.Top = y
     lst.Width = LIST_W
-    lst.Height = 3 * (BTN_H + 6) - 6
+    lst.Height = LIST_H
     For i = 0 To STYLE_SLOT_COUNT - 1
         lst.AddItem StyleSlotLabel(i) & "   (" & StyleSlotName(i) & ")"
     Next i
@@ -166,7 +169,7 @@ Private Sub BuildControls()
     Set mModify = AddButton("btnModify", "Modify in Word...", MARGIN + LIST_W + 12, y, INSIDE_W - MARGIN - (MARGIN + LIST_W + 12))
     Set mResetStyle = AddButton("btnResetStyle", "Reset This Style", MARGIN + LIST_W + 12, y + BTN_H + 6, INSIDE_W - MARGIN - (MARGIN + LIST_W + 12))
     Set mResetAll = AddButton("btnResetAll", "Reset the Six Tier Styles", MARGIN + LIST_W + 12, y + 2 * (BTN_H + 6), INSIDE_W - MARGIN - (MARGIN + LIST_W + 12))
-    y = y + 3 * (BTN_H + 6) + 2
+    y = y + LIST_H + 6
     note = "Modify in Word opens Word's own style dialog on the selected style: font, size, colour, "
     note = note & "spacing, everything. Every example follows on its next re-wrap. Reset puts a style back "
     note = note & "to what a fresh document gets, following the Normal style."

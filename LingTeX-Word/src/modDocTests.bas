@@ -88,6 +88,7 @@ Public Sub RunDocTests()
     RunSection "settings"
     RunSection "spacing"
     RunSection "dialog"
+    RunSection "spacefix"
     RunSection "measure"
     RunSection "agreement"
     RunSection "rendering"
@@ -129,6 +130,7 @@ Private Sub RunSection(ByVal which As String)
         Case "settings":     TestSettings
         Case "spacing":      TestSpacing
         Case "dialog":       TestDialog
+        Case "spacefix":     TestSpaceFix
         Case "measure":      TestMeasure
         Case "agreement":    TestRenderMeasureAgreement
         Case "rendering":    TestRendering
@@ -824,6 +826,81 @@ Private Sub TestDialog()
 
     gQuiet = savedQuiet
     Unload frm
+    CloseNoSave doc
+End Sub
+
+
+'=============================================================================
+' -- SPACES TYPED INTO CELLS ARE REPAIRED ON RE-WRAP ------------------------
+'=============================================================================
+' Invariant 2 says no space inside an interlinear cell; Insert has always
+' repaired one, and now so does every re-wrap (Seth, 2026-09-14), with the
+' document's replacement character. The translation is prose and is left alone.
+
+Private Sub TestSpaceFix()
+    Dim doc As Document
+    Dim ex As IgtExample
+    Dim tbl As Table
+    Dim rng As Range
+
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "spacefix: could create a blank document", False
+        Exit Sub
+    End If
+    EnsureStyles doc, True
+    ClearCache
+    SetSettingNumberExamples doc, False        ' content cells start at column 1
+
+    ex = ThreeTierExample()
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then
+        Ok "spacefix: an example draws", False
+        Emit "         " & gRenderError
+        CloseNoSave doc
+        Exit Sub
+    End If
+
+    ' Type a space into the gloss cell, as a user would.
+    On Error Resume Next
+    Set rng = tbl.Cell(2, 2).Range
+    rng.End = rng.End - 1
+    rng.Text = "attack CMP=REL"
+    Err.Clear
+    On Error GoTo 0
+    ex = ReadExampleFromTable(tbl)
+    Ok "the typed space is in the cell before the re-wrap", (InStr(ex.Cells(1, 1), " ") > 0)
+
+    Set tbl = RewrapTable(tbl)
+    If tbl Is Nothing Then
+        Ok "spacefix: the example re-wraps", False
+        Emit "         " & gRenderError
+        CloseNoSave doc
+        Exit Sub
+    End If
+    ex = ReadExampleFromTable(tbl)
+    Eq "re-wrap replaces the space with the document's full stop", ex.Cells(1, 1), "attack.CMP=REL"
+    Ok "the vernacular cell above it is untouched", (ex.Cells(0, 1) = "deda=di")
+    Ok "the translation keeps its spaces", (InStr(ex.FreeLines(0), " ") > 0)
+
+    ' With the other replacement character.
+    SetSettingSpaceReplacement doc, "_"
+    On Error Resume Next
+    Set rng = tbl.Cell(1, 3).Range
+    rng.End = rng.End - 1
+    rng.Text = "bu jo"
+    Err.Clear
+    On Error GoTo 0
+    Set tbl = RewrapTable(tbl)
+    If Not tbl Is Nothing Then
+        ex = ReadExampleFromTable(tbl)
+        Eq "re-wrap uses an underscore when the document says so", ex.Cells(0, 2), "bu_jo"
+    Else
+        Ok "spacefix: the second re-wrap", False
+        Emit "         " & gRenderError
+    End If
+    SetSettingSpaceReplacement doc, "."
+
     CloseNoSave doc
 End Sub
 
