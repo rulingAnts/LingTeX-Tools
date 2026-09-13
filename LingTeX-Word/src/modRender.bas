@@ -347,8 +347,18 @@ Private Sub NumberFirstCell(tbl As Table, doc As Document, ByVal level As Long, 
         ByVal numText As String)
     Dim rng As Range
     Dim para As Paragraph
+    Dim rowAfter As Double
 
     On Error Resume Next
+    ' What FillTable gave this row -- the tier gap, or the line gap when the
+    ' first row is also the last tier of its wrap line -- read from a content
+    ' cell before the number paragraph is restyled, and put back on it after,
+    ' so every paragraph of the row agrees. (Word draws the row as tall as its
+    ' tallest cell either way; this is about the row reading as one thing.
+    ' Found by the spacing doc-test, Mac, 2026-09-14.)
+    rowAfter = tbl.Cell(1, 2).Range.ParagraphFormat.SpaceAfter
+    If Err.Number <> 0 Or rowAfter < 0 Or rowAfter = wdUndefined Then rowAfter = 0
+    Err.Clear
     Set rng = tbl.Cell(1, 1).Range
     rng.End = rng.End - 1
     rng.ListFormat.RemoveNumbers
@@ -365,7 +375,7 @@ Private Sub NumberFirstCell(tbl As Table, doc As Document, ByVal level As Long, 
         .LeftIndent = 0
         .FirstLineIndent = 0
         .SpaceBefore = 0
-        .SpaceAfter = 0
+        .SpaceAfter = rowAfter
     End With
     If numText <> "" Then rng.Text = numText
     Err.Clear
