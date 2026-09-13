@@ -645,15 +645,20 @@ End Function
 ' Word -- but the failure is now recorded, and modDocTests asserts all four are
 ' zero on a drawn table rather than shrugging at a non-zero one.
 '-----------------------------------------------------------------------------
-Public Sub ZeroTablePadding(tbl As Table)
+' The padding is a document setting now (the Cell Padding group of the
+' LingTeX Styles tab), zero unless set; the renderer widens each column by the
+' left and right padding it asks for, so the text still has the width it was
+' measured at. Word's default, left in place, would NOT be accounted for.
+Public Sub SetTablePadding(tbl As Table, ByVal padLeft As Double, _
+        ByVal padRight As Double, ByVal padTop As Double, ByVal padBottom As Double)
     On Error Resume Next
-    tbl.LeftPadding = 0
-    tbl.RightPadding = 0
-    tbl.TopPadding = 0
-    tbl.BottomPadding = 0
+    tbl.LeftPadding = padLeft
+    tbl.RightPadding = padRight
+    tbl.TopPadding = padTop
+    tbl.BottomPadding = padBottom
     tbl.Spacing = 0
     If Err.Number <> 0 Then
-        MeasureFail "could not zero the table cell padding; cells will be about " & _
+        MeasureFail "could not set the table cell padding; cells will be about " & _
                     "10.8pt too narrow and text will wrap inside them"
         Err.Clear
     End If

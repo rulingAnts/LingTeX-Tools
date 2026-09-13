@@ -159,6 +159,9 @@ Free Eng (When) she picked her yams early.
 | After any command, `Application.ScreenUpdating` is back on (the screen is not frozen) | ☐ | ☐ |
 | No hidden scratch document is left open — check the Window menu | ☐ | ☐ |
 | Run `LingTeXToggleRewrapOnSelectionChange`, then click in and out of an example → it re-wraps, does not recurse, and typing stays responsive | ☐ | ☐ |
+| **LingTeX Styles tab:** type `12` into *Tier gap*, Return → the tiers of every example move apart at once; clear the box → they close up. `abc` → a clear message, the box reverts | ☐ | ☐ |
+| **LingTeX Styles tab:** *Before* 12, *After* 12, *Right* 72 → air above and below each example, wrap lines and translation stop an inch short of the margin; one Undo takes back one change | ☐ | ☐ |
+| **LingTeX Styles tab:** Style → *Gloss*, Size `9`, Return → glosses shrink and the columns re-wrap; empty the box → they follow Normal again. *Modify in Word* opens Word's Style dialog on `LingTeX Gloss`; *Reset This Style* asks first | ☐ | ☐ |
 
 ---
 

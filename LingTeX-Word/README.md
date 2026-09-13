@@ -155,7 +155,8 @@ examples are tables to Word but not to the user.
 
 By Word / By Morpheme, Re-wrap on Save, Re-wrap on Leave, Numbers and First
 Capital are toggle buttons: they show the active document's setting and flip it
-silently. The same settings are also commands in the macro list, which report
+silently. The edit boxes of the LingTeX Styles tab work the same way: they show
+the active document's value, and a change is stored and drawn at once. The same settings are also commands in the macro list, which report
 what they did. If the toggles stop following changes, the VBA project was reset
 and Word must be restarted for the ribbon to reconnect.
 
@@ -196,8 +197,9 @@ Any multilevel scheme Word can express works the same way.
 ### Settings
 
 Stored as **document variables**, so they travel inside the `.docx` and a
-colleague re-wrapping the file gets the same layout. Set them from the Immediate
-window:
+colleague re-wrapping the file gets the same layout. The toggles are on the
+LingTeX tab; every spacing, and the styles, are on the **LingTeX Styles** tab
+(below). The typed setters still work from the Immediate window:
 
 ```vba
 SetSettingGap ActiveDocument, 8              ' points between columns (default 6)
@@ -208,7 +210,52 @@ SetSettingGranularity ActiveDocument, igtMorphemeAligned   ' default igtWordAlig
 SetSettingLowercaseGramGloss ActiveDocument, False   ' keep capitals as typed
 SetSettingRewrapOnSave ActiveDocument, False
 SetSettingRewrapOnSelectionChange ActiveDocument, False  ' on by default
+SetSpacingText ActiveDocument, "TierGap", "2"     ' any key of the Styles tab; "" unsets
 ```
+
+### The LingTeX Styles tab: spacing at every level, and the styles
+
+A second ribbon tab (the **Spacing and Styles** button in Setup opens it) with
+one edit box per spacing, in points, grouped by level. **An empty box is a
+state**: the spacing is not set, and the default, or the style, applies. Type
+a number and every example in the document is re-wrapped at once, so the
+page shows the change; clear the box to go back.
+
+| Group | Box | What it sets | Empty means |
+|---|---|---|---|
+| Example | Before | Space above the example, on its first row | none |
+| | After | Space after the translation, or after the last row when there is none | the translation style's own 3 pt |
+| | Left | Left indent of every *new* example | the indent of the paragraph it is inserted into |
+| | Right | Right indent: the wrap lines and translation stop this far short of the margin | none |
+| Lines and Tiers | Line gap | Space between the wrap lines of an example | 6 |
+| | Continuation | Extra indent of every wrap line after the first | 0 |
+| | Tier gap | Space between the tiers of one wrap line | 0 |
+| Columns | Column gap | Space to the right of every column's widest cell | 6 |
+| | Number | Width of the number column | 36 |
+| Cell Padding | Left, Right | Padding inside every cell; the columns are widened to match | 0 |
+| | Top, Bottom | Padding inside every cell of every row | 0 |
+| Translation | Above | Space between the last row and the first translation | none |
+| | Between | Space between two translations | the style's own 3 pt |
+
+The **Style** group edits the add-in's own styles in place, one at a time:
+pick one in the drop-down (Vernacular, Morphemes, Gloss, Word Gloss, Category,
+Free Translation, Grammatical Gloss, Example Number), and its Font and Size
+boxes and Bold / Italic / Small Caps toggles show what it sets. An empty Font
+or Size box means the style **follows the Normal style**, so changing the body
+font changes the examples too; type a value to pin one. Nothing is stored
+beside the style: Format → Style shows the same values, and **Modify in Word**
+opens that dialog on the selected style for what the ribbon does not show
+(colour, borders, the paragraph format). **Reset This Style** puts one style
+back to what a fresh document gets; **Reset Styles** on the LingTeX tab does
+the six tier styles together.
+
+Where a spacing lives follows from what it depends on. Everything that depends
+on the layout, and so has to be written per row or per paragraph when the
+example is drawn (which row is first, which is the last of a wrap line, where
+the translation starts), is a document setting written by the renderer. The
+appearance of the text is style-borne, because that is what a Word style is
+for, and because it keeps the escape hatch: a document restyled by hand and
+one set from the ribbon are the same document.
 
 ### Spelling
 
@@ -545,15 +592,11 @@ Phase 2 data sheet, where a linguist types the example by hand and the only
 rule is what she typed. FieldWorks data working correctly comes first, and it
 is most of the way there; this is the question to reopen once it is done.
 
-**Later — every space a user might want to set.** Today three are document
-settings (column gap, wrap-line gap, continuation indent) and the rest are
-paragraph spacing on styles the user already owns: space before an example is
-`Space Before` on the first tier's style, between tiers `Space After` on each
-tier's style, between the last row and the translation `Space Before` on
-`LingTeX Free`, after an example `Space After` on it. The finishing step is one
-interface over all of them — the Phase 2 settings dialog — with the style-borne
-ones written back to the styles rather than to document variables, so a
-document restyled by hand and one set from the dialog stay the same document.
+**Done — every space a user might want to set** is on the LingTeX Styles tab
+(*Using it*, above), with the style-borne properties written to the styles
+themselves. Still to prove: that ribbon edit boxes and drop-downs call back on
+Mac Word, as the toggle buttons were before them, and how the tab lays out on
+a narrow window (Word collapses groups it cannot fit).
 
 **Later — several examples in one paste.** A FLEx text copied whole arrives as
 several interlinear blocks and the parser already returns all of them

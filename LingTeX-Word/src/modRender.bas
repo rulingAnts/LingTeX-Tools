@@ -73,6 +73,12 @@ Public Function RenderExample(ex As IgtExample, target As Range) As Table
     ' wide as the NumberHang setting. It sits where the paragraph it replaces
     ' sat, so an example inserted in an indented paragraph is indented too.
     indent = ParagraphIndentAt(target)
+    ' ...unless the document says where every new example starts (the Left
+    ' box of the Example group). Zero is a real answer here: flush left even
+    ' inside an indented paragraph.
+    If SettingOptional(doc, "ExampleLeft") >= 0 Then
+        indent = SettingOptional(doc, "ExampleLeft")
+    End If
     level = SettingNumberLevel(doc)
     numW = 0
     If SettingNumberExamples(doc) Then
@@ -123,6 +129,7 @@ Private Function PlanExample(ex As IgtExample, target As Range, doc As Document,
     Dim cellWidths() As Double
     Dim flags() As Boolean
     Dim avail As Double, gap As Double, contIndent As Double
+    Dim rightIndent As Double
 
     why = ""
     If ex.TierCount = 0 Or ex.ColCount = 0 Then
@@ -152,6 +159,14 @@ Private Function PlanExample(ex As IgtExample, target As Range, doc As Document,
     ' as well -- on a re-wrap the anchor is the translation, whose indent is
     ' hang, which used to come off twice.
     avail = AvailableTextWidth(target, True)
+    ' The example's right indent (the Right box of the Example group) comes
+    ' off the budget: the wrap lines stop that far short of the right margin,
+    ' and WriteFreeLines indents the translation to match.
+    rightIndent = SettingOptional(doc, "ExampleRight")
+    If rightIndent > 0 Then
+        avail = avail - rightIndent
+        If avail < 36 Then avail = 36          ' never an unusable budget
+    End If
 
     MeasureExample ex, doc, cellWidths
     If gMeasureFailed Then
@@ -162,7 +177,12 @@ Private Function PlanExample(ex As IgtExample, target As Range, doc As Document,
         Exit Function
     End If
 
-    colW = ColumnWidths(ex, cellWidths, gap)
+    ' A column is its widest cell plus the gap -- plus the cell padding, when
+    ' the document sets any: Word's cell width includes the padding, so a cell
+    ' padded on the left and right needs that much more to show the text at
+    ' the width it was measured at.
+    colW = ColumnWidths(ex, cellWidths, gap + SettingCellPadding(doc, "Left") _
+                                             + SettingCellPadding(doc, "Right"))
     ' hang is the example's indent plus its number column: where the content of
     ' every wrap line starts.
     flags = NoBreakFlags(ex)
@@ -260,6 +280,9 @@ Private Function DrawExample(ex As IgtExample, target As Range, doc As Document,
     gRenderError = ""
     FillTable tbl, ex, interTiers, nInter, lineStarts, colW, doc, indent, numW
     If nNum = 1 Then NumberFirstCell tbl, doc, level, numText
+    ' After the number cell, whose paragraph is re-formatted by NumberFirstCell:
+    ' the number must sit as far down as the vernacular beside it.
+    ApplyExampleSpacing tbl, doc, (ex.FreeCount > 0)
 
     '-- free translations, after the table ----------------------------------
     ' Written BEFORE the row keeps, so SetRowKeeps can see the first translation
@@ -279,6 +302,36 @@ Private Function DrawExample(ex As IgtExample, target As Range, doc As Document,
 
     Set DrawExample = tbl
 End Function
+
+'-----------------------------------------------------------------------------
+' The Translation group of the LingTeX Styles tab, and the Example group's
+' After and Right: air above the first translation, between translations,
+' after the last one (which is the end of the example), and the example's
+' right indent, kept on the translation so it stops where the wrap lines do.
+' Each is an OPTIONAL setting: unset, the LingTeX Free style decides, as it
+' always has (three points after each translation, none before).
+'-----------------------------------------------------------------------------
+Private Sub ApplyTranslationSpacing(after As Range, doc As Document)
+    Dim v As Double
+    Dim n As Long, i As Long
+    On Error Resume Next
+    n = after.Paragraphs.Count
+    If n = 0 Then Exit Sub
+    v = SettingOptional(doc, "FreeAbove")
+    If v >= 0 Then after.Paragraphs(1).SpaceBefore = v
+    v = SettingOptional(doc, "FreeBetween")
+    If v >= 0 Then
+        For i = 1 To n - 1
+            after.Paragraphs(i).SpaceAfter = v
+        Next i
+    End If
+    v = SettingOptional(doc, "ExampleAfter")
+    If v >= 0 Then after.Paragraphs(n).SpaceAfter = v
+    v = SettingOptional(doc, "ExampleRight")
+    If v >= 0 Then after.ParagraphFormat.RightIndent = v
+    Err.Clear
+    On Error GoTo 0
+End Sub
 
 '-----------------------------------------------------------------------------
 ' Number the example: the first row's first cell gets the LingTeX Example
@@ -616,7 +669,31 @@ Private Sub StyleTable(tbl As Table, doc As Document)
     tbl.Rows.Alignment = wdAlignRowLeft
     On Error GoTo 0
 
-    ZeroTablePadding tbl
+    SetTablePadding tbl, SettingCellPadding(doc, "Left"), _
+                    SettingCellPadding(doc, "Right"), _
+                    SettingCellPadding(doc, "Top"), _
+                    SettingCellPadding(doc, "Bottom")
+End Sub
+
+'-----------------------------------------------------------------------------
+' The air around the example as a block, from the Example group of the LingTeX
+' Styles tab: space before goes on every paragraph of the first row (every
+' cell, so the row is one height and the number sits level with the vernacular);
+' space after, when there is no translation to carry it, on the last row. Both
+' are OPTIONAL settings -- unset, nothing here is touched, and the styles'
+' own spacing shows through, which is what every earlier document has.
+'-----------------------------------------------------------------------------
+Private Sub ApplyExampleSpacing(tbl As Table, doc As Document, ByVal hasFree As Boolean)
+    Dim v As Double
+    On Error Resume Next
+    v = SettingOptional(doc, "ExampleBefore")
+    If v >= 0 Then tbl.Rows(1).Range.ParagraphFormat.SpaceBefore = v
+    If Not hasFree Then
+        v = SettingOptional(doc, "ExampleAfter")
+        If v >= 0 Then tbl.Rows(tbl.Rows.Count).Range.ParagraphFormat.SpaceAfter = v
+    End If
+    Err.Clear
+    On Error GoTo 0
 End Sub
 
 '-----------------------------------------------------------------------------
@@ -636,7 +713,7 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
     Dim surplus As Long, k As Long
     Dim role As String
     Dim cellRng As Range
-    Dim lineGap As Double
+    Dim lineGap As Double, tierGap As Double
     Dim contIndent As Double
     Dim nNum As Long
     Dim numCellW As Double
@@ -644,6 +721,7 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
     nLines = UBound(lineStarts) - LBound(lineStarts) + 1
     maxCols = MaxColumnsPerLine(lineStarts, ex.ColCount)
     lineGap = SettingLineGap(doc)
+    tierGap = SettingTierGap(doc)
     contIndent = SettingContIndent(doc)
     If numW > 0 Then nNum = 1
 
@@ -742,12 +820,18 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
             On Error GoTo 0
 
             ' Air between wrap lines goes on the last tier row of each group,
-            ' except the final group, which is followed by the free translation.
+            ' except the final group, which is followed by the free translation
+            ' (or by ApplyExampleSpacing). Air between the tiers of one wrap
+            ' line -- the tier gap, zero unless set -- goes on every other row.
             On Error Resume Next
-            If i = nInter - 1 And g < nLines - 1 Then
-                tbl.Rows(r).Range.ParagraphFormat.SpaceAfter = lineGap
+            If i = nInter - 1 Then
+                If g < nLines - 1 Then
+                    tbl.Rows(r).Range.ParagraphFormat.SpaceAfter = lineGap
+                Else
+                    tbl.Rows(r).Range.ParagraphFormat.SpaceAfter = 0
+                End If
             Else
-                tbl.Rows(r).Range.ParagraphFormat.SpaceAfter = 0
+                tbl.Rows(r).Range.ParagraphFormat.SpaceAfter = tierGap
             End If
             On Error GoTo 0
         Next i
@@ -1006,6 +1090,7 @@ Private Sub WriteFreeLines(ex As IgtExample, tbl As Table, doc As Document, _
         Err.Clear
         On Error GoTo 0
     End If
+    ApplyTranslationSpacing after, doc
 
     ' Several translations hold together; the last one releases, so the example
     ' does not drag the following body text onto its page.

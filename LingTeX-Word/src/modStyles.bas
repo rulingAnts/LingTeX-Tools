@@ -87,6 +87,19 @@ Private Const STYLES_VERSION As String = "1-num3-noproof"
 '   your template.
 Public Const FALLBACK_FONT As String = "Charis SIL"
 
+'-- The STYLE SLOTS: every style the add-in owns, in the order the LingTeX
+'   Styles tab lists them. The ribbon's Style drop-down is a fixed list in
+'   src/customUI14.xml, and its items are in THIS order -- change one, change
+'   the other. Slots 0 to 5 are the tier paragraph styles, 6 the grammatical-
+'   gloss character style, 7 the number-cell paragraph style.
+Public Const STYLE_SLOT_COUNT As Long = 8
+Private Const SLOT_LABELS As String = _
+    "Vernacular|Morphemes|Gloss|Word Gloss|Category|Free Translation|" & _
+    "Grammatical Gloss|Example Number"
+' The space after the translation paragraph, as created: a little air under
+' the example. The one paragraph-format default that is not zero.
+Private Const FREE_SPACE_AFTER As Double = 3
+
 ' Paragraph style name for a tier role.
 Public Function ParaStyleName(ByVal role As String) As String
     ParaStyleName = STYLE_PREFIX & role
@@ -151,8 +164,8 @@ Public Sub EnsureStyles(doc As Document, Optional ByVal force As Boolean = False
     EnsureParaStyle doc, ROLE_GLOSS, bodyFont, bodySize, False, 0
     EnsureParaStyle doc, ROLE_WORDGLOSS, bodyFont, bodySize, False, 0
     EnsureParaStyle doc, ROLE_CATEGORY, bodyFont, bodySize, False, 0
-    ' The free translation sits under the table and gets a little air above it.
-    EnsureParaStyle doc, ROLE_FREE, bodyFont, bodySize, False, 3
+    ' The free translation sits under the table and gets a little air under it.
+    EnsureParaStyle doc, ROLE_FREE, bodyFont, bodySize, False, FREE_SPACE_AFTER
 
     EnsureGramStyle doc, bodyFont
     EnsureTableStyle doc
@@ -237,6 +250,16 @@ Private Sub EnsureParaStyle(doc As Document, ByVal role As String, _
     On Error GoTo 0
     If st Is Nothing Then Exit Sub
 
+    ApplyTierStyleDefaults doc, st, role, fontName, fontSize, italic, spaceAfter
+End Sub
+
+' What a tier paragraph style looks like as created. Shared by creation and by
+' Reset This Style on the ribbon, so a reset gives back exactly what a fresh
+' document gets.
+Private Sub ApplyTierStyleDefaults(doc As Document, st As Style, ByVal role As String, _
+        ByVal fontName As String, ByVal fontSize As Double, _
+        ByVal italic As Boolean, ByVal spaceAfter As Double)
+
     On Error Resume Next
     With st
         ' Based on Normal, with the SIZE inherited, so a document whose body
@@ -248,7 +271,10 @@ Private Sub EnsureParaStyle(doc As Document, ByVal role As String, _
         ' can apply, and a theme placeholder ("+Body") is not.
         .BaseStyle = doc.Styles(wdStyleNormal)
         .Font.Name = fontName
+        .Font.Size = fontSize
+        .Font.Bold = False
         .Font.Italic = italic
+        .Font.SmallCaps = False
         ' Tight, unjustified, unhyphenated: a cell holds one alignment slot and
         ' must not be re-laid-out by Word behind the planner's back.
         With .ParagraphFormat
@@ -560,4 +586,261 @@ Public Sub ApplyParaStyle(rng As Range, doc As Document, ByVal role As String)
     rng.Style = doc.Styles(ParaStyleName(role))
     Err.Clear
     On Error GoTo 0
+End Sub
+
+
+'=============================================================================
+' -- THE STYLE SLOTS: WHAT THE RIBBON'S STYLE GROUP EDITS -------------------
+'=============================================================================
+' The LingTeX Styles tab picks one of the add-in's styles in a drop-down and
+' shows its font and size in two edit boxes, with Bold / Italic / Small Caps
+' toggles beside them. The boxes hold TEXT, and an empty box is the state Seth
+' asked for by name: "leave it undefined" -- the property is whatever the base
+' style (Normal) says, so a document whose body font changes takes the
+' examples with it. A value equal to the base's IS the inherited state as far
+' as Word is concerned (it stores no difference), so that is what empty means
+' on both the reading and the writing side.
+'
+' Nothing here bypasses the styles: every write goes to the Word style itself,
+' so a user who prefers Format > Style sees the same values there, and a
+' document restyled by hand and one set from the ribbon are the same document.
+
+' The Word style name of a slot; "" for an index out of range.
+Public Function StyleSlotName(ByVal i As Long) As String
+    Select Case i
+        Case 0: StyleSlotName = ParaStyleName(ROLE_VERNACULAR)
+        Case 1: StyleSlotName = ParaStyleName(ROLE_MORPHEMES)
+        Case 2: StyleSlotName = ParaStyleName(ROLE_GLOSS)
+        Case 3: StyleSlotName = ParaStyleName(ROLE_WORDGLOSS)
+        Case 4: StyleSlotName = ParaStyleName(ROLE_CATEGORY)
+        Case 5: StyleSlotName = ParaStyleName(ROLE_FREE)
+        Case 6: StyleSlotName = STYLE_GRAM
+        Case 7: StyleSlotName = STYLE_EXAMPLE
+    End Select
+End Function
+
+' What the drop-down calls the slot.
+Public Function StyleSlotLabel(ByVal i As Long) As String
+    Dim parts() As String
+    parts = Split(SLOT_LABELS, "|")
+    If i < 0 Then Exit Function
+    If i > UBound(parts) Then Exit Function
+    StyleSlotLabel = parts(i)
+End Function
+
+' The tier role of a paragraph slot, "" for the two that are not tiers.
+Private Function StyleSlotRole(ByVal i As Long) As String
+    If i >= 0 And i <= 5 Then StyleSlotRole = RoleFromParaStyle(StyleSlotName(i))
+End Function
+
+' The style object of a slot. With create:=True the LingTeX styles are made
+' first if the document has none yet, so the ribbon can edit a style before
+' any example is drawn -- the WRITERS pass that. The readers do not: the
+' ribbon asks every getText and getPressed on every refresh, in whatever
+' document is active, and a document must not acquire ten styles (and a
+' dirty flag) because its owner looked at the ribbon. Nothing when the slot
+' is out of range or the style is absent or could not be made.
+Public Function StyleSlotObject(doc As Document, ByVal i As Long, _
+        Optional ByVal create As Boolean = False) As Style
+    Dim nm As String
+    If doc Is Nothing Then Exit Function
+    nm = StyleSlotName(i)
+    If nm = "" Then Exit Function
+    If create Then EnsureStyles doc
+    On Error Resume Next
+    Set StyleSlotObject = doc.Styles(nm)
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+' The font name every slot inherits when it sets none: the body font, as a
+' name the measurer can use (never a theme placeholder).
+Private Function SlotBaseFontName(doc As Document) As String
+    SlotBaseFontName = BodyFontName(doc)
+End Function
+
+' A style's own font name, resolved past a theme placeholder the same way the
+' base is, so the comparison is between two real names.
+Private Function SlotFontName(doc As Document, st As Style) As String
+    Dim fn As String
+    On Error Resume Next
+    fn = st.Font.Name
+    Err.Clear
+    On Error GoTo 0
+    If fn = "" Or Left$(fn, 1) = "+" Then fn = SlotBaseFontName(doc)
+    SlotFontName = fn
+End Function
+
+' The slot's font name for its edit box: "" when it is the base's.
+Public Function StyleFontText(doc As Document, ByVal i As Long) As String
+    Dim st As Style
+    Dim fn As String
+    Set st = StyleSlotObject(doc, i)
+    If st Is Nothing Then Exit Function
+    fn = SlotFontName(doc, st)
+    If StrComp(fn, SlotBaseFontName(doc), vbTextCompare) = 0 Then Exit Function
+    StyleFontText = fn
+End Function
+
+' The slot's font size for its edit box: "" when it is the base's.
+Public Function StyleSizeText(doc As Document, ByVal i As Long) As String
+    Dim st As Style
+    Dim sz As Double
+    Set st = StyleSlotObject(doc, i)
+    If st Is Nothing Then Exit Function
+    On Error Resume Next
+    sz = st.Font.Size
+    Err.Clear
+    On Error GoTo 0
+    If sz <= 0 Then Exit Function
+    If sz = BodyFontSize(doc) Then Exit Function
+    StyleSizeText = CStr(sz)
+End Function
+
+' Bold, Italic or SmallCaps as the style resolves it. Booleans have no empty
+' state a toggle could show, so these are the EFFECTIVE values; Reset This
+' Style puts the flags back to what a fresh document gets.
+Public Function StyleFlag(doc As Document, ByVal i As Long, ByVal which As String) As Boolean
+    Dim st As Style
+    Dim v As Long
+    Set st = StyleSlotObject(doc, i)
+    If st Is Nothing Then Exit Function
+    On Error Resume Next
+    Select Case which
+        Case "Bold":      v = st.Font.Bold
+        Case "Italic":    v = st.Font.Italic
+        Case "SmallCaps": v = st.Font.SmallCaps
+    End Select
+    Err.Clear
+    On Error GoTo 0
+    StyleFlag = (v <> False)
+End Function
+
+' Set a slot's font name from its edit box. Empty means the base's -- which
+' Word stores as no difference, so from then on it follows Normal. Any other
+' text is taken as a font name; Word substitutes when it has no such font, and
+' the measurer measures what Word draws, so a misspelling is visible rather
+' than fatal. Returns False only when the style could not be reached.
+Public Function SetStyleFontText(doc As Document, ByVal i As Long, _
+        ByVal text As String) As Boolean
+    Dim st As Style
+    Dim fn As String
+    Set st = StyleSlotObject(doc, i, True)
+    If st Is Nothing Then Exit Function
+    fn = Trim$(text)
+    If fn = "" Then fn = SlotBaseFontName(doc)
+    On Error Resume Next
+    st.Font.Name = fn
+    SetStyleFontText = (Err.Number = 0)
+    Err.Clear
+    On Error GoTo 0
+    ClearCache
+End Function
+
+' Set a slot's font size from its edit box: empty means the base's; otherwise
+' a number of points, with either decimal separator. False for anything else,
+' and for a size Word would refuse.
+Public Function SetStyleSizeText(doc As Document, ByVal i As Long, _
+        ByVal text As String) As Boolean
+    Dim st As Style
+    Dim t As String
+    Dim sz As Double
+    Set st = StyleSlotObject(doc, i, True)
+    If st Is Nothing Then Exit Function
+    t = Trim$(text)
+    If LCase$(Right$(t, 2)) = "pt" Then t = Trim$(Left$(t, Len(t) - 2))
+    If t = "" Then
+        sz = BodyFontSize(doc)
+    Else
+        t = Replace(t, ",", ".")
+        If Not IsPlainNumber(t) Then Exit Function
+        sz = Val(t)
+        If sz < 1 Or sz > 1638 Then Exit Function
+    End If
+    On Error Resume Next
+    st.Font.Size = sz
+    SetStyleSizeText = (Err.Number = 0)
+    Err.Clear
+    On Error GoTo 0
+    ClearCache
+End Function
+
+' Digits with at most one decimal point and nothing else.
+Private Function IsPlainNumber(ByVal t As String) As Boolean
+    Dim i As Long, ch As String, points As Long
+    If t = "" Or t = "." Then Exit Function
+    For i = 1 To Len(t)
+        ch = Mid$(t, i, 1)
+        If ch = "." Then
+            points = points + 1
+        ElseIf ch < "0" Or ch > "9" Then
+            Exit Function
+        End If
+    Next i
+    IsPlainNumber = (points <= 1)
+End Function
+
+' Switch Bold, Italic or SmallCaps on or off for a slot.
+Public Sub SetStyleFlag(doc As Document, ByVal i As Long, ByVal which As String, _
+        ByVal v As Boolean)
+    Dim st As Style
+    Set st = StyleSlotObject(doc, i, True)
+    If st Is Nothing Then Exit Sub
+    On Error Resume Next
+    Select Case which
+        Case "Bold":      st.Font.Bold = v
+        Case "Italic":    st.Font.Italic = v
+        Case "SmallCaps": st.Font.SmallCaps = v
+    End Select
+    Err.Clear
+    On Error GoTo 0
+    ClearCache
+End Sub
+
+'-----------------------------------------------------------------------------
+' Put one slot back to what a fresh document gets: based on Normal, the body
+' font and size (so it follows Normal from here on), italic for the two
+' object-language tiers, small capitals for the grammatical-gloss style, and
+' the tier paragraph format (tight, left-aligned, no indents). It IS a
+' clobber of anything set on that style by hand, and the command says so.
+'-----------------------------------------------------------------------------
+Public Sub ResetStyleSlot(doc As Document, ByVal i As Long)
+    Dim st As Style
+    Dim role As String
+    Dim bodyFont As String, bodySize As Double
+    Set st = StyleSlotObject(doc, i, True)
+    If st Is Nothing Then Exit Sub
+    bodyFont = BodyFontName(doc)
+    bodySize = BodyFontSize(doc)
+    role = StyleSlotRole(i)
+    Select Case i
+        Case 0, 1
+            ApplyTierStyleDefaults doc, st, role, bodyFont, bodySize, True, 0
+        Case 2, 3, 4
+            ApplyTierStyleDefaults doc, st, role, bodyFont, bodySize, False, 0
+        Case 5
+            ApplyTierStyleDefaults doc, st, role, bodyFont, bodySize, False, FREE_SPACE_AFTER
+        Case 6
+            ' A character style inherits from the paragraph it sits in; the body
+            ' font and size are that, for every paragraph the add-in writes.
+            On Error Resume Next
+            st.Font.Name = bodyFont
+            st.Font.Size = bodySize
+            st.Font.Bold = False
+            st.Font.Italic = False
+            st.Font.SmallCaps = True
+            Err.Clear
+            On Error GoTo 0
+        Case 7
+            On Error Resume Next
+            st.BaseStyle = doc.Styles(wdStyleNormal)
+            st.Font.Name = bodyFont
+            st.Font.Size = bodySize
+            st.Font.Bold = False
+            st.Font.Italic = False
+            st.Font.SmallCaps = False
+            Err.Clear
+            On Error GoTo 0
+    End Select
+    ClearCache
 End Sub
