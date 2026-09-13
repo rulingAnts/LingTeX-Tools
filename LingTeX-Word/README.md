@@ -242,7 +242,7 @@ anything is stored.
 | | Tier gap | Space between the tiers of one wrap line | 0 |
 | Columns | Column gap | Space to the right of every column's widest cell | 6 |
 | | Number column | Width of the number column | 36 |
-| Cell padding | Left, Right | Padding inside every cell; the columns are widened to match, and the table's edge moves left by the left padding so the text stays at the example's indent, level with the translation | 0 |
+| Cell padding | Left, Right | Padding inside every cell; the columns are widened to match, and the table's edge moves left by the left padding so the text stays at the example's indent | 0 |
 | | Top, Bottom | Padding inside every cell of every row | 0 |
 | Translation | Above | Space between the last row and the first translation | 6, half a line |
 | | Between | Space between two translations | 0 |
@@ -264,6 +264,13 @@ paragraph when the example is drawn, because each depends on the layout
 starts). The appearance of the text — font, size, colour — is style-borne,
 because that is what a Word style is for; the paragraph spacing on the
 LingTeX styles is not what shows, the settings are.
+
+**Alignment is measured, not assumed.** After every draw, the add-in asks Word
+where each row's first content cell actually starts on the page and nudges any
+row that is off, allowing for the continuation indent on later wrap lines, and
+lines the translation up with the first row's content the same way. So whatever
+a given Word makes of a table indent, and whatever cell padding does to it, the
+wrap lines start together and the translation starts under them.
 
 The dialog is a UserForm with **no controls at design time**: every control is
 built in code when it opens, so its only source is `src/frmLingTeXSettings.frm`,
