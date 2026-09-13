@@ -384,10 +384,15 @@ loaded). Two stale copies from the by-hand phase sit in Word's Templates
 folder and in `~/Documents/Custom Office Templates`; they compile, prove
 nothing, and are worth moving aside.
 
-The dev template's `modImport` must be **re-pasted once** for this: it is
-what creates the form component, and the copy in `LingTeX-Dev.dotm` predates
-`FORM_LIST`. Until then the import brings in fourteen, `TestDialog` cannot
-compile, and the whole engine fails to load.
+The dev template's `modImport` must be **re-pasted whenever
+`tools/ImportModules.bas` changes** (last: 2026-09-14, the form is reused
+rather than removed and re-added). It is what creates the form component;
+with an older copy the import brings in fourteen, and every module that
+names the form — modLingTeX, modDocTests — fails to compile whole, which
+shows as "Compile error in hidden module" on Settings, on every ribbon
+toggle, and at the start of RunDocTests. The import log
+(`LingTeX-Word-reports/ImportModules.txt`) says "14 of 15" and names the
+reason when that has happened.
 
 ## If the engine will not compile at Word start
 

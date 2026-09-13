@@ -128,7 +128,9 @@ Private Const FORM_LIST As String = "frmLingTeXSettings.frm"
 '
 ' The Settings form, src/frmLingTeXSettings.frm, goes the same way as a UserForm
 ' (type 3). It has no .frx to import: its controls are built in code when it
-' opens, so its code is the whole of it, installed like a class's.
+' opens, so its code is the whole of it, installed like a class's. Unlike a
+' class it is REUSED when already present -- only its code is replaced --
+' because the VBE keeps a removed form's name until the file is saved.
 '
 ' Either way the twelve standard modules come in the easy way, and the report at the
 ' end says exactly what is left to do.
@@ -383,6 +385,7 @@ Public Sub ImportLingTeXModules()
     '-- the two class modules and the form: explicitly created, or left to you
     If IMPORT_CLASS_MODULES Then
         ImportGroup vbp, CLASS_LIST, 2, log, okCount, failCount, todo, todoCount
+        RemoveStrayForms vbp
         ImportGroup vbp, FORM_LIST, 3, log, okCount, failCount, todo, todoCount
     Else
         log = log & "  skipped  clsIgtWarning.cls   (paste by hand)" & vbCr
@@ -437,8 +440,17 @@ Private Sub ImportGroup(vbp As Object, ByVal fileList As String, _
             log = log & "  MISSING  " & leaf & vbCr
             failCount = failCount + 1
         Else
-            ' Replace rather than duplicate, so re-running picks up edits.
-            RemoveComponent vbp, compName
+            ' Replace rather than duplicate, so re-running picks up edits --
+            ' except a UserForm that is already a UserForm, which ImportOne
+            ' REUSES, replacing only its code. The VBE keeps a removed form's
+            ' name reserved until the file is saved and reopened, so remove-
+            ' and-add could not name the new form (50132) on the second run,
+            ' 2026-09-14, and every module naming the form failed to compile.
+            If kind = 3 And ComponentKind(vbp, compName) = 3 Then
+                ' kept
+            Else
+                RemoveComponent vbp, compName
+            End If
 
             note = ImportOne(vbp, fullPath, compName, kind)
             If note = "" Then
@@ -754,23 +766,50 @@ Private Function ImportOne(vbp As Object, ByVal fullPath As String, _
     code = StripVbaMetadata(code)
 
     On Error Resume Next
-    ' 2 = vbext_ct_ClassModule, 3 = vbext_ct_MSForm. Not available late-bound.
-    Set comp = vbp.VBComponents.Add(kind)
-    If Err.Number <> 0 Or comp Is Nothing Then
-        ImportOne = "could not add a " & KindName(kind) & " (" & CStr(Err.Number) & ": " & _
-                    Err.Description & ")"
+    ' A UserForm that is already there is reused (see ImportGroup).
+    If kind = 3 Then
+        Set comp = vbp.VBComponents(compName)
         Err.Clear
-        On Error GoTo 0
-        Exit Function
+        If Not comp Is Nothing Then
+            If comp.Type <> 3 Then Set comp = Nothing
+        End If
     End If
 
-    comp.Name = compName
-    If Err.Number <> 0 Then
-        ImportOne = "could not name it " & compName & " (" & CStr(Err.Number) & _
-                    ": " & Err.Description & ")"
-        Err.Clear
-        On Error GoTo 0
-        Exit Function
+    If comp Is Nothing Then
+        ' 2 = vbext_ct_ClassModule, 3 = vbext_ct_MSForm. Not available late-bound.
+        Set comp = vbp.VBComponents.Add(kind)
+        If Err.Number <> 0 Or comp Is Nothing Then
+            ImportOne = "could not add a " & KindName(kind) & " (" & CStr(Err.Number) & ": " & _
+                        Err.Description & ")"
+            Err.Clear
+            On Error GoTo 0
+            Exit Function
+        End If
+
+        comp.Name = compName
+        If Err.Number <> 0 And kind = 3 Then
+            ' The name of a form removed earlier in this session is reserved
+            ' until the file is saved. Take the nameless form out, save, and
+            ' try once more.
+            Err.Clear
+            vbp.VBComponents.Remove comp
+            Err.Clear
+            SaveEngineForRetry
+            Set comp = vbp.VBComponents.Add(kind)
+            If Err.Number = 0 Then
+                If Not comp Is Nothing Then comp.Name = compName
+            End If
+        End If
+        If Err.Number <> 0 Or comp Is Nothing Then
+            ImportOne = "could not name it " & compName & " (" & CStr(Err.Number) & _
+                        ": " & Err.Description & ")"
+            Err.Clear
+            ' Not left behind as UserForm1 with nothing in it.
+            If Not comp Is Nothing Then vbp.VBComponents.Remove comp
+            Err.Clear
+            On Error GoTo 0
+            Exit Function
+        End If
     End If
 
     ' A new class module may already carry Option Explicit, depending on the
@@ -808,6 +847,38 @@ Private Function ImportOne(vbp As Object, ByVal fullPath As String, _
     End If
     On Error GoTo 0
 End Function
+
+' Save the engine document mid-import, so the VBE lets go of the names of
+' components removed since the last save (a removed UserForm's above all).
+' Silent; the import saves again at the end.
+Private Sub SaveEngineForRetry()
+    On Error Resume Next
+    If Not mEngineDoc Is Nothing Then mEngineDoc.Save
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' Remove UserForm1, UserForm2...: what a form that could not be named leaves
+' behind (2026-09-14). Only forms with the default name and next to no code.
+Private Sub RemoveStrayForms(vbp As Object)
+    Dim c As Object
+    Dim strays As Collection
+    Dim i As Long
+    Set strays = New Collection
+    On Error Resume Next
+    For Each c In vbp.VBComponents
+        If c.Type = 3 Then
+            If Left$(c.Name, 8) = "UserForm" Then
+                If c.CodeModule.CountOfLines < 3 Then strays.Add c
+            End If
+        End If
+    Next c
+    For i = 1 To strays.Count
+        vbp.VBComponents.Remove strays(i)
+    Next i
+    Err.Clear
+    On Error GoTo 0
+End Sub
 
 ' Does the project reference a library of this name (e.g. "MSForms")?
 Private Function HasReference(vbp As Object, ByVal nm As String) As Boolean
