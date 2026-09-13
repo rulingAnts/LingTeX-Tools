@@ -804,7 +804,11 @@ def check_no_single(files):
 # "Variable not defined" dialog half-way through a run (wdStyleTableGrid, 2026-09-12).
 # Every name here is a long-standing member of its enumeration, and those the
 # suites reach have compiled on Mac Word 16.112. Add to it deliberately; prefer a
-# style's name to a wdStyle* enum.
+# style's name to a wdStyle* enum, and a number (with the name in a comment) to
+# a name that has not yet compiled on Mac -- wdHorizontalPositionRelativeToPage
+# and wdVerticalPositionRelativeToPage were added here unproven and the first
+# draw that reached them was a compile error (2026-09-14); they are the numbers
+# INFO_X_PAGE and INFO_Y_PAGE in modRender now.
 WD_CONSTANTS = {
     "wdAdjustNone",
     "wdAlignParagraphLeft",
@@ -822,9 +826,7 @@ WD_CONSTANTS = {
     "wdCollapseStart",
     "wdDeleteCellsShiftLeft",
     "wdDoNotSaveChanges",
-    "wdHorizontalPositionRelativeToPage",
     "wdHorizontalPositionRelativeToTextBoundary",
-    "wdVerticalPositionRelativeToPage",
     "wdLineSpaceSingle",
     "wdLineStyleNone",
     "wdListNoNumbering",

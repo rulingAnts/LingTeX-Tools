@@ -963,6 +963,8 @@ Private Sub TestRowGeometry()
     Dim para As Paragraph
     Dim allSame As Boolean
     Dim bad As String
+    Dim c As Long
+    Dim yTop As Double, yc As Double
 
     Set doc = NewBlankDoc()
     If doc Is Nothing Then
@@ -995,8 +997,8 @@ Private Sub TestRowGeometry()
 
     '-- horizontal: every row's text starts where the first row's does ------
     On Error Resume Next
-    xNum = tbl.Cell(1, 1).Range.Information(wdHorizontalPositionRelativeToPage)
-    x0 = tbl.Cell(1, 2).Range.Information(wdHorizontalPositionRelativeToPage)
+    xNum = tbl.Cell(1, 1).Range.Information(INFO_X_PAGE)
+    x0 = tbl.Cell(1, 2).Range.Information(INFO_X_PAGE)
     Err.Clear
     On Error GoTo 0
     Ok "the number sits at the left margin (the table's edge is the padding to its left)", _
@@ -1005,7 +1007,7 @@ Private Sub TestRowGeometry()
     allSame = True
     For r = 2 To tbl.Rows.Count
         On Error Resume Next
-        xr = tbl.Cell(r, 2).Range.Information(wdHorizontalPositionRelativeToPage)
+        xr = tbl.Cell(r, 2).Range.Information(INFO_X_PAGE)
         Err.Clear
         On Error GoTo 0
         If Abs(xr - x0) > 0.75 Then
@@ -1019,20 +1021,42 @@ Private Sub TestRowGeometry()
     Set para = ParagraphAfterTable(tbl)
     If Not para Is Nothing Then
         On Error Resume Next
-        xFree = para.Range.Information(wdHorizontalPositionRelativeToPage)
+        xFree = para.Range.Information(INFO_X_PAGE)
         Err.Clear
         On Error GoTo 0
         Ok "the translation starts where the content does", (Abs(xFree - x0) <= 0.75)
         Emit "         translation at " & CStr(xFree)
     End If
 
+    '-- every cell of the first row starts at the same height ----------------
+    ' (Seth saw the number and the first cell sit lower than the rest of the
+    ' row after an aborted run, 2026-09-14; this asks Word rather than the eye.)
+    On Error Resume Next
+    yTop = tbl.Cell(1, 1).Range.Information(INFO_Y_PAGE)
+    Err.Clear
+    On Error GoTo 0
+    allSame = True
+    bad = ""
+    For c = 2 To tbl.Rows(1).Cells.Count
+        On Error Resume Next
+        yc = tbl.Cell(1, c).Range.Information(INFO_Y_PAGE)
+        Err.Clear
+        On Error GoTo 0
+        If Abs(yc - yTop) > 0.75 Then
+            allSame = False
+            bad = bad & " cell " & CStr(c) & " at " & CStr(yc) & ";"
+        End If
+    Next c
+    Ok "every cell of the first row starts at the same height, number included", allSame
+    Emit "         cell 1 at " & CStr(yTop) & IIf(bad = "", "", "; off:" & bad)
+
     '-- vertical: the numbered first row is as tall as the later vernacular row
     On Error Resume Next
     For r = 1 To 4
-        y(r) = tbl.Cell(r, 2).Range.Information(wdVerticalPositionRelativeToPage)
+        y(r) = tbl.Cell(r, 2).Range.Information(INFO_Y_PAGE)
     Next r
     If Not para Is Nothing Then
-        y(5) = para.Range.Information(wdVerticalPositionRelativeToPage) - para.SpaceBefore
+        y(5) = para.Range.Information(INFO_Y_PAGE) - para.SpaceBefore
     End If
     Err.Clear
     On Error GoTo 0

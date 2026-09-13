@@ -85,6 +85,18 @@ requests.
 
 ## State of play
 
+- **"Compile error in hidden module: modRender" at the first draw** (07:29
+  run): the likeliest cause is the two WdInformation names I put on the
+  linter's allowlist unproven (wdHorizontalPositionRelativeToPage,
+  wdVerticalPositionRelativeToPage) -- a constant missing from Mac Word's
+  type library is exactly that error (wdStyleTableGrid before). They are
+  numbers now (INFO_X_PAGE = 5, INFO_Y_PAGE = 6 in modRender), and
+  ParagraphFormat.NoSpaceBetweenParagraphsOfSameStyle is late-bound. If the
+  error recurs: VBE, LingTeX project, Debug > Compile, and read the
+  highlighted line. The aborted run left the spacing test's document open
+  (with 9pt set above the example, by the test) and half-repainted; the
+  "janked" screenshot was that document, and the `rows` test now checks
+  every cell of the first row starts at the same height.
 - **Alignment is measured** (2026-09-14, Seth's idea): AlignRowsToFirst at
   the end of DrawExample asks Word (Information, page x) where every row's
   first content cell starts and nudges each row's LeftIndent by its error

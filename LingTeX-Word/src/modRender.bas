@@ -4,6 +4,15 @@ Option Explicit
 ' Word's hard limit on table columns. Tables.Add raises rather than clamping, so
 ' the plan is checked against it before anything is drawn.
 Private Const MAX_TABLE_COLUMNS As Long = 63
+' Range.Information types, as numbers. The WdInformation names for these two
+' (wdHorizontalPositionRelativeToPage, wdVerticalPositionRelativeToPage) had
+' never compiled on Mac Word when they were first used, and the first draw
+' after that gave "Compile error in hidden module: modRender" (2026-09-14);
+' a constant missing from Mac Word's type library is exactly that error, and
+' the one this project has met before (wdStyleTableGrid). Numbers cannot be
+' missing. The text-boundary one, 7, has compiled on Mac and keeps its name.
+Public Const INFO_X_PAGE As Long = 5
+Public Const INFO_Y_PAGE As Long = 6
 
 ' Why the last render or re-wrap gave up, for callers that report to the user.
 ' Empty after a successful one.
@@ -377,7 +386,7 @@ End Sub
 Private Function PageX(rng As Range) As Double
     Dim v As Double
     On Error Resume Next
-    v = rng.Information(wdHorizontalPositionRelativeToPage)
+    v = rng.Information(INFO_X_PAGE)
     If Err.Number <> 0 Then v = -1
     Err.Clear
     On Error GoTo 0
@@ -397,10 +406,16 @@ End Function
 Private Sub ApplyTranslationSpacing(after As Range, doc As Document)
     Dim n As Long, i As Long
     Dim between As Double
+    Dim pf As Object
     On Error Resume Next
     n = after.Paragraphs.Count
     If n = 0 Then Exit Sub
-    after.ParagraphFormat.NoSpaceBetweenParagraphsOfSameStyle = False
+    ' Late-bound: the property is proven on Mac on a Style, not yet on a
+    ' ParagraphFormat, and a member missing there would be a compile error
+    ' for the whole module.
+    Set pf = after.ParagraphFormat
+    pf.NoSpaceBetweenParagraphsOfSameStyle = False
+    Err.Clear
     after.ParagraphFormat.SpaceBefore = 0
     after.Paragraphs(1).SpaceBefore = SettingFreeAbove(doc)
     between = SettingFreeBetween(doc)
