@@ -322,7 +322,7 @@ Private Function SpacingTip(ByVal key As String) As String
         Case "NumberHang"
             s = "Width of the number column, the cell that holds (1), (2)... at the start of every row of a numbered example. Empty: 36."
         Case "PadLeft", "PadRight"
-            s = "Cell padding inside every cell; the columns are widened to keep the text at its measured width. Empty: 0."
+            s = "Cell padding inside every cell; the columns are widened to keep the text at its measured width, and the table's edge moves out so the text stays at the example's indent, level with the translation. Empty: 0."
         Case "PadTop", "PadBottom"
             s = "Cell padding inside every cell of every row. Empty: 0."
         Case "FreeAbove"

@@ -465,15 +465,23 @@ Private Function ListLevelOf(para As Paragraph, ByVal dflt As Long) As Long
     On Error GoTo 0
 End Function
 
-' Where an example starts: its first row's left indent. What the indent
-' commands step and a re-wrap keeps.
+' Where an example starts: where its text starts, which is its first row's
+' left indent plus the left cell padding FillTable took off it (the row's
+' edge is that far left of the text). What the indent commands step and a
+' re-wrap keeps; read this way, a re-wrap under a changed padding neither
+' drifts nor doubles it.
 Public Function ExampleIndent(tbl As Table) As Double
-    Dim v As Double
+    Dim v As Double, padL As Double
     On Error Resume Next
     v = tbl.Rows(1).LeftIndent
-    If Err.Number = 0 And v > 0 Then ExampleIndent = v
+    If Err.Number <> 0 Then v = 0
+    Err.Clear
+    padL = tbl.LeftPadding
+    If Err.Number <> 0 Then padL = 0
     Err.Clear
     On Error GoTo 0
+    v = v + padL
+    If v > 0.01 Then ExampleIndent = v
 End Function
 
 ' Remove an example whole: table, translations, and a legacy number line.
@@ -731,7 +739,7 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
     Dim role As String
     Dim cellRng As Range
     Dim lineGap As Double, tierGap As Double
-    Dim contIndent As Double
+    Dim contIndent As Double, padL As Double
     Dim nNum As Long
     Dim numCellW As Double
 
@@ -740,6 +748,7 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
     lineGap = SettingLineGap(doc)
     tierGap = SettingTierGap(doc)
     contIndent = SettingContIndent(doc)
+    padL = SettingCellPadding(doc, "Left")
     If numW > 0 Then nNum = 1
 
     For g = 0 To nLines - 1
@@ -827,11 +836,19 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
             ' Where the row starts: at the example's indent. Without a number
             ' column, later wrap lines go further in by the continuation indent
             ' (with one, the number cell carries it, above).
+            '
+            ' Less the left cell padding. Word measures a row's indent to the
+            ' table's EDGE and sets the text in by the padding, so a padded
+            ' table at the indent would put its text -- and the number -- a
+            ' padding to the right of where the translation starts, which
+            ' reads as a hanging indent (Seth, 2026-09-14). Word's own tables
+            ' do the same: their edge sits in the margin so the text aligns.
+            ' ExampleIndent adds the padding back when it reads this.
             On Error Resume Next
             If g = 0 Or nNum = 1 Then
-                tbl.Rows(r).LeftIndent = indent
+                tbl.Rows(r).LeftIndent = indent - padL
             Else
-                tbl.Rows(r).LeftIndent = indent + contIndent
+                tbl.Rows(r).LeftIndent = indent + contIndent - padL
             End If
             Err.Clear
             On Error GoTo 0

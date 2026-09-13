@@ -239,7 +239,7 @@ that is not a number is refused by name before anything is stored.
 | | Tier gap | Space between the tiers of one wrap line | 0 |
 | Columns | Column gap | Space to the right of every column's widest cell | 6 |
 | | Number column | Width of the number column | 36 |
-| Cell padding | Left, Right | Padding inside every cell; the columns are widened to match | 0 |
+| Cell padding | Left, Right | Padding inside every cell; the columns are widened to match, and the table's edge moves left by the left padding so the text stays at the example's indent, level with the translation | 0 |
 | | Top, Bottom | Padding inside every cell of every row | 0 |
 | Translation | Above | Space between the last row and the first translation | none |
 | | Between | Space between two translations | the style's own 3 pt |

@@ -85,6 +85,15 @@ requests.
 
 ## State of play
 
+- **Left cell padding no longer reads as a hanging indent** (2026-09-14,
+  Seth saw it): Word measures Rows.LeftIndent to the table's EDGE and sets
+  the text in by the padding, so a padded table put its text a padding right
+  of the translation. FillTable now sets the rows at indent - padL (Word's
+  own tables do the same), and ExampleIndent adds tbl.LeftPadding back, so
+  a re-wrap neither drifts nor doubles it. Assumes Word 2013+ table-indent
+  semantics (compatibility mode 15), which every document made in current
+  Word has. Continuation is the one spacing MEANT to indent later wrap
+  lines; empty keeps them flush.
 - **Re-wrap repairs spaces in cells** (2026-09-14, Seth): RewrapTable runs
   FixCellSpaces with the document's replacement character before redrawing,
   as Insert always has. Doc-test section `spacefix`.
