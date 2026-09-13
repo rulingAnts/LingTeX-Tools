@@ -680,6 +680,9 @@ Private Sub TestSpacing()
     Ok "the last row carries no space after (the translation follows)", _
         (tbl.Rows(tbl.Rows.Count).Range.ParagraphFormat.SpaceAfter = 0)
     Ok "left padding is 2", (tbl.LeftPadding = 2)
+    Ok "the rows start the left padding before the indent, so the text sits at it", _
+        (Abs(tbl.Rows(1).LeftIndent + 2) <= 0.5)
+    Ok "  and ExampleIndent still reads 0", (ExampleIndent(tbl) = 0)
     Ok "right padding is 3", (tbl.RightPadding = 3)
     Ok "top padding is 1", (tbl.TopPadding = 1)
     Ok "bottom padding is 1.5", (tbl.BottomPadding = 1.5)
@@ -711,6 +714,8 @@ Private Sub TestSpacing()
             (tbl.Rows(1).Range.ParagraphFormat.SpaceBefore = 0)
         Ok "no tier gap", (tbl.Rows(1).Range.ParagraphFormat.SpaceAfter = 0)
         Ok "padding is back to 0", (tbl.LeftPadding = 0 And tbl.RightPadding = 0)
+        Ok "  and the rows are back at the indent, not a padding left of it", _
+            (Abs(tbl.Rows(1).LeftIndent) <= 0.5)
         Set para = ParagraphAfterTable(tbl)
         If Not para Is Nothing Then
             Ok "the translation has the style's own spacing again", _
