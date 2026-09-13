@@ -89,6 +89,7 @@ Public Sub RunDocTests()
     RunSection "spacing"
     RunSection "dialog"
     RunSection "spacefix"
+    RunSection "rows"
     RunSection "measure"
     RunSection "agreement"
     RunSection "rendering"
@@ -131,6 +132,7 @@ Private Sub RunSection(ByVal which As String)
         Case "spacing":      TestSpacing
         Case "dialog":       TestDialog
         Case "spacefix":     TestSpaceFix
+        Case "rows":         TestRowGeometry
         Case "measure":      TestMeasure
         Case "agreement":    TestRenderMeasureAgreement
         Case "rendering":    TestRendering
@@ -575,7 +577,11 @@ Private Sub TestSpacing()
 
     Ok "a virgin document sets no spacing", (SpacingText(doc, "TierGap") = "")
     Ok "an unset optional spacing reads as SETTING_UNSET", _
-        (SettingOptional(doc, "ExampleBefore") = SETTING_UNSET)
+        (SettingOptional(doc, "ExampleLeft") = SETTING_UNSET)
+    Ok "the defaults: before 0, after 3, right 0", _
+        (SettingExampleBefore(doc) = 0 And SettingExampleAfter(doc) = 3 And SettingExampleRight(doc) = 0)
+    Ok "  above the translation 6, between translations 0", _
+        (SettingFreeAbove(doc) = 6 And SettingFreeBetween(doc) = 0)
 
     Ok "SetSpacingText accepts 6.5", SetSpacingText(doc, "Gap", "6.5")
     Ok "  and the typed getter sees 6.5", (SettingGap(doc) = 6.5)
@@ -597,12 +603,24 @@ Private Sub TestSpacing()
     Ok "  and SettingDefined says so", (Not SettingDefined(doc, "Gap"))
 
     Ok "an optional spacing round-trips", _
-        (SetSpacingText(doc, "ExampleBefore", "9") And SettingOptional(doc, "ExampleBefore") = 9)
+        (SetSpacingText(doc, "ExampleLeft", "9") And SettingOptional(doc, "ExampleLeft") = 9)
     Ok "an optional spacing can be 0, which is not unset", _
         (SetSpacingText(doc, "ExampleLeft", "0") And SettingOptional(doc, "ExampleLeft") = 0)
-    ClearSetting doc, "ExampleBefore"
-    Ok "ClearSetting unsets", (SettingOptional(doc, "ExampleBefore") = SETTING_UNSET)
     ClearSetting doc, "ExampleLeft"
+    Ok "ClearSetting unsets", (SettingOptional(doc, "ExampleLeft") = SETTING_UNSET)
+
+    '-- percentages of the font size ---------------------------------------
+    Ok "a percentage is accepted", SetSpacingText(doc, "LineGap", "50%")
+    Eq "  and stored as one", SpacingText(doc, "LineGap"), CStr(50) & "%"
+    Ok "  and resolves against the example's font size", _
+        (Abs(SettingLineGap(doc) - 0.5 * SpacingFontSize(doc)) < 0.01)
+    Emit "         font size " & CStr(SpacingFontSize(doc)) & ", 50% = " & CStr(SettingLineGap(doc))
+    Ok "a percentage with a space before the sign", SetSpacingText(doc, "LineGap", "25 %")
+    Ok "  resolves too", (Abs(SettingLineGap(doc) - 0.25 * SpacingFontSize(doc)) < 0.01)
+    Ok "letters before the sign are refused", (Not SetSpacingText(doc, "LineGap", "abc%"))
+    Ok "IsValidSpacingText accepts a percentage", IsValidSpacingText("50%")
+    ClearSetting doc, "LineGap"
+    Ok "  and the line gap is back at 6", (SettingLineGap(doc) = 6)
 
     Ok "cell padding defaults to 0 on every side", _
         (SettingCellPadding(doc, "Left") = 0 And SettingCellPadding(doc, "Right") = 0 _
@@ -718,8 +736,8 @@ Private Sub TestSpacing()
             (Abs(tbl.Rows(1).LeftIndent) <= 0.5)
         Set para = ParagraphAfterTable(tbl)
         If Not para Is Nothing Then
-            Ok "the translation has the style's own spacing again", _
-                (para.SpaceBefore = 0 And para.SpaceAfter = 3 And para.RightIndent = 0)
+            Ok "the translation has the defaults again: 6 above, 3 after, no right indent", _
+                (para.SpaceBefore = 6 And para.SpaceAfter = 3 And para.RightIndent = 0)
         End If
     End If
 
@@ -822,6 +840,14 @@ Private Sub TestDialog()
     Ok "Apply accepts them again", frm.ApplyNow()
     Ok "  and the tier gap is 5 now", (SettingTierGap(doc) = 5)
 
+    frm.RestoreDefaultFields
+    Ok "Restore Defaults empties the boxes", (frm.BoxText("TierGap") = "" And frm.BoxText("Gap") = "")
+    Ok "  and ticks the defaults", _
+        (frm.FlagValue("Word") And frm.FlagValue("Number") And frm.FlagValue("Dot"))
+    Ok "  and unticks the rest", (Not frm.FlagValue("Morpheme") And Not frm.FlagValue("Underscore"))
+    Ok "  and the list level is 1", (frm.BoxText("NumberLevel") = "1")
+    Ok "  without storing anything", (SettingTierGap(doc) = 5 And SettingGranularity(doc) = igtMorphemeAligned)
+
     frm.LoadFrom doc
     Ok "LoadFrom shows what was stored", _
         (Val(Replace(frm.BoxText("TierGap"), ",", ".")) = 5)
@@ -886,7 +912,12 @@ Private Sub TestSpaceFix()
     ex = ReadExampleFromTable(tbl)
     Eq "re-wrap replaces the space with the document's full stop", ex.Cells(1, 1), "attack.CMP=REL"
     Ok "the vernacular cell above it is untouched", (ex.Cells(0, 1) = "deda=di")
-    Ok "the translation keeps its spaces", (InStr(ex.FreeLines(0), " ") > 0)
+    ' ReadExampleFromTable reads the TABLE; the translation is a paragraph
+    ' after it (AbsorbFreeParagraphs brings it in for a re-wrap), so it is
+    ' read where it is. (The first Mac run read FreeLines(0) of a table-only
+    ' example and got nothing, 2026-09-14.)
+    Ok "the translation keeps its spaces", _
+        (InStr(ParagraphAfterTable(tbl).Range.Text, " ") > 0)
 
     ' With the other replacement character.
     SetSettingSpaceReplacement doc, "_"
@@ -906,6 +937,120 @@ Private Sub TestSpaceFix()
     End If
     SetSettingSpaceReplacement doc, "."
 
+    CloseNoSave doc
+End Sub
+
+
+'=============================================================================
+' -- ROW GEOMETRY, AS WORD LAYS IT OUT --------------------------------------
+'=============================================================================
+' Seth saw two things a screenshot cannot settle (2026-09-14): the gap between
+' the tiers looking larger on the first wrap line than on the second, and a
+' hanging indent -- later wrap lines starting to the right of the first --
+' after spacing or padding was set. So ask Word where things are: the page
+' position of every row's first content cell and of the translation, and the
+' height of every row. A numbered example on a narrow page, so it wraps, with
+' cell padding set, since that is where it went wrong.
+
+Private Sub TestRowGeometry()
+    Dim doc As Document
+    Dim ex As IgtExample
+    Dim tbl As Table
+    Dim r As Long
+    Dim x0 As Double, xr As Double, xNum As Double, xFree As Double
+    Dim y(1 To 5) As Double
+    Dim h1 As Double, h2 As Double, h3 As Double, h4 As Double
+    Dim para As Paragraph
+    Dim allSame As Boolean
+    Dim bad As String
+
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "rows: could create a blank document", False
+        Exit Sub
+    End If
+    EnsureStyles doc, True
+    ClearCache
+    SetPageGeometry doc, 320, 792, 72          ' 176pt of text: the example wraps
+    SetSpacingText doc, "PadLeft", "2"
+    SetSpacingText doc, "PadRight", "3"
+    SetSpacingText doc, "PadTop", "1"
+
+    ex = ThreeTierExample()
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then
+        Ok "rows: a numbered example draws on the narrow page", False
+        Emit "         " & gRenderError
+        CloseNoSave doc
+        Exit Sub
+    End If
+    Ok "rows: a numbered example draws on the narrow page", True
+    If tbl.Rows.Count < 4 Then
+        Ok "rows: it wrapped onto a second line", False
+        Emit "         " & CStr(tbl.Rows.Count) & " rows"
+        CloseNoSave doc
+        Exit Sub
+    End If
+    Ok "rows: it wrapped onto a second line", True
+
+    '-- horizontal: every row's text starts where the first row's does ------
+    On Error Resume Next
+    xNum = tbl.Cell(1, 1).Range.Information(wdHorizontalPositionRelativeToPage)
+    x0 = tbl.Cell(1, 2).Range.Information(wdHorizontalPositionRelativeToPage)
+    Err.Clear
+    On Error GoTo 0
+    Ok "the number sits at the left margin (the table's edge is the padding to its left)", _
+        (Abs(xNum - 72) <= 0.75)
+    Emit "         number at " & CStr(xNum) & ", margin 72"
+    allSame = True
+    For r = 2 To tbl.Rows.Count
+        On Error Resume Next
+        xr = tbl.Cell(r, 2).Range.Information(wdHorizontalPositionRelativeToPage)
+        Err.Clear
+        On Error GoTo 0
+        If Abs(xr - x0) > 0.75 Then
+            allSame = False
+            bad = bad & " row " & CStr(r) & " at " & CStr(xr) & ";"
+        End If
+    Next r
+    Ok "no hanging indent: every row's first content cell starts where row 1's does", allSame
+    Emit "         row 1 content at " & CStr(x0) & IIf(bad = "", "", "; off:" & bad)
+
+    Set para = ParagraphAfterTable(tbl)
+    If Not para Is Nothing Then
+        On Error Resume Next
+        xFree = para.Range.Information(wdHorizontalPositionRelativeToPage)
+        Err.Clear
+        On Error GoTo 0
+        Ok "the translation starts where the content does", (Abs(xFree - x0) <= 0.75)
+        Emit "         translation at " & CStr(xFree)
+    End If
+
+    '-- vertical: the numbered first row is as tall as the later vernacular row
+    On Error Resume Next
+    For r = 1 To 4
+        y(r) = tbl.Cell(r, 2).Range.Information(wdVerticalPositionRelativeToPage)
+    Next r
+    If Not para Is Nothing Then
+        y(5) = para.Range.Information(wdVerticalPositionRelativeToPage) - para.SpaceBefore
+    End If
+    Err.Clear
+    On Error GoTo 0
+    h1 = y(2) - y(1)                            ' vernacular, with the number
+    h2 = y(3) - y(2)                            ' gloss, plus the line gap
+    h3 = y(4) - y(3)                            ' vernacular, second wrap line
+    h4 = y(5) - y(4)                            ' gloss, last
+    Emit "         row heights " & CStr(h1) & " / " & CStr(h2) & " / " & CStr(h3) & " / " & CStr(h4)
+    Ok "rows: Word reported positions", (y(1) > 0 And y(2) > y(1) And y(3) > y(2) And y(4) > y(3))
+    Ok "the numbered first row is as tall as the later vernacular row", (Abs(h1 - h3) <= 0.75)
+    If y(5) > y(4) Then
+        Ok "the gloss row before the wrap is the last gloss row plus the line gap", _
+            (Abs((h2 - h4) - SettingLineGap(doc)) <= 0.75)
+    End If
+
+    ClearSetting doc, "PadLeft"
+    ClearSetting doc, "PadRight"
+    ClearSetting doc, "PadTop"
     CloseNoSave doc
 End Sub
 

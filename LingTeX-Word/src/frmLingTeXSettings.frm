@@ -64,6 +64,7 @@ Private WithEvents mCancel As MSForms.CommandButton
 Private WithEvents mModify As MSForms.CommandButton
 Private WithEvents mResetStyle As MSForms.CommandButton
 Private WithEvents mResetAll As MSForms.CommandButton
+Private WithEvents mDefaults As MSForms.CommandButton
 
 ' Layout, in points. One grid, so the form reads as one thing.
 Private Const INSIDE_W As Double = 540
@@ -138,9 +139,9 @@ Private Sub BuildControls()
     y = y + ROW_H + 6
 
     '-- Spacing -------------------------------------------------------------
-    AddHeader "Spacing, in points. An empty box means the default (in brackets), or the style's own spacing.", y
-    y = y + LABEL_H + 4
-    AddSpacingRow y, "Example", "ExampleBefore=Before|ExampleAfter=After|ExampleLeft=Left|ExampleRight=Right"
+    AddHeader "Spacing, in points (6) or as a percentage of the font size (50% is half a line). An empty box means the default, in brackets.", y, 2
+    y = y + 2 * LABEL_H + 4
+    AddSpacingRow y, "Example", "ExampleBefore=Before (0)|ExampleAfter=After (3)|ExampleLeft=Left|ExampleRight=Right (0)"
     y = y + ROW_H
     AddSpacingRow y, "Wrap lines", "LineGap=Line gap (6)|ContIndent=Continuation (0)|TierGap=Tier gap (0)"
     y = y + ROW_H
@@ -148,7 +149,7 @@ Private Sub BuildControls()
     y = y + ROW_H
     AddSpacingRow y, "Cell padding", "PadLeft=Left (0)|PadRight=Right (0)|PadTop=Top (0)|PadBottom=Bottom (0)"
     y = y + ROW_H
-    AddSpacingRow y, "Translation", "FreeAbove=Above|FreeBetween=Between"
+    AddSpacingRow y, "Translation", "FreeAbove=Above (6)|FreeBetween=Between (0)"
     y = y + ROW_H + 6
 
     '-- Styles ----------------------------------------------------------------
@@ -176,7 +177,12 @@ Private Sub BuildControls()
     AddLabel note, MARGIN, y, INSIDE_W - 2 * MARGIN, 2 * LABEL_H
     y = y + 2 * LABEL_H + 8
 
-    '-- OK / Apply / Cancel ---------------------------------------------------
+    '-- Restore Defaults / OK / Apply / Cancel --------------------------------
+    Set mDefaults = AddButton("btnDefaults", "Restore Defaults", MARGIN, y, 120)
+    On Error Resume Next
+    mDefaults.ControlTipText = "Every box and tick back to what a fresh document gets. Nothing is stored until OK or Apply. The styles have their own Reset buttons above."
+    Err.Clear
+    On Error GoTo 0
     Set mOK = AddButton("btnOK", "OK", INSIDE_W - MARGIN - 3 * BTN_W - 16, y, BTN_W)
     Set mApply = AddButton("btnApply", "Apply", INSIDE_W - MARGIN - 2 * BTN_W - 8, y, BTN_W)
     Set mCancel = AddButton("btnCancel", "Cancel", INSIDE_W - MARGIN - BTN_W, y, BTN_W)
@@ -213,9 +219,9 @@ Private Sub AddSpacingRow(ByVal y As Double, ByVal rowLabel As String, ByVal spe
     Next i
 End Sub
 
-Private Sub AddHeader(ByVal text As String, ByVal y As Double)
+Private Sub AddHeader(ByVal text As String, ByVal y As Double, Optional ByVal lines As Long = 1)
     Dim lbl As Object
-    Set lbl = AddLabel(text, MARGIN, y, INSIDE_W - 2 * MARGIN)
+    Set lbl = AddLabel(text, MARGIN, y, INSIDE_W - 2 * MARGIN, lines * LABEL_H)
     On Error Resume Next
     lbl.Font.Bold = True
     Err.Clear
@@ -304,13 +310,13 @@ Private Function SpacingTip(ByVal key As String) As String
     Dim s As String
     Select Case key
         Case "ExampleBefore"
-            s = "Space above the example, on its first row. Empty: none."
+            s = "Space above the example, on its first row. Empty: 0."
         Case "ExampleAfter"
-            s = "Space below the example: after the translation, or after the last row when there is none. Empty: the translation style's own 3 pt."
+            s = "Space below the example: after the translation, or after the last row when there is none. Empty: 3."
         Case "ExampleLeft"
             s = "Left indent of every NEW example. Empty: a new example takes the indent of the paragraph it is inserted into. Indent and Outdent, and the ruler, still move an example already on the page."
         Case "ExampleRight"
-            s = "Right indent: the wrap lines and the translation stop this far short of the right margin. Empty: none."
+            s = "Right indent: the wrap lines and the translation stop this far short of the right margin. Empty: 0."
         Case "LineGap"
             s = "Space between the wrap lines of an example, under the last tier of each wrap line but the last. Empty: 6."
         Case "ContIndent"
@@ -326,11 +332,11 @@ Private Function SpacingTip(ByVal key As String) As String
         Case "PadTop", "PadBottom"
             s = "Cell padding inside every cell of every row. Empty: 0."
         Case "FreeAbove"
-            s = "Space between the last row and the first translation. Empty: the LingTeX Free style's own (none)."
+            s = "Space between the last row and the first translation. Empty: 6, half a line."
         Case "FreeBetween"
-            s = "Space between two translations, after every translation paragraph but the last. Empty: the LingTeX Free style's own 3 pt."
+            s = "Space between two translations, after every translation paragraph but the last. Empty: 0."
     End Select
-    SpacingTip = s
+    SpacingTip = s & " Points, or a percentage of the font size (50% is half a line)."
 End Function
 
 
@@ -430,6 +436,25 @@ Public Function ApplyNow() As Boolean
 End Function
 
 
+' Every box and tick back to what a fresh document gets -- the defaults in
+' modSettings, so this cannot drift from them. The document is untouched
+' until OK or Apply; the styles have their own Reset buttons.
+Public Sub RestoreDefaultFields()
+    Dim keys() As String
+    Dim flags() As String
+    Dim i As Long
+    keys = Split(SPACING_KEYS, "|")
+    For i = 0 To UBound(keys)
+        SetBoxText keys(i), ""
+    Next i
+    SetBoxText "NumberLevel", CStr(DefaultNumberLevel())
+    flags = Split("Word|Morpheme|Number|SmallCaps|InitialCap|RewrapSave|RewrapLeave|Dot|Underscore", "|")
+    For i = 0 To UBound(flags)
+        SetFlag flags(i), DefaultFlag(flags(i))
+    Next i
+End Sub
+
+
 '=============================================================================
 ' -- THE CONTROLS BY NAME ---------------------------------------------------
 '=============================================================================
@@ -520,6 +545,10 @@ End Sub
 Private Sub mCancel_Click()
     Result = "cancel"
     Me.Hide
+End Sub
+
+Private Sub mDefaults_Click()
+    RestoreDefaultFields
 End Sub
 
 ' Step aside and let the caller open Word's Style dialog; see the header.

@@ -423,6 +423,10 @@ Private Sub EnsureExampleParaStyle(doc As Document)
             .KeepWithNext = True
             .SpaceBefore = 0
             .SpaceAfter = 0
+            ' Single, not Normal's multiple: the number shares a row with the
+            ' vernacular line and must not make that row taller than the rest.
+            .LineSpacingRule = wdLineSpaceSingle
+            .Alignment = wdAlignParagraphLeft
             .WidowControl = False
         End With
         .NextParagraphStyle = doc.Styles(wdStyleNormal)
@@ -748,6 +752,9 @@ Public Sub ResetStyleSlot(doc As Document, ByVal i As Long)
             st.Font.Bold = False
             st.Font.Italic = False
             st.Font.SmallCaps = False
+            st.ParagraphFormat.SpaceBefore = 0
+            st.ParagraphFormat.SpaceAfter = 0
+            st.ParagraphFormat.LineSpacingRule = wdLineSpaceSingle
             Err.Clear
             On Error GoTo 0
     End Select

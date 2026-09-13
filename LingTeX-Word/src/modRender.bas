@@ -162,7 +162,7 @@ Private Function PlanExample(ex As IgtExample, target As Range, doc As Document,
     ' The example's right indent (the Right box of the Example group) comes
     ' off the budget: the wrap lines stop that far short of the right margin,
     ' and WriteFreeLines indents the translation to match.
-    rightIndent = SettingOptional(doc, "ExampleRight")
+    rightIndent = SettingExampleRight(doc)
     If rightIndent > 0 Then
         avail = avail - rightIndent
         If avail < 36 Then avail = 36          ' never an unusable budget
@@ -304,31 +304,30 @@ Private Function DrawExample(ex As IgtExample, target As Range, doc As Document,
 End Function
 
 '-----------------------------------------------------------------------------
-' The Translation group of the LingTeX Styles tab, and the Example group's
-' After and Right: air above the first translation, between translations,
-' after the last one (which is the end of the example), and the example's
-' right indent, kept on the translation so it stops where the wrap lines do.
-' Each is an OPTIONAL setting: unset, the LingTeX Free style decides, as it
-' always has (three points after each translation, none before).
+' The Translation row of the Settings dialog, and the Example row's After and
+' Right: air above the first translation (6 by default: half a line, Seth,
+' 2026-09-14), between translations (0), after the last one (3, the end of
+' the example), and the example's right indent, kept on the translation so it
+' stops where the wrap lines do. Written on the paragraphs, so the LingTeX
+' Free style's own spacing is not what shows; and "do not add space between
+' paragraphs of the same style" is switched off on them, or Between would be
+' ignored between two translations however it was set.
 '-----------------------------------------------------------------------------
 Private Sub ApplyTranslationSpacing(after As Range, doc As Document)
-    Dim v As Double
     Dim n As Long, i As Long
+    Dim between As Double
     On Error Resume Next
     n = after.Paragraphs.Count
     If n = 0 Then Exit Sub
-    v = SettingOptional(doc, "FreeAbove")
-    If v >= 0 Then after.Paragraphs(1).SpaceBefore = v
-    v = SettingOptional(doc, "FreeBetween")
-    If v >= 0 Then
-        For i = 1 To n - 1
-            after.Paragraphs(i).SpaceAfter = v
-        Next i
-    End If
-    v = SettingOptional(doc, "ExampleAfter")
-    If v >= 0 Then after.Paragraphs(n).SpaceAfter = v
-    v = SettingOptional(doc, "ExampleRight")
-    If v >= 0 Then after.ParagraphFormat.RightIndent = v
+    after.ParagraphFormat.NoSpaceBetweenParagraphsOfSameStyle = False
+    after.ParagraphFormat.SpaceBefore = 0
+    after.Paragraphs(1).SpaceBefore = SettingFreeAbove(doc)
+    between = SettingFreeBetween(doc)
+    For i = 1 To n - 1
+        after.Paragraphs(i).SpaceAfter = between
+    Next i
+    after.Paragraphs(n).SpaceAfter = SettingExampleAfter(doc)
+    after.ParagraphFormat.RightIndent = SettingExampleRight(doc)
     Err.Clear
     On Error GoTo 0
 End Sub
@@ -376,6 +375,11 @@ Private Sub NumberFirstCell(tbl As Table, doc As Document, ByVal level As Long, 
         .FirstLineIndent = 0
         .SpaceBefore = 0
         .SpaceAfter = rowAfter
+        ' Single, like every tier row. The style says so too, but a document
+        ' whose LingTeX Example style predates that would inherit Normal's
+        ' multiple (1.08 or 1.15 in current Word) and make the first row the
+        ' one row taller than the vernacular row below it (Seth, 2026-09-14).
+        .LineSpacingRule = wdLineSpaceSingle
     End With
     If numText <> "" Then rng.Text = numText
     Err.Clear
@@ -701,21 +705,18 @@ Private Sub StyleTable(tbl As Table, doc As Document)
 End Sub
 
 '-----------------------------------------------------------------------------
-' The air around the example as a block, from the Example group of the LingTeX
-' Styles tab: space before goes on every paragraph of the first row (every
-' cell, so the row is one height and the number sits level with the vernacular);
-' space after, when there is no translation to carry it, on the last row. Both
-' are OPTIONAL settings -- unset, nothing here is touched, and the styles'
-' own spacing shows through, which is what every earlier document has.
+' The air around the example as a block, from the Example row of the Settings
+' dialog: space before goes on every paragraph of the first row (every cell,
+' so the row is one height and the number sits level with the vernacular);
+' space after, when there is no translation to carry it, on the last row.
+' Document settings with defaults (0 and 3), like every spacing: the styles
+' carry the look of the text, the settings carry the layout.
 '-----------------------------------------------------------------------------
 Private Sub ApplyExampleSpacing(tbl As Table, doc As Document, ByVal hasFree As Boolean)
-    Dim v As Double
     On Error Resume Next
-    v = SettingOptional(doc, "ExampleBefore")
-    If v >= 0 Then tbl.Rows(1).Range.ParagraphFormat.SpaceBefore = v
+    tbl.Rows(1).Range.ParagraphFormat.SpaceBefore = SettingExampleBefore(doc)
     If Not hasFree Then
-        v = SettingOptional(doc, "ExampleAfter")
-        If v >= 0 Then tbl.Rows(tbl.Rows.Count).Range.ParagraphFormat.SpaceAfter = v
+        tbl.Rows(tbl.Rows.Count).Range.ParagraphFormat.SpaceAfter = SettingExampleAfter(doc)
     End If
     Err.Clear
     On Error GoTo 0

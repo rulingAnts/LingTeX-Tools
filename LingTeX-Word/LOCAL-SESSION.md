@@ -85,6 +85,21 @@ requests.
 
 ## State of play
 
+- **Spacing defaults, percentages, Restore Defaults, row geometry**
+  (2026-09-14, Seth): every spacing is a document setting with a numeric
+  default now (Before 0, After 3, Right 0, Above 6 = half a line, Between 0;
+  only Left stays optional); the renderer always writes them, so the LingTeX
+  styles' paragraph spacing is not what shows, and contextual spacing is off
+  on translation paragraphs so Between is honoured. A box takes "50%" -- a
+  percentage of the vernacular style's font size, resolved at draw time
+  (SpacingFontSize). The dialog has Restore Defaults (fields only; OK/Apply
+  store). The number-cell paragraph is single-spaced (style and paragraph):
+  it inherited Normal's multiple and could make row 1 the tallest row.
+  Doc-test section `rows` asks Word for the page position of every row's
+  first content cell and of the translation (no hanging indent, with
+  padding set) and for the row heights (row 1 = row 3) -- Seth saw both
+  look wrong; if the section is green, what remains is font substitution
+  (a glyph such as the IPA length mark from a fallback font grows its row).
 - **The second import could not name the form** (2026-09-14, 06:55 run):
   ImportGroup removed the existing frmLingTeXSettings and ImportOne added a
   new UserForm, and `comp.Name = "frmLingTeXSettings"` raised 50132 -- the
