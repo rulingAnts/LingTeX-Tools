@@ -269,8 +269,17 @@ elif [ -z "$prev" ]; then
     echo "  SKIP  no earlier word-v* tag in this clone, so SETUP_VERSION ($cur) is not compared"
 else
     was=$(git -C "$root" show "$prev:./src/modLingTeX.bas" 2>/dev/null | setup_of)
+    # The release being checked: the tag CI runs for, or a tag already on HEAD.
+    this=${GITHUB_REF_NAME:-$(git -C "$root" tag --points-at HEAD --list 'word-v*' 2>/dev/null | head -1)}
     if [ "$cur" != "$was" ]; then
         pass "SETUP_VERSION moved since $prev ($was to $cur), so upgraders get their shortcuts back"
+    elif [ "$this" = "word-v0.1.0-beta.5" ]; then
+        # The one exemption (Seth, 2026-09-14). beta.5 ships the beta.4 template
+        # with only its package type corrected -- the file that worked on the
+        # Mac -- rather than a rebuild in Word. Windows users upgrading from
+        # beta.4 click Install Shortcuts once; the release notes and the guide
+        # say so. The release after beta.5 must move SETUP_VERSION again.
+        pass "SETUP_VERSION is still $cur, as in $prev: allowed for $this only (the template was not rebuilt)"
     else
         fail "SETUP_VERSION is still $cur, as in $prev: an upgrade would lose the shortcuts"
         echo "        Bump SETUP_VERSION in src/modLingTeX.bas, then rebuild the template"

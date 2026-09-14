@@ -246,5 +246,7 @@ jobs:
             landed). The **Interlinear** tab is on the ribbon of every document.
 
             **Upgrading** is the same: run the new installer and it replaces the
-            old file. To remove the add-in: Settings → Apps on Windows, or
-            **Uninstall LingTeX-Word** from the disk image on the Mac.
+            old file. If your keyboard shortcuts stop working after an upgrade,
+            click **Install Shortcuts** on the Interlinear tab once. To remove the
+            add-in: Settings → Apps on Windows, or **Uninstall LingTeX-Word** from
+            the disk image on the Mac.
