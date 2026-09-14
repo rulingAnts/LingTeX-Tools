@@ -585,9 +585,65 @@ footer a:hover { text-decoration: underline; }
 
 .btn-danger { color: var(--red-600); }
 
+/* ── LingTeX-Word: hero announcement and featured card ───────────────────── */
+.hero-announce {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 auto 26px;
+  padding: 7px 16px 7px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.14);
+  border: 1.5px solid rgba(255,255,255,0.35);
+  color: #fff;
+  font: 500 0.875rem var(--font);
+  text-decoration: none;
+  transition: background .15s, transform .1s;
+}
+.hero-announce:hover { background: rgba(255,255,255,0.24); text-decoration: none; transform: translateY(-1px); }
+.hero-announce .tag {
+  background: var(--amber-200);
+  color: #78350f;
+  font-weight: 700;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.hero-announce .arrow { color: #bfdbfe; font-weight: 700; }
+.product-card.featured {
+  grid-column: 1 / -1;
+  border-color: var(--blue-100);
+  background: linear-gradient(180deg, var(--blue-50) 0%, #fff 60%);
+}
+.product-card.featured .card-body {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 28px;
+  align-items: start;
+}
+.product-card.featured .card-desc { margin-bottom: 14px; }
+.product-card.featured .card-features { margin-bottom: 12px; }
+.beta-tag {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--amber-200);
+  color: #78350f;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .products { grid-template-columns: 1fr; }
+  .product-card.featured .card-body { grid-template-columns: 1fr; }
   .cfg-row  { grid-template-columns: 1fr; }
   .cfg-hint { grid-column: 1; }
   .try-online-hdr { flex-direction: column; }
@@ -600,6 +656,7 @@ footer a:hover { text-decoration: underline; }
 <nav class="site-nav">
   <div class="nav-brand">LingTeX Tools</div>
   <div class="nav-links">
+    <a href="#word-addin">Word Add-in</a>
     <a href="#download">Desktop App</a>
     <a href="#extensions">Extensions</a>
     <a href="#shortcuts">Shortcuts</a>
@@ -610,6 +667,11 @@ footer a:hover { text-decoration: underline; }
 
 <!-- ── Hero ──────────────────────────────────────────────────────────────── -->
 <section class="hero">
+  <a class="hero-announce" href="https://github.com/rulingAnts/LingTeX-Tools/releases/tag/word-v0.1.0-beta.4" data-word="release" target="_blank">
+    <span class="tag">New &middot; Beta</span>
+    <span><strong>LingTeX-Word</strong> &mdash; interlinear glossed text inside Microsoft Word &middot; <span data-word="version">0.1.0-beta.4</span></span>
+    <span class="arrow">&rarr;</span>
+  </a>
   <h1>Linguistic fieldwork data, converted instantly</h1>
   <p class="hero-sub">
     Convert FLEx interlinear text and Phonology Assistant exports to
@@ -649,6 +711,52 @@ footer a:hover { text-decoration: underline; }
 <!-- ── Download / Products ───────────────────────────────────────────────── -->
 <div id="download">
 <section class="products">
+
+  <!-- LingTeX-Word: the Word add-in (beta) -->
+  <div class="product-card featured" id="word-addin">
+    <h2>📝 LingTeX-Word <span class="beta-tag">Beta</span></h2>
+    <div class="card-body">
+      <div>
+        <p class="card-desc">
+          Interlinear glossed text inside <strong>Microsoft Word</strong>. An
+          <em>Interlinear</em> tab on the ribbon inserts an example straight from FLEx
+          (copy, then Insert Interlinear), from an ordinary table, or from lines you typed.
+          The example is a Word table whose columns wrap to the page width and re-wrap
+          themselves when you edit a cell, widen a gloss, or change the margins.
+          Numbering, per-word or per-morpheme alignment, small-capital grammatical
+          glosses, and a check against the Leipzig Glossing Rules are built in.
+        </p>
+        <ul class="card-features">
+          <li>Paste from FLEx, convert a table, or type the lines &mdash; one click each</li>
+          <li>Examples re-wrap to the page on their own; split and merge columns in place</li>
+          <li>Word list numbering &mdash; (1), (2)&hellip; renumber when an example moves</li>
+          <li>Plain Word styles and tables: documents stay editable without the add-in</li>
+        </ul>
+        <p class="cfg-hint">
+          Beta, for Word 2016 and later on Windows and Mac (Microsoft 365). Please
+          <a href="https://github.com/rulingAnts/LingTeX-Tools/issues" target="_blank">report what breaks</a>.
+          The user guide is in every download.
+        </p>
+      </div>
+      <div class="dl-btns">
+        <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/download/word-v0.1.0-beta.4/LingTeX-Word-Setup-word-v0.1.0-beta.4.exe" class="dl-btn primary" data-word="exe" target="_blank">
+          <span class="os-icon">🪟</span> Windows installer (.exe)
+        </a>
+        <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/download/word-v0.1.0-beta.4/LingTeX-Word-word-v0.1.0-beta.4-windows.zip" class="dl-btn" data-word="winzip" target="_blank">
+          <span class="os-icon">🪟</span> Windows (.zip, no installer)
+        </a>
+        <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/download/word-v0.1.0-beta.4/LingTeX-Word-word-v0.1.0-beta.4-macos.zip" class="dl-btn" data-word="maczip" target="_blank">
+          <span class="os-icon"></span> macOS (.zip)
+        </a>
+        <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/download/word-v0.1.0-beta.4/LingTeX-Word-Guide-word-v0.1.0-beta.4.pdf" class="dl-btn" data-word="guide" target="_blank">
+          <span class="os-icon">📖</span> User Guide (PDF)
+        </a>
+        <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/tag/word-v0.1.0-beta.4" class="dl-btn muted" data-word="release" target="_blank">
+          Release notes &middot; <span data-word="version">0.1.0-beta.4</span>
+        </a>
+      </div>
+    </div>
+  </div>
 
   <!-- Desktop App -->
   <div class="product-card">
@@ -1096,6 +1204,46 @@ footer a:hover { text-decoration: underline; }
 </footer>
 
 <script src="core.js"></script>
+
+<script>
+// ── LingTeX-Word: point the beta links at the newest word-v* release ─────────
+// The links above are written for the release current when this page was
+// edited; this asks GitHub for the newest Word pre-release and moves them.
+// Anything that fails leaves the written links in place.
+(function () {
+    if (!window.fetch) return;
+    var pick = {
+        exe:    function (n) { return /^LingTeX-Word-Setup-.*\.exe$/.test(n); },
+        winzip: function (n) { return /-windows\.zip$/.test(n); },
+        maczip: function (n) { return /-macos\.zip$/.test(n); },
+        guide:  function (n) { return /^LingTeX-Word-Guide-.*\.pdf$/.test(n); }
+    };
+    fetch('https://api.github.com/repos/rulingAnts/LingTeX-Tools/releases?per_page=30',
+          { headers: { Accept: 'application/vnd.github+json' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (list) {
+            if (!list || !list.length) return;
+            var rel = null;
+            list.forEach(function (r) {
+                if (!/^word-v/.test(r.tag_name) || r.draft) return;
+                if (!rel || r.published_at > rel.published_at) rel = r;
+            });
+            if (!rel) return;
+            var short = rel.tag_name.replace(/^word-v/, '');
+            document.querySelectorAll('[data-word]').forEach(function (el) {
+                var k = el.getAttribute('data-word');
+                if (k === 'version') { el.textContent = short; return; }
+                if (k === 'release') { el.href = rel.html_url; return; }
+                var f = pick[k];
+                if (!f) return;
+                for (var j = 0; j < rel.assets.length; j++) {
+                    if (f(rel.assets[j].name)) { el.href = rel.assets[j].browser_download_url; return; }
+                }
+            });
+        })
+        .catch(function () {});
+})();
+</script>
 
 <script>
 // ══════════════════════════════════════════════════════════════════════════════
