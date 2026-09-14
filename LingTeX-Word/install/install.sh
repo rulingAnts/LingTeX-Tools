@@ -2,7 +2,7 @@
 # install.sh -- LingTeX-Word for Mac
 #
 # Puts LingTeX-Word.dotm into Word's Startup folder, where Word loads it as a
-# global template at every start: the LingTeX tab and its commands are then on
+# global template at every start: the Interlinear tab and its commands are then on
 # every document. The first time Word loads it, the add-in installs its keyboard
 # shortcuts and says so.
 #
@@ -47,5 +47,5 @@ echo ""
 echo "Start Word. If it asks whether to enable macros in LingTeX-Word.dotm, choose"
 echo "Enable Macros (Word > Preferences > Security can make that permanent). A"
 echo "message then says LingTeX-Word is installed and lists its keyboard shortcuts"
-echo "(Cmd+Option+Shift + a letter); the LingTeX tab is on the ribbon of every"
+echo "(Cmd+Option+Shift + a letter); the Interlinear tab is on the ribbon of every"
 echo "document."

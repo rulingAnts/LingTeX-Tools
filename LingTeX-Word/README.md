@@ -456,7 +456,7 @@ arrived inside a downloaded zip.
 
 Still unverified, for one pass on Windows: the NSIS installer. Custom ribbon XML
 in a startup `.dotm` **does** load on Mac — verified 2026-09-12 on Word 16.112,
-the full LingTeX tab over a new document, every group and icon present.
+the full tab (LingTeX then, Interlinear now) over a new document, every group and icon present.
 
 **And one finding that changed the testing policy, then changed again.** `MicroDiagnose`
 produced run-time error 6, *Overflow*, on `s1 = 10` where `s1` is `As Single`, and
