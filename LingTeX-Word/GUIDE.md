@@ -70,21 +70,25 @@ STARTUP folder.
 
 ### Mac
 
-1. Unzip the `-macos.zip`.
-2. Double-click `install.command`. If macOS refuses to open it, right-click
-   it and choose *Open*. It copies the template into Word's Startup folder
-   and clears the download quarantine.
+1. Open the `-macos.dmg`.
+2. Double-click **Install LingTeX-Word**. It opens in Script Editor, with what
+   it does written out at the top. Click the **Run** button (the triangle)
+   and follow the messages. It copies the template into Word's Startup folder
+   for your account, replacing an earlier version, and clears the download
+   quarantine. If macOS asks whether Script Editor may use files on the disk
+   image or data from other apps, click OK.
 3. Start Word. If Word asks whether to enable macros in `LingTeX-Word.dotm`,
    choose **Enable Macros**. A message then says LingTeX-Word is installed and
    lists its keyboard shortcuts (**Cmd+Option+Shift** and a letter). The
    Interlinear tab is on the ribbon.
 
-To remove the add-in, run `sh install.sh --uninstall` from the unzipped
-folder, or delete `LingTeX-Word.dotm` from Word's Startup folder.
+To remove the add-in, run **Uninstall LingTeX-Word** from the disk image the
+same way, or delete `LingTeX-Word.dotm` from Word's Startup folder.
 
 ### Upgrading
 
-Close Word and run the new installer; it replaces the file. Documents made
+Close Word and run the new installer (on the Mac, the new **Install
+LingTeX-Word**); it replaces the file. Documents made
 with an earlier version keep working, and re-wrap with the new one.
 
 ## The Interlinear tab
