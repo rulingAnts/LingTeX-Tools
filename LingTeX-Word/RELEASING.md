@@ -42,7 +42,8 @@ git tag word-v0.1.0-beta.1 && git push origin word-v0.1.0-beta.1
 packs `LingTeX-Word-word-v0.1.0-<label>-windows.zip` (template, `install.bat`,
 `install.ps1`, `INSTALL.md`, the guide), builds `-macos.dmg` on a macOS runner
 (template, the **Install LingTeX-Word** and **Uninstall LingTeX-Word** script
-documents, the guide), runs the Windows installer for real on a Windows
+documents compiled to `.scpt` from the `.applescript` sources in `install/`, the
+guide), runs the Windows installer for real on a Windows
 runner (`.github/workflows/lingtex-word-installer-test.yml`: silent install,
 upgrade, refusal while Word runs or the old file is held open, uninstall), and
 publishes them as a pre-release tagged `word-v0.1.0-<label>` only when that

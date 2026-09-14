@@ -111,9 +111,9 @@ jobs:
 
   dmg:
     # The Mac download: a disk image holding the template, the two Script
-    # Editor documents that install and remove it, and the guide. A script
-    # document rather than an installer app, because Gatekeeper blocks an
-    # unsigned downloaded program but lets a document open (RELEASING.md).
+    # Editor documents that install and remove it (compiled from the
+    # .applescript sources), and the guide. A script document rather than an
+    # installer app, because Gatekeeper blocks an unsigned downloaded program.
     needs: package
     runs-on: macos-latest
     env:
@@ -134,12 +134,20 @@ jobs:
           dmg="out/LingTeX-Word-$TAG-macos.dmg"
           mkdir -p "$stage"
           cp out/LingTeX-Word.dotm "$stage/"
-          cp "LingTeX-Word/install/Install LingTeX-Word.applescript" "$stage/"
-          cp "LingTeX-Word/install/Uninstall LingTeX-Word.applescript" "$stage/"
           cp "out/LingTeX-Word-Guide-$TAG.pdf" "$stage/LingTeX-Word-Guide.pdf"
-          # Both script documents must compile, or the user's Run fails.
-          osacompile -o "$RUNNER_TEMP/i.scpt" "$stage/Install LingTeX-Word.applescript"
-          osacompile -o "$RUNNER_TEMP/u.scpt" "$stage/Uninstall LingTeX-Word.applescript"
+          # The scripts ship COMPILED, as .scpt documents. A plain-text script is
+          # recompiled by Script Editor when Run is pressed, and on a read-only
+          # disk image that edit makes it ask to Unlock or Duplicate (Seth's test,
+          # 2026-09-14). A .scpt is a single-file document, not an app: it opens
+          # in Script Editor showing its source and comments. Never osacompile -x
+          # (run-only), which would strip the source the user is meant to read.
+          for k in Install Uninstall; do
+            src="LingTeX-Word/install/$k LingTeX-Word.applescript"
+            dst="$stage/$k LingTeX-Word.scpt"
+            osacompile -o "$dst" "$src"
+            [ -f "$dst" ] || { echo "::error::$dst is not a single-file document"; exit 1; }
+            osadecompile "$dst" | grep -q "WHAT IT DOES" || { echo "::error::$dst does not carry its source"; exit 1; }
+          done
           # HFS+ so older macOS mounts it too. hdiutil on hosted runners now and
           # then fails with "Resource busy"; a retry clears it.
           for attempt in 1 2 3; do
