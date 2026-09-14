@@ -65,11 +65,16 @@ indent, Ctrl+Alt+Shift+I inserts. Then the upgrade path: open Word and run
 the `.exe` again. It must refuse until Word is closed, then replace the file;
 start Word and check with **Shortcuts** that the keys are still bound.
 
-**Mac**: move `LingTeX-Dev.dotm` out of the Startup folder first (the dev rig
-would load a second copy of the code), quit Word, open the `-macos.dmg`,
-double-click **Install LingTeX-Word** and press Run in Script Editor, start
-Word, Enable Macros, and the same checks with Cmd+Option+Shift. Afterwards run
-**Uninstall LingTeX-Word** the same way and put the dev template back.
+**Mac**: quit Word and run `sh LingTeX-Word/tools/word-clean-slate.sh park`.
+It moves every LingTeX file out of Word into `build/`: the dev rig (which would
+otherwise load the engine from the clone and show its own Interlinear tab), any
+installed or stale copy, and a saved copy of Normal.dotm. `status` shows what
+Word can see. Then open the `-macos.dmg`, double-click **Install LingTeX-Word**
+and press Run in Script Editor, start Word, Enable Macros, and the same checks
+with Cmd+Option+Shift. Quit Word and run `... word-clean-slate.sh restore`,
+which sets the test's install and its Normal aside and puts everything back.
+Don't drag the dev template out in Finder instead: on 2026-09-14 that made a
+copy, the original kept loading, and the test measured the dev rig.
 
 ## What the first run does
 
