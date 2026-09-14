@@ -1,7 +1,7 @@
 # install.ps1 -- LingTeX-Word for Windows
 #
 # Puts LingTeX-Word.dotm into Word's STARTUP folder, where Word loads it as a
-# global template at every start: the LingTeX tab and its commands are then on
+# global template at every start: the Interlinear tab and its commands are then on
 # every document. The first time Word loads it, the add-in installs its keyboard
 # shortcuts and says so.
 #
@@ -48,6 +48,6 @@ Unblock-File -Path $dst -ErrorAction SilentlyContinue
 Write-Host "Installed $dst"
 Write-Host ""
 Write-Host "Start Word. A message says LingTeX-Word is installed and lists its keyboard"
-Write-Host "shortcuts (Ctrl+Alt+Shift + a letter); the LingTeX tab is on the ribbon of"
+Write-Host "shortcuts (Ctrl+Alt+Shift + a letter); the Interlinear tab is on the ribbon of"
 Write-Host "every document. Word's STARTUP folder is a trusted location, so no macro"
 Write-Host "warning should appear; if one does, choose Enable."

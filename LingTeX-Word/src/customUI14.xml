@@ -65,7 +65,7 @@
                     image="igtRewrapAll"
                     onAction="RbnRewrapAll"
                     screentip="Re-wrap every example in the document"
-                    supertip="Also runs automatically when the document is saved. Turn that off with the LingTeX_RewrapOnSave document variable."/>
+                    supertip="Also runs automatically when the document is saved; the Re-wrap on Save toggle turns that off."/>
             <button id="LingTeXRewrapCurrent"
                     label="Re-wrap This"
                     image="igtRewrapThis"
@@ -138,7 +138,7 @@
                   getPressed="RbnGetPressed"
                   onAction="RbnToggle"
                   screentip="Number new examples (1), (2)... with Word list numbering"
-                  supertip="A number line above the table, continuing through the document, so deleting or moving an example renumbers the rest. To restart per chapter, link level 1 of the LingTeX Example Number list style to Heading 1 and set NumberLevel to 2."/>
+                  supertip="The number sits in a first column, continuing through the document, so deleting or moving an example renumbers the rest. To restart per chapter, link level 1 of the LingTeX Example Number list style to Heading 1 and set the list level to 2 in Settings."/>
           <toggleButton id="LingTeXInitialCapToggle"
                   label="First Capital"
                   image="igtInitialCap"
@@ -167,7 +167,7 @@
                   label="Install Shortcuts"
                   image="igtInstallKeys"
                   onAction="RbnInstallShortcuts"
-                  screentip="Bind every command to Ctrl+Alt (Cmd+Option on Mac) + a letter"
+                  screentip="Bind every command to Ctrl+Alt+Shift (Cmd+Option+Shift on Mac) + a letter"
                   supertip="Installed in the Normal template, so they work in every document. LingTeXRemoveShortcuts takes them out again."/>
           <button id="LingTeXShowKeys"
                   label="Shortcuts"

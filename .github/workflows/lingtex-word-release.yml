@@ -133,6 +133,6 @@ jobs:
             keyboard shortcuts (Ctrl+Alt+Shift + a letter on Windows,
             Cmd+Option+Shift + a letter on Mac; a key Word already uses is skipped
             for an alternate letter, and **Shortcuts** on the tab lists what
-            landed). The **LingTeX** tab is on the ribbon of every document.
+            landed). The **Interlinear** tab is on the ribbon of every document.
 
             `INSTALL.md` in the zip has the same steps, and how to remove it.

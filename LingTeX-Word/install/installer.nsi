@@ -1,7 +1,7 @@
 ; installer.nsi -- LingTeX-Word for Windows, the .exe most users get.
 ;
 ; Everything it does: copy LingTeX-Word.dotm into Word's STARTUP folder, where
-; Word loads it at every start, so the LingTeX tab is on every document; and
+; Word loads it at every start, so the Interlinear tab is on every document; and
 ; register an uninstaller that takes it out again. Nothing needs administrator
 ; rights -- STARTUP is per user -- and the file NSIS extracts carries no
 ; "downloaded from the internet" mark, so Word does not block its macros.
@@ -35,7 +35,7 @@ SetCompressor /SOLID lzma
 !define MUI_WELCOMEPAGE_TITLE "LingTeX-Word ${VERSION}"
 !define MUI_WELCOMEPAGE_TEXT "This installs LingTeX-Word, a Word add-in for interlinear glossed text: paste an example from FLEx and it becomes a table that wraps to the page.$\r$\n$\r$\nIt puts one file, LingTeX-Word.dotm, into Word's STARTUP folder for your user account. No administrator rights are needed.$\r$\n$\r$\nClose Word before continuing."
 !define MUI_FINISHPAGE_TITLE "Installed"
-!define MUI_FINISHPAGE_TEXT "Start Word. A message will say LingTeX-Word is installed and list its keyboard shortcuts (Ctrl+Alt+Shift + a letter), and the LingTeX tab will be on the ribbon of every document.$\r$\n$\r$\nTo remove it later: Settings > Apps > LingTeX-Word > Uninstall."
+!define MUI_FINISHPAGE_TEXT "Start Word. A message will say LingTeX-Word is installed and list its keyboard shortcuts (Ctrl+Alt+Shift + a letter), and the Interlinear tab will be on the ribbon of every document.$\r$\n$\r$\nTo remove it later: Settings > Apps > LingTeX-Word > Uninstall."
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
