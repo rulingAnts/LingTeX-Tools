@@ -145,7 +145,7 @@ Open documents at start: 1
   PASS   top padding is 1
   PASS   bottom padding is 1.5
   PASS   no row runs past the example's right indent
-         widest row 205.75pt, room 396pt
+         widest row 206.25pt, room 396pt
   PASS   the translation paragraph is there
   PASS   space above the translation
   PASS   space after the example, on the translation
@@ -209,10 +209,10 @@ Open documents at start: 1
   PASS   every cell of the first row starts at the same height, number included
          cell 1 at 72
   PASS   the number paragraph has the row's space before and after, single-spaced
-         4 rows; heights 15 / 20.25 / 15 ... last 14.25
+         4 rows; heights 14.1999969482422 / 20.8500061035156 / 15.1499938964844 ... last 13.9000091552734
   PASS   rows: Word reported positions
-  PASS   the numbered first row is as tall as the later vernacular row
-  PASS   the gloss row before the wrap is the last gloss row plus the line gap
+  FAIL   the numbered first row is as tall as the later vernacular row
+  FAIL   the gloss row before the wrap is the last gloss row plus the line gap
 
 -- fromtext --------------------------------------------------
   PASS   TextLines of nothing is the empty sentinel, not an error
@@ -263,16 +263,16 @@ Open documents at start: 1
 
 -- measure ---------------------------------------------------
   PASS   widths are strictly increasing for i < iii < WWW
-         i=3  iii=8.25  WWW=27.75
+         i=2.84999990463257  iii=8.55000019073486  WWW=27.4500007629395
   PASS   measurement reported no failure
   PASS   width of i is in 1..12pt
   PASS   width of WWWWW is in 20..90pt
-         i=3  WWWWW=44.25   (probe recorded 3.0 and 53.3 at 12pt)
+         i=2.84999990463257  WWWWW=44.5499992370605   (probe recorded 3.0 and 53.3 at 12pt)
   PASS   empty string measures 0
   PASS   a single space measures 0
   PASS   a letter measures more than 0
   PASS   a batch agrees with single measurements
-         PST as a gloss 15, as a morpheme 17.25
+         PST as a gloss 15.1499996185303, as a morpheme 17.0499992370605
   PASS   role is part of the cache identity
   PASS   a cache hit opens no document
   PASS   ClearCache really invalidates
@@ -282,11 +282,11 @@ Open documents at start: 1
 
 -- agreement -------------------------------------------------
   PASS   measured width of ERG matches the drawn width
-         measured 17.25, drawn 17.25
+         measured 17.0499992370605, drawn 17.0499992370605
   PASS   measured width of follow.CMP matches the drawn width
-         measured 51.75, drawn 51.75
+         measured 52.0999984741211, drawn 52.0999984741211
   PASS   measured width of dream matches the drawn width
-         measured 28.5, drawn 28.5
+         measured 28.3999996185303, drawn 28.3999996185303
   PASS   measured width of Ozivela matches the drawn width
          measured 36, drawn 36
   PASS   transform: follow.CMP on a gloss row keeps a full-size first capital
@@ -316,7 +316,7 @@ Open documents at start: 1
   PASS   bottom padding is 0
   PASS   every form sits directly above its gloss (equal column widths)
   PASS   no row is wider than the text area
-         widest row 192.75pt, text area 468pt
+         widest row 193.25pt, text area 468pt
   PASS   every row's first cell carries its tier's paragraph style
   PASS   interlinear cells are not spell-checked
   PASS   the translation still is
@@ -564,5 +564,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 492 passed
+FAILURES -- 490 passed, 2 FAILED
 
