@@ -94,3 +94,17 @@ makes the first run put them back at the next start. beta.2 → beta.3 kept
 when SETUP_VERSION equals the previous `word-v*` tag's, locally and in CI, so a
 release cannot ship without the bump. It is compiled into the template, so a
 release whose only change is packaging still needs a template rebuild in Word.
+
+**Read the template's VBA references before tagging.** `check-dotm.sh` now
+runs `tools/check-vba-refs.py`, which fails when the VBA project references
+another VBA project. beta.3, beta.4 and beta.5 carried a reference to the
+builder's own Normal template (`/Users/Seth/Library/Containers/.../Normal`),
+added because SaveAsTemplate saved a macro-enabled *document*, and a document
+references its attached template. As a document, Windows Word ignored it; once
+beta.5 declared the package a template, Windows reported "Compile error in
+hidden module: modLingTeX" and "Can't find project or library" (MISSING:
+Normal), and any Mac but the builder's would too. SaveAsTemplate now saves
+FileFormat 15. **After any change to `tools/ImportModules.bas`, re-paste
+modImport into LingTeX-Dev.dotm before running SaveAsTemplate**, or the old
+code does the saving. Before a tag, also load the release template in Windows
+Word once: nothing on the Mac or in CI compiles it there.
