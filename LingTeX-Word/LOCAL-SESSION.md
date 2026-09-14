@@ -99,6 +99,15 @@ requests.
   (with 9pt set above the example, by the test) and half-repainted; the
   "janked" screenshot was that document, and the `rows` test now checks
   every cell of the first row starts at the same height.
+- **The user guide** (2026-09-14, Seth: a PDF with the release, button icons
+  as pictures): `GUIDE.md` is the source, `tools/make-guide.py` renders it
+  with reportlab + python-markdown (Helvetica, so Windows-1252 only; the
+  icons inline from src/icons; table columns measured from plain text so no
+  word breaks mid-word). The release workflow pip-installs the three
+  packages, renders `LingTeX-Word-Guide-<tag>.pdf`, ships it as an asset
+  and inside both zips. Locally: python3 tools/make-guide.py -> build/.
+  Shortcuts: H opens the Settings dialog (was the report), F/B/V is Text to
+  Interlinear; SETUP_VERSION 3, so every install re-binds at its next start.
 - **Text to Interlinear** (2026-09-14, Seth): select typed lines (words /
   glosses / translation, blank lines anywhere) and draw them. Not Word's
   text-to-table: the lines become the model directly (modIgtModel, PLAIN

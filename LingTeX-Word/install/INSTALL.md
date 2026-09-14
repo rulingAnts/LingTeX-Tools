@@ -2,9 +2,10 @@
 
 LingTeX-Word is one file, `LingTeX-Word.dotm`, a Word template that lives in
 Word's STARTUP folder and loads at every start. Once it is there, every
-document has a **LingTeX** tab on the ribbon: insert an interlinear example
-from FLEx or from text, re-wrap it to the page, split and merge columns,
-check the glossing, indent, number.
+document has an **Interlinear** tab on the ribbon: insert an interlinear
+example from FLEx or from text, re-wrap it to the page, split and merge
+columns, check the glossing, indent, number. `LingTeX-Word-Guide.pdf`, beside
+this file, is the user guide.
 
 **Word must be closed while you install.**
 

@@ -7,7 +7,9 @@ Part of [LingTeX Tools](../README.md), but a self-contained sub-project: it
 shares no build step with the web app, the browser extensions or the desktop app,
 and ships as its own two downloads.
 
-> **Setting it up for the first time? Start with
+> **Using it? [`GUIDE.md`](GUIDE.md) is the user guide**, shipped as a PDF with
+> every release (`tools/make-guide.py` renders it, icons inline).
+> **Setting it up for the first time as a developer? Start with
 > [`QUICKSTART.md`](QUICKSTART.md).** It runs the probe, then the modules in two
 > stages, and lists what to do for each way it can fail.
 
