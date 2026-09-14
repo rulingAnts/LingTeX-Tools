@@ -1134,6 +1134,10 @@ Private Sub TestTextToInterlinear()
           "panjang kalau dia lihat sesuatu.)" & vbCr
 
     '-- the pure steps -----------------------------------------------------
+    lines = TextLines("")
+    Ok "TextLines of nothing is the empty sentinel, not an error", (UBound(lines) = -1)
+    lines = TextLines("word" & vbCr & Chr(7))
+    Ok "  and a cell mark is not a line", (UBound(lines) = 0)
     lines = TextLines(raw)
     Ok "TextLines drops the blank lines and keeps three", (UBound(lines) = 2)
     Ok "  a manual line break inside a line is a space", (InStr(lines(1), "can make.long") > 0)
@@ -1231,6 +1235,32 @@ Private Sub TestTextToInterlinear()
     doc.Content.Select
     RunCommandByName "LingTeXInsertInterlinear"
     Ok "Insert Interlinear on the same plain lines takes the same road", (doc.Tables.Count = 1)
+
+    ' The number alone on its own line is dropped whole (the review found it
+    ' becoming the example's only column, 2026-09-14).
+    doc.Content.Text = "(1)" & vbCr & Mid$(raw, 5)
+    doc.Content.Select
+    RunCommandByName "LingTeXTextToInterlinear"
+    Ok "a number alone on the first line is dropped", (doc.Tables.Count = 1)
+    If doc.Tables.Count = 1 Then
+        back = ReadExampleFromTable(doc.Tables(1))
+        Ok "  and the example is the same eleven columns", (back.ColCount = 11)
+        Eq "  starting with the first word", back.Cells(0, 0), "Ewaub"
+    End If
+
+    ' A selection from the second word of the first line to the middle of
+    ' the last: the whole paragraphs are read, since the whole paragraphs are
+    ' replaced -- nothing is erased that did not reach the table.
+    doc.Content.Text = raw
+    doc.Range(doc.Paragraphs(1).Range.Start + 10, doc.Paragraphs(5).Range.Start + 20).Select
+    RunCommandByName "LingTeXTextToInterlinear"
+    Ok "a selection that starts mid-line still reads the whole lines", (doc.Tables.Count = 1)
+    If doc.Tables.Count = 1 Then
+        back = ReadExampleFromTable(doc.Tables(1))
+        Eq "  the first word is in the table, not erased", back.Cells(0, 0), "Ewaub"
+        Ok "  and the whole translation is under it", _
+            (InStr(ParagraphAfterTable(doc.Tables(1)).Range.Text, "sesuatu") > 0)
+    End If
 
     gQuiet = savedQuiet
     gQuietText = savedText

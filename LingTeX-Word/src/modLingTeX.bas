@@ -207,7 +207,7 @@ Public Sub LingTeXFirstRun()
     On Error GoTo 0
 
     Report "LingTeX-Word is installed." & vbCr & vbCr & _
-           "The LingTeX tab is on the ribbon of every document: insert an " & _
+           "The Interlinear tab is on the ribbon of every document: insert an " & _
            "interlinear example from FLEx or from text, re-wrap, split and " & _
            "merge columns, check the glossing. Examples are numbered; the " & _
            "Numbers button turns that off for a document." & vbCr & vbCr & _
@@ -307,8 +307,12 @@ Public Sub LingTeXInsertInterlinear()
         End If
         Set target = Selection.Range.Duplicate
     Else
-        raw = Selection.Range.Text
+        ' The whole paragraphs the selection touches: that is what the example
+        ' replaces, so it is what is read -- a selection from the second word
+        ' would otherwise erase the first without drawing it (the review,
+        ' 2026-09-14).
         Set target = SelectedParagraphRange()
+        raw = target.Text
     End If
 
     ex = ModelFromText(raw, SettingGranularity(doc))
@@ -317,7 +321,7 @@ Public Sub LingTeXInsertInterlinear()
         ' text -- words on one line, glosses on the next -- take the Text to
         ' Interlinear road, with its one question (Seth, 2026-09-14).
         If Not fromClipboard Then
-            If InStr(raw, vbTab) = 0 Then
+            If InStr(raw, vbTab) = 0 And Not SelectionInTable() Then
                 lines = TextLines(raw)
                 If UBound(lines) >= 1 Then
                     TextToInterlinearCore doc, target, raw
@@ -443,28 +447,57 @@ Public Sub LingTeXTextToInterlinear()
                "Blank lines between them do no harm.", vbInformation
         Exit Sub
     End If
-    On Error Resume Next
-    inTable = Selection.Information(wdWithInTable)
-    Err.Clear
-    On Error GoTo 0
+    inTable = SelectionInTable()
     If inTable Then
         Report "The selection is inside a table. Convert Table turns a table into " & _
                "an example; this command wants lines of plain text.", vbInformation
         Exit Sub
     End If
+    On Error GoTo Fail
     Set target = SelectedParagraphRange()
-    TextToInterlinearCore doc, target, Selection.Range.Text
+    ' What is read is what is replaced: the whole paragraphs, not the part of
+    ' them a hand-dragged selection happened to cover.
+    TextToInterlinearCore doc, target, target.Text
+    Exit Sub
+
+Fail:
+    Report "Error " & CStr(Err.Number) & ": " & Err.Description, vbCritical
 End Sub
+
+' Is the selection inside a table? False when Word cannot say.
+Private Function SelectionInTable() As Boolean
+    On Error Resume Next
+    SelectionInTable = Selection.Information(wdWithInTable)
+    If Err.Number <> 0 Then SelectionInTable = False
+    Err.Clear
+    On Error GoTo 0
+End Function
 
 ' The shared road: lines out of the text, the question, the model, the draw.
 Private Sub TextToInterlinearCore(doc As Document, target As Range, ByVal raw As String)
     Dim lines() As String
-    Dim n As Long, nFree As Long
+    Dim n As Long, nFree As Long, i As Long
     Dim answer As String
     Dim ex As IgtExample
 
     lines = TextLines(raw)
     n = UBound(lines) + 1
+    ' A number alone on the first line -- "(1)" on a line of its own -- is
+    ' dropped whole; a number that opens the first line is dropped from it.
+    ' The document numbers its examples itself.
+    If n >= 1 Then
+        If IsExampleNumberToken(lines(0)) Then
+            For i = 0 To n - 2
+                lines(i) = lines(i + 1)
+            Next i
+            n = n - 1
+            If n > 0 Then
+                ReDim Preserve lines(0 To n - 1)
+            Else
+                ReDim lines(-1 To -1)
+            End If
+        End If
+    End If
     If n < 2 Then
         Report "Select at least two lines: the words of the example on one line " & _
                "and their glosses on the next, with any translation under them.", _
@@ -472,16 +505,11 @@ Private Sub TextToInterlinearCore(doc As Document, target As Range, ByVal raw As
         Exit Sub
     End If
     lines(0) = StripExampleNumber(lines(0))
-    If lines(0) = "" Then
-        Report "The first line holds only an example number. The words of the " & _
-               "example come first; the document numbers it itself.", vbInformation
-        Exit Sub
-    End If
 
     nFree = GuessFreeLineCount(lines)
     answer = Trim$(Ask(FreeLinesPrompt(lines, nFree), CStr(nFree)))
     If answer = "" Then Exit Sub                     ' Cancel
-    If Not IsDigitsOnly(answer) Then
+    If Not IsDigitsOnly(answer) Or Len(answer) > 4 Then
         Report "A whole number of lines, please: 0, 1, 2...", vbExclamation
         Exit Sub
     End If
@@ -502,27 +530,41 @@ Private Sub TextToInterlinearCore(doc As Document, target As Range, ByVal raw As
     DrawParsedExample ex, target, doc, "Text to interlinear"
 End Sub
 
-' The question: every line with its word count, then the ask.
+' The question first, then the guess, then every line with its word count --
+' in that order because InputBox shows about 1,000 characters and cuts the
+' rest (InstallShortcuts guards its report the same way), so the question
+' must never be what is cut. Past eight lines the listing shows the first
+' four and the last four.
 Private Function FreeLinesPrompt(lines() As String, ByVal guess As Long) As String
     Dim s As String
-    Dim i As Long
-    Dim preview As String
-    s = CStr(UBound(lines) + 1) & " lines selected:" & vbCr & vbCr
-    For i = 0 To UBound(lines)
-        preview = lines(i)
-        If Len(preview) > 60 Then preview = Left$(preview, 57) & "..."
-        s = s & CStr(i + 1) & ".  " & preview & "   (" & CStr(WordCount(lines(i))) & _
-            " words)" & vbCr
-    Next i
-    s = s & vbCr & "How many of the LAST lines are free translations? The lines " & _
-        "before them are the tiers, in order: the words, then their glosses. " & _
-        "Type 0 if there is none."
+    Dim i As Long, n As Long
+    n = UBound(lines) + 1
+    s = "How many of the LAST of these " & CStr(n) & " lines are free translations? " & _
+        "The lines before them are the tiers, in order: the words, then their " & _
+        "glosses. Type 0 if there is none."
     If guess > 0 Then
         s = s & vbCr & vbCr & "The last " & CStr(guess) & IIf(guess = 1, " line has", _
             " lines have") & " a different number of words from the first, so " & _
             IIf(guess = 1, "it looks", "they look") & " like the translation."
     End If
+    s = s & vbCr
+    For i = 0 To n - 1
+        If n > 8 And i = 4 Then
+            s = s & vbCr & "   ..."
+            i = n - 5
+        Else
+            s = s & vbCr & PromptLine(lines, i)
+        End If
+    Next i
     FreeLinesPrompt = s
+End Function
+
+Private Function PromptLine(lines() As String, ByVal i As Long) As String
+    Dim preview As String
+    preview = lines(i)
+    If Len(preview) > 50 Then preview = Left$(preview, 47) & "..."
+    PromptLine = CStr(i + 1) & ".  " & preview & "   (" & CStr(WordCount(lines(i))) & _
+                 " words)"
 End Function
 
 Private Function IsDigitsOnly(ByVal s As String) As Boolean
@@ -1514,8 +1556,8 @@ Public Sub LingTeXToggleRewrapOnSelectionChange()
     RefreshRibbon
     Report "Re-wrap an example as soon as the cursor leaves it: now " & _
            IIf(v, "ON", "OFF") & " for this document." & vbCr & vbCr & _
-           IIf(v, "Off is the default, because this repaints while you type.", _
-                  ""), vbInformation
+           IIf(v, "It fires only when the cursor leaves an example, never while " & _
+                  "you type inside one.", ""), vbInformation
 End Sub
 
 Public Sub LingTeXToggleExampleNumbers()

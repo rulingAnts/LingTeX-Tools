@@ -848,6 +848,11 @@ Public Function TextLines(ByVal raw As String) As String()
 
     raw = Replace(Replace(raw, vbCrLf, vbLf), vbCr, vbLf)
     parts = Split(raw, vbLf)
+    If UBound(parts) < 0 Then                ' "" splits to nothing at all
+        ReDim out(-1 To -1)
+        TextLines = out
+        Exit Function
+    End If
     ReDim out(0 To UBound(parts))
     For i = 0 To UBound(parts)
         ln = CleanTextLine(parts(i))
@@ -864,13 +869,29 @@ Public Function TextLines(ByVal raw As String) As String()
     TextLines = out
 End Function
 
-' One line as TextLines wants it.
+' One line as TextLines wants it. Word's own control characters go too: a
+' cell mark (7), an inline shape (1), a footnote or comment mark (2, 5), a
+' drawn object (8), field marks (19, 20, 21), an optional hyphen (31) -- a
+' whole cell selected in a table ends in a cell mark, which would otherwise
+' be a one-"word" line of its own (the review, 2026-09-14). A column break
+' (14) is a space, a non-breaking hyphen (30) a hyphen.
 Public Function CleanTextLine(ByVal s As String) As String
     s = StripInvisible(s)
     s = Replace(s, Chr(11), " ")           ' manual line break: the same line
     s = Replace(s, Chr(12), " ")           ' page break
+    s = Replace(s, Chr(14), " ")           ' column break
     s = Replace(s, vbTab, " ")
     s = Replace(s, ChrW(&HA0), " ")        ' non-breaking space
+    s = Replace(s, Chr(30), "-")           ' non-breaking hyphen
+    s = Replace(s, Chr(1), "")
+    s = Replace(s, Chr(2), "")
+    s = Replace(s, Chr(5), "")
+    s = Replace(s, Chr(7), "")
+    s = Replace(s, Chr(8), "")
+    s = Replace(s, Chr(19), "")
+    s = Replace(s, Chr(20), "")
+    s = Replace(s, Chr(21), "")
+    s = Replace(s, Chr(31), "")
     Do While InStr(s, "  ") > 0
         s = Replace(s, "  ", " ")
     Loop
