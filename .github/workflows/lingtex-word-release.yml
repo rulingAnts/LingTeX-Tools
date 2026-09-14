@@ -45,8 +45,13 @@ jobs:
           fetch-depth: 0
 
       - name: The template is committed and matches src/
+        env:
+          # check-dotm.sh reads the VBA references with olefile; here the check
+          # may not be skipped.
+          LINGTEX_REQUIRE_OLEFILE: "1"
         run: |
           [ -f LingTeX-Word/LingTeX-Word.dotm ] || { echo "::error::LingTeX-Word/LingTeX-Word.dotm is not committed; see LingTeX-Word/RELEASING.md"; exit 1; }
+          python3 -m pip install --quiet --disable-pip-version-check olefile
           sh LingTeX-Word/tools/check-dotm.sh
 
       - name: NSIS

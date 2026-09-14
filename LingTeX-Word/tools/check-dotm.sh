@@ -186,6 +186,18 @@ if [ -f "$ct" ]; then
     esac
 fi
 
+#-- 4c. the VBA project references no other project ---------------------------
+# A project reference names a file by a path on the machine that saved it, so
+# everywhere else it is MISSING and nothing compiles: beta.3 to beta.5 carried
+# one to the builder's Normal, and beta.5 failed on Windows with "Compile error
+# in hidden module". tools/check-vba-refs.py reads the references out of
+# word/vbaProject.bin (needs python3 and olefile; CI requires both).
+if command -v python3 >/dev/null 2>&1; then
+    if python3 "$here/check-vba-refs.py" "$dotm"; then :; else fails=$((fails + 1)); fi
+else
+    echo "  SKIP  python3 is not available; VBA references not checked"
+fi
+
 #-- 5. the ribbon is well-formed, and every onAction resolves ----------------
 if command -v xmllint >/dev/null 2>&1; then
     if xmllint --noout "$ribbon" 2>/dev/null; then
