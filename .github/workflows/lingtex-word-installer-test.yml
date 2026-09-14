@@ -1,0 +1,77 @@
+name: LingTeX-Word installer test
+
+# Builds the Windows installer with NSIS as the release does (Linux, makensis
+# from apt) and runs it for real on a Windows runner: silent install, upgrade,
+# Word running, the installed template held open, uninstall
+# (LingTeX-Word/install/test-installer.ps1). Runs when the installer, its test
+# or the template changes; from the Actions tab; and from the release
+# workflow, which will not publish an installer that fails it. The built
+# installers stay as an artifact for a week, for a by-hand run on a VM.
+#
+# The installer is built and tested here, never with a local makensis.
+# Public repository, standard runners (ubuntu-latest, windows-latest): free.
+
+on:
+  push:
+    paths:
+      - 'LingTeX-Word/install/installer.nsi'
+      - 'LingTeX-Word/install/test-installer.ps1'
+      - 'LingTeX-Word/LingTeX-Word.dotm'
+      - '.github/workflows/lingtex-word-installer-test.yml'
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: NSIS
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nsis
+
+      - name: Two installers, an old version and a new one
+        run: |
+          mkdir -p out
+          for v in 0.0.1-test 0.0.2-test; do
+            makensis -V2 -DVERSION="$v" \
+              -DDOTM="$PWD/LingTeX-Word/LingTeX-Word.dotm" \
+              -DOUT="$PWD/out/LingTeX-Word-Setup-$v.exe" \
+              LingTeX-Word/install/installer.nsi
+          done
+          ls -la out
+
+      - name: Hand them to the Windows job
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-under-test
+          path: out/LingTeX-Word-Setup-*.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  windows:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: The installers
+        uses: actions/download-artifact@v4
+        with:
+          name: installers-under-test
+          path: out
+
+      - name: Install, upgrade, refuse, uninstall
+        shell: pwsh
+        run: |
+          ./LingTeX-Word/install/test-installer.ps1 `
+            -Old out/LingTeX-Word-Setup-0.0.1-test.exe `
+            -New out/LingTeX-Word-Setup-0.0.2-test.exe `
+            -Template LingTeX-Word/LingTeX-Word.dotm
