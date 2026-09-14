@@ -230,9 +230,11 @@ jobs:
               anyone who prefers to see what the installer does.)
             - **Mac:** open `-macos.dmg` and double-click **Install LingTeX-Word**.
               It opens in Script Editor with what it does written at the top; click
-              the **Run** button (the triangle). It copies the template into Word's
-              Startup folder, replacing an earlier version, and clears the download
-              quarantine. When Word asks whether to enable macros in
+              the **Run** button (the triangle) and follow the messages. If macOS
+              asks whether Script Editor may access data from other apps, click
+              **Allow**: that is the copy into Word's folder. It copies the template
+              into Word's Startup folder, replacing an earlier version, and clears
+              the download quarantine. When Word asks whether to enable macros in
               `LingTeX-Word.dotm`, choose **Enable Macros**.
             - **The user guide** is `LingTeX-Word-Guide-…pdf`, and is inside the
               Windows zip and the Mac disk image.
