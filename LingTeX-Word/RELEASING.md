@@ -67,6 +67,10 @@ folder (never from a clone): it installs the shortcuts, records the setup
 version in the Normal template, and shows one message. Not from `AutoExec`
 itself: Word times each STARTUP template's load, a modal message counts for
 as long as it is on screen, and the result was an add-in alert on Windows
-offering to disable the add-in. Bump
-`SETUP_VERSION` in `modLingTeX` to make every machine do it again at the next
-start (for instance after the shortcut table changes).
+offering to disable the add-in. **Bump
+`SETUP_VERSION` in `modLingTeX` for every release**, not only when the
+shortcut table changes: where Word lets the add-in store its bindings in
+the template itself (Windows does), the installer's replacement of
+`LingTeX-Word.dotm` throws them away, and only a moved `SETUP_VERSION`
+makes the first run put them back at the next start. beta.2 → beta.3 kept
+"2" and would have lost them; beta.4 moved to "3".
