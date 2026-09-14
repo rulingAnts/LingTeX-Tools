@@ -215,6 +215,8 @@ Open documents at start: 1
   PASS   the gloss row before the wrap is the last gloss row plus the line gap
 
 -- fromtext --------------------------------------------------
+  PASS   TextLines of nothing is the empty sentinel, not an error
+  PASS     and a cell mark is not a line
   PASS   TextLines drops the blank lines and keeps three
   PASS     a manual line break inside a line is a space
   PASS     a double space is one
@@ -252,6 +254,12 @@ Open documents at start: 1
          13 columns
   PASS   Cancel at the question draws nothing
   PASS   Insert Interlinear on the same plain lines takes the same road
+  PASS   a number alone on the first line is dropped
+  PASS     and the example is the same eleven columns
+  PASS     starting with the first word
+  PASS   a selection that starts mid-line still reads the whole lines
+  PASS     the first word is in the table, not erased
+  PASS     and the whole translation is under it
 
 -- measure ---------------------------------------------------
   PASS   widths are strictly increasing for i < iii < WWW
@@ -556,5 +564,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 484 passed
+ALL PASS -- 492 passed
 
