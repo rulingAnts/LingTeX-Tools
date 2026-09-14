@@ -214,6 +214,45 @@ Open documents at start: 1
   PASS   the numbered first row is as tall as the later vernacular row
   PASS   the gloss row before the wrap is the last gloss row plus the line gap
 
+-- fromtext --------------------------------------------------
+  PASS   TextLines drops the blank lines and keeps three
+  PASS     a manual line break inside a line is a space
+  PASS     a double space is one
+  PASS   StripExampleNumber drops (1)
+  PASS     and 12a.
+  PASS     and 3)
+  PASS     but not a bare number, which is a word
+  PASS     nor a word
+  PASS   IsExampleNumberToken knows (1), (12a), 1), 1.
+  PASS     and refuses a, (a), 1, pe.
+  PASS   eleven words on the first line
+  PASS   the guess is one translation: the last line's count differs, the gloss line's does not
+  PASS   ModelFromLines: two tiers, eleven columns, one translation
+  PASS     the first cell is the first word
+  PASS     the placeholder is a column of its own
+  PASS     the tiers are Vernacular and Gloss
+  PASS     the translation is verbatim
+  PASS   ProjectToMorphemes splits the two columns whose form AND gloss have a boundary
+  PASS     Akwal-mam becomes Akwal, -mam
+  PASS     over Neck, -3.POSS
+  PASS     nalami over what-PP is left whole: the form has no boundary
+  PASS   the sample's di=de and deda=di split, bujo does not: five columns
+  PASS     =de over =ERG
+  PASS     projecting again changes nothing
+  PASS   Text to Interlinear draws an example from the selected lines
+  PASS     two tiers, eleven columns: by word
+  PASS     the number is dropped: the first cell is the first word
+  PASS     the translation is under it
+  PASS   LingTeXTextToInterlinear leaves gBusy clear
+  PASS   LingTeXTextToInterlinear leaves ScreenUpdating on
+  PASS   LingTeXTextToInterlinear leaks no document
+  PASS   LingTeXTextToInterlinear leaves no undo record open
+  PASS   by morpheme: the same lines draw with thirteen columns
+  PASS     thirteen
+         13 columns
+  PASS   Cancel at the question draws nothing
+  PASS   Insert Interlinear on the same plain lines takes the same road
+
 -- measure ---------------------------------------------------
   PASS   widths are strictly increasing for i < iii < WWW
          i=3  iii=8.25  WWW=27.75
@@ -517,5 +556,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 448 passed
+ALL PASS -- 484 passed
 
