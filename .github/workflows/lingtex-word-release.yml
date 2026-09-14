@@ -42,12 +42,22 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq nsis
 
+      - name: The user guide (PDF from GUIDE.md, icons inline)
+        # Pure Python; the runner's python3 plus three pip packages, seconds.
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check markdown reportlab pillow
+
       - name: The tag
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then tag="${{ github.ref_name }}"; else tag="word-v0.1.0-${{ inputs.label }}"; fi
           echo "TAG=$tag" >> "$GITHUB_ENV"
           echo "VERSION=${tag#word-v}" >> "$GITHUB_ENV"
           echo "$tag"
+
+      - name: Render the guide
+        run: |
+          mkdir -p out
+          python3 LingTeX-Word/tools/make-guide.py --version "$TAG" --out "out/LingTeX-Word-Guide-$TAG.pdf"
 
       - name: Windows installer (.exe)
         # The same two actions as install.bat, wrapped for people who would
@@ -70,6 +80,8 @@ jobs:
           cp LingTeX-Word/install/install.bat LingTeX-Word/install/install.ps1 out/win/
           cp LingTeX-Word/LingTeX-Word.dotm LingTeX-Word/install/INSTALL.md out/mac/
           cp LingTeX-Word/install/install.command LingTeX-Word/install/install.sh out/mac/
+          cp "out/LingTeX-Word-Guide-$tag.pdf" out/win/LingTeX-Word-Guide.pdf
+          cp "out/LingTeX-Word-Guide-$tag.pdf" out/mac/LingTeX-Word-Guide.pdf
           chmod +x out/mac/install.command out/mac/install.sh
           ( cd out/win && zip -q -X -r "../LingTeX-Word-$tag-windows.zip" . )
           ( cd out/mac && zip -q -X -r "../LingTeX-Word-$tag-macos.zip" . )
@@ -89,6 +101,7 @@ jobs:
             out/LingTeX-Word-Setup-${{ env.TAG }}.exe
             out/LingTeX-Word-${{ env.TAG }}-windows.zip
             out/LingTeX-Word-${{ env.TAG }}-macos.zip
+            out/LingTeX-Word-Guide-${{ env.TAG }}.pdf
             out/LingTeX-Word.dotm
           body: |
             **LingTeX-Word** is a Word add-in for interlinear glossed text: paste an
@@ -110,6 +123,7 @@ jobs:
               and registers an uninstaller under Settings → Apps. (The
               `-windows.zip` holds the same template with `install.bat`, for
               anyone who prefers to see what the installer does.)
+            - **The user guide** is `LingTeX-Word-Guide-…pdf`, and is inside both zips.
             - **Mac:** unzip `-macos.zip`, double-click `install.command` (if macOS refuses, right-click
               it and choose Open). It copies the template into Word's Startup folder
               and clears the download quarantine. When Word asks whether to enable
