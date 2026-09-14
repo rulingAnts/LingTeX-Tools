@@ -746,7 +746,7 @@ footer a:hover { text-decoration: underline; }
           <span class="os-icon">🪟</span> Windows (.zip, no installer)
         </a>
         <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/download/word-v0.1.0-beta.4/LingTeX-Word-word-v0.1.0-beta.4-macos.zip" class="dl-btn" data-word="maczip" target="_blank">
-          <span class="os-icon"></span> macOS (.zip)
+          <span class="os-icon"></span> macOS (<span data-word="macext">.zip</span>)
         </a>
         <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/download/word-v0.1.0-beta.4/LingTeX-Word-Guide-word-v0.1.0-beta.4.pdf" class="dl-btn" data-word="guide" target="_blank">
           <span class="os-icon">📖</span> User Guide (PDF)
@@ -1215,7 +1215,7 @@ footer a:hover { text-decoration: underline; }
     var pick = {
         exe:    function (n) { return /^LingTeX-Word-Setup-.*\.exe$/.test(n); },
         winzip: function (n) { return /-windows\.zip$/.test(n); },
-        maczip: function (n) { return /-macos\.zip$/.test(n); },
+        maczip: function (n) { return /-macos\.(dmg|zip)$/.test(n); },
         guide:  function (n) { return /^LingTeX-Word-Guide-.*\.pdf$/.test(n); }
     };
     fetch('https://api.github.com/repos/rulingAnts/LingTeX-Tools/releases?per_page=30',
@@ -1237,7 +1237,16 @@ footer a:hover { text-decoration: underline; }
                 var f = pick[k];
                 if (!f) return;
                 for (var j = 0; j < rel.assets.length; j++) {
-                    if (f(rel.assets[j].name)) { el.href = rel.assets[j].browser_download_url; return; }
+                    if (f(rel.assets[j].name)) {
+                        el.href = rel.assets[j].browser_download_url;
+                        // The Mac download was a zip and is a disk image from the
+                        // release after beta.4; the label follows the file.
+                        if (k === 'maczip') {
+                            var ext = rel.assets[j].name.replace(/^.*(\.[a-z]+)$/, '$1');
+                            document.querySelectorAll('[data-word="macext"]').forEach(function (x) { x.textContent = ext; });
+                        }
+                        return;
+                    }
                 }
             });
         })
