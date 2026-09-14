@@ -233,6 +233,35 @@ else
     fi
 fi
 
+#-- 7. an upgrade gets its shortcuts back -------------------------------------
+# The first run saves the shortcuts it installs into the installed template
+# itself, and records in Normal that it ran. An upgrade replaces that template,
+# so the shortcuts go, and the first run puts them back only when SETUP_VERSION
+# differs from the one recorded. So every release must move it (RELEASING.md);
+# beta.3 did not, and upgraders from beta.2 would have lost their shortcuts.
+# Compared with the newest word-v* tag behind this commit; skipped outside a
+# git clone, or in one with no such tag (CI fetches the history for this).
+setup_of() { tr -d '\r' | sed -n 's/.*SETUP_VERSION As String = "\([^"]*\)".*/\1/p' | head -1; }
+cur=$(setup_of < "$src/modLingTeX.bas")
+prev=""
+if command -v git >/dev/null 2>&1 && git -C "$root" rev-parse --git-dir >/dev/null 2>&1; then
+    prev=$(git -C "$root" tag --list 'word-v*' --merged HEAD --no-contains HEAD --sort=-creatordate 2>/dev/null | head -1)
+fi
+if [ -z "$cur" ]; then
+    fail "no SETUP_VERSION found in src/modLingTeX.bas"
+elif [ -z "$prev" ]; then
+    echo "  SKIP  no earlier word-v* tag in this clone, so SETUP_VERSION ($cur) is not compared"
+else
+    was=$(git -C "$root" show "$prev:./src/modLingTeX.bas" 2>/dev/null | setup_of)
+    if [ "$cur" != "$was" ]; then
+        pass "SETUP_VERSION moved since $prev ($was to $cur), so upgraders get their shortcuts back"
+    else
+        fail "SETUP_VERSION is still $cur, as in $prev: an upgrade would lose the shortcuts"
+        echo "        Bump SETUP_VERSION in src/modLingTeX.bas, then rebuild the template"
+        echo "        (RELEASING.md): it is compiled into the template, so this needs Word."
+    fi
+fi
+
 echo ""
 if [ "$fails" -eq 0 ]; then
     echo "ALL PASS"
