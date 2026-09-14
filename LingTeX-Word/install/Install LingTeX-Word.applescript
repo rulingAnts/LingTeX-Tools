@@ -59,11 +59,7 @@ on run
         set upgrading to fileExists(destination)
 
         do shell script "mkdir -p " & quoted form of folderPath
-        do shell script "cp -f " & quoted form of source & " " & quoted form of destination
-        -- Word will not load a quarantined template from its Startup folder.
-        do shell script "xattr -d com.apple.quarantine " & quoted form of destination & " 2>/dev/null; true"
-        -- cmp fails, and so stops the script with its error, unless the copy is identical.
-        do shell script "cmp -s " & quoted form of source & " " & quoted form of destination
+        installCopy(source, folderPath, destination)
 
         if upgrading then
             set resultText to "LingTeX-Word is upgraded."
@@ -99,6 +95,29 @@ on findTemplate()
     if chosen does not end with ".dotm" then error "That is not " & templateName & ":" & return & chosen
     return chosen
 end findTemplate
+
+-- The new template goes in under a temporary name, and only once it is
+-- complete, identical and cleared of quarantine is it moved over the old one,
+-- in a single step. A copy that fails therefore leaves the installed version
+-- where it was: copying straight onto it with cp -f deletes the old file when
+-- it cannot be opened, leaving Word nothing, or a half-written template it
+-- cannot open. The temporary name does not end in .dotm, so Word never tries
+-- to load it.
+on installCopy(source, folderPath, destination)
+    set staging to folderPath & "/LingTeX-Word.installing"
+    try
+        do shell script "cp " & quoted form of source & " " & quoted form of staging
+        -- Word will not load a quarantined template from its Startup folder.
+        do shell script "xattr -d com.apple.quarantine " & quoted form of staging & " 2>/dev/null; true"
+        do shell script "cmp -s " & quoted form of source & " " & quoted form of staging & " || { echo 'The copy is not identical to the original.' >&2; exit 1; }"
+        do shell script "mv -f " & quoted form of staging & " " & quoted form of destination
+    on error errorText number errorNumber
+        try
+            do shell script "rm -f " & quoted form of staging
+        end try
+        error errorText number errorNumber
+    end try
+end installCopy
 
 -- Word's Startup folder for the person running this. Word 2016 and later keep
 -- it in the Office group container. Word names the folders with a hidden
