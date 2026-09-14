@@ -89,7 +89,9 @@ same way, or delete `LingTeX-Word.dotm` from Word's Startup folder.
 
 Close Word and run the new installer (on the Mac, the new **Install
 LingTeX-Word**); it replaces the file. Documents made
-with an earlier version keep working, and re-wrap with the new one.
+with an earlier version keep working, and re-wrap with the new one. If your
+keyboard shortcuts stop working after an upgrade, click **Install Shortcuts**
+on the Interlinear tab once.
 
 ## The Interlinear tab
 
