@@ -97,7 +97,7 @@ right-hand column, for anyone who prefers that.
 
 | Button | What it does | Macro name |
 |---|---|---|
-| ![Insert Interlinear](src/icons/igtInsert.png) **Insert Interlinear** | With nothing selected, reads the clipboard; with text selected, replaces it. Accepts FLEx interlinear text, plain tab-separated rows, or lines you typed. | `LingTeXInsertInterlinear` |
+| ![Insert Interlinear](src/icons/igtInsert.png) **Insert Interlinear** | With nothing selected, reads the clipboard (FLEx interlinear text or plain tab-separated rows); with text selected, replaces it, and selected lines you typed take the Text to Interlinear road. | `LingTeXInsertInterlinear` |
 | ![Convert Table](src/icons/igtConvert.png) **Convert Table** | Adopts an ordinary Word table as an auto-wrapping example: one row per tier, a row merged into one cell as the translation. | `LingTeXConvertTableToIgt` |
 | ![Text to Interlinear](src/icons/igtFromText.png) **Text to Interlinear** | Turns selected lines of text into an example: the words on one line, their glosses on the next, the translation under them. | `LingTeXTextToInterlinear` |
 
@@ -119,9 +119,10 @@ right-hand column, for anyone who prefers that.
 
 ### Settings (toggles)
 
-These show the active document's setting and flip it. They apply to
-**new** examples; an example already on the page is unchanged until it is
-inserted again.
+These show the active document's setting and flip it. By Word, By Morpheme
+and Numbers apply to **new** examples; an example already on the page is
+unchanged until it is inserted again. First Capital applies to every example
+at its next re-wrap, which with the defaults is the next save.
 
 | Button | What it sets | Macro name |
 |---|---|---|
@@ -186,13 +187,15 @@ translations, so you are asked. The question lists every line with its word
 count and offers a guess: the trailing lines whose word count differs from
 the first line's. Accept it or type the number, or Cancel to draw nothing.
 
-With the document set to **By Morpheme**, every column whose form and gloss
-both carry a morpheme boundary is split at it, on both tiers, so `Akwal-mam`
-over `Neck-3.POSS` becomes two columns while `nalami` over `what-PP` stays one.
-Check Glossing reports that mismatch afterwards, as it always has.
+With the document set to **By Morpheme**, every column in which every filled
+tier cell carries a morpheme boundary is split at it, on every tier, so
+`Akwal-mam` over `Neck-3.POSS` becomes two columns while `nalami` over
+`what-PP` stays one (an empty cell does not stand in the way). Check Glossing
+reports that mismatch afterwards, as it always has.
 
-**Insert Interlinear** takes the same road when the text it is given is plain
-lines rather than FLEx text or tab-separated rows.
+**Insert Interlinear** takes the same road when its *selection* is plain
+lines rather than FLEx text or tab-separated rows; from the clipboard it
+expects FLEx text or tab-separated rows.
 
 ## Working with an example
 
@@ -235,12 +238,14 @@ can point at it; the list style decides its format.
 an example keeps its number through every re-wrap. The width of the number
 column is a setting (36 pt by default).
 
-**Per chapter.** Modify the list style *LingTeX Example Number* (Settings,
-then *Example Number* in the Styles list, then Modify in Word): link its
-level 1 to Heading 1 with no number text, put `(%2)` on level 2 with no
-trailing character and a text position of 0, and set the list level to 2 in
-the Settings dialog. New examples then sit on level 2, which Word restarts
-after every Heading 1.
+**Per chapter.** Modify the list style *LingTeX Example Number* in Word's
+own style dialog (Format > Style on Mac, the Styles pane on Windows; set its
+list to *All styles* to see it): link its level 1 to Heading 1 with no number
+text, put `(%2)` on level 2 with no trailing character and a text position of
+0, and set the list level to 2 in the Settings dialog. New examples then sit
+on level 2, which Word restarts after every Heading 1. (The *Example Number*
+entry in the Settings dialog's Styles list is the paragraph style of the
+number cell, not this list style.)
 
 ## The Settings dialog
 
@@ -390,7 +395,7 @@ widths are remembered.
 it, and on Windows that Word's Trust Center allows macros in templates from
 the Startup folder.
 
-**Reporting a problem.** LingTeX-Word is part of LingTeX Tools:
-https://github.com/rulingAnts/LingTeX-Tools. Open an issue there with the
-version from the title of this guide, your platform, and, where you can, the
-text of the example.
+**Reporting a problem.** LingTeX-Word is part of LingTeX Tools, at
+[github.com/rulingAnts/LingTeX-Tools](https://github.com/rulingAnts/LingTeX-Tools).
+Open an issue there with the version from the title of this guide, your
+platform, and, where you can, the text of the example.

@@ -125,7 +125,10 @@ class Guide:
         self.version = version
         self.out = out
         self.bad_chars = set()
-        self.width = A4[0] - 2 * 22 * mm
+        # The text column: the page less the margins less the frame's own 6pt
+        # of padding each side, which paragraphs respect and a Table sized to
+        # the bare column would overhang (the review, 2026-09-14).
+        self.width = A4[0] - 2 * 22 * mm - 12
 
     def esc(self, s):
         # Helvetica is WinAnsi; say what falls outside rather than print a box.
@@ -221,8 +224,11 @@ class Guide:
                 story.append(self.table(c))
                 story.append(Spacer(1, 8))
             elif t == "pre":
+                # Wrapped at the frame: a fenced line longer than the page would
+                # otherwise run into the margin.
                 code = c.text().rstrip("\n")
-                story.append(Preformatted(self.esc_plain(code), STYLES["pre"]))
+                per_line = int((self.width - STYLES["pre"].leftIndent - 4) / (0.6 * STYLES["pre"].fontSize))
+                story.append(Preformatted(self.esc_plain(code), STYLES["pre"], maxLineLength=per_line))
             elif t == "hr":
                 story.append(HRFlowable(width="100%", thickness=0.6, color=colors.HexColor("#BBBBBB"),
                                         spaceBefore=6, spaceAfter=10))
@@ -322,8 +328,12 @@ class Guide:
                 texts.append(stringWidth(txt, face, 9.5) + (ICON_PT + 4 if has_icon else 0))
                 for w in txt.split():
                     words.append(stringWidth(w, face, 9.5) + (ICON_PT + 4 if has_icon else 0))
-            mins.append(min(max(words) + pad, self.width * 0.4))
+            mins.append(max(words) + pad)
             wants.append(min(max(texts) + pad, self.width * 0.55))
+        # A column is never narrower than its longest word, so nothing breaks
+        # mid-word -- unless the words alone do not fit the page, when every
+        # column is scaled and something has to. The old 0.4 cap split
+        # LingTeXToggleRewrapOnSelectionChange across two lines.
         spare = self.width - sum(mins)
         if spare <= 0:
             widths = [self.width * m / sum(mins) for m in mins]
@@ -383,8 +393,8 @@ class Guide:
             canvas.saveState()
             canvas.setFont("Helvetica", 8.5)
             canvas.setFillColor(colors.HexColor("#666666"))
-            canvas.drawString(22 * mm, 13 * mm, "LingTeX-Word User Guide  -  " + version)
-            canvas.drawRightString(A4[0] - 22 * mm, 13 * mm, str(doc.page))
+            canvas.drawString(22 * mm + 6, 13 * mm, "LingTeX-Word User Guide  -  " + version)
+            canvas.drawRightString(A4[0] - 22 * mm - 6, 13 * mm, str(doc.page))
             canvas.restoreState()
 
         os.makedirs(os.path.dirname(os.path.abspath(self.out)), exist_ok=True)
@@ -392,10 +402,12 @@ class Guide:
                                 topMargin=20 * mm, bottomMargin=22 * mm,
                                 title="LingTeX-Word User Guide", author="LingTeX Tools")
         doc.build(story, onFirstPage=footer, onLaterPages=footer)
-        if self.bad_chars:
-            print("make-guide: characters outside Helvetica's repertoire were replaced with ?: "
-                  + " ".join("U+%04X" % ord(c) for c in sorted(self.bad_chars)), file=sys.stderr)
         print("make-guide: wrote %s (%d pages)" % (self.out, doc.page))
+        if self.bad_chars:
+            # Loud, so a release cannot ship a guide with question marks in it.
+            sys.exit("make-guide: characters outside Helvetica's repertoire were replaced with ?: "
+                     + " ".join("U+%04X" % ord(c) for c in sorted(self.bad_chars))
+                     + " -- rewrite them in GUIDE.md")
 
 
 def main():
