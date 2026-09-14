@@ -142,6 +142,23 @@ if [ -f "$kmap" ]; then
     echo "  removed the keyboard customizations (word/customizations.xml) from the build"
 fi
 
+#-- 1d. the package is a TEMPLATE -------------------------------------------------
+# What makes a .dotm a template is one content type: the Override for
+# /word/document.xml. SaveAsTemplate saved with FileFormat 13 until 2026-09-14,
+# which is a macro-enabled DOCUMENT, so beta.3 and beta.4 were .docm files under
+# a .dotm name. Windows Word loaded them from STARTUP anyway; Word for Mac
+# refused ("Word cannot open this document template"). Corrected here whatever
+# Word wrote, and check-dotm.sh refuses a package that is not a template.
+ctf="$stage/[Content_Types].xml"
+if grep -q 'ContentType="application/vnd.ms-word.document.macroEnabled.main+xml"' "$ctf"; then
+    sed 's|ContentType="application/vnd.ms-word.document.macroEnabled.main+xml"|ContentType="application/vnd.ms-word.template.macroEnabledTemplate.main+xml"|' \
+        "$ctf" > "$ctf.new"
+    mv "$ctf.new" "$ctf"
+    echo "  made the package a macro-enabled template (Word had saved a macro-enabled document)"
+fi
+grep -q 'ContentType="application/vnd.ms-word.template.macroEnabledTemplate.main+xml"' "$ctf" \
+    || die "the main part of $dotm is not a macro-enabled template or document; save it again from Word"
+
 #-- 2. the root relationship --------------------------------------------------
 # Any existing relationship pointing at this part is removed first, so re-running
 # replaces rather than duplicates. Relationship elements in .rels are always

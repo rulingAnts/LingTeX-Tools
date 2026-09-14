@@ -170,6 +170,22 @@ else
     fail "[Content_Types].xml does not cover $PART -- Word will reject the file"
 fi
 
+#-- 4b. the package is a TEMPLATE, not a document named .dotm ----------------
+# SaveAsTemplate saved with FileFormat 13 until 2026-09-14, which is
+# wdFormatXMLDocumentMacroEnabled: a .docm under a .dotm name. Windows Word
+# loaded it from STARTUP anyway; Word for Mac said "Word cannot open this
+# document template", so the Mac install never worked. The type lives in one
+# Override in [Content_Types].xml.
+if [ -f "$ct" ]; then
+    main=$(tr -d '\r\n' < "$ct" | grep -o '<Override PartName="/word/document.xml" ContentType="[^"]*"' | sed 's/.*ContentType="//; s/"$//')
+    case "$main" in
+        application/vnd.ms-word.template.macroEnabledTemplate.main+xml)
+            pass "the package is a macro-enabled template, not a document" ;;
+        *)
+            fail "the main part is \"$main\", not a macro-enabled template -- Word for Mac will not open it from Startup; re-run build-dotm.sh" ;;
+    esac
+fi
+
 #-- 5. the ribbon is well-formed, and every onAction resolves ----------------
 if command -v xmllint >/dev/null 2>&1; then
     if xmllint --noout "$ribbon" 2>/dev/null; then
