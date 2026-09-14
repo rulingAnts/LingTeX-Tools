@@ -686,8 +686,12 @@ Public Sub SaveAsTemplate()
     If doc Is Nothing Then Exit Sub
 
     On Error Resume Next
-    ' 13 = wdFormatXMLTemplateMacroEnabled
-    doc.SaveAs2 FileName:=target, FileFormat:=13
+    ' 15 = wdFormatXMLTemplateMacroEnabled. It was 13 until 2026-09-14, which is
+    ' wdFormatXMLDocumentMacroEnabled: every release so far was a .docm under a
+    ' .dotm name. Windows Word loaded it from STARTUP anyway; Word for Mac said
+    ' it could not open the document template. build-dotm.sh corrects the type
+    ' too, and check-dotm.sh refuses a template that is not one.
+    doc.SaveAs2 FileName:=target, FileFormat:=15
     If Err.Number <> 0 Then
         Report "Could not save the template:" & vbCr & vbCr & _
                CStr(Err.Number) & ": " & Err.Description, False
