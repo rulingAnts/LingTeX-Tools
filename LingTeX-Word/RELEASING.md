@@ -55,7 +55,9 @@ the Interlinear tab, and then, from Alt+F8: `RunAllTests` (79) and `RunDocTests`
 (all green; it writes `RunDocTests.win.txt` beside the template in STARTUP,
 which the Immediate window may cut short). Then the by-hand basics: insert
 the sample, re-wrap after narrowing the margins, split and merge, check,
-indent, Ctrl+Alt+Shift+I inserts.
+indent, Ctrl+Alt+Shift+I inserts. Then the upgrade path: open Word and run
+the `.exe` again. It must refuse until Word is closed, then replace the file;
+start Word and check with **Shortcuts** that the keys are still bound.
 
 **Mac**: move `LingTeX-Dev.dotm` out of the Startup folder first (the dev rig
 would load a second copy of the code), quit Word, open the `-macos.dmg`,
