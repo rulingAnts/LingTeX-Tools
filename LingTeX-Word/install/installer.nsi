@@ -72,12 +72,15 @@ FunctionEnd
 
 ; Asks until Word is closed. Leaves "ok" or "cancel" on the stack; the caller
 ; aborts, since an Abort inside a called function does not reach the callback.
+; Every Retry/Cancel box carries /SD IDCANCEL: a silent run (/S, as an admin's
+; deployment or the CI test uses) cannot ask, so it stops with exit code 2
+; instead of hanging on a box nobody sees.
 Function ${un}WaitForWord
   check:
     Call ${un}WordIsRunning
     Pop $0
     StrCmp $0 "0" closed
-    MessageBox MB_ICONEXCLAMATION|MB_RETRYCANCEL "Word is running. Close every Word window (check the taskbar too), then click Retry." IDRETRY check
+    MessageBox MB_ICONEXCLAMATION|MB_RETRYCANCEL "Word is running. Close every Word window (check the taskbar too), then click Retry." /SD IDCANCEL IDRETRY check
     Push "cancel"
     Return
   closed:
@@ -111,7 +114,7 @@ Section "LingTeX-Word"
     ClearErrors
     FileOpen $0 "$INSTDIR\${TEMPLATE}" a
     IfErrors 0 free
-    MessageBox MB_ICONEXCLAMATION|MB_RETRYCANCEL "The installed ${TEMPLATE} is in use, so it cannot be replaced. Close Word, then click Retry." IDRETRY probe
+    MessageBox MB_ICONEXCLAMATION|MB_RETRYCANCEL "The installed ${TEMPLATE} is in use, so it cannot be replaced. Close Word, then click Retry." /SD IDCANCEL IDRETRY probe
     Abort "${TEMPLATE} was in use; nothing was changed."
   free:
     FileClose $0
@@ -141,7 +144,7 @@ Section "Uninstall"
     ClearErrors
     Delete "$APPDATA\Microsoft\Word\STARTUP\${TEMPLATE}"
     IfErrors 0 removed
-    MessageBox MB_ICONEXCLAMATION|MB_RETRYCANCEL "${TEMPLATE} is in use, so it cannot be removed. Close Word, then click Retry." IDRETRY remove
+    MessageBox MB_ICONEXCLAMATION|MB_RETRYCANCEL "${TEMPLATE} is in use, so it cannot be removed. Close Word, then click Retry." /SD IDCANCEL IDRETRY remove
     Abort "${TEMPLATE} was in use; nothing was removed."
   removed:
   Delete "${HOME}\Uninstall.exe"

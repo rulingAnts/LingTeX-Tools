@@ -6,15 +6,16 @@ name: LingTeX-Word pre-release
 # in Word by hand (LingTeX-Word/RELEASING.md), injected and verified by the
 # scripts, and committed; this workflow verifies it again and ships it.
 #
-# Three jobs: `package` (Linux) checks the template, renders the guide and
+# Four jobs: `package` (Linux) checks the template, renders the guide and
 # builds the Windows installer and zip; `dmg` (macOS, the only runner with
-# hdiutil) builds the Mac disk image; `publish` (Linux) makes the release
-# from both.
+# hdiutil) builds the Mac disk image; `installer-test` runs the Windows
+# installer for real on a Windows runner (lingtex-word-installer-test.yml);
+# `publish` (Linux) makes the release once all three have passed.
 #
 # Push a tag, e.g. word-v0.1.0-beta.1, and it runs from the tagged commit (so
 # it works from any branch); or, once this file is on the default branch, run
 # it from the Actions tab with a label. Public repository, standard runners
-# (ubuntu-latest, macos-latest): free.
+# (ubuntu-latest, macos-latest, windows-latest): free.
 
 on:
   push:
@@ -157,17 +158,28 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  installer-test:
+    # The .exe built the same way, installed, upgraded, refused while Word runs
+    # or the old file is held open, and uninstalled, on a Windows runner.
+    uses: ./.github/workflows/lingtex-word-installer-test.yml
+
   publish:
-    needs: [package, dmg]
+    needs: [package, dmg, installer-test]
     runs-on: ubuntu-latest
     env:
       TAG: ${{ needs.package.outputs.tag }}
     steps:
-      - name: The files from package and dmg
+      - name: The files from package
         uses: actions/download-artifact@v4
         with:
+          name: release-files
           path: out
-          merge-multiple: true
+
+      - name: The disk image from dmg
+        uses: actions/download-artifact@v4
+        with:
+          name: dmg
+          path: out
 
       - name: List
         run: ls -la out
