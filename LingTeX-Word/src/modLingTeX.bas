@@ -69,8 +69,8 @@ Private Const SHORTCUT_TABLE As String = _
     "IEJ=LingTeXInsertInterlinear|R=LingTeXRewrapCurrent|A=LingTeXRewrapAll|" & _
     "SXD=LingTeXSplitColumn|M=LingTeXMergeColumns|K=LingTeXCheckExample|" & _
     "T=LingTeXConvertTableToIgt|W=LingTeXAlignByWord|P=LingTeXAlignByMorpheme|" & _
-    "H=LingTeXShowSettings|N=LingTeXToggleExampleNumbers|" & _
-    "G=LingTeXIndentExample|LOUYQ=LingTeXOutdentExample"
+    "H=LingTeXSettings|N=LingTeXToggleExampleNumbers|" & _
+    "G=LingTeXIndentExample|LOUYQ=LingTeXOutdentExample|FBV=LingTeXTextToInterlinear"
 Private Const MODS_WINDOWS As Long = 512 + 1024 + 256      ' Ctrl+Alt+Shift
 Private Const MODS_MAC As Long = 256 + 2048 + 512          ' Command+Option+Shift
 
@@ -80,7 +80,7 @@ Private Const INDENT_STEP As Double = 36
 ' The first run: what the add-in does for itself the first time Word loads
 ' it from STARTUP, recorded in the Normal template so it happens once. Bump
 ' to run it again on every machine at the next start.
-Private Const SETUP_VERSION As String = "2"      ' 2: the first run moved out of AutoExec
+Private Const SETUP_VERSION As String = "3"      ' 3: H opens the dialog; F is Text to Interlinear
 Private Const SETUP_VAR As String = "LingTeX_Setup"
 
 '-----------------------------------------------------------------------------
