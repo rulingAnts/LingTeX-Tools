@@ -6,10 +6,15 @@ name: LingTeX-Word pre-release
 # in Word by hand (LingTeX-Word/RELEASING.md), injected and verified by the
 # scripts, and committed; this workflow verifies it again and ships it.
 #
+# Three jobs: `package` (Linux) checks the template, renders the guide and
+# builds the Windows installer and zip; `dmg` (macOS, the only runner with
+# hdiutil) builds the Mac disk image; `publish` (Linux) makes the release
+# from both.
+#
 # Push a tag, e.g. word-v0.1.0-beta.1, and it runs from the tagged commit (so
 # it works from any branch); or, once this file is on the default branch, run
-# it from the Actions tab with a label. Public repository, standard runner:
-# free.
+# it from the Actions tab with a label. Public repository, standard runners
+# (ubuntu-latest, macos-latest): free.
 
 on:
   push:
@@ -28,9 +33,15 @@ permissions:
 jobs:
   package:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # The whole history and its tags: check-dotm.sh compares
+          # SETUP_VERSION with the previous release's.
+          fetch-depth: 0
 
       - name: The template is committed and matches src/
         run: |
@@ -48,10 +59,12 @@ jobs:
           python3 -m pip install --quiet --disable-pip-version-check markdown reportlab pillow
 
       - name: The tag
+        id: tag
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then tag="${{ github.ref_name }}"; else tag="word-v0.1.0-${{ inputs.label }}"; fi
           echo "TAG=$tag" >> "$GITHUB_ENV"
           echo "VERSION=${tag#word-v}" >> "$GITHUB_ENV"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "$tag"
 
       - name: Render the guide
@@ -71,22 +84,93 @@ jobs:
             LingTeX-Word/install/installer.nsi
           ls -la out
 
-      - name: Package
+      - name: Windows zip
         run: |
           tag="$TAG"
           mv out/LingTeX-Word-Setup.exe "out/LingTeX-Word-Setup-$tag.exe"
-          mkdir -p out/win out/mac
+          mkdir -p out/win
           cp LingTeX-Word/LingTeX-Word.dotm LingTeX-Word/install/INSTALL.md out/win/
           cp LingTeX-Word/install/install.bat LingTeX-Word/install/install.ps1 out/win/
-          cp LingTeX-Word/LingTeX-Word.dotm LingTeX-Word/install/INSTALL.md out/mac/
-          cp LingTeX-Word/install/install.command LingTeX-Word/install/install.sh out/mac/
           cp "out/LingTeX-Word-Guide-$tag.pdf" out/win/LingTeX-Word-Guide.pdf
-          cp "out/LingTeX-Word-Guide-$tag.pdf" out/mac/LingTeX-Word-Guide.pdf
-          chmod +x out/mac/install.command out/mac/install.sh
           ( cd out/win && zip -q -X -r "../LingTeX-Word-$tag-windows.zip" . )
-          ( cd out/mac && zip -q -X -r "../LingTeX-Word-$tag-macos.zip" . )
           cp LingTeX-Word/LingTeX-Word.dotm out/
           ls -la out
+
+      - name: Hand the files to the next jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: |
+            out/LingTeX-Word-Setup-*.exe
+            out/LingTeX-Word-*-windows.zip
+            out/LingTeX-Word-Guide-*.pdf
+            out/LingTeX-Word.dotm
+          if-no-files-found: error
+          retention-days: 1
+
+  dmg:
+    # The Mac download: a disk image holding the template, the two Script
+    # Editor documents that install and remove it, and the guide. A script
+    # document rather than an installer app, because Gatekeeper blocks an
+    # unsigned downloaded program but lets a document open (RELEASING.md).
+    needs: package
+    runs-on: macos-latest
+    env:
+      TAG: ${{ needs.package.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: The files from package
+        uses: actions/download-artifact@v4
+        with:
+          name: release-files
+          path: out
+
+      - name: Mac disk image (.dmg)
+        run: |
+          stage="$RUNNER_TEMP/LingTeX-Word"
+          dmg="out/LingTeX-Word-$TAG-macos.dmg"
+          mkdir -p "$stage"
+          cp out/LingTeX-Word.dotm "$stage/"
+          cp "LingTeX-Word/install/Install LingTeX-Word.applescript" "$stage/"
+          cp "LingTeX-Word/install/Uninstall LingTeX-Word.applescript" "$stage/"
+          cp "out/LingTeX-Word-Guide-$TAG.pdf" "$stage/LingTeX-Word-Guide.pdf"
+          # Both script documents must compile, or the user's Run fails.
+          osacompile -o "$RUNNER_TEMP/i.scpt" "$stage/Install LingTeX-Word.applescript"
+          osacompile -o "$RUNNER_TEMP/u.scpt" "$stage/Uninstall LingTeX-Word.applescript"
+          # HFS+ so older macOS mounts it too. hdiutil on hosted runners now and
+          # then fails with "Resource busy"; a retry clears it.
+          for attempt in 1 2 3; do
+            hdiutil create -volname "LingTeX-Word" -srcfolder "$stage" -fs HFS+ -format UDZO -ov "$dmg" && break
+            echo "hdiutil create failed (attempt $attempt); retrying"; sleep 10
+          done
+          [ -f "$dmg" ] || { echo "::error::no disk image was made"; exit 1; }
+          hdiutil verify "$dmg"
+          ls -la out
+
+      - name: Hand the disk image to publish
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg
+          path: out/LingTeX-Word-*-macos.dmg
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: [package, dmg]
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ needs.package.outputs.tag }}
+    steps:
+      - name: The files from package and dmg
+        uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: List
+        run: ls -la out
 
       - name: Publish pre-release
         uses: softprops/action-gh-release@v2
@@ -97,10 +181,11 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: 'LingTeX-Word ${{ env.TAG }} (pre-release)'
           prerelease: true
+          fail_on_unmatched_files: true
           files: |
             out/LingTeX-Word-Setup-${{ env.TAG }}.exe
             out/LingTeX-Word-${{ env.TAG }}-windows.zip
-            out/LingTeX-Word-${{ env.TAG }}-macos.zip
+            out/LingTeX-Word-${{ env.TAG }}-macos.dmg
             out/LingTeX-Word-Guide-${{ env.TAG }}.pdf
             out/LingTeX-Word.dotm
           body: |
@@ -123,11 +208,14 @@ jobs:
               and registers an uninstaller under Settings → Apps. (The
               `-windows.zip` holds the same template with `install.bat`, for
               anyone who prefers to see what the installer does.)
-            - **The user guide** is `LingTeX-Word-Guide-…pdf`, and is inside both zips.
-            - **Mac:** unzip `-macos.zip`, double-click `install.command` (if macOS refuses, right-click
-              it and choose Open). It copies the template into Word's Startup folder
-              and clears the download quarantine. When Word asks whether to enable
-              macros in `LingTeX-Word.dotm`, choose **Enable Macros**.
+            - **Mac:** open `-macos.dmg` and double-click **Install LingTeX-Word**.
+              It opens in Script Editor with what it does written at the top; click
+              the **Run** button (the triangle). It copies the template into Word's
+              Startup folder, replacing an earlier version, and clears the download
+              quarantine. When Word asks whether to enable macros in
+              `LingTeX-Word.dotm`, choose **Enable Macros**.
+            - **The user guide** is `LingTeX-Word-Guide-…pdf`, and is inside the
+              Windows zip and the Mac disk image.
 
             Then start Word. A message says LingTeX-Word is installed and lists its
             keyboard shortcuts (Ctrl+Alt+Shift + a letter on Windows,
@@ -135,4 +223,6 @@ jobs:
             for an alternate letter, and **Shortcuts** on the tab lists what
             landed). The **Interlinear** tab is on the ribbon of every document.
 
-            `INSTALL.md` in the zip has the same steps, and how to remove it.
+            **Upgrading** is the same: run the new installer and it replaces the
+            old file. To remove the add-in: Settings → Apps on Windows, or
+            **Uninstall LingTeX-Word** from the disk image on the Mac.

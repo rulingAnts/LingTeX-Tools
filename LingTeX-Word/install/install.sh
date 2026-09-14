@@ -6,7 +6,9 @@
 # every document. The first time Word loads it, the add-in installs its keyboard
 # shortcuts and says so.
 #
-#   Double-click install.command, or in Terminal:
+# For Terminal and the dev rig. The release ships the Script Editor documents
+# "Install LingTeX-Word" and "Uninstall LingTeX-Word" in its disk image
+# instead, which do the same copy. In Terminal:
 #     sh install.sh
 #     sh install.sh --uninstall
 #

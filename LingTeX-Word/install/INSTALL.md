@@ -25,17 +25,21 @@ To remove it: Settings → Apps → LingTeX-Word → Uninstall (or `install.bat
 
 ## Mac
 
-1. Unzip the download.
-2. Double-click `install.command` (if macOS refuses, right-click it and choose
-   **Open**). It copies the template into Word's Startup folder and clears the
-   download quarantine.
+1. Open the `-macos.dmg`.
+2. Double-click **Install LingTeX-Word**. It opens in Script Editor with what it
+   does written at the top; click the **Run** button (the triangle) and follow
+   the messages. It copies the template into Word's Startup folder, replacing an
+   earlier version, and clears the download quarantine. If macOS asks whether
+   Script Editor may use files on the disk image or data from other apps, click
+   OK.
 3. Start Word. If Word asks whether to enable macros in `LingTeX-Word.dotm`,
    choose **Enable Macros** (Word → Preferences → Security can make that
    permanent). A message then says LingTeX-Word is installed and lists its
    keyboard shortcuts (**Cmd+Option+Shift** + a letter). The Interlinear tab is on
    the ribbon.
 
-To remove it: `sh install.sh --uninstall`, or delete the file from
+To remove it: run **Uninstall LingTeX-Word** from the disk image the same way,
+or delete the file from
 `~/Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/Word`.
 
 ## Shortcuts
