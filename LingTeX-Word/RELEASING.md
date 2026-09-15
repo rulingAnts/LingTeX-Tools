@@ -57,7 +57,7 @@ Not the dev rig: the files a user would download.
 
 **Windows** (the VM): download the `.exe`, close Word, run it (SmartScreen:
 More info → Run anyway), start Word. Expect the installed message with the shortcuts,
-the Interlinear tab, and then, from Alt+F8: `RunAllTests` (79) and `RunDocTests`
+the Interlinear tab, and then, from Alt+F8: `RunAllTests` (116) and `RunDocTests`
 (all green; it writes `RunDocTests.win.txt` beside the template in STARTUP,
 which the Immediate window may cut short). Then the by-hand basics: insert
 the sample, re-wrap after narrowing the margins, split and merge, check,

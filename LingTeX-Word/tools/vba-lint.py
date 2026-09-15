@@ -42,8 +42,8 @@ WINDOWS_ONLY = {
 }
 
 # Line breaks found, split or normalised with vbCrLf or vbNewLine. Those are not
-# what their names say on every host: in the VBA of PowerPoint for Mac 16.112,
-# vbCrLf is LF then CR and vbNewLine is LF alone (2026-09-15), so
+# what their names say on every host: in the VBA of Word and PowerPoint for Mac
+# 16.112, vbCrLf is LF then CR and vbNewLine is LF alone (2026-09-15), so
 # Replace(s, vbCrLf, vbLf) matched no real CR LF and the vbCr pass after it
 # doubled every line break. Only the FIND argument is checked (Replace's and
 # Split's second, InStr's second or third): writing output with them is not

@@ -119,14 +119,15 @@ End Property
 '=============================================================================
 
 ' Line breaks are found, split and normalised with these, never with vbCrLf or
-' vbNewLine.  In the VBA of PowerPoint for Mac 16.112, vbCrLf is LF then CR --
-' the reverse of a real CR LF -- and vbNewLine is LF alone (2026-09-15).  So
-' Replace(s, vbCrLf, vbLf) matched no CR LF there, and the vbCr pass after it
-' turned each one into two line breaks: a blank line after every tier row,
-' which ParseFlexBlocks reads as the end of an example.  These modules are
-' shared with LingTeX-PowerPoint.  RunAllTests records what the constants are
-' on the host it runs on.  Property Get, not Const, for the reason in the
-' header: a Const cannot hold Chr$().
+' vbNewLine.  In the VBA of Word and of PowerPoint for Mac 16.112, vbCrLf is LF
+' then CR -- the reverse of a real CR LF -- and vbNewLine is LF alone (measured
+' 2026-09-15; RunAllTests records them on every host it runs on).  So
+' Replace(s, vbCrLf, vbLf) matched no CR LF, and the vbCr pass after it turned
+' each one into two line breaks: a blank line after every tier row, which
+' ParseFlexBlocks reads as the end of an example.  Word hands these modules
+' text from a document, where a paragraph ends in CR, so it never met the bug;
+' LingTeX-PowerPoint, which shares them, would have.  Property Get, not Const,
+' for the reason in the header: a Const cannot hold Chr$().
 Public Property Get LINE_CR() As String
     LINE_CR = Chr$(13)
 End Property
