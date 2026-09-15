@@ -9,13 +9,17 @@ Option Explicit
 ' stays as the bootstrap: run-in-powerpoint.sh first has it import only this
 ' module, then runs LingTeXDevImport, here, to import everything else.
 '
-' WHY IT EXISTS.  CodeModule.AddFromString on the Mac counts CR and LF as two
-' line breaks, so a class filled with CRLF text came out with every line
-' doubled (clsProbeEvents: 121 lines for 55, 2026-09-15).  Doubled blank lines
-' are harmless, but a line continuation followed by a blank line is a syntax
-' error.  So this asks AddFromString, once per run, which separator it counts
-' as ONE break on this platform, builds classes with that, and checks every
-' module's line count against its source.
+' WHY IT EXISTS.  A class filled with CRLF text came out with every line
+' doubled (clsProbeEvents: 121 lines for 55, 2026-09-15).  The cause was this
+' module's own normalising, not AddFromString: Mac VBA's vbCrLf is LF CR, so
+' Replace(code, vbCrLf, vbLf) matched nothing and the vbCr pass that followed
+' turned every CR LF into LF LF.  LingTeX-Word's importer had the same fault,
+' and that session proved offline that no CR ever reached AddFromString.
+' Doubled blank lines are harmless, but a line continuation followed by a
+' blank line is a syntax error.  Line breaks here are Chr$(13) and Chr$(10),
+' never vbCrLf.  Which separator AddFromString counts as ONE break is still
+' host-dependent, so this asks it once per run, builds classes with that, and
+' checks every module's line count against its source.
 '
 ' Uses modLingTeXDev's DevDocuments and WriteDevReport.  Never imports or
 ' removes itself or the bootstrap.  Pure ASCII, numbers instead of named
