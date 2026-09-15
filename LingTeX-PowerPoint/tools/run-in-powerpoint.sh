@@ -253,6 +253,13 @@ if [ "$import" = 1 ]; then
         echo "   LingTeXDevImport did not return cleanly (see above)."
         exit 1
     fi
+    # A module that failed to import leaves the project unable to compile what
+    # depends on it: stop before any macro runs into that as a dialog.
+    if grep -q "FAILED\|PROBLEM" "$boxreports/ImportModules.mac.txt" 2>/dev/null; then
+        cat "$boxreports/ImportModules.mac.txt"
+        echo "   the import reported a problem (above), so nothing else was run."
+        exit 1
+    fi
 fi
 all="$macros"
 for m in $all; do

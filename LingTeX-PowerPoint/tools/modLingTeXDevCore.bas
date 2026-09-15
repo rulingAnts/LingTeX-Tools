@@ -29,6 +29,7 @@ Private Const LIST_FILE As String = "modules.txt"
 
 Private mLog As String
 Private mSep As String
+Private mHost As Object
 
 '-----------------------------------------------------------------------------
 ' Import every module named in modules.txt into the presentation that holds
@@ -46,6 +47,7 @@ Public Sub LingTeXDevImport()
         Note "PROBLEM: no open presentation's VBA project shows " & SELF_NAME
         GoTo Done
     End If
+    Set mHost = pres
     Set vbp = pres.VBProject
     folder = DevDocuments() & PathSep() & SRC_DIR
     Note "  from  " & folder
@@ -131,6 +133,27 @@ Private Function ImportOne(ByVal vbp As Object, ByVal path As String) As Boolean
     If isClass Then
         Set comp = vbp.VBComponents.Add(2)
         If Err.Number = 0 Then comp.Name = compName
+        If Err.Number <> 0 And Not comp Is Nothing Then
+            ' The name of a class removed earlier in this session can stay held
+            ' until the file is saved (LingTeX-Word's importer met this with a
+            ' form). Take the unnamed class out, save, and try once more; never
+            ' leave a stray Class1 behind.
+            Err.Clear
+            vbp.VBComponents.Remove comp
+            Err.Clear
+            mHost.Save
+            Err.Clear
+            Set comp = Nothing
+            Set comp = vbp.VBComponents.Add(2)
+            If Err.Number = 0 Then comp.Name = compName
+            If Err.Number <> 0 Then
+                Note "  FAILED   " & leaf & " (could not name the class " & compName & ": " & Err.Description & ")"
+                Err.Clear
+                If Not comp Is Nothing Then vbp.VBComponents.Remove comp
+                Err.Clear
+                Exit Function
+            End If
+        End If
         If Err.Number = 0 Then
             With comp.CodeModule
                 If .CountOfLines > 0 Then .DeleteLines 1, .CountOfLines
