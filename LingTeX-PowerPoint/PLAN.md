@@ -88,8 +88,19 @@ Full report: `LingTeX-PowerPoint-reports/Probe.mac.txt`.
 |---|---|
 | Which width is the text's own | `Characters(1, n).BoundWidth`. For "neighbor-F" at 20 pt it gives 88.4 pt, the same as the last character's right edge. A whole range's `BoundWidth` gives 93.4 pt (a quarter em more), and a box fitted to the text is 89.2 pt. |
 | Reading clipboard text | Paste it into an empty text box's text: `TextRange2.Paste` works with no window, tabs intact (so do `TextRange2.PasteSpecial` as plain text and `TextRange.Paste`). `Shapes.Paste` refuses text copied in another application, and `TextRange.PasteSpecial` and `View.PasteSpecial` aren't supported. |
-| Line breaks | Windows line breaks (CR LF) arrive doubled, as CR CR. Mac/Unix line breaks (LF) arrive as one CR. The reader must collapse doubled breaks when the text has no single ones, or the blank lines would split one example into several. |
+| Line breaks | On this Mac, from `pbcopy`: Windows line breaks (CR LF) arrived doubled, as CR CR; Mac/Unix line breaks (LF) arrived as one CR. This may well differ by platform and by where the text comes from, so the reader must detect doubling rather than assume it. See "Clipboard tests to run" below. |
 | Letters beyond ASCII | Arrive intact ("ñ"). |
 | `AppleScriptTask` | Exists (error 5 when no script is installed). A clipboard script is a fallback if ever needed. |
 | `MacScript("the clipboard")` | Works on this Mac, giving the same text as the paste plus a trailing break. |
 | Startup folder | PowerPoint on this Mac loads Adobe's `SaveAsAdobePDF.ppam` from Office's shared Startup folder for PowerPoint (loaded, autoload). It may also write to the user's own Startup folder. So an installer that drops the add-in there will very likely work; the load test will confirm it. |
+
+## Clipboard tests to run once Insert works
+
+Line breaks (and possibly other details) may arrive differently depending on the platform and on where the text was copied. Run all of these with a real FLEx copy, and with plain tab-separated text, before trusting the reader:
+
+1. FLEx on Windows, pasted into PowerPoint on Windows.
+2. FLEx in the Parallels Windows VM, pasted through the shared clipboard into PowerPoint on the Mac.
+3. Text with CR LF and with LF line breaks, from a text editor, into PowerPoint on the Mac and on Windows.
+4. An example with a blank line between two examples, so that collapsing doubled breaks is shown not to merge two examples into one, or split one into two.
+
+For each, record the tab, CR, LF and vertical-tab counts the paste produced (probe section 9 already prints them), and keep them in the doc tests.
