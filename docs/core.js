@@ -314,7 +314,7 @@
      * @param {Array} words  Mutated in place
      */
     function handleStandalonePunctuation(words) {
-        var M = '\u2026,:;.!?-\u2012\u2013\u2014\u2015/|&';
+        var M = '\u2026,:;.!?-\u2012\u2013\u2014\u2015/|&\u02D0\u02D1';
         for (var i = 1; i < words.length; i++) {
             var w = words[i];
             if (w.form.length === 1 && M.indexOf(w.form) !== -1 && w.glossParts.length === 0) {
