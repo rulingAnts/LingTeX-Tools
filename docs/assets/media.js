@@ -10,14 +10,8 @@
 // that name to word/media/available.json. No page edit.
 //
 // Videos play muted and looped, only while on screen, and not at all for
-// visitors who ask for reduced motion (they get the controls instead). The
-// hints naming each slot's shot and file show on a local preview, or with
-// ?media-hints in the address.
+// visitors who ask for reduced motion (they get the controls instead).
 (function () {
-    var root = document.documentElement;
-    if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || /[?&]media-hints\b/.test(location.search)) {
-        root.classList.add('show-media-hints');
-    }
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     var meta = document.querySelector('meta[name="media-manifest"]');

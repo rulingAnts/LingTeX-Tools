@@ -1,0 +1,67 @@
+/* LingTeX Tools site: Windows window chrome and a FLEx interface for the
+   animated demos, shared by the Word demo (site.css, .mock) and the LaTeX demo
+   (tex-demo.css, .td-slot). Every class starts wm-. Sizes are in cqw, so it
+   scales with whichever slot it sits in. The app icons are plain letter tiles
+   drawn here, not Microsoft's or SIL's own logos. */
+
+.wm-titlebar { display: flex; align-items: center; gap: 1cqw; height: 3.4cqw; flex-shrink: 0; padding-left: 1.2cqw; background: #f3f3f3; color: #1f1f1f; border-bottom: 1px solid #e5e5e5; font: 1.15cqw 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif; white-space: nowrap; }
+.wm-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.wm-controls { display: flex; align-self: stretch; margin-left: auto; }
+.wm-controls i { position: relative; width: 4.4cqw; }
+.wm-controls i::before, .wm-controls i::after { content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.wm-controls .min::before { width: 1.05cqw; border-top: 1px solid currentColor; }
+.wm-controls .max::before { width: .95cqw; height: .95cqw; border: 1px solid currentColor; border-radius: .15cqw; }
+.wm-controls .close::before, .wm-controls .close::after { width: 1.3cqw; border-top: 1px solid currentColor; transform: translate(-50%, -50%) rotate(45deg); }
+.wm-controls .close::after { transform: translate(-50%, -50%) rotate(-45deg); }
+
+.wm-icon { flex-shrink: 0; display: grid; place-items: center; width: 1.8cqw; height: 1.8cqw; border-radius: .35cqw; color: #fff; font: 700 1.1cqw/1 'Segoe UI', system-ui, sans-serif; }
+.wm-icon-word { background: linear-gradient(135deg, #41a5ee, #2b7cd3 50%, #185abd); box-shadow: 0 0 0 1px rgba(255,255,255,.6); }
+.wm-icon-flex { background: linear-gradient(135deg, #7c9cd6, #2f5aa8); }
+.wm-icon-tex { background: linear-gradient(135deg, #2dd4bf, #0f766e); }
+
+/* Word: the blue title bar, the tabs, and a ribbon of labelled groups */
+.wm-word { background: #185abd; color: #fff; border-bottom: 0; }
+.wm-autosave { display: inline-flex; align-items: center; gap: .6cqw; font-size: 1.05cqw; }
+.wm-autosave b { position: relative; width: 2.6cqw; height: 1.35cqw; border: 1px solid currentColor; border-radius: 1cqw; }
+.wm-autosave b::after { content: ''; position: absolute; left: .2cqw; top: 50%; width: .75cqw; height: .75cqw; border-radius: 50%; background: currentColor; transform: translateY(-50%); }
+.wm-word .wm-title { flex: 1; text-align: center; }
+.wm-search { display: inline-flex; align-items: center; gap: .7cqw; width: 17cqw; height: 2.2cqw; padding: 0 1cqw; border-radius: .5cqw; background: rgba(255,255,255,.18); color: rgba(255,255,255,.92); font-size: 1.05cqw; }
+.wm-search::before { content: ''; width: .75cqw; height: .75cqw; border: 1.5px solid currentColor; border-radius: 50%; }
+.wm-word .wm-controls { margin-left: 1.2cqw; }
+.wm-word-tabs { display: flex; gap: 1.9cqw; flex-shrink: 0; padding: .8cqw 1.8cqw 0; background: #f3f2f1; color: #323130; font: 1.12cqw 'Segoe UI', system-ui, sans-serif; white-space: nowrap; overflow: hidden; }
+.wm-word-tabs span, .wm-word-tabs b { padding-bottom: .5cqw; }
+.wm-word-tabs b { color: #185abd; font-weight: 600; border-bottom: .25cqw solid #185abd; }
+.wm-ribbon-bg { flex-shrink: 0; padding: .1cqw .8cqw .7cqw; background: #f3f2f1; border-bottom: 1px solid #e1dfdd; }
+.wm-ribbon { display: flex; padding: .5cqw .6cqw .3cqw; background: #fff; border-radius: .6cqw; box-shadow: 0 .1cqw .3cqw rgba(0,0,0,.13); }
+.wm-group { display: flex; flex-direction: column; align-items: center; padding: 0 .8cqw; border-right: 1px solid #e1dfdd; }
+.wm-group:last-child { border-right: 0; }
+.wm-btns { display: flex; flex: 1; align-items: flex-start; gap: .3cqw; }
+.wm-btn { position: relative; display: flex; flex-direction: column; align-items: center; gap: .3cqw; width: 6.4cqw; padding: .35cqw .2cqw; border-radius: .35cqw; color: #323130; font: 1cqw/1.15 'Segoe UI', system-ui, sans-serif; text-align: center; }
+.wm-btn img { width: 2.8cqw; height: 2.8cqw; }
+.wm-btn.on { background: #e1dfdd; }
+.wm-group-label { margin-top: .25cqw; color: #605e5c; font: .92cqw 'Segoe UI', system-ui, sans-serif; white-space: nowrap; }
+
+/* FLEx: menu bar, the Texts & Words sidebar, and a text's tabs */
+.wm-menubar { display: flex; gap: 1.5cqw; flex-shrink: 0; padding: .45cqw 1.2cqw; background: #fff; border-bottom: 1px solid #e5e5e5; color: #1f1f1f; font: 1.08cqw 'Segoe UI', system-ui, sans-serif; white-space: nowrap; overflow: hidden; }
+.wm-flex-main { flex: 1; display: flex; min-height: 0; }
+.wm-sidebar { display: flex; flex-direction: column; flex-shrink: 0; width: 14.5cqw; background: #f4f6f9; border-right: 1px solid #d5dae2; color: #1f2937; font: 1.02cqw 'Segoe UI', system-ui, sans-serif; white-space: nowrap; }
+.wm-side-head { padding: .55cqw 1cqw; background: linear-gradient(#e9eef6, #d9e2ef); border-bottom: 1px solid #c9d2df; font-weight: 600; }
+.wm-side-list { flex: 1; display: flex; flex-direction: column; padding: .4cqw 0; overflow: hidden; }
+.wm-side-list span { padding: .38cqw 1cqw; overflow: hidden; text-overflow: ellipsis; }
+.wm-side-list .on { background: #cce4f7; box-shadow: inset .25cqw 0 #0078d4; }
+.wm-areas { display: flex; flex-direction: column; border-top: 1px solid #c9d2df; }
+.wm-areas span { padding: .42cqw 1cqw; border-bottom: 1px solid #e2e7ee; color: #374151; font-weight: 600; }
+.wm-areas .on { background: #d9e2ef; color: #123f7a; }
+.wm-flex-pane { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #fff; }
+.wm-pane-head { display: flex; align-items: baseline; gap: 1.2cqw; flex-shrink: 0; padding: .45cqw 1.4cqw; background: linear-gradient(#f1f4f9, #e3e9f2); border-bottom: 1px solid #d0d7e2; color: #4b5563; font: 1.1cqw 'Segoe UI', system-ui, sans-serif; }
+.wm-pane-head b { color: #111827; font-weight: 600; }
+.wm-flex-tabs { display: flex; gap: .2cqw; flex-shrink: 0; padding: .6cqw 1.2cqw 0; border-bottom: 1px solid #d0d7e2; color: #374151; font: 1.05cqw 'Segoe UI', system-ui, sans-serif; }
+.wm-flex-tabs span, .wm-flex-tabs b { padding: .35cqw .9cqw; border: 1px solid transparent; border-bottom: 0; border-radius: .3cqw .3cqw 0 0; }
+.wm-flex-tabs b { margin-bottom: -1px; background: #fff; border-color: #d0d7e2; color: #111827; font-weight: 400; }
+
+/* A Windows context menu; each demo places it and animates it */
+.wm-ctx { position: absolute; z-index: 3; width: 19cqw; padding: .35cqw 0; opacity: 0; background: #f9f9f9; border: 1px solid #ccc; box-shadow: .25cqw .25cqw .7cqw rgba(0,0,0,.28); color: #1f1f1f; font: 1.12cqw 'Segoe UI', system-ui, sans-serif; }
+.wm-ctx div { display: flex; justify-content: space-between; margin: 0 .3cqw; padding: .4cqw 1.2cqw .4cqw 2.6cqw; border: 1px solid transparent; }
+.wm-ctx kbd { color: #6b6b6b; font: inherit; }
+.wm-ctx .dim, .wm-ctx .dim kbd { color: #a8a8a8; }
+.wm-ctx hr { margin: .3cqw .3cqw .3cqw 2.6cqw; border: 0; border-top: 1px solid #d9d9d9; }
