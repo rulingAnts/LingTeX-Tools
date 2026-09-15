@@ -212,11 +212,14 @@ def check(path):
         for pat, msg in WINDOWS_ONLY.items():
             if re.search(pat, t, re.I):
                 problems.append((n, msg))
-        # The engine only: tools/ImportModules.bas still normalises with vbCrLf,
-        # and a change to it has to be pasted into the dev template by hand.
-        if path.parent.name == "src" and any(p.search(mask_strings(t)) for p in FIND_BY_NEWLINE_CONST):
-            problems.append((n, "vbCrLf / vbNewLine used to find, split or normalise line breaks; "
-                                "use LINE_CRLF, LINE_CR, LINE_LF or NormalizeLineBreaks (modFlexParse)"))
+        # The engine, and the importer that installs it: tools/ImportModules.bas
+        # is pasted alone, so it has its own ChCRLF / ChCR / ChLF.
+        if path.parent.name == "src" or path.name == "ImportModules.bas":
+            if any(p.search(mask_strings(t)) for p in FIND_BY_NEWLINE_CONST):
+                fix = ("use ChCRLF, ChCR, ChLF or BreaksToLF (its own: it is pasted alone)"
+                       if path.name == "ImportModules.bas" else
+                       "use LINE_CRLF, LINE_CR, LINE_LF or NormalizeLineBreaks (modFlexParse)")
+                problems.append((n, "vbCrLf / vbNewLine used to find, split or normalise line breaks; " + fix))
         # VBA does NOT short-circuit And/Or: every operand is evaluated. So a
         # bounds guard written as `If i <= UBound(a) And a(i) = x` still
         # evaluates a(i) and raises "subscript out of range". The guard has to be
@@ -882,11 +885,14 @@ def check_wd_constants(files):
 
 def check_no_continuation_in_classes(files):
     """No line continuation in a .cls or a .frm. The classes are installed by the bootstrap
-    from a string, and on Mac Word that arrives double-spaced (see ReadTextFile in
-    ImportModules.bas), so a "_" followed by a blank line is a compile error that
-    surfaces only when the class is first used -- the events section, after
-    everything else passed (clsAppEvents, 2026-09-12). Build long strings with
-    several statements instead. The form's code goes in the same way."""
+    from a string, and until 2026-09-15 that string arrived double-spaced on Mac Word:
+    ImportModules.bas normalised line breaks with vbCrLf, which is LF CR there (see
+    ReadTextFile). A "_" followed by one of those blank lines was a compile error that
+    surfaced only when the class was first used -- the events section, after
+    everything else passed (clsAppEvents, 2026-09-12). The rule can go once an import
+    with the re-pasted modImport logs both classes and the form at their source's line
+    count; until then, build long strings with several statements. The form's code
+    goes in the same way."""
     problems = []
     for f in files:
         if f.suffix.lower() not in (".cls", ".frm"):
