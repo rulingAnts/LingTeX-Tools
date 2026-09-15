@@ -36,6 +36,46 @@ Input routing
   PASS  TSV round trip preserves the form row
   PASS  TSV round trip preserves the gloss row
 
+Line breaks (CR LF and CR input parse as LF input does)
+  note  here vbCr is [13], vbLf [10], vbCrLf [10+13], vbNewLine [10]
+  PASS  LINE_CRLF is CR then LF
+  PASS  NormalizeLineBreaks makes CR LF, CR and LF one LF each
+  PASS  FLEx block: the CR LF input has 2 CR LF pairs and no lone LF
+  PASS  FLEx block: CR LF normalises to the LF text, no break doubled
+  PASS  FLEx block: routed the same with CR LF
+  PASS  FLEx block: TextLines gives the same lines with CR LF
+  PASS  FLEx block: ParseFlexBlocks finds as many blocks with CR LF
+  PASS  FLEx block: ParseFlexBlocks finds as many blocks with CR
+  PASS  FLEx block: examples in the LF text
+  PASS  FLEx block, CR LF: as many examples
+  PASS  FLEx block, CR LF: example 1 is the same
+  PASS  FLEx block, CR: as many examples
+  PASS  FLEx block, CR: example 1 is the same
+  PASS  TSV example: the CR LF input has 3 CR LF pairs and no lone LF
+  PASS  TSV example: CR LF normalises to the LF text, no break doubled
+  PASS  TSV example: routed the same with CR LF
+  PASS  TSV example: TextLines gives the same lines with CR LF
+  PASS  TSV example: examples in the LF text
+  PASS  TSV example, CR LF: as many examples
+  PASS  TSV example, CR LF: example 1 is the same
+  PASS  TSV example, CR: as many examples
+  PASS  TSV example, CR: example 1 is the same
+  FAIL  two FLEx examples: the CR LF input has 5 CR LF pairs and no lone LF
+  PASS  two FLEx examples: CR LF normalises to the LF text, no break doubled
+  PASS  two FLEx examples: routed the same with CR LF
+  PASS  two FLEx examples: TextLines gives the same lines with CR LF
+  PASS  two FLEx examples: ParseFlexBlocks finds as many blocks with CR LF
+  PASS  two FLEx examples: ParseFlexBlocks finds as many blocks with CR
+  PASS  two FLEx examples: examples in the LF text
+  PASS  two FLEx examples, CR LF: as many examples
+  PASS  two FLEx examples, CR LF: example 1 is the same
+  PASS  two FLEx examples, CR LF: example 2 is the same
+  PASS  two FLEx examples, CR: as many examples
+  PASS  two FLEx examples, CR: example 1 is the same
+  PASS  two FLEx examples, CR: example 2 is the same
+  PASS  two FLEx examples, CR LF: the first is example 1
+  PASS  two FLEx examples, CR LF: the second is example 2
+
 Column split and merge
   PASS  split: reports success
   PASS  split: form pieces
@@ -95,5 +135,5 @@ Wrap planner
   PASS  NoBreakFlags never flags the first column
   PASS  NoBreakFlags flags the enclitic columns of example 2
 
-ALL PASS -- 79 passed
+FAILURES -- 115 passed, 1 FAILED
 
