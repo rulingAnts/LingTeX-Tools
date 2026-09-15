@@ -2,7 +2,7 @@
 
 LingTeX-Word's Interlinear tab, for PowerPoint. The idea: paste from FLEx and get an aligned interlinear example that wraps inside its own frame and re-wraps when the frame changes.
 
-Status (2026-09-15): the first probe has run (results below). The design is settled: one text box is the frame. Next comes the dev rig, then a second probe.
+Status (2026-09-15): three probe rounds have run, the second and third through the dev rig with no hand-pasting (results below). The design is settled: one text box is the frame. Measuring, reading the clipboard and the Startup folder all have answers. Next: confirm a `.ppam` loads from the Startup folder (needs a PowerPoint restart), then step 2.
 
 ## Why it differs from Word
 
@@ -44,11 +44,18 @@ These modules never touch Word's objects: `modFlexParse`, `modIgtModel`, `modLei
 3. runs the probe or the tests;
 4. copies the reports into `LingTeX-PowerPoint-reports/`.
 
-See the header of `modLingTeXDev.bas` for setup.
+See the header of `modLingTeXDev.bas` for setup. First full run: 2026-09-15 (ping, import, probe).
+
+Two fixes from that run:
+
+- **Checking for the open presentation.** Reading `name of p` inside an AppleScript loop fails (-2763), so the runner asks for `name of every presentation` instead.
+- **The clipboard sample.** `pbcopy` needs a UTF-8 locale, or "ñ" arrives as "√±".
 
 ## Steps
 
-1. **Probe.** `tools/probe/modProbe.bas`: first run done. Probe 2 covers the clipboard, the measuring method, events and undo.
+1. **Probe.** `tools/probe/modProbe.bas`: three rounds done (below). Still to probe:
+   - events (resize, selection) and undo grouping, which need a class module;
+   - whether a `.ppam` in the Startup folder loads (`MakeStartupProbeAddIn`, then restart PowerPoint).
 2. **Core.** Insert, re-wrap and read back an example.
 3. **Commands.** Events, settings, numbering, Check Glossing, Split and Merge Columns.
 4. **Tests.** Tests that run inside PowerPoint, on the Mac and on Windows.
@@ -67,8 +74,22 @@ Full report: `LingTeX-PowerPoint-reports/Probe.mac.txt`.
 | Tab stop limit | 32 per paragraph. |
 | A tab line wider than the box | It breaks at the tabs, each piece starting at the left. A narrowed frame looks scrambled until it is re-wrapped. |
 | Hanging number | Works: a left indent, a negative first-line indent, and a stop at the indent. |
-| Clipboard as text | `Shapes.PasteSpecial` isn't supported (error 438). Probe 2 tries `Shapes.Paste` and a windowed `View.PasteSpecial`. |
+| Clipboard as text | `Shapes.PasteSpecial` isn't supported (error 438). What works is in rounds 2 and 3, below. |
 | Tags | Survive Duplicate and Copy + Paste. 20,000 characters read back whole. |
 | Grouped boxes | Group, tag and edit work. Resizing the group stretches the boxes but not the font. |
 | Tables | One grid, confirmed: a cell's width can't be set apart from its column. A table can't be grouped. |
 | VBA project | Available, so a macro can import modules. |
+
+## Probe rounds 2 and 3 (Mac, PowerPoint 16.112.4, 2026-09-15, through the dev rig)
+
+Full report: `LingTeX-PowerPoint-reports/Probe.mac.txt`.
+
+| Question | Result |
+|---|---|
+| Which width is the text's own | `Characters(1, n).BoundWidth`. For "neighbor-F" at 20 pt it gives 88.4 pt, the same as the last character's right edge. A whole range's `BoundWidth` gives 93.4 pt (a quarter em more), and a box fitted to the text is 89.2 pt. |
+| Reading clipboard text | Paste it into an empty text box's text: `TextRange2.Paste` works with no window, tabs intact (so do `TextRange2.PasteSpecial` as plain text and `TextRange.Paste`). `Shapes.Paste` refuses text copied in another application, and `TextRange.PasteSpecial` and `View.PasteSpecial` aren't supported. |
+| Line breaks | Windows line breaks (CR LF) arrive doubled, as CR CR. Mac/Unix line breaks (LF) arrive as one CR. The reader must collapse doubled breaks when the text has no single ones, or the blank lines would split one example into several. |
+| Letters beyond ASCII | Arrive intact ("ñ"). |
+| `AppleScriptTask` | Exists (error 5 when no script is installed). A clipboard script is a fallback if ever needed. |
+| `MacScript("the clipboard")` | Works on this Mac, giving the same text as the paste plus a trailing break. |
+| Startup folder | PowerPoint on this Mac loads Adobe's `SaveAsAdobePDF.ppam` from Office's shared Startup folder for PowerPoint (loaded, autoload). It may also write to the user's own Startup folder. So an installer that drops the add-in there will very likely work; the load test will confirm it. |

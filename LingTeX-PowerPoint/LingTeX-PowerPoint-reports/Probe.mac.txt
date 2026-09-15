@@ -1,4 +1,4 @@
-LingTeX-PowerPoint probe  2026-09-15 18:13:16
+LingTeX-PowerPoint probe  2026-09-15 18:47:23
 
 == 1. Environment
 PowerPoint 16.112.4
@@ -14,7 +14,9 @@ slide 960 x 540 pt
 'W' at 20pt: 23.9   (the box is 19.1 wide)
 'WWWW' at 20pt: 80.5   four times 'W': 95.5
 'WWWW' at 40pt: 161.0   twice the 20pt width: 161.0
-'neighbor-F buy-PST.3PL': 206.4   its second word alone, Characters(12, 11): 108.0 starting at x 93.3
+'neighbor-F buy-PST.3PL': 206.4   its second word alone, Characters(12, 11): 108.0 starting at x 93.4
+which width is the text's: 'neighbor-F' whole range 93.4 / chars 88.4 / box 89.2 / last char right edge 88.4
+  at 40pt: 187.1 / chars 177.1 / box 178.8 / last char right edge 177.1
 200 measurements (set the text, read the width): 0.05 s
 
 == 4. Small capitals: Font2.Smallcaps
@@ -44,9 +46,18 @@ p1 indent 40.0, first line -40.0   columns start at 0.0,40.0,150.0
 p2 indent 40.0   columns start at 40.0,150.0
 wanted: p1 at 0,40,150 and p2 at 40,150
 
-== 9. Clipboard text, pasted as text
-ERROR 438 (PasteSpecial(ppPasteText) of the current clipboard): Object doesn't support this property or method
-ERROR 438 (PasteSpecial of the sample): Object doesn't support this property or method
+== 9. Clipboard text copied in another application (the runner puts a FLEx sample there)
+no window:   TextRange2.Paste: 57 characters; tabs 7, CR 2, LF 0, VT 0   Word\tLos\tni\uF1os\rMorphemes\tLos\tni\uF1\t-o\t-s\rFree\tThe children.
+no window:   TextRange2.PasteSpecial(plain text): 57 characters; tabs 7, CR 2, LF 0, VT 0   Word\tLos\tni\uF1os\rMorphemes\tLos\tni\uF1\t-o\t-s\rFree\tThe children.
+no window:   TextRange.Paste: 57 characters; tabs 7, CR 2, LF 0, VT 0   Word\tLos\tni\uF1os\rMorphemes\tLos\tni\uF1\t-o\t-s\rFree\tThe children.
+ERROR 438 (no window:   TextRange.PasteSpecial(ppPasteText)): Object doesn't support this property or method
+with window: TextRange2.Paste: 57 characters; tabs 7, CR 2, LF 0, VT 0   Word\tLos\tni\uF1os\rMorphemes\tLos\tni\uF1\t-o\t-s\rFree\tThe children.
+with window: TextRange2.PasteSpecial(plain text): 57 characters; tabs 7, CR 2, LF 0, VT 0   Word\tLos\tni\uF1os\rMorphemes\tLos\tni\uF1\t-o\t-s\rFree\tThe children.
+with window: TextRange.Paste: 57 characters; tabs 7, CR 2, LF 0, VT 0   Word\tLos\tni\uF1os\rMorphemes\tLos\tni\uF1\t-o\t-s\rFree\tThe children.
+ERROR 438 (with window: TextRange.PasteSpecial(ppPasteText)): Object doesn't support this property or method
+ERROR 5 (AppleScriptTask (no script installed yet)): Invalid procedure call or argument
+MacScript("the clipboard"): 58 characters; tabs 7, CR 3, LF 0, VT 0   Word\tLos\tni\uF1os\rMorphemes\tLos\tni\uF1\t-o\t-s\rFree\tThe children.\r
+round trip inside PowerPoint (Copy, Shapes.Paste): IDENTICAL
 
 == 10. Tags: set, Duplicate, Copy + Paste, a long value
 set: LINGTEX = 'example v1' (1 tag)
@@ -67,6 +78,12 @@ CONFIRMED: one grid -- every row keeps the same column widths
 ERROR -2147024891 (grouping a table with a rectangle): Grouping is disabled for the selected shapes.
 
 == 13. Can VBA see its own project? (a build that imports its modules)
-AVAILABLE: this project has 1 component(s)
+AVAILABLE: this project has 2 component(s)
+
+== 14. Add-ins, and Office's Startup folder for PowerPoint
+add-ins registered: 1
+  SaveAsAdobePDF  loaded -1, autoload -1, /Library/Application Support/Microsoft/Office365/User Content.localized/Startup/PowerPoint/SaveAsAdobePDF.ppam
+Startup folder: /Users/Seth/Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/PowerPoint
+USABLE: PowerPoint may write to it (a file was written and deleted)
 
 == end

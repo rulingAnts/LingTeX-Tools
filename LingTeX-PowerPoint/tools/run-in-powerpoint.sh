@@ -99,8 +99,14 @@ rm -f "$boxreports"/*.mac.txt
 # The probe's clipboard section reads what is on the clipboard: make that a
 # FLEx-shaped sample, with tabs, Windows line breaks and a non-ASCII letter.
 case "$macros" in
-    *Probe*) printf 'Word\tLos\tni\303\261os\r\nMorphemes\tLos\tni\303\261\t-o\t-s\r\nFree\tThe children.\r\n' | pbcopy
-             echo "== the clipboard now holds a FLEx-shaped sample (for the probe)" ;;
+    *Probe*)
+        # LINGTEX_CLIP_EOL=lf for Mac/Unix line breaks; Windows (CR LF) otherwise,
+        # as FLEx running on Windows copies. pbcopy reads its input in the
+        # locale's encoding: without a UTF-8 locale the n-tilde arrived as two
+        # MacRoman characters (2026-09-15).
+        if [ "${LINGTEX_CLIP_EOL:-crlf}" = lf ]; then eol='\n'; else eol='\r\n'; fi
+        printf "Word\tLos\tni\303\261os${eol}Morphemes\tLos\tni\303\261\t-o\t-s${eol}Free\tThe children.${eol}" | LC_ALL=en_US.UTF-8 pbcopy
+        echo "== the clipboard now holds a FLEx-shaped sample, ${LINGTEX_CLIP_EOL:-crlf} line breaks (for the probe)" ;;
 esac
 
 #-- Dialogs ------------------------------------------------------------------
@@ -157,10 +163,12 @@ on run argv
     set macroName to item 2 of argv
     set presName to item 3 of argv
     tell application "Microsoft PowerPoint"
+        -- "name of every presentation", not a loop over presentations: reading
+        -- "name of p" inside a repeat fails here (-2763, 2026-09-15).
         set isOpen to false
-        repeat with p in presentations
-            if (name of p) is presName then set isOpen to true
-        end repeat
+        try
+            if (name of every presentation) contains presName then set isOpen to true
+        end try
         if not isOpen then open (POSIX file presPath)
         with timeout of 3600 seconds
             run VB macro macro name macroName
