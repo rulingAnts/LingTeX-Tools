@@ -179,15 +179,15 @@ Unformatted Text) so the tabs survive — or copy a real interlinear selection o
 of FLEx:
 
 ```
-Morphemes	dae	kudi			kada			=te	bo	=taha	Edefina	bi	:	dae	kudi			kada			=te	Su	di	=de	deda			=di	bu	a	bujo	=de	=di
-	Lex. Gloss	dog		take	.CMP		carry	.CMP	SEQ	3SG	two	P.N.	ACMP		dog		take	.CMP		carry	.CMP	SEQ	P.N.	pig	ERG		attack	.CMP	REL	FOC	1SG	speak	ABL	REL
-Free Eng (When) she took her dogs hunting.
+Morphemes	Los	niñ	-o	-s	de	mi	vecin	-a	compr	-aron	pan	en	el	mercado
+	Lex. Gloss	DEF.M.PL	child	M	PL	of	1SG.POSS	neighbor	F	buy	PST.3PL	bread	in	DEF.M.SG	market
+Free Eng My neighbor's children bought bread at the market.
 ```
 
 Select it and run `LingTeXInsertInterlinear`.
 
 You should get a borderless table: each form sitting directly above its gloss,
-`SEQ` `ERG` `FOC` `3SG` in small capitals, `dog` `take` `carry` not, the object
+`DEF` `PL` `PST` `3PL` in small capitals, `child` `bread` `market` not, the object
 language italic, and the free translation below in single quotes.
 
 ### 2b. Does it wrap — and unwrap?
@@ -203,10 +203,10 @@ most:
 
 ### 2c. Does the alignment stay honest?
 
-Put the cursor in the `kada=te` column and run `LingTeXSplitColumn`. You should
-get two columns — `kada` / `carry.CMP` and `=te` / `=SEQ` — with the `=` leading
-the cell on **both** rows, and the free translation untouched.
-`LingTeXMergeColumns` with the cursor in `kada` should put it back.
+Put the cursor in the `compr-aron` column and run `LingTeXSplitColumn`. You
+should get two columns — `compr` / `buy` and `-aron` / `-PST.3PL` — with the `-`
+leading the cell on **both** rows, and the free translation untouched.
+`LingTeXMergeColumns` with the cursor in `compr` should put it back.
 
 Then `TESTING.md` section 3 at whatever depth is useful.
 
