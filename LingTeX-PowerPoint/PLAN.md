@@ -30,7 +30,7 @@ These modules never touch Word's objects: `modFlexParse`, `modIgtModel`, `modLei
 ## Known limits
 
 - **No custom keyboard shortcuts.** Assigning keys from a macro is Word-only (`KeyBindings`).
-- **Undo may take several presses.** PowerPoint has no custom undo record (`UndoRecord`); probe 2 measures how PowerPoint groups a macro's changes.
+- **Undo takes one press per change unless we design around it.** PowerPoint has no custom undo record (`UndoRecord`), and each change a macro makes is its own undo step (probe round 4). The plan is to make a re-wrap a single paste; see round 4 below.
 - **Numbering is plain text**, renumbered by a command.
 - **Installing on the Mac:** copy the add-in (`.ppam`) into Office's Startup folder for PowerPoint, as Word's template goes into Word's (confirmed below). On Windows, PowerPoint registers add-ins in the registry instead.
 - **PowerPoint for Mac won't save an add-in from VBA** (below). The build saves a `.pptm` and changes its content type, as LingTeX-Word's build does for its template.
@@ -60,7 +60,7 @@ Two fixes from that run:
 ## Steps
 
 1. **Probe.** `tools/probe/modProbe.bas`: three rounds done (below). Still to probe:
-   - events (resize, selection) and undo grouping, which need a class module;
+   - whether a re-wrap can be one undo step: compose the formatted text in a scratch presentation and paste it into the real box in one operation;
    - which `SaveAs` format numbers Mac PowerPoint actually uses (Windows' 25 and 30 fail there).
 2. **Core.** Insert, re-wrap and read back an example.
 3. **Commands.** Events, settings, numbering, Check Glossing, Split and Merge Columns.
@@ -133,3 +133,16 @@ Reports: `LingTeX-PowerPoint-reports/StartupAddIn.mac.txt` and `MakeStartupTestA
   - `SaveAs` with format 25 (a macro-enabled presentation on Windows) gives "Failed".
 - **What works:** a `.ppam` is a `.pptm` whose main part has the add-in content type (`application/vnd.ms-powerpoint.addin.macroEnabled.main+xml` in place of `...presentation.macroEnabled.main+xml`). The test add-in was the dev presentation, saved by the importer's ordinary `Save`, with that one string changed. The build can make the real add-in the same way on any machine. It still needs a `.pptm` holding only the add-in's modules (an engine presentation, as LingTeX-Word has an engine template), either saved once by hand or saved by VBA once the Mac's format numbers are known.
 - Test modules: `tools/probe/modStartupProbe.bas` (the save attempts) and `tools/probe/modStartupAutoOpen.bas` (the `Auto_Open` that reported). Neither is imported by default.
+
+## Probe round 4: events and undo (Mac, PowerPoint 16.112, 2026-09-15, with Seth at the keyboard)
+
+Reports: `LingTeX-PowerPoint-reports/Events.mac.txt` and `Undo.mac.txt`. The probe: `tools/probe/modProbeEvents.bas` and `clsProbeEvents.cls`.
+
+| Question | Result |
+|---|---|
+| Resizing by hand | `AfterShapeSizeChange` fires once, when the handle is let go (not during the drag), with the new size (254 x 124 pt; the box grew taller as its text wrapped). So re-wrapping when the frame is resized is possible. |
+| Resizing by code | Also fires `AfterShapeSizeChange`, but only after the macro has returned, and only once for several size changes to one shape in a run. A re-wrap that changes a box's size hears its own event after its busy flag is already cleared, so the guard has to be something else. For example: ignore a resize to exactly the size the re-wrap just set. |
+| Selection | `WindowSelectionChange` fires on clicking into a box's text (type 3), on selecting the box (type 2) and on clicking away (type 0), and `SlideSelectionChanged` fires too. So re-wrapping when the cursor leaves an example is possible. |
+| Undo | One Cmd+Z took back only the last of six changes one macro made (the text). The shape, its fill, position, width and tag all stayed. Each change a macro makes is its own undo step, so a re-wrap made of many changes would need many Cmd+Z. |
+
+Next probe: can a re-wrap be one undo step? Compose the example's formatted text in a scratch presentation, then put it into the real box with one `TextRange2.Paste`. Check that one Cmd+Z restores the old example whole, and that per-paragraph tab stops, small capitals and italics survive the paste.

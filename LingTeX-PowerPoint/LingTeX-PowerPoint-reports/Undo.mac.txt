@@ -1,0 +1,8 @@
+Undo probe  2026-09-15 19:24:27
+probe presentations open: 1
+1 shape added:    yes, Id 3
+2 red fill:       yes
+3 moved to 320:   yes  (left 320.0)
+4 width 240:      yes  (width 240.0)
+5 tagged:         yes
+6 text 'undo me': no  (text '')

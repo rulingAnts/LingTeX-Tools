@@ -1,3 +1,12 @@
 Event probe  2026-09-15 19:20:48
 19:20:48  -- listening; code now sets the box's width to 400 (a resize event just below means code fires it too)
 19:20:48  -- code done; over to the person at the keyboard
+19:20:48  SlideSelectionChanged  1 slide(s)
+19:20:48  WindowSelectionChange  type 0
+19:20:48  AfterShapeSizeChange  shape LingTeXResizeMe  now 400.0 x 65.4
+19:22:41  WindowSelectionChange  type 3  shape LingTeXResizeMe  400.0 wide
+19:22:42  WindowSelectionChange  type 2  shape LingTeXResizeMe  400.0 wide
+19:22:44  AfterShapeSizeChange  shape LingTeXResizeMe  now 254.1 x 123.6
+19:22:45  WindowSelectionChange  type 0
+19:23:25  AfterShapeSizeChange  shape LingTeXUndoMe  now 240.0 x 60.0
+19:25:18  -- stopped (listening until now); events in other presentations, counted but not described: 2
