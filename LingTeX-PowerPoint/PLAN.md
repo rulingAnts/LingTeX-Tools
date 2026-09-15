@@ -2,7 +2,7 @@
 
 LingTeX-Word's Interlinear tab, for PowerPoint. The idea: paste from FLEx and get an aligned interlinear example that wraps inside its own frame and re-wraps when the frame changes.
 
-Status (2026-09-15): three probe rounds have run, the second and third through the dev rig with no hand-pasting (results below). The design is settled: one text box is the frame. Measuring, reading the clipboard and the Startup folder all have answers. Next: confirm a `.ppam` loads from the Startup folder (needs a PowerPoint restart), then step 2.
+Status (2026-09-15): three probe rounds have run, the second and third through the dev rig with no hand-pasting (results below). The design is settled: one text box is the frame. Measuring, reading the clipboard and the Startup folder all have answers. A `.ppam` in the Startup folder loads when PowerPoint starts (confirmed). Next: step 2.
 
 ## Why it differs from Word
 
@@ -32,7 +32,8 @@ These modules never touch Word's objects: `modFlexParse`, `modIgtModel`, `modLei
 - **No custom keyboard shortcuts.** Assigning keys from a macro is Word-only (`KeyBindings`).
 - **Undo may take several presses.** PowerPoint has no custom undo record (`UndoRecord`); probe 2 measures how PowerPoint groups a macro's changes.
 - **Numbering is plain text**, renumbered by a command.
-- **The add-in (`.ppam`) has to be registered.** It isn't dropped into a Startup folder.
+- **Installing on the Mac:** copy the add-in (`.ppam`) into Office's Startup folder for PowerPoint, as Word's template goes into Word's (confirmed below). On Windows, PowerPoint registers add-ins in the registry instead.
+- **PowerPoint for Mac won't save an add-in from VBA** (below). The build saves a `.pptm` and changes its content type, as LingTeX-Word's build does for its template.
 - **At most 32 tab stops per paragraph**, so at most 33 columns in one wrap line.
 
 ## Dev rig
@@ -55,7 +56,7 @@ Two fixes from that run:
 
 1. **Probe.** `tools/probe/modProbe.bas`: three rounds done (below). Still to probe:
    - events (resize, selection) and undo grouping, which need a class module;
-   - whether a `.ppam` in the Startup folder loads (`MakeStartupProbeAddIn`, then restart PowerPoint).
+   - which `SaveAs` format numbers Mac PowerPoint actually uses (Windows' 25 and 30 fail there).
 2. **Core.** Insert, re-wrap and read back an example.
 3. **Commands.** Events, settings, numbering, Check Glossing, Split and Merge Columns.
 4. **Tests.** Tests that run inside PowerPoint, on the Mac and on Windows.
@@ -104,3 +105,15 @@ Line breaks (and possibly other details) may arrive differently depending on the
 4. An example with a blank line between two examples, so that collapsing doubled breaks is shown not to merge two examples into one, or split one into two.
 
 For each, record the tab, CR, LF and vertical-tab counts the paste produced (probe section 9 already prints them), and keep them in the doc tests.
+
+## The Startup folder and saving an add-in (Mac, 2026-09-15)
+
+Reports: `LingTeX-PowerPoint-reports/StartupAddIn.mac.txt` and `MakeStartupTestAddIn.mac.txt`.
+
+- **A `.ppam` in the Startup folder loads when PowerPoint starts.** A test add-in in `~/Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/PowerPoint` ran its `Auto_Open` one second after PowerPoint started. PowerPoint listed it as loaded, set to load automatically, and ticked in Tools > PowerPoint Add-ins. So the Mac installer copies the add-in there.
+- **VBA can't save an add-in here.**
+  - `SaveAs` and `SaveCopyAs` with format 30 (`ppSaveAsOpenXMLAddin` on Windows) give "Invalid enumeration value", with or without a window.
+  - `SaveAs` with no format writes the old binary format under a doubled name ("LingTeXStartupProbe.ppam.ppt").
+  - `SaveAs` with format 25 (a macro-enabled presentation on Windows) gives "Failed".
+- **What works:** a `.ppam` is a `.pptm` whose main part has the add-in content type (`application/vnd.ms-powerpoint.addin.macroEnabled.main+xml` in place of `...presentation.macroEnabled.main+xml`). The test add-in was the dev presentation, saved by the importer's ordinary `Save`, with that one string changed. The build can make the real add-in the same way on any machine. It still needs a `.pptm` holding only the add-in's modules (an engine presentation, as LingTeX-Word has an engine template), either saved once by hand or saved by VBA once the Mac's format numbers are known.
+- Test modules: `tools/probe/modStartupProbe.bas` (the save attempts) and `tools/probe/modStartupAutoOpen.bas` (the `Auto_Open` that reported). Neither is imported by default.

@@ -1,0 +1,3 @@
+Auto_Open ran at 2026-09-15 18:58:24
+  add-in SaveAsAdobePDF  loaded -1, autoload -1, /Library/Application Support/Microsoft/Office365/User Content.localized/Startup/PowerPoint/SaveAsAdobePDF.ppam
+  add-in LingTeXStartupProbe  loaded -1, autoload -1, /Users/Seth/Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/PowerPoint/LingTeXStartupProbe.ppam

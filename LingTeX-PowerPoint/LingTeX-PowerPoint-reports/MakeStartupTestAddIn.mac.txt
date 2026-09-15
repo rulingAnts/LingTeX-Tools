@@ -1,0 +1,9 @@
+MakeStartupTestAddIn  2026-09-15 18:52:37
+  folder  /Users/Seth/Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/PowerPoint
+  no window, SaveAs FileFormat 30: ERROR -2147024809: Presentation.SaveAs : Invalid enumeration value.
+  no window, SaveAs, format from the .ppam name: no error, but no file
+  no window, SaveCopyAs FileFormat 30: ERROR -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+  window, SaveAs FileFormat 30: ERROR -2147024809: Presentation.SaveAs : Invalid enumeration value.
+  window, SaveAs, format from the .ppam name: no error, but no file
+  window, SaveCopyAs FileFormat 30: ERROR -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+PROBLEM: no way of saving an add-in worked (the attempts are above)
