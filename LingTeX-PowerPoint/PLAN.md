@@ -52,6 +52,11 @@ Two fixes from that run:
 - **Checking for the open presentation.** Reading `name of p` inside an AppleScript loop fails (-2763), so the runner asks for `name of every presentation` instead.
 - **The clipboard sample.** `pbcopy` needs a UTF-8 locale, or "ñ" arrives as "√±".
 
+## Where it is developed
+
+- **Develop and test on the Mac first; smoke-test on Windows later.** Mac VBA is the less forgiving environment: constants missing from the type library, the sandbox, and save formats that don't exist there. Code that works on the Mac is more likely to work on both.
+- **Nothing in the build or the dev rig should need Windows.** For example, the add-in is made by changing a `.pptm`'s content type, not by Windows PowerPoint's SaveAs.
+
 ## Steps
 
 1. **Probe.** `tools/probe/modProbe.bas`: three rounds done (below). Still to probe:
