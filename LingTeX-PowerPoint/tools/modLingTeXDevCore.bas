@@ -74,6 +74,8 @@ Public Sub LingTeXDevImport()
         End If
     Next
 
+    RemoveUnlisted vbp, files, folder
+
     On Error Resume Next
     pres.Save
     If Err.Number <> 0 Then
@@ -299,6 +301,37 @@ Private Function HostPresentation() As Object
         End If
     Next
 End Function
+
+' Anything left from an earlier run that modules.txt no longer names is
+' removed, so a stale module can neither clash with a current one ("Ambiguous
+' name detected") nor linger in the project.  The importer and the bootstrap
+' always stay.
+Private Sub RemoveUnlisted(ByVal vbp As Object, ByVal files As Collection, ByVal folder As String)
+    Dim keep As String, f As Variant, nm As String, c As Object, gone As Collection, i As Long
+    keep = "|" & LCase$(SELF_NAME) & "|" & LCase$(BOOT_NAME) & "|"
+    For Each f In files
+        nm = VbName(ReadText(folder & PathSep() & CStr(f)))
+        If nm <> "" Then keep = keep & LCase$(nm) & "|"
+    Next
+    Set gone = New Collection
+    On Error Resume Next
+    For Each c In vbp.VBComponents
+        If c.Type = 1 Or c.Type = 2 Or c.Type = 3 Then
+            If InStr(keep, "|" & LCase$(c.Name) & "|") = 0 Then gone.Add c
+        End If
+    Next
+    Err.Clear
+    For i = 1 To gone.Count
+        nm = gone(i).Name
+        vbp.VBComponents.Remove gone(i)
+        If Err.Number <> 0 Then
+            Note "  CHECK    could not remove " & nm & " (" & Err.Description & ")"
+            Err.Clear
+        Else
+            Note "  removed  " & nm & " (not in " & LIST_FILE & ")"
+        End If
+    Next
+End Sub
 
 Private Sub RemoveComponent(ByVal vbp As Object, ByVal compName As String)
     Dim comp As Object
