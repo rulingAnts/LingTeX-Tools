@@ -173,3 +173,17 @@ Reports: `LingTeX-PowerPoint-reports/Round6.mac.txt` and `SaveScan2.mac.txt`. Th
 - **Making the add-in.** Seth saves the engine as `.pptm` or `.potm` with File > Save As (the importer's ordinary `Save` keeps it that way), and the build makes the `.ppam` from it by changing the main part's content type, as the startup test did. Nothing on the Mac writes a `.ppam` directly.
 - **PowerPoint crashed three seconds after round 6 finished.** Microsoft Error Reporting (log from Seth): `EXC_BAD_ACCESS` on the main thread, inside a background job, 1.7 s after the last VBA call. The likely cause is a save still running in the background when the probe closed the presentation: the movie (12), and perhaps 14 to 21. PowerPoint restarted and recovered its open presentations; the second scan (37 to 120) then ran without trouble. The probe now always skips 12 and 14 to 21.
 - **Rule:** never close a presentation in the same macro run as a `SaveCopyAs` in format 12 or 14 to 21. A macro that ever saves a `.pptm` (16) must wait until the file is complete before closing anything.
+
+## Smoke test: the shared LingTeX-Word modules in PowerPoint (Mac, PowerPoint 16.112.4, 2026-09-16)
+
+Setup: `tools/stage-shared.sh` stages `modFlexParse`, `modIgtModel`, `clsIgtWarning`, `modLeipzig` and `modWrap` from `origin/claude/lingtex-word-crlf` (82fefb8, the line-break fix) into `build/shared/`. The rig imports them with `build/smoke/modPptSmoke.bas` and runs `PptSmokeRun`; the probes are left out of MODULES. The smoke module and its report stay out of git for now, because they contain the owner's FLEx copies (field data), pending his decision on publishing them.
+
+| Question | Result |
+|---|---|
+| Do the shared modules compile in PowerPoint? | Yes: all five, unchanged, with no stand-in module. One call into each ran (`NormalizeLineBreaks`, `NewExample`, `CheckExample` and `FixCellSpaces`, `ComputeWrapLines`). |
+| Does Insert's road run? | Yes, up to where Word would start drawing: `LooksLikeFlex`, `ParseFlexBlocks`, `ModelsFromText`, `FixCellSpaces`, `CheckExample`, `ModelFromText`, and the wrap planner on made-up widths. No run-time error anywhere. |
+| The owner's real FLEx copies | The typical two-line copy parses as it does in Word: example 1 is 1 column word-aligned and 3 morpheme-aligned, example 2 is 9 columns. The known parser defects show up as expected: the second example's free translation loses its first word, Insert would draw only the first example, "§" becomes a word with an empty gloss, and a copy with several writing systems gives no example. They belong to the LingTeX-Word parser issue, not to PowerPoint. |
+| Line breaks | CR LF, CR, and CR with no final break give the same result as LF. CR CR and LF CR split every row into its own block; vertical tabs (Shift+Return, Chr 11) join rows into one line. |
+
+- **PowerPoint's clipboard reader must therefore, before calling `ParseFlexBlocks`,** collapse doubled breaks (CR CR, LF CR) without merging two examples that a real blank line separates, and decide what a vertical tab means. The smoke test's "blank line between two examples" input is the baseline for that.
+- The rig's probe sample (`run-in-powerpoint.sh`, "Free" followed by a tab) is not FLEx's shape: its free line keeps a leading tab. Use a real FLEx line shape in future samples.
