@@ -100,6 +100,17 @@ Full report: `LingTeX-PowerPoint-reports/Probe.mac.txt`.
 | `MacScript("the clipboard")` | Works on this Mac, giving the same text as the paste plus a trailing break. |
 | Startup folder | PowerPoint on this Mac loads Adobe's `SaveAsAdobePDF.ppam` from Office's shared Startup folder for PowerPoint (loaded, autoload). It may also write to the user's own Startup folder. So an installer that drops the add-in there will very likely work; the load test will confirm it. |
 
+## vbCrLf is not CR LF here (Mac, PowerPoint 16.112, 2026-09-15)
+
+In PowerPoint for Mac's VBA, `vbCrLf` is the two characters LF, CR (codes 10, 13), in that order, and `vbNewLine` is LF alone (`ImportModules.mac.txt` logs both). So:
+
+- **`Replace(text, vbCrLf, vbLf)` never matches a real CR LF.** Replacing CR on its own afterwards then turns every line break into two. That is what doubled every line of the first class module the rig imported.
+- **Text built with `vbCrLf` puts LF CR between lines.**
+
+**Rule for this project:** never use `vbCrLf` or `vbNewLine` to find, split or normalise line breaks. Use `Chr$(13)` and `Chr$(10)`, as `modLingTeXDevCore` does. Audit every module shared with LingTeX-Word for the same thing before it runs here.
+
+The importer is now `tools/modLingTeXDevCore.bas`, which can itself be re-imported. The pasted `modLingTeXDev` only bootstraps it, so fixes to the importer never need pasting again. The core checks every module's line count against its source.
+
 ## Clipboard tests to run once Insert works
 
 Line breaks (and possibly other details) may arrive differently depending on the platform and on where the text was copied. Run all of these with a real FLEx copy, and with plain tab-separated text, before trusting the reader:

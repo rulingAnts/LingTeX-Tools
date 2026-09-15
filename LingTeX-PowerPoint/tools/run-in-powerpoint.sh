@@ -55,6 +55,7 @@ startup_probe="$HOME/Library/Group Containers/UBF8T346G9.Office/User Content.loc
 # What is imported, in order, relative to LingTeX-PowerPoint/. The modules
 # shared with Word will be listed here as ../LingTeX-Word/src/<name>.bas.
 MODULES="
+tools/modLingTeXDevCore.bas
 tools/probe/modProbe.bas
 tools/probe/modProbeEvents.bas
 tools/probe/clsProbeEvents.cls
@@ -89,13 +90,21 @@ presname=$(basename "$pres")
 [ -d "$box" ] || { echo "run-in-powerpoint: $box is missing; start PowerPoint once first" >&2; exit 2; }
 
 #-- Stage the modules -------------------------------------------------------
-rm -rf "$stage"; mkdir -p "$stage" "$boxreports" "$reports"
-: > "$stage/modules.txt"
+# Copies the named modules (relative to LingTeX-PowerPoint/) into the folder
+# PowerPoint reads, with modules.txt naming them in order.
+stage_modules() {
+    rm -rf "$stage"; mkdir -p "$stage"
+    : > "$stage/modules.txt"
+    for m in "$@"; do
+        [ -f "$root/$m" ] || { echo "run-in-powerpoint: missing module $m" >&2; exit 2; }
+        cp "$root/$m" "$stage/"
+        basename "$m" >> "$stage/modules.txt"
+    done
+}
 for m in $MODULES; do
     [ -f "$root/$m" ] || { echo "run-in-powerpoint: missing module $m" >&2; exit 2; }
-    cp "$root/$m" "$stage/"
-    basename "$m" >> "$stage/modules.txt"
 done
+mkdir -p "$boxreports" "$reports"
 rm -f "$boxreports"/*.mac.txt
 
 # The probe's clipboard section reads what is on the clipboard: make that a
@@ -223,9 +232,29 @@ if [ ! -f "$boxreports/Ping.mac.txt" ]; then
     fi
 fi
 
-all=""
-[ "$import" = 1 ] && all="ImportLingTeXModulesQuiet"
-all="$all $macros"
+# The import, in two phases. The hand-pasted modLingTeXDev is only the
+# bootstrap: it imports modLingTeXDevCore, the importer proper, which can
+# itself be fixed and re-imported without pasting anything. Its AddFromString
+# on the Mac doubled every line of a class (CR and LF counted as two breaks);
+# the core finds the separator that counts as one, and checks line counts.
+if [ "$import" = 1 ]; then
+    stage_modules tools/modLingTeXDevCore.bas
+    echo "   running ImportLingTeXModulesQuiet (the bootstrap: modLingTeXDevCore only) ..."
+    if ! run_macro ImportLingTeXModulesQuiet "${qualify}ImportLingTeXModulesQuiet" || \
+       ! grep -q "ALL IMPORTED" "$boxreports/ImportModules.mac.txt" 2>/dev/null; then
+        cat "$boxreports/ImportModules.mac.txt" 2>/dev/null
+        echo "   the bootstrap could not import modLingTeXDevCore (see above)."
+        exit 1
+    fi
+    stage_modules $MODULES
+    rm -f "$boxreports/ImportModules.mac.txt"
+    echo "   running LingTeXDevImport ..."
+    if ! run_macro LingTeXDevImport "${qualify}LingTeXDevImport"; then
+        echo "   LingTeXDevImport did not return cleanly (see above)."
+        exit 1
+    fi
+fi
+all="$macros"
 for m in $all; do
     echo "   running $m ..."
     if ! run_macro "$m" "$qualify$m"; then
@@ -247,9 +276,9 @@ for p in "$boxreports"/*.mac.txt; do
     echo ""
     if grep -q "PROBLEM\|FAILED\|CRASH" "$p"; then status=1; fi
 done
-case "$all" in
-    *ImportLingTeXModulesQuiet*) [ -f "$boxreports/ImportModules.mac.txt" ] || { echo "no ImportModules.mac.txt: the import wrote nothing"; status=1; } ;;
-esac
+if [ "$import" = 1 ] && [ ! -f "$boxreports/ImportModules.mac.txt" ]; then
+    echo "no ImportModules.mac.txt: the import wrote nothing"; status=1
+fi
 
 if [ "$commit" = 1 ]; then
     if git -C "$root" add -- "$reports"/*.mac.txt 2>/dev/null && \
