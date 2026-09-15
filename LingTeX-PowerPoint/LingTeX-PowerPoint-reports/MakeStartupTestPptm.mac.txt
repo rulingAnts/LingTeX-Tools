@@ -1,0 +1,5 @@
+MakeStartupTestPptm  2026-09-15 18:53:58
+  SaveAs FileFormat 25: ERROR -2147467259: Presentation.SaveAs : Failed.
+  SaveAs FileFormat 25: no file
+  SaveAs, format from the .pptm name: no file
+PROBLEM: the .pptm could not be saved

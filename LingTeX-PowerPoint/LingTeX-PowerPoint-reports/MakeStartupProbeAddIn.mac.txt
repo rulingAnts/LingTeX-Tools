@@ -1,0 +1,2 @@
+MakeStartupProbeAddIn  2026-09-15 18:50:52
+PROBLEM: -2147024809: Presentation.SaveAs : Invalid enumeration value.
