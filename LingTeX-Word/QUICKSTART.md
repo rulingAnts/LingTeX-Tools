@@ -508,7 +508,8 @@ a function's array return passed into a `ByRef` array parameter, seven
 module-level declarations placed after the first procedure, a scratch-document
 cleanup that closed the document holding the running code, `wdStyleTableGrid`
 (not in Mac Word's type library), a `_` continuation in a class module that the
-bootstrap installs double-spaced on Mac, and the Overflow that was blamed on
+bootstrap installed double-spaced on Mac (its own `vbCrLf` normalisation: that
+constant is LF CR there; fixed 2026-09-15), and the Overflow that was blamed on
 `Single` and turned out to be `Debug.Print` — see *The `Single` failure* below.
 Each has a linter rule now.
 
