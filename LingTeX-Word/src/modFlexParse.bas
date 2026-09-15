@@ -29,6 +29,11 @@ Option Explicit
 ' with ChrW() at run time.  VBA's Const cannot hold a ChrW() call (it is a
 ' function, not a literal), which is why these are Property Get / Function
 ' rather than Const.  Do not "tidy" them into Const.
+'
+' Line breaks are character codes too -- Chr$(13) and Chr$(10), through
+' LINE_CR, LINE_LF, LINE_CRLF and NormalizeLineBreaks -- and never vbCrLf or
+' vbNewLine, which are not what their names say on every host.  See LINE
+' BREAKS below.
 ' ---------------------------------------------------------------------------
 '=============================================================================
 
@@ -107,6 +112,38 @@ End Property
 Public Property Get RightSingleQuote() As String
     RightSingleQuote = ChrW(&H2019)
 End Property
+
+
+'=============================================================================
+' -- LINE BREAKS -------------------------------------------------------------
+'=============================================================================
+
+' Line breaks are found, split and normalised with these, never with vbCrLf or
+' vbNewLine.  In the VBA of PowerPoint for Mac 16.112, vbCrLf is LF then CR --
+' the reverse of a real CR LF -- and vbNewLine is LF alone (2026-09-15).  So
+' Replace(s, vbCrLf, vbLf) matched no CR LF there, and the vbCr pass after it
+' turned each one into two line breaks: a blank line after every tier row,
+' which ParseFlexBlocks reads as the end of an example.  These modules are
+' shared with LingTeX-PowerPoint.  RunAllTests records what the constants are
+' on the host it runs on.  Property Get, not Const, for the reason in the
+' header: a Const cannot hold Chr$().
+Public Property Get LINE_CR() As String
+    LINE_CR = Chr$(13)
+End Property
+
+Public Property Get LINE_LF() As String
+    LINE_LF = Chr$(10)
+End Property
+
+Public Property Get LINE_CRLF() As String
+    LINE_CRLF = Chr$(13) & Chr$(10)
+End Property
+
+' Every line break as LF: CR LF (Windows text), CR (a Word paragraph mark) and
+' LF.  CR LF goes first, or each one would become two.
+Public Function NormalizeLineBreaks(ByVal s As String) As String
+    NormalizeLineBreaks = Replace(Replace(s, LINE_CRLF, LINE_LF), LINE_CR, LINE_LF)
+End Function
 
 
 '=============================================================================
@@ -343,8 +380,8 @@ Public Function ParseFlexBlocks(ByVal raw As String) As FlexBlock()
     Dim b As FlexBlock
     Dim blank As Boolean, started As Boolean
 
-    raw = Replace(Replace(raw, vbCrLf, vbLf), vbCr, vbLf)
-    lines = Split(raw, vbLf)
+    raw = NormalizeLineBreaks(raw)
+    lines = Split(raw, LINE_LF)
 
     ReDim chunks(0 To UBound(lines) + 1)
     nChunks = 0
@@ -364,7 +401,7 @@ Public Function ParseFlexBlocks(ByVal raw As String) As FlexBlock()
                 nChunks = nChunks + 1
                 chunks(nChunks) = ""
             End If
-            If Len(chunks(nChunks)) > 0 Then chunks(nChunks) = chunks(nChunks) & vbLf
+            If Len(chunks(nChunks)) > 0 Then chunks(nChunks) = chunks(nChunks) & LINE_LF
             chunks(nChunks) = chunks(nChunks) & lines(i)
             started = True
         End If
@@ -402,8 +439,8 @@ Public Function ParseFlexBlock(ByVal text As String) As FlexBlock
     Dim seenFree As Boolean
     Dim numPart As String
 
-    text = Replace(Replace(text, vbCrLf, vbLf), vbCr, vbLf)
-    lines = Split(text, vbLf)
+    text = NormalizeLineBreaks(text)
+    lines = Split(text, LINE_LF)
 
     ReDim res.LineTypes(0 To UBound(lines))
     ReDim res.ColArrays(0 To UBound(lines))
