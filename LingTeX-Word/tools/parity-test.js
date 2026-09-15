@@ -184,8 +184,8 @@ section('Line breaks (CR LF and CR input parse as LF input does)');
 
 (function () {
     // Mirrors TestLineBreaks in modTests.bas. "\r\n" is a real CR LF here; the
-    // VBA builds it from Chr$(13) & Chr$(10), because vbCrLf in PowerPoint for
-    // Mac 16.112 is LF then CR.
+    // VBA builds it from Chr$(13) & Chr$(10), because vbCrLf in Word and
+    // PowerPoint for Mac 16.112 is LF then CR.
     function sameExamples(name, lf, wantExamples) {
         var want = R.buildModels(lf, R.WORD_ALIGNED);
         eq(name + ': examples in the LF text', want.length, wantExamples);

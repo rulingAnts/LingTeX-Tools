@@ -486,9 +486,9 @@ End Sub
 ' Text from Windows, and text PowerPoint takes off the clipboard, ends its lines
 ' in CR LF; Word for Mac hands the parsers CR, a paragraph mark.  All of it must
 ' parse as LF text does.  The CR LF is built from Chr$(13) & Chr$(10), never
-' from vbCrLf: in PowerPoint for Mac 16.112 that is LF then CR, the parsers
-' once normalised with it, and every CR LF became two line breaks -- a blank
-' line after each tier row, where ParseFlexBlocks ends an example.
+' from vbCrLf: in Word and PowerPoint for Mac 16.112 that is LF then CR, the
+' parsers once normalised with it, and every CR LF became two line breaks -- a
+' blank line after each tier row, where ParseFlexBlocks ends an example.
 Private Sub TestLineBreaks()
     Dim lf As String
     Dim mixed As String
@@ -511,7 +511,7 @@ Private Sub TestLineBreaks()
 
     ' Two FLEx examples separated by one blank line: two, not one and not four.
     lf = Vector1Raw() & vbLf & vbLf & Vector2Raw()
-    CheckLineBreakVariants "two FLEx examples", lf, 5, 2
+    CheckLineBreakVariants "two FLEx examples", lf, 6, 2
     CheckTwoExamplesCrLf lf
 End Sub
 
@@ -982,9 +982,10 @@ Public Function WriteReportFile(ByVal leaf As String, ByVal text As String) As B
     fn = FreeFile
     Open path For Output As #fn
     ' The report is built with vbCr between lines. Write it with this platform's
-    ' newline (CRLF on Windows, CR on Mac): a bare CR in a Windows console is
-    ' "return to the start of the line", and the runner's printout came out as
-    ' every line overwriting the last (Windows run, 2026-09-12).
+    ' newline, vbNewLine (CRLF on Windows; LF on Mac, not CR -- measured
+    ' 2026-09-15): a bare CR in a Windows console is "return to the start of the
+    ' line", and the runner's printout came out as every line overwriting the
+    ' last (Windows run, 2026-09-12).
     Print #fn, Replace(text, vbCr, vbNewLine)
     Close #fn
     WriteReportFile = True
