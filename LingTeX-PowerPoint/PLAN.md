@@ -59,9 +59,7 @@ Two fixes from that run:
 
 ## Steps
 
-1. **Probe.** `tools/probe/modProbe.bas`: three rounds done (below). Still to probe:
-   - confirm PowerPoint has no `UndoRecord` (Word's named undo), and whether the paste keeps Tags and the box's size and position (it should: only the text is replaced);
-   - which `SaveAs` format numbers Mac PowerPoint actually uses (Windows' 25 and 30 fail there).
+1. **Probe.** Six rounds done (below). Round 6 settled the last questions: PowerPoint has no `UndoRecord`, one paste leaves the example's box alone, and VBA on the Mac has no save format for a macro-enabled presentation or an add-in.
 2. **Core.** Insert, re-wrap and read back an example.
 3. **Commands.** Events, settings, numbering, Check Glossing, Split and Merge Columns.
 4. **Tests.** Tests that run inside PowerPoint, on the Mac and on Windows.
@@ -158,3 +156,17 @@ Report: `LingTeX-PowerPoint-reports/Paste.mac.txt`. The probe: `tools/probe/modP
 3. One Cmd+Z restored the OLD example whole: text, stops, italics and small capitals (Seth's screenshot and the report agree).
 
 **So every re-wrap and insert is: plan and measure, compose in a scratch presentation, copy, one paste into the example's box.** That keeps undo to one step, as `UndoRecord` does in Word, and leaves the box itself, its position, size and Tags, untouched.
+
+## Probe round 6: undo entries, what a paste leaves alone, save formats (Mac, PowerPoint 16.112.4, 2026-09-15)
+
+Reports: `LingTeX-PowerPoint-reports/Round6.mac.txt` and `SaveScan2.mac.txt`. The probe: `tools/probe/modProbeSave.bas` (`ProbeRound6Quiet`, `ProbeSaveScan2Quiet`), run through the rig with nobody at the keyboard.
+
+| Question | Result |
+|---|---|
+| Named undo | `Application.UndoRecord` and `Application.StartNewUndoEntry` both give error 438. VBA cannot name or group undo steps here, so composing in a scratch presentation and pasting once (round 5) is the only way to make an insert or re-wrap one undo step. |
+| What one paste leaves alone | After one `TextRange2.Paste` into an example's box, its name, Id, left, top, width, Tags, AutoSize, word wrap, margins and z-order were all unchanged. Only the height changed, because AutoSize fitted the new text. |
+| `SaveCopyAs` format numbers | Wrote a file: 1 (.ppt), 5 (.pot), 6 (.rtf), 7 (.pps), 10 (.pptx), 12 (.mov); with no format, .pptx. No error but no file anywhere: 8 and 14 to 21. "Not supported in this version": 2, 3, 4 and 9 (PowerPoint 3, 4 and 95) and 11 (HTML). "Invalid enumeration value": 0, 13, 22 to 36, and every number from 37 to 120. |
+
+- **VBA on the Mac cannot save a macro-enabled presentation or an add-in in any format.** The build keeps the route found earlier: an engine `.pptm` (saved by hand once, then kept up to date by the importer's ordinary `Save`), and the add-in made from it by changing the main part's content type.
+- **PowerPoint crashed three seconds after round 6 finished.** Microsoft Error Reporting (log from Seth): `EXC_BAD_ACCESS` on the main thread, inside a background job, 1.7 s after the last VBA call. The likely cause is format 12: it exports a movie in the background, and the probe closed the presentation while that was still running. PowerPoint restarted and recovered its open presentations; the second scan (37 to 120) then ran without trouble. The probe now always skips 12.
+- **Rule:** never export a movie or pictures from a macro and close the presentation in the same run. LingTeX needs neither.
