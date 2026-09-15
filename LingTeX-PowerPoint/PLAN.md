@@ -30,7 +30,7 @@ These modules never touch Word's objects: `modFlexParse`, `modIgtModel`, `modLei
 ## Known limits
 
 - **No custom keyboard shortcuts.** Assigning keys from a macro is Word-only (`KeyBindings`).
-- **Undo takes one press per change unless we design around it.** PowerPoint has no custom undo record (`UndoRecord`), and each change a macro makes is its own undo step (probe round 4). The plan is to make a re-wrap a single paste; see round 4 below.
+- **Undo: a re-wrap is one step, but it can't be named.** Each change a macro makes is its own undo step (probe round 4). A re-wrap composed out of sight and pasted in with one `TextRange2.Paste` is a single step, which one Cmd+Z takes back whole (round 5). PowerPoint labels it "Undo Paste"; there is no Word-style `UndoRecord` to name it "Undo Re-wrap".
 - **Numbering is plain text**, renumbered by a command.
 - **Installing on the Mac:** copy the add-in (`.ppam`) into Office's Startup folder for PowerPoint, as Word's template goes into Word's (confirmed below). On Windows, PowerPoint registers add-ins in the registry instead.
 - **PowerPoint for Mac won't save an add-in from VBA** (below). The build saves a `.pptm` and changes its content type, as LingTeX-Word's build does for its template.
@@ -60,7 +60,7 @@ Two fixes from that run:
 ## Steps
 
 1. **Probe.** `tools/probe/modProbe.bas`: three rounds done (below). Still to probe:
-   - whether a re-wrap can be one undo step: compose the formatted text in a scratch presentation and paste it into the real box in one operation;
+   - confirm PowerPoint has no `UndoRecord` (Word's named undo), and whether the paste keeps Tags and the box's size and position (it should: only the text is replaced);
    - which `SaveAs` format numbers Mac PowerPoint actually uses (Windows' 25 and 30 fail there).
 2. **Core.** Insert, re-wrap and read back an example.
 3. **Commands.** Events, settings, numbering, Check Glossing, Split and Merge Columns.
@@ -146,3 +146,15 @@ Reports: `LingTeX-PowerPoint-reports/Events.mac.txt` and `Undo.mac.txt`. The pro
 | Undo | One Cmd+Z took back only the last of six changes one macro made (the text). The shape, its fill, position, width and tag all stayed. Each change a macro makes is its own undo step, so a re-wrap made of many changes would need many Cmd+Z. |
 
 Next probe: can a re-wrap be one undo step? Compose the example's formatted text in a scratch presentation, then put it into the real box with one `TextRange2.Paste`. Check that one Cmd+Z restores the old example whole, and that per-paragraph tab stops, small capitals and italics survive the paste.
+
+## Probe round 5: a re-wrap as one undo step (Mac, PowerPoint 16.112, 2026-09-15, with Seth at the keyboard)
+
+Report: `LingTeX-PowerPoint-reports/Paste.mac.txt`. The probe: `tools/probe/modProbePaste.bas`.
+
+1. A box held an OLD example: two paragraphs with tab stops at 100 and 220 pt, italic forms, small-capital glosses.
+2. One macro composed a NEW example in a scratch presentation (three paragraphs, stops at 80, 190 and 260, a free translation), copied it, and replaced the old text with one `TextRange2.Paste`.
+   - The box then held the NEW example whole: text, per-paragraph tab stops, italics and small capitals all came through the paste.
+   - PowerPoint's Edit menu read "Undo Paste".
+3. One Cmd+Z restored the OLD example whole: text, stops, italics and small capitals (Seth's screenshot and the report agree).
+
+**So every re-wrap and insert is: plan and measure, compose in a scratch presentation, copy, one paste into the example's box.** That keeps undo to one step, as `UndoRecord` does in Word, and leaves the box itself, its position, size and Tags, untouched.

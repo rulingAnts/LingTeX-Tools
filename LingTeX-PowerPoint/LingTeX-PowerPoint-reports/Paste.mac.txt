@@ -1,0 +1,5 @@
+Paste probe  2026-09-15 19:31:02
+paragraphs: 2
+  p1  'Los\tnin-o-s\tde\r'  stops [100,220]  italic -1  smallcaps 0
+  p2  'def.m.pl\tchild-m-pl\tof'  stops [100,220]  italic 0  smallcaps -1
+HOLDS: the OLD example, whole
