@@ -239,8 +239,10 @@ main { flex: 1; }
 
 /* The mock: one 16-second loop in pure CSS, dressed as Windows. An example is
    selected and copied in a FLEx window; Word slides in and Insert Interlinear
-   draws it; then the ruler's right margin is dragged in and back out, and the
-   example re-wraps to fit. The window chrome and the FLEx interface come from
+   draws it; then the ruler's right margin is dragged in. The example keeps its
+   width, as a LingTeX example does until something re-wraps it (leaving it, a
+   save, or a Re-wrap button), until Re-wrap All is clicked; the margin goes back
+   while the window is out of sight. The window chrome and the FLEx interface come from
    win-mock.css, shared with the LaTeX demo. Every keyframe below shares that one
    timeline, and the cursor's stops were measured from the rendered layout, so
    clicks land on what they click. Reduced motion shows the finished page. */
@@ -250,8 +252,10 @@ main { flex: 1; }
   linear-gradient(160deg, var(--blue-900), var(--blue-700)); }
 .mock-win { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: #fff; border-radius: .8cqw .8cqw 0 0; box-shadow: 0 2cqw 5cqw rgba(2,6,23,.45); animation: mock-word-win 16s ease-in-out infinite; }
 .mock-insert-btn { animation: mock-btn 16s linear infinite; }
+.mock-rewrap-btn { animation: mock-btn-rw 16s linear infinite; }
 .mock-tip { position: absolute; left: 0; top: calc(100% + .5cqw); z-index: 5; width: 21cqw; padding: .8cqw 1cqw; background: #fff; border: 1px solid #c8c6c4; box-shadow: 0 .4cqw 1.2cqw rgba(0,0,0,.18); color: #323130; font: 1.05cqw/1.35 'Segoe UI', system-ui, sans-serif; text-align: left; opacity: 0; animation: mock-tip 16s linear infinite; }
 .mock-tip b { display: block; margin-bottom: .3cqw; font-weight: 600; }
+.mock-tip-rewrap { animation-name: mock-tip-rw; }
 .mock-page { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; overflow: hidden; background: #ebebeb; }
 .mock-ruler { position: relative; flex-shrink: 0; width: 76cqw; height: 1.7cqw; margin: .7cqw 0 1cqw; border: 1px solid #d2d0ce; background: repeating-linear-gradient(90deg, #a19f9d 0 1px, transparent 1px 1.27cqw) 0 55% / 100% 32% no-repeat, #fff; }
 .mock-ruler::before, .mock-ruler::after { content: ''; position: absolute; top: 0; bottom: 0; background: #d2d0ce; }
@@ -264,7 +268,10 @@ main { flex: 1; }
 .mock-caret { position: relative; height: 0; }
 .mock-caret::after { content: ''; position: absolute; left: 0; top: 0; width: .2cqw; height: 2.1cqw; background: #111827; opacity: 0; animation: mock-caret 16s linear infinite; }
 .igt { display: flex; gap: 2.4cqw; }
-.mock .igt { border-radius: .4cqw; animation: mock-insert 16s ease-out infinite; }
+/* The example's width is animated on its own: it stays as drawn when the margin
+   moves, and only takes the new width when Re-wrap All runs (68.8cqw and 44.8cqw
+   are the sheet's text width at the two margins). */
+.mock .igt { border-radius: .4cqw; animation: mock-insert 16s ease-out infinite, mock-igt 16s linear infinite; }
 .igt-num { flex-shrink: 0; width: 4.5cqw; }
 .igt-body { flex: 1; min-width: 0; }
 .igt-cols { display: flex; flex-wrap: wrap; column-gap: 1.7cqw; row-gap: 1.2cqw; }
@@ -307,17 +314,20 @@ main { flex: 1; }
 @keyframes mock-copy   { 0%, 21.5% { background: transparent; border-color: transparent; } 22%, 26.5% { background: #cce8ff; border-color: #99d1ff; } 27%, 100% { background: transparent; border-color: transparent; } }
 @keyframes mock-caret  { 0%, 35% { opacity: 0; } 35.5%, 37.5% { opacity: 1; } 38%, 39% { opacity: 0; } 39.5%, 41.5% { opacity: 1; } 42%, 100% { opacity: 0; } }
 @keyframes mock-btn    { 0%, 37.5% { background: transparent; } 38%, 40.7% { background: #e1dfdd; } 40.8%, 41.8% { background: #c8c6c4; } 42%, 46% { background: #e1dfdd; } 46.5%, 100% { background: transparent; } }
+@keyframes mock-btn-rw { 0%, 65.5% { background: transparent; } 66%, 69.2% { background: #e1dfdd; } 69.3%, 70.3% { background: #c8c6c4; } 70.5%, 72% { background: #e1dfdd; } 72.5%, 100% { background: transparent; } }
 @keyframes mock-tip    { 0%, 39% { opacity: 0; } 39.5%, 45.5% { opacity: 1; } 46%, 100% { opacity: 0; } }
-@keyframes mock-insert { 0%, 41.5% { opacity: 0; background: rgba(253,230,138,0); } 42% { opacity: 1; background: rgba(253,230,138,.9); } 52%, 100% { opacity: 1; background: rgba(253,230,138,0); } }
-@keyframes mock-pad    { 0%, 54% { padding-right: 3.6cqw; } 62%, 76% { padding-right: 27.6cqw; } 86%, 100% { padding-right: 3.6cqw; } }
-@keyframes mock-margin { 0%, 54% { width: 3.6cqw; } 62%, 76% { width: 27.6cqw; } 86%, 100% { width: 3.6cqw; } }
-@keyframes mock-handle { 0%, 54% { right: 3.6cqw; } 62%, 76% { right: 27.6cqw; } 86%, 100% { right: 3.6cqw; } }
+@keyframes mock-tip-rw { 0%, 67% { opacity: 0; } 67.5%, 72.5% { opacity: 1; } 73%, 100% { opacity: 0; } }
+@keyframes mock-insert { 0%, 41.5% { opacity: 0; background: rgba(253,230,138,0); } 42% { opacity: 1; background: rgba(253,230,138,.9); } 52%, 69.9% { opacity: 1; background: rgba(253,230,138,0); } 70.2% { background: rgba(253,230,138,.9); } 78%, 100% { opacity: 1; background: rgba(253,230,138,0); } }
+@keyframes mock-igt    { 0%, 69.9% { width: 68.8cqw; } 70%, 98% { width: 44.8cqw; } 99%, 100% { width: 68.8cqw; } }
+@keyframes mock-pad    { 0%, 54% { padding-right: 3.6cqw; } 62%, 98% { padding-right: 27.6cqw; } 99%, 100% { padding-right: 3.6cqw; } }
+@keyframes mock-margin { 0%, 54% { width: 3.6cqw; } 62%, 98% { width: 27.6cqw; } 99%, 100% { width: 3.6cqw; } }
+@keyframes mock-handle { 0%, 54% { right: 3.6cqw; } 62%, 98% { right: 27.6cqw; } 99%, 100% { right: 3.6cqw; } }
 @keyframes mock-click {
   0%, { opacity: 0; transform: scale(.3); } 18% { opacity: 1; transform: scale(.3); } 20% { opacity: 0; transform: scale(1.5); }
   24.9% { opacity: 0; transform: scale(.3); } 25% { opacity: 1; transform: scale(.3); } 27% { opacity: 0; transform: scale(1.5); }
   40.9% { opacity: 0; transform: scale(.3); } 41% { opacity: 1; transform: scale(.3); } 43% { opacity: 0; transform: scale(1.5); }
   53.4% { opacity: 0; transform: scale(.3); } 53.5% { opacity: 1; transform: scale(.3); } 55.5% { opacity: 0; transform: scale(1.5); }
-  75.4% { opacity: 0; transform: scale(.3); } 75.5% { opacity: 1; transform: scale(.3); } 77.5% { opacity: 0; transform: scale(1.5); }
+  69.4% { opacity: 0; transform: scale(.3); } 69.5% { opacity: 1; transform: scale(.3); } 71.5% { opacity: 0; transform: scale(1.5); }
   100% { opacity: 0; }
 }
 /* The cursor's stops are the pointer tip on its target, measured from the rendered
@@ -331,9 +341,9 @@ main { flex: 1; }
   33%           { left: 30%; top: 40%; }
   38%, 46%      { left: 11.5%; top: 24.5%; }
   51%, 54%      { left: 84.2%; top: 39.4%; }
-  62%, 76%      { left: 60.2%; top: 39.4%; }
-  86%           { left: 84.2%; top: 39.4%; }
-  91%, 93%      { left: 74%; top: 70%; }
+  62%           { left: 60.2%; top: 39.4%; }
+  66%, 72%      { left: 33%; top: 24.5%; }
+  78%, 92%      { left: 80%; top: 78%; }
   98%, 100%     { left: 25.3%; top: 33.5%; }
 }
 @keyframes mock-cursor-long {
@@ -344,9 +354,9 @@ main { flex: 1; }
   33%           { left: 30%; top: 40%; }
   38%, 46%      { left: 11.5%; top: 24.6%; }
   51%, 54%      { left: 84.3%; top: 39.5%; }
-  62%, 76%      { left: 60.3%; top: 39.5%; }
-  86%           { left: 84.3%; top: 39.5%; }
-  91%, 93%      { left: 74%; top: 70%; }
+  62%           { left: 60.3%; top: 39.5%; }
+  66%, 72%      { left: 33%; top: 24.5%; }
+  78%, 92%      { left: 80%; top: 78%; }
   98%, 100%     { left: 25.3%; top: 33.3%; }
 }
 @media (prefers-reduced-motion: reduce) {
