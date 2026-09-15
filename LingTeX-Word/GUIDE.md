@@ -176,11 +176,11 @@ For an example that exists only as text, select the lines and click **Text to
 Interlinear**:
 
 ```
-(1) Ewaub pe. [...] Akwal-mam pe auk-nu as truko, nalami weto numuhe.
+(1) Ayer los niñ-o-s de mi vecin-a compr-aron pan en el mercado.
 
-Egret DET [...] Neck-3.POSS DET long.SG-and can make.long, what-PP sees.something if
+yesterday DEF.M.PL child-M-PL of 1SG.POSS neighbor-F buy-PST.3PL bread in DEF.M.SG market
 
-(Bebas: Burung bangau itu. Lehernya itu panjang dan bisa kasi panjang kalau dia lihat sesuatu.)
+'Yesterday my neighbor's children bought bread at the market.'
 ```
 
 The words of each tier line become the columns. Any run of spaces separates
@@ -195,8 +195,8 @@ the first line's. Accept it or type the number, or Cancel to draw nothing.
 
 With the document set to **By Morpheme**, every column in which every filled
 tier cell carries a morpheme boundary is split at it, on every tier, so
-`Akwal-mam` over `Neck-3.POSS` becomes two columns while `nalami` over
-`what-PP` stays one (an empty cell does not stand in the way). Check Glossing
+`vecin-a` over `neighbor-F` becomes two columns while `del` over
+`of-DEF.M.SG` stays one (an empty cell does not stand in the way). Check Glossing
 reports that mismatch afterwards, as it always has.
 
 **Insert Interlinear** takes the same road when its *selection* is plain
@@ -349,7 +349,7 @@ what has one right answer:
 | A column filled on some tiers and not others | No: legal, but usually a slip |
 
 `.` and `:` are never counted as morpheme breaks: they mark one morpheme
-glossed with several words, so `carry.CMP=SEQ` against `kada=te` is correct
+glossed with several words, so `buy-PST.3PL` against `compr-aron` is correct
 and is not flagged.
 
 ## Keyboard shortcuts
@@ -377,6 +377,16 @@ lost.
 | Indent | G |
 | Outdent | L, O, U, Y, Q |
 | Text to Interlinear | F, B, V |
+
+## Known issues
+
+**Undo after editing an ordinary table takes two presses (Mac).** After you
+delete a cell in a table that is not an interlinear example, the first
+Cmd+Z makes the whole table seem to vanish and disturbs the layout around
+it. Press Cmd+Z once more: the table comes back exactly as it was, and
+nothing is lost. Seen in Word for Mac; not yet checked on Windows. It is
+tracked at
+[github.com/rulingAnts/LingTeX-Tools/issues/3](https://github.com/rulingAnts/LingTeX-Tools/issues/3).
 
 ## When something goes wrong
 
