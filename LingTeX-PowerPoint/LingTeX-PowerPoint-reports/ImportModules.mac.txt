@@ -1,0 +1,10 @@
+ImportLingTeXModules  2026-09-15 18:46:28
+  from  /Users/Seth/Library/Containers/com.microsoft.Powerpoint/Data/Documents/LingTeX-PowerPoint-src
+  into  /Users/Seth/Documents/LingTeX-PowerPoint-Dev.pptm
+  ok       modProbe.bas  modProbe, 784 lines
+
+components now:
+  modLingTeXDev  (443 lines, type 1)
+  modProbe  (784 lines, type 1)
+
+ALL IMPORTED -- 1 module(s)

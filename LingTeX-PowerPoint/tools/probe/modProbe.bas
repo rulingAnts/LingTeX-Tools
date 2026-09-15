@@ -22,9 +22,9 @@ Option Explicit
 '   6  How many tab stops a paragraph holds.
 '   7  What a tab line wider than a wrapping box does.
 '   8  Whether indents make a hanging number column.
-'   9  Reading clipboard text: Shapes.Paste, and a windowed View.PasteSpecial
-'      (Shapes.PasteSpecial is not supported: round 1).  Tabs, line breaks,
-'      and letters beyond ASCII.
+'   9  Reading clipboard text copied in another application: pasted into a
+'      text box four ways, with and without a window; AppleScriptTask and
+'      MacScript on the Mac.  Tabs, line breaks, letters beyond ASCII.
 '  10  Whether Tags survive Duplicate and Copy + Paste; how long a tag can be.
 '  11  The fallback design: grouped text boxes with an invisible frame, and
 '      what resizing the group does to them.
@@ -522,51 +522,51 @@ End Sub
 ' 9. Clipboard text
 '-----------------------------------------------------------------------------
 Private Sub ProbeClipboardText()
-    Dim sr As Object, src As Object, got As String, sample As String
-    Dim app As Object, wp As Object, ws As Object, n As Long
+    Dim app As Object, wp As Object, ws As Object, sr As Object, src As Object
+    Dim got As String, sample As String
     Set app = Application
-    Heading "9. Clipboard text"
+    Heading "9. Clipboard text copied in another application (the runner puts a FLEx sample there)"
     On Error Resume Next
-    ' a. Whatever is on the clipboard now (run-in-powerpoint.sh puts a
-    '    FLEx-shaped sample there), with Shapes.Paste on the scratch slide.
-    Set sr = mSld.Shapes.Paste
-    If Err.Number <> 0 Then
-        SayError "Shapes.Paste of the current clipboard"
-    Else
-        got = sr.Item(1).TextFrame2.TextRange.Text
-        If Err.Number <> 0 Then
-            SayError "reading the pasted shape's text (type " & sr.Item(1).Type & ")"
-        Else
-            Say "Shapes.Paste: " & ClipSummary(got)
-        End If
-        sr.Delete
-        Set sr = Nothing
-    End If
-    Err.Clear
-    ' b. The same clipboard through a window's View.PasteSpecial, as text.
+    ' Round 2: Shapes.Paste refused text from another application, and a
+    ' window's View.PasteSpecial is not supported. So: into a text box's text.
+    TryTextPaste "no window:   TextRange2.Paste", mSld, 0
+    TryTextPaste "no window:   TextRange2.PasteSpecial(plain text)", mSld, 4
+    TryTextPaste "no window:   TextRange.Paste", mSld, -1
+    TryTextPaste "no window:   TextRange.PasteSpecial(ppPasteText)", mSld, -2
     Set wp = app.Presentations.Add(-1)
     If Err.Number <> 0 Then
-        SayError "a windowed presentation"
+        SayError "a presentation with a window"
     Else
         Set ws = wp.Slides.Add(1, 12)
         wp.Windows(1).Activate
         wp.Windows(1).View.GotoSlide 1
-        n = ws.Shapes.Count
-        wp.Windows(1).View.PasteSpecial 2
-        If Err.Number <> 0 Then
-            SayError "View.PasteSpecial(ppPasteText)"
-        ElseIf ws.Shapes.Count = n Then
-            Say "View.PasteSpecial(ppPasteText): no error, but nothing was pasted"
-        Else
-            got = ws.Shapes(ws.Shapes.Count).TextFrame2.TextRange.Text
-            Say "View.PasteSpecial(ppPasteText): " & ClipSummary(got)
-        End If
         Err.Clear
+        TryTextPaste "with window: TextRange2.Paste", ws, 0
+        TryTextPaste "with window: TextRange2.PasteSpecial(plain text)", ws, 4
+        TryTextPaste "with window: TextRange.Paste", ws, -1
+        TryTextPaste "with window: TextRange.PasteSpecial(ppPasteText)", ws, -2
         wp.Saved = -1
         wp.Close
     End If
     Err.Clear
-    ' c. A round trip: text copied from a text box, pasted with Shapes.Paste.
+#If Mac Then
+    ' The way Mac Office add-ins usually reach the clipboard: a script in
+    ' ~/Library/Application Scripts/com.microsoft.Powerpoint/. None is installed
+    ' yet, so the error says whether the call itself exists.
+    got = AppleScriptTask("LingTeXClipboard.scpt", "clipboardText", "")
+    If Err.Number <> 0 Then
+        SayError "AppleScriptTask (no script installed yet)"
+    Else
+        Say "AppleScriptTask: " & ClipSummary(got)
+    End If
+    got = MacScript("the clipboard")
+    If Err.Number <> 0 Then
+        SayError "MacScript(""the clipboard"")"
+    Else
+        Say "MacScript(""the clipboard""): " & ClipSummary(got)
+    End If
+#End If
+    ' A round trip inside PowerPoint: text copied from a text box, Shapes.Paste.
     sample = "Word" & TB & "Los" & TB & "ninos" & vbCr & _
              "Morphemes" & TB & "Los" & TB & "nin" & TB & "-o" & TB & "-s" & vbCr & _
              "Free" & TB & "The children."
@@ -577,14 +577,38 @@ Private Sub ProbeClipboardText()
     If Err.Number <> 0 Then SayError "Shapes.Paste of the sample": GoTo Tidy
     got = sr.Item(1).TextFrame2.TextRange.Text
     If got = sample Then
-        Say "round trip (Copy, Shapes.Paste): IDENTICAL"
+        Say "round trip inside PowerPoint (Copy, Shapes.Paste): IDENTICAL"
     Else
-        Say "round trip (Copy, Shapes.Paste): DIFFERENT -- got " & Escape(got)
+        Say "round trip inside PowerPoint (Copy, Shapes.Paste): DIFFERENT -- got " & Escape(got)
     End If
 Tidy:
     On Error Resume Next
     src.Delete
     sr.Delete
+End Sub
+
+' Paste the clipboard into a new, empty text box's text, one way:
+' 0 TextRange2.Paste, 4 TextRange2.PasteSpecial(msoClipboardFormatPlainText),
+' -1 TextRange.Paste, -2 TextRange.PasteSpecial(ppPasteText).
+Private Sub TryTextPaste(ByVal label As String, ByVal sld As Object, ByVal how As Long)
+    Dim box As Object
+    On Error Resume Next
+    Set box = sld.Shapes.AddTextbox(1, 20, 20, 600, 40)
+    If Err.Number <> 0 Then SayError label & " (making the text box)": Exit Sub
+    Select Case how
+        Case 0: box.TextFrame2.TextRange.Paste
+        Case 4: box.TextFrame2.TextRange.PasteSpecial 4
+        Case -1: box.TextFrame.TextRange.Paste
+        Case -2: box.TextFrame.TextRange.PasteSpecial 2
+    End Select
+    If Err.Number <> 0 Then
+        SayError label
+    ElseIf Len(box.TextFrame2.TextRange.Text) = 0 Then
+        Say label & ": no error, but the box is still empty"
+    Else
+        Say label & ": " & ClipSummary(box.TextFrame2.TextRange.Text)
+    End If
+    box.Delete
 End Sub
 
 Private Function ClipSummary(ByVal got As String) As String
