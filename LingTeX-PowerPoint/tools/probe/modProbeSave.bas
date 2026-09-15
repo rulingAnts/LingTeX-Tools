@@ -20,11 +20,13 @@ Option Explicit
 '      files each number wrote.  37, 39 and 40 are skipped: on Windows they
 '      are video and animated GIF, which can run for a long time.  The report
 '      is rewritten after every number, so a hang still leaves it.
-'      12 is always skipped now.  On the Mac it writes a movie (.mov) in the
-'      background; round 6 then closed the presentation while that was still
-'      running, and PowerPoint crashed three seconds later (2026-09-15).
-'      Never export a movie or pictures and close the presentation in the
-'      same run.
+'      12 and 14 to 21 are always skipped now.  On the Mac these are the
+'      movie, PDF, Open XML (.pptx, .pptm, .ppsx, .ppsm, .potx, .potm) and
+'      theme formats (PowerPoint.sdef, EPPSaveAsFileType), which seem to save
+'      in the background: round 6 closed the presentation while they were
+'      still running, and PowerPoint crashed three seconds later
+'      (2026-09-15).  Never close a presentation in the same run as one of
+'      these saves.
 '
 ' It uses the clipboard, and makes and closes its own windowless
 ' presentations.  Pure ASCII, and numbers instead of named constants.
@@ -251,7 +253,7 @@ Private Sub ProbeSaveFormats(ByVal app As Object, ByVal fromN As Long, ByVal toN
     End If
 
     For fmt = fromN To toN
-        If fmt = 12 Or (skipVideo And (fmt = 37 Or fmt = 39 Or fmt = 40)) Then
+        If fmt = 12 Or (fmt >= 14 And fmt <= 21) Or (skipVideo And (fmt = 37 Or fmt = 39 Or fmt = 40)) Then
             Say "   " & Format$(fmt, "00") & ": skipped"
         Else
             Err.Clear
