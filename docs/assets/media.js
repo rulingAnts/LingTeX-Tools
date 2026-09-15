@@ -47,17 +47,19 @@
         var video = slot.getAttribute('data-video');
         var img = slot.getAttribute('data-img');
         if (video) {
-            exists(video).then(function (ok) {
-                if (!ok) return;
+            var poster = slot.getAttribute('data-poster');
+            var webm = slot.getAttribute('data-webm');
+            // The poster and the WebM are optional: each is used only when it,
+            // too, is on the list, so a slot never requests a file not there.
+            Promise.all([exists(video), poster ? exists(poster) : false, webm ? exists(webm) : false]).then(function (have) {
+                if (!have[0]) return;
                 var v = document.createElement('video');
                 v.muted = true; v.defaultMuted = true; v.loop = true; v.playsInline = true;
                 v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
                 v.preload = 'metadata';
                 v.setAttribute('aria-label', label);
-                var poster = slot.getAttribute('data-poster');
-                if (poster) v.poster = poster;
-                var webm = slot.getAttribute('data-webm');
-                if (webm) { var s1 = document.createElement('source'); s1.src = webm; s1.type = 'video/webm'; v.appendChild(s1); }
+                if (have[1]) v.poster = poster;
+                if (have[2]) { var s1 = document.createElement('source'); s1.src = webm; s1.type = 'video/webm'; v.appendChild(s1); }
                 var s2 = document.createElement('source'); s2.src = video; s2.type = 'video/mp4'; v.appendChild(s2);
                 slot.appendChild(v);
                 slot.classList.add('has-media');

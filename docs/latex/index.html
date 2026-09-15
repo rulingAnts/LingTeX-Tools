@@ -7,6 +7,7 @@
 <meta name="description" content="LingTeX Tools — convert FLEx interlinear and Phonology Assistant exports to LaTeX, tab-separated tables, and more. Desktop app (macOS &amp; Windows) and browser extension (Chrome &amp; Firefox).">
 <title>LingTeX Tools · LaTeX &amp; XLingPaper</title>
 <link rel="icon" type="image/png" href="../assets/lingtex-icon-32.png">
+<link rel="stylesheet" href="../assets/tex-demo.css">
 <style>
 /* ── Reset ───────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -708,6 +709,34 @@ footer a:hover { text-decoration: underline; }
   </div>
   <p class="hero-note">Works with any TeX editor — Overleaf, VS Code, TeXShop, TeXworks, and more</p>
 </section>
+
+<!-- ── Demo: copy in FLEx, paste as LaTeX, compile ─────────────────────── -->
+<div class="td-hero-wrap">
+  <figure class="td-slot" role="img" aria-label="An interlinear example selected and copied in FLEx, pasted into a LaTeX editor with the LingTeX Tools shortcut as a gll example, then compiled and shown typeset">
+    <div class="td-win td-flex" aria-hidden="true">
+      <div class="td-bar"><i></i><i></i><i></i><span>Sample project — FieldWorks Language Explorer</span></div>
+      <div class="td-tabs"><span>Baseline</span><span>Gloss</span><span>Analyze</span><span>Tagging</span><b>Print View</b></div>
+      <div class="td-flex-body"><div class="td-text"><div class="td-seg">1</div><div class="td-lines"><div class="td-sel"></div>
+        <div class="td-bundles"><div class="td-bundle"><div class="td-wd">Los</div><div class="td-morphs"><div class="td-m"><span>Los</span><span>DEF.M.PL</span></div></div></div><div class="td-bundle"><div class="td-wd">niños</div><div class="td-morphs"><div class="td-m"><span>niñ</span><span>child</span></div><div class="td-m"><span>-o</span><span>M</span></div><div class="td-m"><span>-s</span><span>PL</span></div></div></div><div class="td-bundle"><div class="td-wd">de</div><div class="td-morphs"><div class="td-m"><span>de</span><span>of</span></div></div></div><div class="td-bundle"><div class="td-wd">mi</div><div class="td-morphs"><div class="td-m"><span>mi</span><span>1SG.POSS</span></div></div></div><div class="td-bundle"><div class="td-wd">vecina</div><div class="td-morphs"><div class="td-m"><span>vecin</span><span>neighbor</span></div><div class="td-m"><span>-a</span><span>F</span></div></div></div><div class="td-bundle"><div class="td-wd">compraron</div><div class="td-morphs"><div class="td-m"><span>compr</span><span>buy</span></div><div class="td-m"><span>-aron</span><span>PST.3PL</span></div></div></div><div class="td-bundle"><div class="td-wd">pan</div><div class="td-morphs"><div class="td-m"><span>pan</span><span>bread</span></div></div></div><div class="td-bundle"><div class="td-wd">en</div><div class="td-morphs"><div class="td-m"><span>en</span><span>in</span></div></div></div><div class="td-bundle"><div class="td-wd">el</div><div class="td-morphs"><div class="td-m"><span>el</span><span>DEF.M.SG</span></div></div></div><div class="td-bundle"><div class="td-wd">mercado</div><div class="td-morphs"><div class="td-m"><span>mercado</span><span>market</span></div></div></div></div>
+        <div class="td-free"><b>Free</b>My neighbor’s children bought bread at the market.</div>
+      </div></div></div>
+      <div class="td-menu"><div class="td-dim">Cut</div><div class="td-copy">Copy</div><div class="td-dim">Paste</div><hr><div>Select All</div></div>
+    </div>
+    <div class="td-win td-editor" aria-hidden="true">
+      <div class="td-bar"><i></i><i></i><i></i><span>chapter3.tex — LaTeX editor</span></div>
+      <div class="td-tool"><span class="td-file">chapter3.tex</span><span>main.pdf</span><span class="td-compile">Compile</span></div>
+      <div class="td-panes">
+        <div class="td-code"><div class="td-l"><span class="c">\section</span>{Examples}</div><div class="td-l"> </div><div class="td-l td-big"><span class="cm">% This example was pasted from FLEx</span></div><div class="td-l td-caret-line"><span class="td-caret"></span></div><div class="td-paste"><div class="td-l"><span class="cm">% Interlinear example</span></div><div class="td-l"><span class="c">\begin</span>{exe}</div><div class="td-l"><span class="c">\ex</span> <span class="cm">% \label{ex:KEY}</span></div><div class="td-l"><span class="c">\gll</span> <span class="c">\textit</span>{Los} <span class="c">\textit</span>{niñ-o-s} <span class="c">\textit</span>{de} <span class="c">\textit</span>{mi} <span class="c">\textit</span>{vecin-a} <span class="c">\textit</span>{compr-aron} <span class="c">\textit</span>{pan} <span class="c">\textit</span>{en} <span class="c">\textit</span>{el} <span class="c">\textit</span>{mercado} <span class="k">\\</span></div><div class="td-l td-in"><span class="c">\textsc</span>{Def}.<span class="c">\textsc</span>{M}.<span class="c">\textsc</span>{Pl} child-<span class="c">\textsc</span>{M}-<span class="c">\textsc</span>{Pl} of <span class="c">\textsc</span>{1sg}.<span class="c">\textsc</span>{Poss} neighbor-<span class="c">\textsc</span>{F} buy-<span class="c">\textsc</span>{Pst}.<span class="c">\textsc</span>{3pl} bread in <span class="c">\textsc</span>{Def}.<span class="c">\textsc</span>{M}.<span class="c">\textsc</span>{Sg} market <span class="k">\\</span></div><div class="td-l"><span class="c">\glt</span> 'My neighbor’s children bought bread at the market.'</div><div class="td-l"><span class="c">\end</span>{exe}</div></div></div>
+        <div class="td-pdf"><div class="td-progress"></div><div class="td-page"><div class="td-render">
+          <div class="td-h">1&nbsp;&nbsp;Examples</div>
+          <div class="td-ex"><span class="td-num">(1)</span><div><div class="td-cols"><span class="td-w"><i>Los</i><span><span class="td-sc">Def.M.Pl</span></span></span><span class="td-w"><i>niñ-o-s</i><span>child-<span class="td-sc">M</span>-<span class="td-sc">Pl</span></span></span><span class="td-w"><i>de</i><span>of</span></span><span class="td-w"><i>mi</i><span><span class="td-sc">1sg.Poss</span></span></span><span class="td-w"><i>vecin-a</i><span>neighbor-<span class="td-sc">F</span></span></span><span class="td-w"><i>compr-aron</i><span>buy-<span class="td-sc">Pst.3pl</span></span></span><span class="td-w"><i>pan</i><span>bread</span></span><span class="td-w"><i>en</i><span>in</span></span><span class="td-w"><i>el</i><span><span class="td-sc">Def.M.Sg</span></span></span><span class="td-w"><i>mercado</i><span>market</span></span></div><div class="td-tr">‘My neighbor’s children bought bread at the market.’</div></div></div>
+        </div></div></div>
+      </div>
+    </div>
+    <div class="td-keys" aria-hidden="true"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>V</kbd><span>LingTeX smart paste</span></div>
+    <div class="td-cursor" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2 L4 20 L9 15.5 L12.5 23 L15.5 21.6 L12 14.3 L19 14.3 Z" fill="#fff" stroke="#0f172a" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+  </figure>
+</div>
 
 <!-- ── Download / Products ───────────────────────────────────────────────── -->
 <div id="download">
