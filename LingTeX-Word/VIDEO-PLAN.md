@@ -33,12 +33,16 @@ does, back to the start.
 - **Word:** light appearance (the website is light), the **Interlinear** tab
   selected, zoom about **140%** so the text stays legible when scaled down,
   navigation pane and comments closed, no account name or avatar in view.
-- **The document:** titled something real, e.g. *A grammar -- Chapter 3*.
-  A heading ("3.2 Serial verb constructions"), one sentence of prose, then
+- **The document:** titled generically, e.g. *Grammar -- Chapter 3*. A
+  heading ("3.2 Examples"), one sentence of prose, then
   empty space. Below the empty space, out of view at first, three typed lines
   for shot 4: words, glosses, translation.
 - **Clipboard:** copy the FLEx example before you start recording, so the
   recording can open inside Word.
+- **Data:** generic and anonymized, like the website's demo: a Spanish
+  sentence glossed in English (e.g. *Los niñ-o-s de mi vecin-a compr-aron pan
+  en el mercado*, 'My neighbor's children bought bread at the market'), not
+  data from a language under study.
 - **Settings:** the add-in's defaults (numbering on, By Word, Re-wrap on Leave
   on), so what the video shows is what a new user gets.
 - **Cursor:** move deliberately, pause half a second before each click, never
@@ -50,8 +54,8 @@ does, back to the start.
 |---|---|---|---|
 | 0 | 0:00-0:02 | The clean page: heading, prose, cursor on the empty line. This is also the loop's last frame. | -- |
 | 1 | 0:02-0:06 | Click **Insert Interlinear**. Example (1) appears: aligned columns, small-capital glosses, the translation in quotes. Hold a beat. | Paste from FLEx |
-| 2 | 0:06-0:11 | Click in a gloss cell and type a longer gloss (e.g. *pick* to *pick.early*); click below the example. Columns flow onto the next line. | Re-wraps as you edit |
-| 3 | 0:11-0:15 | Cursor in a cell with a clitic (*rixu=xo*). Click **Split Column**: *rixu* and *=xo* become two columns on both tiers. | Split at morpheme breaks |
+| 2 | 0:06-0:11 | Click in a gloss cell and type a longer gloss (e.g. *bread* to *fresh.bread*); click below the example. Columns flow onto the next line. | Re-wraps as you edit |
+| 3 | 0:11-0:15 | Cursor in a cell with a morpheme break (*compr-aron*, glossed *buy-PST.3PL*). Click **Split Column**: *compr* and *-aron* become two columns on both tiers. | Split at morpheme breaks |
 | 4 | 0:15-0:20 | Scroll a little. Select the three typed lines, click **Text to Interlinear**, answer 1. Example (2) appears under (1). | Typed lines, too |
 | 5 | 0:20-0:23 | Hold on the page with (1) and (2). | Numbered by Word |
 | -- | 0:23-0:24 | I cross-fade back to shot 0 for a seamless loop. | -- |
