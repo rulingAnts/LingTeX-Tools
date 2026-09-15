@@ -1,8 +1,9 @@
 /* LingTeX Tools site: the LaTeX & XLingPaper demo.
    Every class starts td- so it can sit on the landing page and on latex/, whose
    own inline styles it must not disturb. The Windows window chrome and the FLEx
-   interface come from win-mock.css, shared with the Word demo. A 14-second loop in
-   pure CSS: an example is selected and copied in a FLEx print-view mock, pasted
+   interface come from win-mock.css, shared with the Word demo. A 22-second loop in
+   pure CSS: FLEx's lines are set to Morphemes and Lex. Gloss (Tools > Configure >
+   Interlinear..., untick Word under Baseline, OK), then an example is selected and copied in a FLEx print-view mock, pasted
    into a LaTeX editor mock with LingTeX Tools' smart-paste shortcut (the real
    core.js output for this example), compiled, and shown typeset. Visitors who
    ask for reduced motion see the finished editor, still. */
@@ -30,36 +31,38 @@
 }
 
 /* FLEx: the Print View tab of a text */
-.td-flex { animation: td-flex-win 14s ease-in-out infinite; opacity: 0; }
+.td-flex { animation: td-flex-win 22s ease-in-out infinite; opacity: 0; }
 .td-flex-body { flex: 1; padding: 2.4cqw 2.6cqw; background: #fff; }
 .td-text { position: relative; display: flex; gap: 1.6cqw; font-family: 'Charis SIL', 'Doulos SIL', Cambria, Georgia, serif; font-size: 1.6cqw; color: #111827; }
-.td-seg { flex-shrink: 0; font-family: system-ui, sans-serif; font-size: 1.3cqw; color: #64748b; padding-top: .2cqw; }
+.td-seg { flex-shrink: 0; font-family: system-ui, sans-serif; font-size: 1.3cqw; font-weight: 700; color: #000; padding-top: .2cqw; }
 .td-lines { position: relative; flex: 1; }
-.td-sel { position: absolute; left: -.6cqw; top: -.6cqw; bottom: -.6cqw; width: 0; background: rgba(0,120,215,.25); animation: td-sel 14s linear infinite; }
+.td-sel { position: absolute; left: -.6cqw; top: -.6cqw; bottom: -.6cqw; width: 0; background: rgba(0,120,215,.25); animation: td-sel 22s linear infinite; }
 /* Rows are fixed in the markup, filled to about 90% of the pane (the way FLEx
    wraps), so the text breaks in the same places at every size and the
    cursor's measured stops stay on target. */
 .td-bundles { position: relative; display: flex; flex-direction: column; row-gap: 1.6cqw; }
 .td-row { display: flex; column-gap: 2.2cqw; }
+/* A word never squeezes: an over-full row shows it (and the rows are re-filled), rather than its morphemes breaking apart. */
+.td-row > *, .td-morphs > * { flex-shrink: 0; }
 .td-bundle { display: flex; flex-direction: column; gap: .5cqw; }
-.td-wd { font-weight: 600; }
-.td-morphs { display: flex; gap: 1cqw; }
+.td-wd { height: 2.08cqw; overflow: hidden; font-weight: 600; animation: td-wordline 22s ease-in-out infinite; }
+.td-morphs { display: flex; gap: 1cqw; animation: td-morphgap 22s ease-in-out infinite; }
 .td-m { display: flex; flex-direction: column; gap: .4cqw; }
 .td-m span:last-child { color: #334155; font-family: system-ui, sans-serif; font-size: 1.3cqw; }
 .td-free { position: relative; margin-top: 2cqw; font-family: system-ui, sans-serif; font-size: 1.4cqw; color: #334155; }
 .td-free b { color: #64748b; font-weight: 600; margin-right: 1cqw; }
-.td-menu { animation: td-menu 14s linear infinite; }
-.td-edit { animation: td-menubtn 14s linear infinite; }
-.td-menu .td-copy { animation: td-copy 14s linear infinite; }
+.td-menu { animation: td-menu 22s linear infinite; }
+.td-edit { animation: td-menubtn 22s linear infinite; }
+.td-menu .td-copy { animation: td-copy 22s linear infinite; }
 
 /* The LaTeX editor: source on the left, PDF on the right */
-.td-editor { animation: td-ed-win 14s ease-in-out infinite; }
+.td-editor { animation: td-ed-win 22s ease-in-out infinite; }
 .td-tool { display: flex; align-items: center; gap: 1.4cqw; padding: .8cqw 1.6cqw; border-bottom: 1px solid #e2e8f0; font-size: 1.3cqw; color: #475569; flex-shrink: 0; }
 .td-tool .td-file { font-weight: 600; color: #0f172a; }
 .td-compile {
   margin-left: auto; display: inline-flex; align-items: center; gap: .7cqw; padding: .55cqw 1.4cqw;
   background: #0f766e; color: #fff; border-radius: .6cqw; font-weight: 700; font-size: 1.3cqw;
-  animation: td-compile 14s linear infinite;
+  animation: td-compile 22s linear infinite;
 }
 .td-compile::before { content: ''; border-left: 1.05cqw solid #fff; border-top: .65cqw solid transparent; border-bottom: .65cqw solid transparent; }
 .td-panes { flex: 1; display: grid; grid-template-columns: 1.08fr 1fr; min-height: 0; }
@@ -74,20 +77,20 @@
 .cm { color: #15803d; font-style: italic; }
 .k { color: #9333ea; }
 .td-caret-line { height: 1.5em; }
-.td-caret { display: inline-block; width: .18cqw; height: 1.2em; vertical-align: text-bottom; background: #0f172a; opacity: 0; animation: td-caret 14s linear infinite; }
-.td-paste { border-radius: .4cqw; animation: td-paste 14s linear infinite; }
+.td-caret { display: inline-block; width: .18cqw; height: 1.2em; vertical-align: text-bottom; background: #0f172a; opacity: 0; animation: td-caret 22s linear infinite; }
+.td-paste { border-radius: .4cqw; animation: td-paste 22s linear infinite; }
 .td-keys {
   position: absolute; left: 34.5%; top: 74%; z-index: 4; display: inline-flex; align-items: center; gap: .6cqw;
   padding: .8cqw 1.2cqw; background: #0f172a; color: #fff; border-radius: 1cqw; box-shadow: 0 1cqw 2.5cqw rgba(2,6,23,.4);
-  font-size: 1.35cqw; font-weight: 600; opacity: 0; animation: td-keys 14s ease-out infinite;
+  font-size: 1.35cqw; font-weight: 600; opacity: 0; animation: td-keys 22s ease-out infinite;
 }
 .td-keys kbd { font: 600 1.5cqw 'Segoe UI', system-ui, sans-serif; min-width: 3cqw; padding: .3cqw .7cqw; text-align: center; background: #fff; color: #0f172a; border-radius: .5cqw; box-shadow: 0 .3cqw 0 #94a3b8; }
 .td-keys span { margin-left: .6cqw; color: #99f6e4; }
 
 .td-pdf { position: relative; background: #e2e8f0; padding: 1.8cqw; display: flex; justify-content: center; overflow: hidden; }
 .td-page { position: relative; width: 100%; background: #fff; box-shadow: 0 .4cqw 1.6cqw rgba(15,23,42,.18); padding: 3cqw 2.8cqw; font-family: 'Latin Modern Roman', 'CMU Serif', 'Computer Modern', Georgia, 'Times New Roman', serif; color: #111; }
-.td-progress { position: absolute; left: 0; top: 0; height: .45cqw; width: 0; background: #0d9488; opacity: 0; animation: td-progress 14s linear infinite; }
-.td-render { animation: td-render 14s ease-out infinite; }
+.td-progress { position: absolute; left: 0; top: 0; height: .45cqw; width: 0; background: #0d9488; opacity: 0; animation: td-progress 22s linear infinite; }
+.td-render { animation: td-render 22s ease-out infinite; }
 .td-h { font-weight: 700; font-size: 2.1cqw; margin-bottom: 2cqw; }
 .td-ex { display: flex; gap: 1.8cqw; font-size: 1.5cqw; line-height: 1.35; }
 .td-num { flex-shrink: 0; }
@@ -97,42 +100,52 @@
 .td-sc { font-variant: small-caps; }
 .td-tr { margin-top: 1cqw; }
 
-.td-cursor { position: absolute; left: 14%; top: 42%; width: 2.2cqw; z-index: 6; pointer-events: none; animation: td-cursor 14s ease-in-out infinite; filter: drop-shadow(0 .2cqw .3cqw rgba(0,0,0,.35)); }
+.td-cursor { position: absolute; left: 14%; top: 42%; width: 2.2cqw; z-index: 6; pointer-events: none; animation: td-cursor 22s ease-in-out infinite; filter: drop-shadow(0 .2cqw .3cqw rgba(0,0,0,.35)); }
 .td-cursor svg { display: block; width: 100%; height: auto; margin: -.18cqw 0 0 -.37cqw; }
-.td-cursor::after { content: ''; position: absolute; left: -1.6cqw; top: -1.6cqw; width: 3.2cqw; height: 3.2cqw; border-radius: 50%; background: rgba(13,148,136,.55); opacity: 0; animation: td-click 14s linear infinite; }
+.td-cursor::after { content: ''; position: absolute; left: -1.6cqw; top: -1.6cqw; width: 3.2cqw; height: 3.2cqw; border-radius: 50%; background: rgba(13,148,136,.55); opacity: 0; animation: td-click 22s linear infinite; }
 
-@keyframes td-flex-win { 0%, 36% { opacity: 1; transform: none; } 41%, 94% { opacity: 0; transform: translateX(-6%); } 98%, 100% { opacity: 1; transform: none; } }
-@keyframes td-ed-win   { 0%, 36% { opacity: 0; transform: translateX(6%); } 41%, 94% { opacity: 1; transform: none; } 98%, 100% { opacity: 0; transform: translateX(6%); } }
-@keyframes td-sel      { 0%, 5% { width: 0; } 19%, 94% { width: calc(100% + 1.2cqw); } 96%, 100% { width: 0; } }
-@keyframes td-menu     { 0%, 21.5% { opacity: 0; transform: scale(.96); } 22.5%, 30.5% { opacity: 1; transform: none; } 31.5%, 100% { opacity: 0; } }
-@keyframes td-menubtn  { 0%, 21.9% { background: transparent; box-shadow: none; } 22%, 30.5% { background: #cce8ff; box-shadow: inset 0 0 0 1px #99d1ff; } 31%, 100% { background: transparent; box-shadow: none; } }
-@keyframes td-copy     { 0%, 25.5% { background: transparent; border-color: transparent; } 26%, 31% { background: #cce8ff; border-color: #99d1ff; } 31.5%, 100% { background: transparent; border-color: transparent; } }
-@keyframes td-caret    { 0%, 43% { opacity: 0; } 44%, 46% { opacity: 1; } 47%, 48% { opacity: 0; } 49%, 52.5% { opacity: 1; } 53%, 100% { opacity: 0; } }
-@keyframes td-keys     { 0%, 48.5% { opacity: 0; transform: translateY(1cqw) scale(.92); } 50%, 52.5% { opacity: 1; transform: none; } 54%, 100% { opacity: 0; transform: none; } }
-@keyframes td-paste    { 0%, 52.5% { opacity: 0; background: rgba(253,230,138,0); } 53% { opacity: 1; background: rgba(253,230,138,.95); } 63% { background: rgba(253,230,138,0); } 94% { opacity: 1; } 96%, 100% { opacity: 0; } }
-@keyframes td-compile  { 0%, 64% { transform: none; background: #0f766e; } 64.5%, 66.5% { transform: scale(.9); background: #115e59; } 67.5%, 100% { transform: none; background: #0f766e; } }
-@keyframes td-progress { 0%, 66% { opacity: 0; width: 0; } 66.5% { opacity: 1; width: 0; } 73% { opacity: 1; width: 100%; } 74%, 100% { opacity: 0; width: 100%; } }
-@keyframes td-render   { 0%, 73.5% { opacity: 0; transform: translateY(.8cqw); } 76.5%, 94% { opacity: 1; transform: none; } 96%, 100% { opacity: 0; } }
-/* The cursor's stops are the pointer tip on its target, measured from the rendered
-   layout (fixed rows and an explicit line height keep them the same at every size
-   and on every page). If the mock's layout changes, measure them again. */
+@keyframes td-flex-win { 0%, 36.36%, 59.27% { opacity: 1; transform: none; } 62.45%, 96.18% { opacity: 0; transform: translateX(-6%); } 98.73%, 100% { opacity: 1; transform: none; } }
+@keyframes td-ed-win   { 0%, 36.36%, 59.27% { opacity: 0; transform: translateX(6%); } 62.45%, 96.18% { opacity: 1; transform: none; } 98.73%, 100% { opacity: 0; transform: translateX(6%); } }
+@keyframes td-sel      { 0%, 36.36%, 39.55% { width: 0; } 48.45%, 75% { width: calc(100% + 1.2cqw); } 75.1%, 100% { width: 0; } }
+@keyframes td-menu     { 0%, 36.36%, 50.45% { opacity: 0; transform: scale(.96); } 50.68%, 55.77% { opacity: 1; transform: none; } 56.41%, 100% { opacity: 0; } }
+@keyframes td-menubtn  { 0%, 36.36%, 50.3% { background: transparent; box-shadow: none; } 50.36%, 55.77% { background: #cce8ff; box-shadow: inset 0 0 0 1px #99d1ff; } 56.09%, 100% { background: transparent; box-shadow: none; } }
+@keyframes td-copy     { 0%, 36.36%, 52.59% { background: transparent; border-color: transparent; } 52.91%, 56.09% { background: #cce8ff; border-color: #99d1ff; } 56.41%, 100% { background: transparent; border-color: transparent; } }
+@keyframes td-caret    { 0%, 36.36%, 63.73% { opacity: 0; } 64.36%, 65.64% { opacity: 1; } 66.27%, 66.91% { opacity: 0; } 67.55%, 69.77% { opacity: 1; } 70.09%, 100% { opacity: 0; } }
+@keyframes td-keys     { 0%, 36.36%, 67.23% { opacity: 0; transform: translateY(1cqw) scale(.92); } 68.18%, 69.77% { opacity: 1; transform: none; } 70.73%, 100% { opacity: 0; transform: none; } }
+@keyframes td-paste    { 0%, 36.36%, 69.77% { opacity: 0; background: rgba(253,230,138,0); } 70.09% { opacity: 1; background: rgba(253,230,138,.95); } 76.45% { background: rgba(253,230,138,0); } 96.18% { opacity: 1; } 97.45%, 100% { opacity: 0; } }
+@keyframes td-compile  { 0%, 36.36%, 77.09% { transform: none; background: #0f766e; } 77.41%, 78.68% { transform: scale(.9); background: #115e59; } 79.32%, 100% { transform: none; background: #0f766e; } }
+@keyframes td-progress { 0%, 36.36%, 78.36% { opacity: 0; width: 0; } 78.68% { opacity: 1; width: 0; } 82.82% { opacity: 1; width: 100%; } 83.45%, 100% { opacity: 0; width: 100%; } }
+@keyframes td-render   { 0%, 36.36%, 83.14% { opacity: 0; transform: translateY(.8cqw); } 85.05%, 96.18% { opacity: 1; transform: none; } 97.45%, 100% { opacity: 0; } }
+/* The cursor's stops are the pointer tip on its target, measured on the landing card and on latex/ (averaged; they agree within about 1%). If the layout changes, measure them again. */
 @keyframes td-cursor {
-  0%, 5%        { left: 24.8%; top: 31.5%; }
-  18.5%         { left: 91.9%; top: 64.2%; }
-  21%, 22.3%    { left: 19.9%; top: 15.3%; }
-  25.5%, 30%    { left: 25.2%; top: 34.4%; }
-  36%           { left: 30%; top: 55%; }
-  42%, 45%      { left: 10.3%; top: 48.5%; }
-  50%, 58%      { left: 22%; top: 93%; }
-  64%, 67%      { left: 87.8%; top: 21.3%; }
-  74%, 92%      { left: 80%; top: 86%; }
-  98%, 100%     { left: 24.8%; top: 31.5%; }
+  0%, 2.73%               { left: 24.8%; top: 31.7%; }
+  6.33%, 6.87%            { left: 41.85%; top: 15.25%; }
+  8.73%, 10.04%           { left: 45.8%; top: 20.15%; }
+  12.44%, 15.05%          { left: 65.45%; top: 20.6%; }
+  19.64%, 21.6%           { left: 39.15%; top: 38.5%; }
+  25.09%, 30%             { left: 63.5%; top: 84.6%; }
+  34.36%                  { left: 24.8%; top: 31.7%; }
+  39.55%                  { left: 24.8%; top: 31.7%; }
+  48.14%                  { left: 91.9%; top: 55.2%; }
+  49.73%, 50.55%          { left: 19.9%; top: 15.25%; }
+  52.59%, 55.45%          { left: 25.2%; top: 34.35%; }
+  59.27%                  { left: 30%; top: 55%; }
+  63.09%, 65%             { left: 10.3%; top: 48.5%; }
+  68.18%, 73.27%          { left: 22%; top: 93%; }
+  77.09%, 79%             { left: 87.8%; top: 21.3%; }
+  83.45%, 94.91%          { left: 80%; top: 86%; }
+  98.73%, 100%            { left: 24.8%; top: 31.7%; }
 }
 @keyframes td-click {
-  0%, 21.9% { opacity: 0; transform: scale(.3); } 22% { opacity: 1; transform: scale(.3); } 24% { opacity: 0; transform: scale(1.5); }
-  28.9% { opacity: 0; transform: scale(.3); } 29% { opacity: 1; transform: scale(.3); } 31% { opacity: 0; transform: scale(1.5); }
-  43.4% { opacity: 0; transform: scale(.3); } 43.5% { opacity: 1; transform: scale(.3); } 45.5% { opacity: 0; transform: scale(1.5); }
-  64.4% { opacity: 0; transform: scale(.3); } 64.5% { opacity: 1; transform: scale(.3); } 66.5% { opacity: 0; transform: scale(1.5); }
+  0% { opacity: 0; transform: scale(.3); }
+  6.48% { opacity: 0; transform: scale(.3); } 6.55% { opacity: 1; transform: scale(.3); } 7.88% { opacity: 0; transform: scale(1.5); }
+  13.02% { opacity: 0; transform: scale(.3); } 13.09% { opacity: 1; transform: scale(.3); } 14.42% { opacity: 0; transform: scale(1.5); }
+  20.11% { opacity: 0; transform: scale(.3); } 20.18% { opacity: 1; transform: scale(.3); } 21.51% { opacity: 0; transform: scale(1.5); }
+  26.11% { opacity: 0; transform: scale(.3); } 26.18% { opacity: 1; transform: scale(.3); } 27.51% { opacity: 0; transform: scale(1.5); }
+  50.29% { opacity: 0; transform: scale(.3); } 50.36% { opacity: 1; transform: scale(.3); } 51.69% { opacity: 0; transform: scale(1.5); }
+  54.75% { opacity: 0; transform: scale(.3); } 54.82% { opacity: 1; transform: scale(.3); } 56.15% { opacity: 0; transform: scale(1.5); }
+  63.98% { opacity: 0; transform: scale(.3); } 64.05% { opacity: 1; transform: scale(.3); } 65.38% { opacity: 0; transform: scale(1.5); }
+  77.34% { opacity: 0; transform: scale(.3); } 77.41% { opacity: 1; transform: scale(.3); } 78.74% { opacity: 0; transform: scale(1.5); }
   100% { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -140,3 +153,27 @@
   .td-flex, .td-menu, .td-keys, .td-progress, .td-cursor, .td-caret-line { display: none; }
   .td-editor, .td-paste, .td-render { opacity: 1; transform: none; }
 }
+
+/* The configure step: Tools > Configure > Interlinear..., untick Word under
+   Baseline, OK, the Word line goes.  Seconds 0-8 of the 22 s loop. */
+.td-tools { animation: td-toolsbtn 22s linear infinite; }
+.td-tmenu { animation: td-tmenu 22s linear infinite; }
+.td-tmenu .td-cfg { animation: td-cfg 22s linear infinite; }
+.td-submenu { animation: td-submenu 22s linear infinite; }
+.td-submenu .td-interlin { animation: td-interlin 22s linear infinite; }
+.td-dlg { animation: td-dlg 22s linear infinite; }
+.td-cbword::after { animation: td-check 22s linear infinite; }
+.td-dlgok { animation: td-dlgok 22s linear infinite; }
+@keyframes td-toolsbtn { 0%, 6.45% { background: transparent; box-shadow: none; } 6.55%, 13.53% { background: #cce8ff; box-shadow: inset 0 0 0 1px #99d1ff; } 13.64%, 100% { background: transparent; box-shadow: none; } }
+@keyframes td-tmenu    { 0%, 6.67% { opacity: 0; } 6.87%, 13.53% { opacity: 1; } 13.64%, 100% { opacity: 0; } }
+@keyframes td-cfg      { 0%, 8.63% { background: transparent; border-color: transparent; } 8.73%, 13.53% { background: #cce8ff; border-color: #99d1ff; } 13.64%, 100% { background: transparent; border-color: transparent; } }
+@keyframes td-submenu  { 0%, 9.84% { opacity: 0; } 10.04%, 13.53% { opacity: 1; } 13.64%, 100% { opacity: 0; } }
+@keyframes td-interlin { 0%, 12.45% { background: transparent; border-color: transparent; } 12.55%, 13.53% { background: #cce8ff; border-color: #99d1ff; } 13.64%, 100% { background: transparent; border-color: transparent; } }
+@keyframes td-dlg      { 0%, 13.75% { opacity: 0; } 14.18%, 26.62% { opacity: 1; } 26.73%, 100% { opacity: 0; } }
+@keyframes td-check    { 0%, 20.18% { opacity: 1; } 20.23%, 75% { opacity: 0; } 75.1%, 100% { opacity: 1; } }
+@keyframes td-dlgok    { 0%, 24.99% { background: #e1e1e1; border-color: #adadad; } 25.09%, 26.08% { background: #e5f1fb; border-color: #0078d7; } 26.18%, 26.62% { background: #cce4f7; border-color: #005499; } 26.73%, 100% { background: #e1e1e1; border-color: #adadad; } }
+@keyframes td-wordline { 0%, 27.27% { height: 2.08cqw; max-width: 30cqw; margin-bottom: 0; opacity: 1; } 28.15% { opacity: 0; } 28.91%, 75% { height: 0; max-width: 0; margin-bottom: -.45cqw; opacity: 0; } 75.1%, 100% { height: 2.08cqw; max-width: 30cqw; margin-bottom: 0; opacity: 1; } }
+/* With the Word line gone FLEx lays the morphemes out as columns of their own:
+   a word's bundle shrinks to its morphemes, and they spread to the column gap. */
+@keyframes td-morphgap { 0%, 27.27% { gap: 1cqw; } 28.91%, 75% { gap: 2.2cqw; } 75.1%, 100% { gap: 1cqw; } }
+
