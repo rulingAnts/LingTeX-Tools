@@ -1,0 +1,3 @@
+Event probe  2026-09-15 19:20:48
+19:20:48  -- listening; code now sets the box's width to 400 (a resize event just below means code fires it too)
+19:20:48  -- code done; over to the person at the keyboard
