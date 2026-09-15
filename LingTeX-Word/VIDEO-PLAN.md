@@ -1,10 +1,12 @@
 # LingTeX-Word on the website: the loop video and three screenshots
 
 The website's LingTeX-Word page and the landing page's Word card have four
-media slots. Until a file exists, each shows an animated mock; once the file is
-in `docs/word/media/` under the name below, the page shows it -- no page edit.
-On a local preview (or with `?media-hints` in the address) each slot names its
-shot and file.
+media slots. Until a file is added, each shows an animated mock. A file goes
+into `docs/word/media/` under the name below, and its name onto the list in
+`docs/word/media/available.json`; then the pages show it, with no page edit.
+(The list keeps the pages from asking visitors' browsers for files that are not
+there yet.) On a local preview, or with `?media-hints` in the address, each
+slot names its shot and file.
 
 | Slot | File | Where it shows |
 |---|---|---|
