@@ -71,6 +71,7 @@ Public Sub RunAllTests()
     RunSection "golden"
     RunSection "projections"
     RunSection "routing"
+    RunSection "linebreaks"
     RunSection "columns"
     RunSection "leipzig"
     RunSection "gramgloss"
@@ -105,6 +106,7 @@ Private Sub RunSection(ByVal which As String)
         Case "golden":      TestGoldenVectors
         Case "projections": TestProjections
         Case "routing":     TestRouting
+        Case "linebreaks":  TestLineBreaks
         Case "columns":     TestColumnEditing
         Case "leipzig":     TestLeipzigChecks
         Case "gramgloss":   TestGramGlossDetection
@@ -474,6 +476,173 @@ Private Sub TestRouting()
     again = ModelFromText(ModelToTsv(first), igtWordAligned)
     Eq "TSV round trip preserves the form row", RowText(again, 0), RowText(first, 0)
     Eq "TSV round trip preserves the gloss row", RowText(again, 1), RowText(first, 1)
+End Sub
+
+
+'=============================================================================
+' -- LINE BREAKS ------------------------------------------------------------
+'=============================================================================
+
+' Text from Windows, and text PowerPoint takes off the clipboard, ends its lines
+' in CR LF; Word for Mac hands the parsers CR, a paragraph mark.  All of it must
+' parse as LF text does.  The CR LF is built from Chr$(13) & Chr$(10), never
+' from vbCrLf: in PowerPoint for Mac 16.112 that is LF then CR, the parsers
+' once normalised with it, and every CR LF became two line breaks -- a blank
+' line after each tier row, where ParseFlexBlocks ends an example.
+Private Sub TestLineBreaks()
+    Dim lf As String
+    Dim mixed As String
+
+    Section "Line breaks (CR LF and CR input parse as LF input does)"
+    Emit "  note  " & LineBreakConstantsLine()
+
+    Eq "LINE_CRLF is CR then LF", CharCodes(LINE_CRLF), "[13+10]"
+    mixed = "a" & Chr$(13) & Chr$(10) & "b" & Chr$(13) & "c" & Chr$(10) & "d"
+    Eq "NormalizeLineBreaks makes CR LF, CR and LF one LF each", _
+       ShowBreaks(NormalizeLineBreaks(mixed)), "a<LF>b<LF>c<LF>d"
+
+    ' A FLEx block: Morphemes, Lex. Gloss and Free lines.
+    CheckLineBreakVariants "FLEx block", Vector1Raw(), 2, 1
+
+    ' A plain TSV example, ending in a line break as copied text usually does.
+    lf = "zomu-xa" & T & "vu" & vbLf & "go-DIST" & T & "fox" & vbLf & _
+         "He went far away." & vbLf
+    CheckLineBreakVariants "TSV example", lf, 3, 1
+
+    ' Two FLEx examples separated by one blank line: two, not one and not four.
+    lf = Vector1Raw() & vbLf & vbLf & Vector2Raw()
+    CheckLineBreakVariants "two FLEx examples", lf, 5, 2
+    CheckTwoExamplesCrLf lf
+End Sub
+
+' The same text with LF, CR LF and CR line breaks must give the same examples:
+' as many of them, with the same tiers, cells and free translations.
+Private Sub CheckLineBreakVariants(ByVal name As String, ByVal lfText As String, _
+        ByVal wantBreaks As Long, ByVal wantExamples As Long)
+    Dim crlfText As String, crText As String
+    Dim lfLines() As String, crlfLines() As String
+    Dim lfBlocks() As FlexBlock, crlfBlocks() As FlexBlock, crBlocks() As FlexBlock
+    Dim lfModels() As IgtExample, nLf As Long
+
+    crlfText = Replace(lfText, Chr$(10), Chr$(13) & Chr$(10))
+    crText = Replace(lfText, Chr$(10), Chr$(13))
+
+    ' Guards the test itself: the LF text is built with vbLf, and a vbLf that
+    ' was not Chr$(10) would leave nothing here to convert.
+    Ok name & ": the CR LF input has " & CStr(wantBreaks) & " CR LF pairs and no lone LF", _
+       (CountOf(crlfText, Chr$(13) & Chr$(10)) = wantBreaks And CountOf(crlfText, Chr$(10)) = wantBreaks)
+    Eq name & ": CR LF normalises to the LF text, no break doubled", _
+       ShowBreaks(NormalizeLineBreaks(crlfText)), ShowBreaks(lfText)
+    Eq name & ": routed the same with CR LF", _
+       CStr(LooksLikeFlex(crlfText)), CStr(LooksLikeFlex(lfText))
+
+    lfLines = TextLines(lfText)
+    crlfLines = TextLines(crlfText)
+    Eq name & ": TextLines gives the same lines with CR LF", _
+       Join(crlfLines, " / "), Join(lfLines, " / ")
+
+    If LooksLikeFlex(lfText) Then
+        lfBlocks = ParseFlexBlocks(lfText)
+        crlfBlocks = ParseFlexBlocks(crlfText)
+        crBlocks = ParseFlexBlocks(crText)
+        Eq name & ": ParseFlexBlocks finds as many blocks with CR LF", _
+           CStr(UBound(crlfBlocks) + 1), CStr(UBound(lfBlocks) + 1)
+        Eq name & ": ParseFlexBlocks finds as many blocks with CR", _
+           CStr(UBound(crBlocks) + 1), CStr(UBound(lfBlocks) + 1)
+    End If
+
+    lfModels = ModelsFromText(lfText, igtWordAligned, nLf)
+    Eq name & ": examples in the LF text", CStr(nLf), CStr(wantExamples)
+    CheckSameExamples name & ", CR LF", lfText, crlfText
+    CheckSameExamples name & ", CR", lfText, crText
+End Sub
+
+Private Sub CheckSameExamples(ByVal name As String, ByVal lfText As String, _
+        ByVal otherText As String)
+    Dim want() As IgtExample, got() As IgtExample
+    Dim nWant As Long, nGot As Long
+    Dim a As IgtExample, b As IgtExample
+    Dim i As Long
+
+    want = ModelsFromText(lfText, igtWordAligned, nWant)
+    got = ModelsFromText(otherText, igtWordAligned, nGot)
+    Eq name & ": as many examples", CStr(nGot), CStr(nWant)
+    If nGot <> nWant Then Exit Sub
+
+    For i = 0 To nGot - 1
+        a = got(i)
+        b = want(i)
+        Eq name & ": example " & CStr(i + 1) & " is the same", _
+           ExampleText(a), ExampleText(b)
+    Next i
+End Sub
+
+' Neither example absorbed nor split: each block is the PROMPT.md example it
+' was built from.
+Private Sub CheckTwoExamplesCrLf(ByVal lfText As String)
+    Dim models() As IgtExample, n As Long
+    Dim ex As IgtExample
+
+    models = ModelsFromText(Replace(lfText, Chr$(10), Chr$(13) & Chr$(10)), igtWordAligned, n)
+    If n <> 2 Then Exit Sub                  ' already reported as a count
+    ex = models(0)
+    Eq "two FLEx examples, CR LF: the first is example 1", RowText(ex, 0), Vector1Forms()
+    ex = models(1)
+    Eq "two FLEx examples, CR LF: the second is example 2", RowText(ex, 0), Vector2Forms()
+End Sub
+
+' An example as one line: each tier's role and cells, then its free lines,
+' with any control character left in them spelled out.
+Private Function ExampleText(ex As IgtExample) As String
+    Dim i As Long, s As String
+    For i = 0 To ex.TierCount - 1
+        s = s & ex.Tiers(i) & ": " & ShowBreaks(RowText(ex, i)) & " / "
+    Next i
+    For i = 0 To ex.FreeCount - 1
+        s = s & "Free: " & ShowBreaks(ex.FreeLines(i)) & " / "
+    Next i
+    ExampleText = s
+End Function
+
+' CR, LF and tab spelled out, so a report shows where the breaks are.
+Private Function ShowBreaks(ByVal s As String) As String
+    s = Replace(s, Chr$(13), "<CR>")
+    s = Replace(s, Chr$(10), "<LF>")
+    ShowBreaks = Replace(s, vbTab, "<TAB>")
+End Function
+
+' How many times part occurs in s.
+Private Function CountOf(ByVal s As String, ByVal part As String) As Long
+    CountOf = (Len(s) - Len(Replace(s, part, ""))) \ Len(part)
+End Function
+
+' The character codes of a string: "[13+10]".
+Private Function CharCodes(ByVal s As String) As String
+    Dim i As Long, out As String
+    For i = 1 To Len(s)
+        If i > 1 Then out = out & "+"
+        out = out & CStr(AscW(Mid$(s, i, 1)))
+    Next i
+    CharCodes = "[" & out & "]"
+End Function
+
+' What this host's line-break constants really are.  Recorded, not asserted:
+' nothing may depend on them.
+Private Function LineBreakConstantsLine() As String
+    LineBreakConstantsLine = "here vbCr is " & CharCodes(vbCr) & _
+        ", vbLf " & CharCodes(vbLf) & _
+        ", vbCrLf " & CharCodes(vbCrLf) & _
+        ", vbNewLine " & CharCodes(vbNewLine)
+End Function
+
+' The same line on its own, for  tools/run-in-word.sh --macro LogLineBreakConstants:
+' written to LingTeX-Word-reports/LineBreaks.<mac|win>.txt, no dialog.
+Public Sub LogLineBreakConstants()
+    Dim s As String
+    s = LineBreakConstantsLine()
+    If Not WriteReportFile("LineBreaks." & PlatformTag() & ".txt", s) Then
+        MsgBox s, vbInformation, "LingTeX-Word line breaks"
+    End If
 End Sub
 
 

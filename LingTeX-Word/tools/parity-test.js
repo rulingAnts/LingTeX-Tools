@@ -178,6 +178,31 @@ ok('does NOT mistake plain TSV for FLEx',
         again.cells[1].join('\t'), first.cells[1].join('\t'));
 })();
 
+// ── 2c. line breaks ───────────────────────────────────────────────────────────
+
+section('Line breaks (CR LF and CR input parse as LF input does)');
+
+(function () {
+    // Mirrors TestLineBreaks in modTests.bas. "\r\n" is a real CR LF here; the
+    // VBA builds it from Chr$(13) & Chr$(10), because vbCrLf in PowerPoint for
+    // Mac 16.112 is LF then CR.
+    function sameExamples(name, lf, wantExamples) {
+        var want = R.buildModels(lf, R.WORD_ALIGNED);
+        eq(name + ': examples in the LF text', want.length, wantExamples);
+        [['CR LF', '\r\n'], ['CR', '\r']].forEach(function (v) {
+            var got = R.buildModels(lf.replace(/\n/g, v[1]), R.WORD_ALIGNED);
+            eq(name + ', ' + v[0] + ': as many examples', got.length, want.length);
+            got.forEach(function (m, i) {
+                eq(name + ', ' + v[0] + ': example ' + (i + 1) + ' is the same',
+                    JSON.stringify(m), JSON.stringify(want[i]));
+            });
+        });
+    }
+    sameExamples('FLEx block', vectors[0].raw, 1);
+    sameExamples('TSV example', 'zomu-xa\tvu\ngo-DIST\tfox\nHe went far away.\n', 1);
+    sameExamples('two FLEx examples', vectors[0].raw + '\n\n' + vectors[1].raw, 2);
+})();
+
 // ── 3. column editing ─────────────────────────────────────────────────────────
 
 section('Column split and merge');

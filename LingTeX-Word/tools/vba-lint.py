@@ -41,6 +41,19 @@ WINDOWS_ONLY = {
     r"\bDeclare\s+(PtrSafe\s+)?(Function|Sub)\b": "Win32 Declare needs an #If Mac Then guard",
 }
 
+# Line breaks found, split or normalised with vbCrLf or vbNewLine. Those are not
+# what their names say on every host: in the VBA of PowerPoint for Mac 16.112,
+# vbCrLf is LF then CR and vbNewLine is LF alone (2026-09-15), so
+# Replace(s, vbCrLf, vbLf) matched no real CR LF and the vbCr pass after it
+# doubled every line break. Only the FIND argument is checked (Replace's and
+# Split's second, InStr's second or third): writing output with them is not
+# finding anything.
+_ARG = r'(?:[^,()"]|\([^()]*\)|"[^"]*")*'
+FIND_BY_NEWLINE_CONST = [
+    re.compile(r"\b(?:Replace|Split)\$?\s*\(" + _ARG + r",\s*(?:vbCrLf|vbNewLine)\b", re.I),
+    re.compile(r"\bInStr(?:Rev)?\s*\((?:" + _ARG + r",\s*){1,2}(?:vbCrLf|vbNewLine)\b", re.I),
+]
+
 # VBA keywords and statement names that must not be used as a procedure name.
 # Declaring e.g. "Private Sub Line(...)" compiles in some contexts and then
 # collides with the Line Input statement in a way that reads as nonsense. Only
@@ -199,6 +212,11 @@ def check(path):
         for pat, msg in WINDOWS_ONLY.items():
             if re.search(pat, t, re.I):
                 problems.append((n, msg))
+        # The engine only: tools/ImportModules.bas still normalises with vbCrLf,
+        # and a change to it has to be pasted into the dev template by hand.
+        if path.parent.name == "src" and any(p.search(mask_strings(t)) for p in FIND_BY_NEWLINE_CONST):
+            problems.append((n, "vbCrLf / vbNewLine used to find, split or normalise line breaks; "
+                                "use LINE_CRLF, LINE_CR, LINE_LF or NormalizeLineBreaks (modFlexParse)"))
         # VBA does NOT short-circuit And/Or: every operand is evaluated. So a
         # bounds guard written as `If i <= UBound(a) And a(i) = x` still
         # evaluates a(i) and raises "subscript out of range". The guard has to be
