@@ -59,6 +59,7 @@ tools/modLingTeXDevCore.bas
 tools/probe/modProbe.bas
 tools/probe/modProbeEvents.bas
 tools/probe/clsProbeEvents.cls
+tools/probe/modProbePaste.bas
 "
 
 import=1; commit=0; pres=""; macros=""; want=""
