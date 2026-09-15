@@ -1,0 +1,72 @@
+LingTeX-PowerPoint probe  2026-09-15 18:13:16
+
+== 1. Environment
+PowerPoint 16.112.4
+build 0909
+OS Macintosh 26.6.2
+HOME /Users/Seth/Library/Containers/com.microsoft.Powerpoint/Data   USERPROFILE 
+
+== 2. A scratch presentation
+USABLE: Presentations.Add(WithWindow:=False)
+slide 960 x 540 pt
+
+== 3. Measuring text: TextRange2.BoundWidth, one line, the box fits the text
+'W' at 20pt: 23.9   (the box is 19.1 wide)
+'WWWW' at 20pt: 80.5   four times 'W': 95.5
+'WWWW' at 40pt: 161.0   twice the 20pt width: 161.0
+'neighbor-F buy-PST.3PL': 206.4   its second word alone, Characters(12, 11): 108.0 starting at x 93.3
+200 measurements (set the text, read the width): 0.05 s
+
+== 4. Small capitals: Font2.Smallcaps
+lower case 71.5   small caps 76.7   capitals 92.4   (Smallcaps reads back -1)
+USABLE: small capitals are measured between lower case and capitals
+
+== 5. Tab stops per paragraph (the one-text-box design)
+paragraphs: 4 (4 expected)
+p1 stops [110.0,230.0,280.0]   columns start at 0.0,110.0,230.0,280.0
+p2 stops [110.0,230.0,280.0]   columns start at 0.0,110.0,230.0,280.0
+p3 stops [80.0,190.0]   columns start at 0.0,80.0,190.0
+p4 stops [50.0,300.0]   columns start at 0.0,300.0
+USABLE: two paragraphs with the same stops start their columns at the same x
+USABLE: a paragraph keeps stops of its own (p3 differs from p1)
+p4 is wider than its first stop (50): its second column shows where a tab goes then
+
+== 6. How many tab stops one paragraph holds
+ERROR -2147467259 (adding stop 33): Method 'Add' of object 'TabStops2' failed
+stops held: 32 (up to 60 asked for)
+
+== 7. A tab line wider than a box that wraps
+box 150.0 wide (150 asked), 96.9 high, 4 line(s)
+'aaaa\tbbbb' at x 0.0  |  '\tcccc' at x 0.0  |  '\tdddd' at x 0.0  |  '\teeee' at x 0.0
+
+== 8. Indents: a hanging number column
+p1 indent 40.0, first line -40.0   columns start at 0.0,40.0,150.0
+p2 indent 40.0   columns start at 40.0,150.0
+wanted: p1 at 0,40,150 and p2 at 40,150
+
+== 9. Clipboard text, pasted as text
+ERROR 438 (PasteSpecial(ppPasteText) of the current clipboard): Object doesn't support this property or method
+ERROR 438 (PasteSpecial of the sample): Object doesn't support this property or method
+
+== 10. Tags: set, Duplicate, Copy + Paste, a long value
+set: LINGTEX = 'example v1' (1 tag)
+Duplicate keeps it: 'example v1'
+Copy + Paste keeps it: 'example v1'
+a 20,000-character tag reads back as 20000 characters
+
+== 11. The fallback design: grouped text boxes in an invisible frame
+grouped 3 shapes; the group is 300.0 wide (the frame, 300)
+group.Width = 150: frame 150.0, text box 44.1 wide, its font 20pt (20 before)
+a grouped box's text can be set: 'Las'; the group's tag reads 'group'
+
+== 12. Tables: one grid for every row? can a table be grouped?
+column 1 set to 80: row 1 cell 80.0, row 2 cell 80.0
+ERROR 445 (setting one cell's width): Object doesn't support this action
+asked row 2's cell 1 for 40: row 1 cell 80.0, row 2 cell 80.0
+CONFIRMED: one grid -- every row keeps the same column widths
+ERROR -2147024891 (grouping a table with a rectangle): Grouping is disabled for the selected shapes.
+
+== 13. Can VBA see its own project? (a build that imports its modules)
+AVAILABLE: this project has 1 component(s)
+
+== end

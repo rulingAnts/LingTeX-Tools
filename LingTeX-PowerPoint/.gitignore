@@ -1,0 +1,5 @@
+# The runner's remembered paths and scratch output.
+build/
+# Dev presentations and built add-ins are made by PowerPoint, not kept here.
+*.pptm
+*.ppam

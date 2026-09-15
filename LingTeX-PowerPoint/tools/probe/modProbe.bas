@@ -22,13 +22,17 @@ Option Explicit
 '   6  How many tab stops a paragraph holds.
 '   7  What a tab line wider than a wrapping box does.
 '   8  Whether indents make a hanging number column.
-'   9  What clipboard text looks like pasted as text: tabs and line breaks.
+'   9  Reading clipboard text: Shapes.Paste, and a windowed View.PasteSpecial
+'      (Shapes.PasteSpecial is not supported: round 1).  Tabs, line breaks,
+'      and letters beyond ASCII.
 '  10  Whether Tags survive Duplicate and Copy + Paste; how long a tag can be.
 '  11  The fallback design: grouped text boxes with an invisible frame, and
 '      what resizing the group does to them.
 '  12  Why not a table: whether rows can differ in column width, and whether
 '      a table can be grouped with another shape.
 '  13  Whether VBA may see its own project (a build that imports its modules).
+'  14  Which add-ins are loaded, and whether PowerPoint may write to Office's
+'      Startup folder for PowerPoint.
 '
 ' Events -- a re-wrap after the frame is resized -- need a class module, so
 ' they are a second, later probe.
@@ -110,6 +114,7 @@ Private Sub RunProbe()
     End If
 AfterScratch:
     ProbeVBProject
+    ProbeAddIns
     Say ""
     Say "== end"
 End Sub
@@ -131,7 +136,7 @@ Private Sub SayError(ByVal what As String)
     Err.Clear
 End Sub
 
-Private Function N2(ByVal v As Double) As String
+Private Function N2(ByVal v As Variant) As String
     N2 = Format$(v, "0.0")
 End Function
 
@@ -140,7 +145,16 @@ Private Function Escape(ByVal s As String) As String
     s = Replace(s, vbCr, "\r")
     s = Replace(s, vbLf, "\n")
     s = Replace(s, Chr$(11), "\v")
-    Escape = s
+    Dim i As Long, ch As String, out As String
+    For i = 1 To Len(s)
+        ch = Mid$(s, i, 1)
+        If AscW(ch) > 126 Or AscW(ch) < 0 Then
+            out = out & "\u" & Hex$(AscW(ch) And &HFFFF&)
+        Else
+            out = out & ch
+        End If
+    Next
+    Escape = out
 End Function
 
 Private Function CountOf(ByVal s As String, ByVal what As String) As Long
@@ -161,10 +175,22 @@ Private Function DeliverReport() As String
 #End If
     home = Environ$("HOME")
     If home = "" Then home = Environ$("USERPROFILE")
-    p = home & sep & "Documents" & sep & "LingTeX-PowerPoint-probe.txt"
     On Error Resume Next
+    MkDir home & sep & "Documents" & sep & "LingTeX-PowerPoint-reports"
+    Err.Clear
+#If Mac Then
+    p = home & sep & "Documents" & sep & "LingTeX-PowerPoint-reports" & sep & "Probe.mac.txt"
+#Else
+    p = home & sep & "Documents" & sep & "LingTeX-PowerPoint-reports" & sep & "Probe.win.txt"
+#End If
     fn = FreeFile
     Open p For Output As #fn
+    If Err.Number <> 0 Then
+        Err.Clear
+        p = home & sep & "Documents" & sep & "LingTeX-PowerPoint-probe.txt"
+        fn = FreeFile
+        Open p For Output As #fn
+    End If
     If Err.Number = 0 Then
         Print #fn, mRpt;
         Close #fn
@@ -279,6 +305,8 @@ Private Function ProbeMeasure() As Boolean
         "   its second word alone, Characters(12, 11): " & _
         N2(d.TextFrame2.TextRange.Characters(12, 11).BoundWidth) & _
         " starting at x " & N2(d.TextFrame2.TextRange.Characters(12, 11).BoundLeft - d.Left)
+    Say "which width is the text's: 'neighbor-F' whole range " & NewBoxWidths("neighbor-F", 20)
+    Say "  at 40pt: " & NewBoxWidths("neighbor-F", 40)
     ProbeMeasure = (a.TextFrame2.TextRange.BoundWidth > 0)
     t = Timer
     For i = 1 To 200
@@ -296,6 +324,18 @@ Tidy:
 Fail:
     SayError "measuring"
     Resume Tidy
+End Function
+
+' "whole-range BoundWidth / Characters(1, n).BoundWidth / fitted box width" for
+' one string: round 1 found the first about a quarter em wider than the text.
+Private Function NewBoxWidths(ByVal txt As String, ByVal size As Single) As String
+    Dim shp As Object, tr As Object
+    Set shp = NewBox(txt, size)
+    Set tr = shp.TextFrame2.TextRange
+    NewBoxWidths = N2(tr.BoundWidth) & " / chars " & N2(tr.Characters(1, Len(txt)).BoundWidth) & _
+                   " / box " & N2(shp.Width) & " / last char right edge " & _
+                   N2(tr.Characters(Len(txt), 1).BoundLeft + tr.Characters(Len(txt), 1).BoundWidth - shp.Left)
+    shp.Delete
 End Function
 
 '-----------------------------------------------------------------------------
@@ -483,40 +523,75 @@ End Sub
 '-----------------------------------------------------------------------------
 Private Sub ProbeClipboardText()
     Dim sr As Object, src As Object, got As String, sample As String
-    Heading "9. Clipboard text, pasted as text"
+    Dim app As Object, wp As Object, ws As Object, n As Long
+    Set app = Application
+    Heading "9. Clipboard text"
     On Error Resume Next
-    ' a. Whatever is on the clipboard now.
-    Set sr = mSld.Shapes.PasteSpecial(2)
+    ' a. Whatever is on the clipboard now (run-in-powerpoint.sh puts a
+    '    FLEx-shaped sample there), with Shapes.Paste on the scratch slide.
+    Set sr = mSld.Shapes.Paste
     If Err.Number <> 0 Then
-        SayError "PasteSpecial(ppPasteText) of the current clipboard"
+        SayError "Shapes.Paste of the current clipboard"
     Else
         got = sr.Item(1).TextFrame2.TextRange.Text
-        Say "current clipboard: " & Len(got) & " characters; tabs " & CountOf(got, vbTab) & _
-            ", CR " & CountOf(got, vbCr) & ", LF " & CountOf(got, vbLf) & ", VT " & CountOf(got, Chr$(11))
-        Say "  it begins: " & Escape(Left$(got, 80))
+        If Err.Number <> 0 Then
+            SayError "reading the pasted shape's text (type " & sr.Item(1).Type & ")"
+        Else
+            Say "Shapes.Paste: " & ClipSummary(got)
+        End If
         sr.Delete
         Set sr = Nothing
     End If
-    ' b. A FLEx-shaped sample, copied from a text box and pasted back as text.
+    Err.Clear
+    ' b. The same clipboard through a window's View.PasteSpecial, as text.
+    Set wp = app.Presentations.Add(-1)
+    If Err.Number <> 0 Then
+        SayError "a windowed presentation"
+    Else
+        Set ws = wp.Slides.Add(1, 12)
+        wp.Windows(1).Activate
+        wp.Windows(1).View.GotoSlide 1
+        n = ws.Shapes.Count
+        wp.Windows(1).View.PasteSpecial 2
+        If Err.Number <> 0 Then
+            SayError "View.PasteSpecial(ppPasteText)"
+        ElseIf ws.Shapes.Count = n Then
+            Say "View.PasteSpecial(ppPasteText): no error, but nothing was pasted"
+        Else
+            got = ws.Shapes(ws.Shapes.Count).TextFrame2.TextRange.Text
+            Say "View.PasteSpecial(ppPasteText): " & ClipSummary(got)
+        End If
+        Err.Clear
+        wp.Saved = -1
+        wp.Close
+    End If
+    Err.Clear
+    ' c. A round trip: text copied from a text box, pasted with Shapes.Paste.
     sample = "Word" & TB & "Los" & TB & "ninos" & vbCr & _
              "Morphemes" & TB & "Los" & TB & "nin" & TB & "-o" & TB & "-s" & vbCr & _
              "Free" & TB & "The children."
     Set src = NewBox(sample, 12)
     src.TextFrame2.TextRange.Copy
     If Err.Number <> 0 Then SayError "copying the sample": GoTo Tidy
-    Set sr = mSld.Shapes.PasteSpecial(2)
-    If Err.Number <> 0 Then SayError "PasteSpecial of the sample": GoTo Tidy
+    Set sr = mSld.Shapes.Paste
+    If Err.Number <> 0 Then SayError "Shapes.Paste of the sample": GoTo Tidy
     got = sr.Item(1).TextFrame2.TextRange.Text
     If got = sample Then
-        Say "round trip: IDENTICAL (tabs and paragraph breaks kept)"
+        Say "round trip (Copy, Shapes.Paste): IDENTICAL"
     Else
-        Say "round trip: DIFFERENT -- sent " & Escape(sample) & "   got " & Escape(got)
+        Say "round trip (Copy, Shapes.Paste): DIFFERENT -- got " & Escape(got)
     End If
 Tidy:
     On Error Resume Next
     src.Delete
     sr.Delete
 End Sub
+
+Private Function ClipSummary(ByVal got As String) As String
+    ClipSummary = Len(got) & " characters; tabs " & CountOf(got, vbTab) & ", CR " & CountOf(got, vbCr) & _
+                  ", LF " & CountOf(got, vbLf) & ", VT " & CountOf(got, Chr$(11)) & _
+                  "   " & Escape(Left$(got, 90))
+End Function
 
 '-----------------------------------------------------------------------------
 ' 10. Tags
@@ -647,4 +722,40 @@ Private Sub ProbeVBProject()
     Else
         Say "AVAILABLE: this project has " & n & " component(s)"
     End If
+End Sub
+
+'-----------------------------------------------------------------------------
+' 14. Add-ins and the Startup folder
+'-----------------------------------------------------------------------------
+Private Sub ProbeAddIns()
+    Dim app As Object, a As Object, i As Long, folder As String, fn As Integer, p As Long
+    Set app = Application
+    Heading "14. Add-ins, and Office's Startup folder for PowerPoint"
+    On Error Resume Next
+    Say "add-ins registered: " & app.AddIns.Count
+    If Err.Number <> 0 Then SayError "AddIns"
+    For i = 1 To app.AddIns.Count
+        Set a = app.AddIns(i)
+        Say "  " & a.Name & "  loaded " & a.Loaded & ", autoload " & a.AutoLoad & ", " & a.FullName
+        Err.Clear
+    Next
+#If Mac Then
+    folder = Environ$("HOME")
+    p = InStr(folder, "/Library/Containers/")
+    If p > 0 Then folder = Left$(folder, p - 1)
+    folder = folder & "/Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/PowerPoint"
+    Say "Startup folder: " & folder
+    fn = FreeFile
+    Open folder & "/LingTeX-write-test.txt" For Output As #fn
+    If Err.Number <> 0 Then
+        SayError "writing a file there"
+    Else
+        Print #fn, "test"
+        Close #fn
+        Kill folder & "/LingTeX-write-test.txt"
+        Say "USABLE: PowerPoint may write to it (a file was written and deleted)"
+    End If
+#Else
+    Say "Windows: PowerPoint registers add-ins; there is no Startup folder to test"
+#End If
 End Sub
