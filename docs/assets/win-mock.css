@@ -42,7 +42,12 @@
 .wm-group-label { margin-top: .25cqw; color: #605e5c; font: .92cqw 'Segoe UI', system-ui, sans-serif; white-space: nowrap; }
 
 /* FLEx: menu bar, the Texts & Words sidebar, and a text's tabs */
-.wm-menubar { display: flex; gap: 1.5cqw; flex-shrink: 0; padding: .45cqw 1.2cqw; background: #fff; border-bottom: 1px solid #e5e5e5; color: #1f1f1f; font: 1.08cqw 'Segoe UI', system-ui, sans-serif; white-space: nowrap; overflow: hidden; }
+.wm-menubar { position: relative; z-index: 4; display: flex; gap: 1.5cqw; flex-shrink: 0; padding: .45cqw 1.2cqw; background: #fff; border-bottom: 1px solid #e5e5e5; color: #1f1f1f; font: 1.08cqw 'Segoe UI', system-ui, sans-serif; white-space: nowrap; }
+/* A menu-bar item with a drop-down inside it, so the menu hangs under the item
+   at every size. FLEx has no Copy on its right-click menu: Edit > Copy is how
+   an interlinear text leaves FLEx, so that is what the demos show. */
+.wm-menu-item { position: relative; margin: -.15cqw -.45cqw; padding: .15cqw .45cqw; }
+.wm-dropdown { left: 0; top: calc(100% + .3cqw); width: 17cqw; text-align: left; }
 .wm-flex-main { flex: 1; display: flex; min-height: 0; }
 .wm-sidebar { display: flex; flex-direction: column; flex-shrink: 0; width: 14.5cqw; background: #f4f6f9; border-right: 1px solid #d5dae2; color: #1f2937; font: 1.02cqw 'Segoe UI', system-ui, sans-serif; white-space: nowrap; }
 .wm-side-head { padding: .55cqw 1cqw; background: linear-gradient(#e9eef6, #d9e2ef); border-bottom: 1px solid #c9d2df; font-weight: 600; }
@@ -61,6 +66,7 @@
 
 /* A Windows context menu; each demo places it and animates it */
 .wm-ctx { position: absolute; z-index: 3; width: 19cqw; padding: .35cqw 0; opacity: 0; background: #f9f9f9; border: 1px solid #ccc; box-shadow: .25cqw .25cqw .7cqw rgba(0,0,0,.28); color: #1f1f1f; font: 1.12cqw 'Segoe UI', system-ui, sans-serif; }
+.wm-ctx div, .wm-ctx hr { box-sizing: border-box; }
 .wm-ctx div { display: flex; justify-content: space-between; margin: 0 .3cqw; padding: .4cqw 1.2cqw .4cqw 2.6cqw; border: 1px solid transparent; }
 .wm-ctx kbd { color: #6b6b6b; font: inherit; }
 .wm-ctx .dim, .wm-ctx .dim kbd { color: #a8a8a8; }

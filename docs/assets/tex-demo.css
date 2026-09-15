@@ -36,8 +36,9 @@
 .td-seg { flex-shrink: 0; font-family: system-ui, sans-serif; font-size: 1.3cqw; color: #64748b; padding-top: .2cqw; }
 .td-lines { position: relative; flex: 1; }
 .td-sel { position: absolute; left: -.6cqw; top: -.6cqw; bottom: -.6cqw; width: 0; background: rgba(0,120,215,.25); animation: td-sel 14s linear infinite; }
-/* Five bundles to a row, so the text breaks in the same places at every size
-   and the cursor's measured stops stay on target. */
+/* Rows are fixed in the markup, filled to about 90% of the pane (the way FLEx
+   wraps), so the text breaks in the same places at every size and the
+   cursor's measured stops stay on target. */
 .td-bundles { position: relative; display: flex; flex-direction: column; row-gap: 1.6cqw; }
 .td-row { display: flex; column-gap: 2.2cqw; }
 .td-bundle { display: flex; flex-direction: column; gap: .5cqw; }
@@ -47,7 +48,8 @@
 .td-m span:last-child { color: #334155; font-family: system-ui, sans-serif; font-size: 1.3cqw; }
 .td-free { position: relative; margin-top: 2cqw; font-family: system-ui, sans-serif; font-size: 1.4cqw; color: #334155; }
 .td-free b { color: #64748b; font-weight: 600; margin-right: 1cqw; }
-.td-menu { left: 38.5%; top: 51.6%; animation: td-menu 14s linear infinite; }
+.td-menu { animation: td-menu 14s linear infinite; }
+.td-edit { animation: td-menubtn 14s linear infinite; }
 .td-menu .td-copy { animation: td-copy 14s linear infinite; }
 
 /* The LaTeX editor: source on the left, PDF on the right */
@@ -103,6 +105,7 @@
 @keyframes td-ed-win   { 0%, 36% { opacity: 0; transform: translateX(6%); } 41%, 94% { opacity: 1; transform: none; } 98%, 100% { opacity: 0; transform: translateX(6%); } }
 @keyframes td-sel      { 0%, 5% { width: 0; } 19%, 94% { width: calc(100% + 1.2cqw); } 96%, 100% { width: 0; } }
 @keyframes td-menu     { 0%, 21.5% { opacity: 0; transform: scale(.96); } 22.5%, 30.5% { opacity: 1; transform: none; } 31.5%, 100% { opacity: 0; } }
+@keyframes td-menubtn  { 0%, 21.9% { background: transparent; box-shadow: none; } 22%, 30.5% { background: #cce8ff; box-shadow: inset 0 0 0 1px #99d1ff; } 31%, 100% { background: transparent; box-shadow: none; } }
 @keyframes td-copy     { 0%, 25.5% { background: transparent; border-color: transparent; } 26%, 31% { background: #cce8ff; border-color: #99d1ff; } 31.5%, 100% { background: transparent; border-color: transparent; } }
 @keyframes td-caret    { 0%, 43% { opacity: 0; } 44%, 46% { opacity: 1; } 47%, 48% { opacity: 0; } 49%, 52.5% { opacity: 1; } 53%, 100% { opacity: 0; } }
 @keyframes td-keys     { 0%, 48.5% { opacity: 0; transform: translateY(1cqw) scale(.92); } 50%, 52.5% { opacity: 1; transform: none; } 54%, 100% { opacity: 0; transform: none; } }
@@ -115,9 +118,9 @@
    and on every page). If the mock's layout changes, measure them again. */
 @keyframes td-cursor {
   0%, 5%        { left: 24.8%; top: 31.5%; }
-  19%           { left: 91.9%; top: 64.2%; }
-  21%, 22.3%    { left: 39.7%; top: 55%; }
-  25.5%, 30%    { left: 46.5%; top: 62.5%; }
+  18.5%         { left: 91.9%; top: 64.2%; }
+  21%, 22.3%    { left: 19.9%; top: 15.3%; }
+  25.5%, 30%    { left: 25.2%; top: 34.4%; }
   36%           { left: 30%; top: 55%; }
   42%, 45%      { left: 10.3%; top: 48.5%; }
   50%, 58%      { left: 22%; top: 93%; }
