@@ -1,4 +1,4 @@
-LingTeXDevImport  2026-09-15 19:27:54
+LingTeXDevImport  2026-09-15 19:34:40
   from  /Users/Seth/Library/Containers/com.microsoft.Powerpoint/Data/Documents/LingTeX-PowerPoint-src
   into  /Users/Seth/Documents/LingTeX-PowerPoint-Dev.pptm
   AddFromString takes LF as one line break here
@@ -8,12 +8,12 @@ LingTeXDevImport  2026-09-15 19:27:54
   ok       modProbeEvents.bas  modProbeEvents, 313 lines
   ok       clsProbeEvents.cls  clsProbeEvents, 73 lines, class
   ok       modProbePaste.bas  modProbePaste, 279 lines
+  removed  modStartupProbe (not in modules.txt)
+  removed  modStartupAutoOpen (not in modules.txt)
 
 components now:
   modLingTeXDev  (443 lines, type 1)
-  modStartupProbe  (188 lines, type 1)
-  modStartupAutoOpen  (38 lines, type 1)
-  modLingTeXDevCore  (396 lines, type 1)
+  modLingTeXDevCore  (429 lines, type 1)
   modProbe  (784 lines, type 1)
   modProbeEvents  (313 lines, type 1)
   clsProbeEvents  (73 lines, type 2)
