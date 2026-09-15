@@ -378,6 +378,16 @@ lost.
 | Outdent | L, O, U, Y, Q |
 | Text to Interlinear | F, B, V |
 
+## Known issues
+
+**Undo after editing an ordinary table takes two presses (Mac).** After you
+delete a cell in a table that is not an interlinear example, the first
+Cmd+Z makes the whole table seem to vanish and disturbs the layout around
+it. Press Cmd+Z once more: the table comes back exactly as it was, and
+nothing is lost. Seen in Word for Mac; not yet checked on Windows. It is
+tracked at
+[github.com/rulingAnts/LingTeX-Tools/issues/3](https://github.com/rulingAnts/LingTeX-Tools/issues/3).
+
 ## When something goes wrong
 
 **"LingTeX-Word is busy with another operation."** A command was interrupted
