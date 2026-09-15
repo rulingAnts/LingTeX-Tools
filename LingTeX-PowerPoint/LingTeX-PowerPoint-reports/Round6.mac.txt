@@ -1,0 +1,67 @@
+Probe round 6  2026-09-15 21:09:02
+PowerPoint 16.112.4
+build 0909
+system Macintosh 26.6.2
+
+1. Undo
+   Application.UndoRecord: error 438: Object doesn't support this property or method
+   Application.StartNewUndoEntry: error 438: Object doesn't support this property or method
+
+2. What one TextRange2.Paste leaves alone
+   text after the paste: 'new\texample\rsecond\tline'
+   name: same (LingTeXKeepMe)
+   id: same (2)
+   left: same (100.0)
+   top: same (120.0)
+   width: same (400.0)
+   height: changed from 32.9 to 54.7
+   tags: same (LINGTEX=example-1;LINGTEXWIDTH=400)
+   autosize: same (1)
+   wordwrap: same (-1)
+   margins: same (3,4,5,6)
+   zorder: same (1)
+
+3. SaveCopyAs format numbers
+   folder: /Users/Seth/Library/Containers/com.microsoft.Powerpoint/Data/Documents/LingTeX-PowerPoint-savescan/20260915-210903
+   no format: no error (0.03 s)
+   00: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   01: no error (0.03 s)
+   02: error -2147188160: Presentation.SaveCopyAs : Invalid request. Saving as PowerPoint 3, 4, or 95 file is not supported in this version of PowerPoint.
+   03: error -2147188160: Presentation.SaveCopyAs : Invalid request. Saving as PowerPoint 3, 4, or 95 file is not supported in this version of PowerPoint.
+   04: error -2147188160: Presentation.SaveCopyAs : Invalid request. Saving as PowerPoint 3, 4, or 95 file is not supported in this version of PowerPoint.
+   05: no error (0.02 s)
+   06: no error (0.00 s)
+   07: no error (0.02 s)
+   08: no error (0.00 s)
+   09: error -2147188160: Presentation.SaveCopyAs : Invalid request. Saving as PowerPoint 3, 4, or 95 file is not supported in this version of PowerPoint.
+   10: no error (0.01 s)
+   11: error -2147188160: Presentation.SaveCopyAs : Invalid request. Saving as an HTML presentation is not supported in this version of PowerPoint.
+   12: no error (0.00 s)
+   13: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   14: no error (0.00 s)
+   15: no error (0.00 s)
+   16: no error (0.00 s)
+   17: no error (0.00 s)
+   18: no error (0.01 s)
+   19: no error (0.00 s)
+   20: no error (0.00 s)
+   21: no error (0.00 s)
+   22: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   23: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   24: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   25: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   26: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   27: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   28: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   29: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   30: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   31: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   32: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   33: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   34: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   35: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   36: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   37: skipped
+   38: error -2147024809: Presentation.SaveCopyAs : Invalid enumeration value.
+   39: skipped
+   40: skipped
