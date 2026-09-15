@@ -176,11 +176,11 @@ For an example that exists only as text, select the lines and click **Text to
 Interlinear**:
 
 ```
-(1) Uwzob zu. [...] Ozwum-vex zu vuz-mo ov vrezo, zovemi vexu muvuze.
+(1) Ayer los niñ-o-s de mi vecin-a compr-aron pan en el mercado.
 
-Lantern DET [...] Cord-3.POSS DET thin.SG-and can make.thin, what-PP touches.something if
+yesterday DEF.M.PL child-M-PL of 1SG.POSS neighbor-F buy-PST.3PL bread in DEF.M.SG market
 
-(Bebas: Lampu minyak itu. Talinya itu tipis dan bisa kasi tipis kalau dia sentuh sesuatu.)
+'Yesterday my neighbor's children bought bread at the market.'
 ```
 
 The words of each tier line become the columns. Any run of spaces separates
@@ -195,8 +195,8 @@ the first line's. Accept it or type the number, or Cancel to draw nothing.
 
 With the document set to **By Morpheme**, every column in which every filled
 tier cell carries a morpheme boundary is split at it, on every tier, so
-`Ozwum-vex` over `Cord-3.POSS` becomes two columns while `zovemi` over
-`what-PP` stays one (an empty cell does not stand in the way). Check Glossing
+`vecin-a` over `neighbor-F` becomes two columns while `del` over
+`of-DEF.M.SG` stays one (an empty cell does not stand in the way). Check Glossing
 reports that mismatch afterwards, as it always has.
 
 **Insert Interlinear** takes the same road when its *selection* is plain
@@ -349,7 +349,7 @@ what has one right answer:
 | A column filled on some tiers and not others | No: legal, but usually a slip |
 
 `.` and `:` are never counted as morpheme breaks: they mark one morpheme
-glossed with several words, so `stack.CMP=SEQ` against `rixu=xo` is correct
+glossed with several words, so `buy-PST.3PL` against `compr-aron` is correct
 and is not flagged.
 
 ## Keyboard shortcuts
