@@ -1,0 +1,1649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1d4ed8">
+<meta name="description" content="LingTeX Tools — convert FLEx interlinear and Phonology Assistant exports to LaTeX, tab-separated tables, and more. Desktop app (macOS &amp; Windows) and browser extension (Chrome &amp; Firefox).">
+<title>LingTeX Tools · LaTeX &amp; XLingPaper</title>
+<link rel="icon" type="image/png" href="../assets/lingtex-icon-32.png">
+<style>
+/* ── Reset ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Design tokens ───────────────────────────────────────────────────────── */
+:root {
+  --blue-50:   #eff6ff;
+  --blue-100:  #dbeafe;
+  --blue-600:  #2563eb;
+  --blue-700:  #1d4ed8;
+  --blue-800:  #1e40af;
+  --slate-50:  #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-300: #cbd5e1;
+  --slate-400: #94a3b8;
+  --slate-500: #64748b;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1e293b;
+  --slate-900: #0f172a;
+  --green-50:  #f0fdf4;
+  --green-200: #bbf7d0;
+  --green-600: #16a34a;
+  --red-50:    #fef2f2;
+  --red-200:   #fecaca;
+  --red-600:   #dc2626;
+  --amber-50:  #fffbeb;
+  --amber-200: #fde68a;
+  --amber-600: #d97706;
+
+  --font:      system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono:      ui-monospace, 'Cascadia Code', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  --r:         8px;
+  --r-sm:      5px;
+  --r-lg:      12px;
+  --max-w:     860px;
+}
+
+/* ── Base ────────────────────────────────────────────────────────────────── */
+html { font-size: 16px; scroll-behavior: smooth; }
+body {
+  font-family: var(--font);
+  background: var(--slate-100);
+  color: var(--slate-900);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+code {
+  font-family: var(--mono);
+  font-size: 0.8125em;
+  background: var(--slate-200);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+a { color: var(--blue-700); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Site navigation ─────────────────────────────────────────────────────── */
+.site-nav {
+  background: #fff;
+  border-bottom: 1px solid var(--slate-200);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 52px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.nav-brand {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--slate-900);
+  white-space: nowrap;
+}
+.nav-links {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.nav-links a {
+  font-size: 0.8125rem;
+  color: var(--slate-600);
+  padding: 5px 10px;
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.nav-links a:hover { background: var(--slate-100); color: var(--slate-900); text-decoration: none; }
+.nav-links a.nav-gh {
+  border: 1px solid var(--slate-200);
+  color: var(--slate-700);
+}
+.nav-links a.nav-gh:hover { background: var(--slate-50); border-color: var(--slate-300); }
+
+/* ── Hero ────────────────────────────────────────────────────────────────── */
+.hero {
+  background: linear-gradient(160deg, var(--blue-800) 0%, var(--blue-700) 60%, #2563eb 100%);
+  color: #fff;
+  padding: 60px 20px 56px;
+  text-align: center;
+}
+.hero h1 {
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  max-width: 680px;
+  margin: 0 auto 16px;
+}
+.hero-sub {
+  font-size: 1.0625rem;
+  color: #bfdbfe;
+  line-height: 1.65;
+  max-width: 580px;
+  margin: 0 auto 32px;
+}
+.hero-btns {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.hero-btns a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 22px;
+  border-radius: var(--r);
+  font: 600 0.9375rem var(--font);
+  text-decoration: none;
+  transition: background .15s, transform .1s;
+}
+.hero-btns a:hover { transform: translateY(-1px); }
+.btn-hero-mac  { background: #fff; color: var(--blue-800); }
+.btn-hero-mac:hover  { background: var(--blue-50); }
+.btn-hero-win  { background: rgba(255,255,255,0.15); color: #fff; border: 1.5px solid rgba(255,255,255,0.35); }
+.btn-hero-win:hover  { background: rgba(255,255,255,0.25); }
+.btn-hero-ext  { background: rgba(255,255,255,0.10); color: #bfdbfe; border: 1.5px solid rgba(255,255,255,0.20); font-size: 0.875rem; padding: 8px 16px; }
+.btn-hero-ext:hover  { background: rgba(255,255,255,0.18); }
+.hero-note { font-size: 0.8125rem; color: #93c5fd; margin-top: 4px; }
+
+/* ── Products section ────────────────────────────────────────────────────── */
+.products {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 48px 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.product-card {
+  background: #fff;
+  border: 1px solid var(--slate-200);
+  border-radius: var(--r-lg);
+  padding: 28px 24px;
+}
+.product-card h2 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--slate-900);
+  margin-bottom: 8px;
+}
+.product-card .card-desc {
+  font-size: 0.9rem;
+  color: var(--slate-600);
+  line-height: 1.65;
+  margin-bottom: 20px;
+}
+.card-features {
+  list-style: none;
+  margin-bottom: 22px;
+}
+.card-features li {
+  font-size: 0.85rem;
+  color: var(--slate-600);
+  padding: 3px 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.card-features li::before { content: '✓'; color: var(--green-600); font-weight: 700; flex-shrink: 0; }
+.dl-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.dl-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: var(--r-sm);
+  font: 500 0.875rem var(--font);
+  text-decoration: none;
+  border: 1px solid var(--slate-200);
+  background: var(--slate-50);
+  color: var(--slate-800);
+  transition: background .15s, border-color .15s;
+}
+.dl-btn:hover { background: var(--blue-50); border-color: var(--blue-100); color: var(--blue-800); text-decoration: none; }
+.dl-btn.primary { background: var(--blue-700); color: #fff; border-color: var(--blue-700); }
+.dl-btn.primary:hover { background: var(--blue-800); border-color: var(--blue-800); }
+.dl-btn.muted { color: var(--slate-500); font-size: 0.8125rem; }
+.dl-btn .os-icon { font-size: 1.05em; }
+
+/* ── Linux note ──────────────────────────────────────────────────────────── */
+.linux-note-section {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding: 0 20px 40px;
+}
+.linux-note-box {
+  background: var(--amber-50);
+  border: 1px solid var(--amber-200);
+  border-radius: var(--r);
+  padding: 14px 18px;
+  font-size: 0.875rem;
+  color: var(--slate-700);
+  line-height: 1.6;
+}
+.linux-note-box strong { color: var(--slate-900); }
+
+/* ── macOS note (inside product card) ───────────────────────────────────── */
+.macos-note {
+  margin-top: 14px;
+  background: var(--blue-50);
+  border: 1px solid var(--blue-100);
+  border-radius: var(--r-sm);
+  padding: 12px 16px;
+  font-size: 0.8125rem;
+  color: var(--slate-700);
+  line-height: 1.6;
+}
+.macos-note strong { color: var(--slate-900); }
+.macos-note ol { margin: 8px 0 0 18px; display: flex; flex-direction: column; gap: 8px; }
+.macos-note code { background: var(--blue-100); }
+
+/* ── Try-online divider ──────────────────────────────────────────────────── */
+.try-online-bar {
+  background: #fff;
+  border-top: 1px solid var(--slate-200);
+  border-bottom: 1px solid var(--slate-200);
+  padding: 20px 20px 0;
+}
+.try-online-hdr {
+  max-width: var(--max-w);
+  margin: 0 auto;
+  padding-bottom: 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.try-online-hdr h2 {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--slate-900);
+  margin-bottom: 4px;
+}
+.try-online-hdr p {
+  font-size: 0.8375rem;
+  color: var(--slate-500);
+  line-height: 1.55;
+  max-width: 560px;
+}
+.app-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--slate-500);
+}
+.dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green-600);
+  transition: background .3s;
+}
+.dot.offline { background: var(--slate-400); }
+.hdr-status-sep { color: var(--slate-300); }
+
+/* ── Mode bar ────────────────────────────────────────────────────────────── */
+.mode-bar {
+  background: #fff;
+  border-bottom: 1px solid var(--slate-200);
+  padding: 0 20px;
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mode-bar::-webkit-scrollbar { display: none; }
+.mode-btn {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--slate-500);
+  cursor: pointer;
+  font: 600 0.875rem var(--font);
+  padding: 11px 14px;
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+  letter-spacing: 0.01em;
+}
+.mode-btn:hover { color: var(--slate-800); }
+.mode-btn.active { color: var(--blue-800); border-color: var(--blue-700); }
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+.tabs {
+  background: var(--slate-50);
+  border-bottom: 1px solid var(--slate-200);
+  padding: 0 20px;
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--slate-500);
+  cursor: pointer;
+  font: 500 0.875rem var(--font);
+  padding: 11px 14px;
+  white-space: nowrap;
+  transition: color .15s, border-color .15s;
+}
+.tab:hover { color: var(--slate-700); }
+.tab.active { color: var(--blue-700); border-color: var(--blue-700); font-weight: 600; }
+
+/* ── Placeholder panel ───────────────────────────────────────────────────── */
+.placeholder-coming-soon {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--slate-400);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+/* ── Main layout ─────────────────────────────────────────────────────────── */
+main {
+  flex: 1;
+  padding: 24px 20px 32px;
+  max-width: var(--max-w);
+  width: 100%;
+  margin: 0 auto;
+}
+
+.panel { display: none; }
+.panel.active { display: grid; gap: 18px; }
+
+.tool-desc {
+  color: var(--slate-600);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+}
+
+/* ── Config block ────────────────────────────────────────────────────────── */
+.cfg {
+  background: var(--slate-50);
+  border: 1px solid var(--slate-200);
+  border-radius: var(--r);
+}
+.cfg summary {
+  padding: 9px 14px;
+  cursor: pointer;
+  font: 600 0.8125rem var(--font);
+  color: var(--slate-600);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+.cfg summary::before {
+  content: '›';
+  font-size: 1.1rem;
+  display: inline-block;
+  transition: transform .15s;
+}
+.cfg[open] summary::before { transform: rotate(90deg); }
+.cfg summary::-webkit-details-marker { display: none; }
+.cfg-body {
+  padding: 12px 14px;
+  border-top: 1px solid var(--slate-200);
+  display: grid;
+  gap: 12px;
+}
+.cfg-row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  align-items: start;
+  gap: 10px;
+}
+.cfg-row label {
+  font-size: 0.8125rem;
+  color: var(--slate-600);
+  font-weight: 500;
+  padding-top: 6px;
+}
+.cfg-row input[type="text"],
+.cfg-row select,
+.cfg-row textarea.cfg-input {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  padding: 5px 8px;
+  border: 1px solid var(--slate-300);
+  border-radius: var(--r-sm);
+  background: #fff;
+  color: var(--slate-900);
+  width: 100%;
+}
+.cfg-row textarea.cfg-input {
+  min-height: 60px;
+  resize: vertical;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.cfg-row input:focus, .cfg-row select:focus, .cfg-row textarea:focus {
+  outline: 2px solid var(--blue-700);
+  outline-offset: -1px;
+}
+.cfg-full {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cfg-full label {
+  font-size: 0.8125rem;
+  color: var(--slate-600);
+  font-weight: 500;
+}
+.cfg-full textarea {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  padding: 5px 8px;
+  border: 1px solid var(--slate-300);
+  border-radius: var(--r-sm);
+  background: #fff;
+  color: var(--slate-900);
+  width: 100%;
+  min-height: 60px;
+  resize: vertical;
+  line-height: 1.5;
+}
+.cfg-full textarea:focus {
+  outline: 2px solid var(--blue-700);
+  outline-offset: -1px;
+}
+.cfg-hint {
+  font-size: 0.75rem;
+  color: var(--slate-500);
+  line-height: 1.5;
+  margin-top: -2px;
+}
+
+/* ── I/O layout ──────────────────────────────────────────────────────────── */
+.io-row {
+  display: grid;
+  gap: 6px;
+}
+.io-label {
+  font: 600 0.8125rem var(--font);
+  color: var(--slate-700);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.io-actions { display: flex; gap: 6px; }
+
+textarea {
+  width: 100%;
+  border: 1px solid var(--slate-300);
+  border-radius: var(--r);
+  padding: 11px 12px;
+  font: 0.875rem/1.6 var(--font);
+  resize: vertical;
+  background: #fff;
+  color: var(--slate-900);
+  transition: border-color .15s;
+}
+textarea:focus { outline: 2px solid var(--blue-700); outline-offset: -1px; }
+textarea.tall  { min-height: 130px; }
+textarea.out   {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  background: var(--slate-800);
+  color: #e2e8f0;
+  border-color: var(--slate-700);
+  min-height: 150px;
+}
+textarea.out:focus { outline-color: #93c5fd; border-color: var(--slate-600); }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font: 500 0.8125rem var(--font);
+  padding: 5px 12px;
+  transition: background .15s;
+  white-space: nowrap;
+}
+.btn-primary   { background: var(--blue-700); color: #fff; }
+.btn-primary:hover   { background: var(--blue-800); }
+.btn-secondary { background: #fff; color: var(--slate-700); border: 1px solid var(--slate-300); }
+.btn-secondary:hover { background: var(--slate-50); }
+.btn-ghost     { background: transparent; color: var(--slate-500); padding: 5px 8px; }
+.btn-ghost:hover     { background: var(--slate-100); color: var(--slate-700); }
+
+/* ── Status / errors ─────────────────────────────────────────────────────── */
+.status { font-size: 0.8125rem; color: var(--slate-500); min-height: 18px; }
+.status.ok  { color: var(--green-600); }
+.status.err { color: var(--red-600); }
+
+.errbox {
+  background: var(--red-50);
+  border: 1px solid var(--red-200);
+  border-radius: var(--r-sm);
+  padding: 9px 12px;
+  font: 0.8rem/1.5 var(--mono);
+  color: var(--red-600);
+  white-space: pre-wrap;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+footer {
+  background: #fff;
+  border-top: 1px solid var(--slate-200);
+  padding: 18px 20px;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--slate-500);
+  line-height: 1.9;
+}
+footer a { color: var(--blue-700); text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+.footer-links { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-bottom: 4px; }
+
+/* ── Dynamic TSV tabs ────────────────────────────────────────────────────── */
+.tab-add {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--slate-400);
+  cursor: pointer;
+  font: 500 1.25rem var(--font);
+  padding: 8px 12px;
+  line-height: 1;
+  transition: color .15s;
+}
+.tab-add:hover { color: var(--blue-700); }
+
+.profile-name-input {
+  font: 600 0.875rem var(--font);
+  color: var(--slate-900);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  padding: 2px 6px;
+  background: transparent;
+  width: 100%;
+}
+.profile-name-input:hover { border-color: var(--slate-300); background: #fff; }
+.profile-name-input:focus { outline: 2px solid var(--blue-700); outline-offset: -1px; border-color: var(--blue-700); background: #fff; }
+
+.btn-danger { color: var(--red-600); }
+
+/* ── LingTeX-Word: hero announcement and featured card ───────────────────── */
+.hero-announce {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 auto 26px;
+  padding: 7px 16px 7px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.14);
+  border: 1.5px solid rgba(255,255,255,0.35);
+  color: #fff;
+  font: 500 0.875rem var(--font);
+  text-decoration: none;
+  transition: background .15s, transform .1s;
+}
+.hero-announce:hover { background: rgba(255,255,255,0.24); text-decoration: none; transform: translateY(-1px); }
+.hero-announce .tag {
+  background: var(--amber-200);
+  color: #78350f;
+  font-weight: 700;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.hero-announce .arrow { color: #bfdbfe; font-weight: 700; }
+.product-card.featured {
+  grid-column: 1 / -1;
+  border-color: var(--blue-100);
+  background: linear-gradient(180deg, var(--blue-50) 0%, #fff 60%);
+}
+.product-card.featured .card-body {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 28px;
+  align-items: start;
+}
+.product-card.featured .card-desc { margin-bottom: 14px; }
+.product-card.featured .card-features { margin-bottom: 12px; }
+.beta-tag {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 8px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--amber-200);
+  color: #78350f;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .products { grid-template-columns: 1fr; }
+  .product-card.featured .card-body { grid-template-columns: 1fr; }
+  .cfg-row  { grid-template-columns: 1fr; }
+  .cfg-hint { grid-column: 1; }
+  .try-online-hdr { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Site navigation ───────────────────────────────────────────────────── -->
+<nav class="site-nav">
+  <a class="nav-brand" href="../" style="color:inherit; text-decoration:none">LingTeX Tools</a>
+  <div class="nav-links">
+    <a href="../word/">Microsoft Word</a>
+    <a href="#download">Desktop App</a>
+    <a href="#extensions">Extensions</a>
+    <a href="#shortcuts">Shortcuts</a>
+    <a href="#try-online">Try Online</a>
+    <a href="https://github.com/rulingAnts/LingTeX-Tools" class="nav-gh" target="_blank">GitHub</a>
+  </div>
+</nav>
+
+<!-- ── Hero ──────────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <a class="hero-announce" href="../word/">
+    <span class="tag">Microsoft Word</span>
+    <span>Writing in Word? <strong>LingTeX-Word</strong> puts interlinear examples straight into your document</span>
+    <span class="arrow">&rarr;</span>
+  </a>
+  <h1>Linguistic fieldwork data, converted instantly</h1>
+  <p class="hero-sub">
+    Convert FLEx interlinear text and Phonology Assistant exports to
+    <strong style="color:#fff">LaTeX</strong>, <strong style="color:#fff">tab-separated tables</strong>,
+    and (coming soon) <strong style="color:#fff">XLingPaper</strong> —
+    from anywhere on your computer or in any online editor.
+  </p>
+  <div class="hero-btns">
+    <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-macos.dmg" class="btn-hero-mac" data-os="mac" target="_blank">
+      ⬇ Download for macOS
+    </a>
+    <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-windows-setup.exe" class="btn-hero-win" data-os="win" target="_blank">
+      ⬇ Download for Windows
+    </a>
+  </div>
+  <div class="hero-btns">
+    <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-linux.deb"
+       class="btn-hero-ext" data-os="linux" target="_blank"
+       title="⚠️ Linux builds have not been tested by the developer — use at your own risk">
+      🐧 Linux (.deb)
+    </a>
+    <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-linux.AppImage"
+       class="btn-hero-ext" data-os="linux" target="_blank"
+       title="⚠️ Linux builds have not been tested by the developer — use at your own risk">
+      🐧 Linux (.AppImage)
+    </a>
+  </div>
+  <p class="hero-note" style="color:rgba(255,255,255,0.55); font-size:0.8rem; margin-top:4px">
+    ⚠️ Linux builds are untested — community contributions welcome
+  </p>
+  <div class="hero-btns" style="margin-top:10px">
+    <a href="#extensions" class="btn-hero-ext">⬡ Browser Extension — Chrome &amp; Firefox</a>
+  </div>
+  <p class="hero-note">Works with any TeX editor — Overleaf, VS Code, TeXShop, TeXworks, and more</p>
+</section>
+
+<!-- ── Download / Products ───────────────────────────────────────────────── -->
+<div id="download">
+<section class="products">
+
+  <!-- Desktop App -->
+  <div class="product-card">
+    <h2>🖥 Desktop App</h2>
+    <p class="card-desc">
+      Runs silently in the system tray (Windows) or menu bar (macOS).
+      Choose your output mode — <em>LaTeX</em>, <em>Table/Spreadsheet</em>, or (coming soon) <em>XLingPaper</em> —
+      and configure keyboard shortcuts that work <em>system-wide</em> in any editor, web-based or desktop.
+      When you press a shortcut, the app reads your clipboard, converts it, and
+      delivers the result at your cursor.
+      On macOS this uses keyboard injection (your clipboard is untouched).
+      On Windows the result is written to the clipboard and pasted — so after
+      a shortcut fires, the converted text stays in your clipboard and you can
+      paste it again with a plain Ctrl+V.
+      Shortcuts fire regardless of which mode or tab is currently open.
+    </p>
+    <ul class="card-features">
+      <li>Global keyboard shortcuts — fire from any app, browser or desktop</li>
+      <li>Multiple output modes: LaTeX, Table/Spreadsheet, XLingPaper (planned)</li>
+      <li>FLEx interlinear + Phonology Assistant + custom TSV profiles</li>
+      <li>No browser needed — works fully offline</li>
+    </ul>
+    <div class="dl-btns">
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-macos.dmg" class="dl-btn primary" data-os="mac" target="_blank">
+        <span class="os-icon"></span> macOS (.dmg)
+      </a>
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-windows-setup.exe" class="dl-btn" data-os="win" target="_blank">
+        <span class="os-icon">🪟</span> Windows (.exe)
+      </a>
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-windows.msi" class="dl-btn" data-os="win" target="_blank">
+        <span class="os-icon">🪟</span> Windows (.msi)
+      </a>
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-linux.deb" class="dl-btn muted" data-os="linux" target="_blank"
+         title="⚠️ Linux builds have not been tested by the developer — use at your own risk">
+        <span class="os-icon">🐧</span> Linux (.deb)
+      </a>
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-linux.AppImage" class="dl-btn muted" data-os="linux" target="_blank"
+         title="⚠️ Linux builds have not been tested by the developer — use at your own risk">
+        <span class="os-icon">🐧</span> Linux (.AppImage)
+      </a>
+    </div>
+    <div class="macos-note">
+      <strong> macOS users:</strong>
+      <ol>
+        <li>
+          <strong>Bypass Gatekeeper</strong> — the app is currently unsigned.
+          After downloading, right-click the <code>.app</code> and choose <strong>Open</strong>,
+          then click Open again in the dialog. Alternatively, run once in Terminal:
+          <br><code>xattr -cr "/Applications/LingTeX Tools.app"</code>
+        </li>
+        <li>
+          <strong>Grant Accessibility access</strong> — when prompted, allow
+          LingTeX Tools in <em>System Settings → Privacy &amp; Security → Accessibility</em>.
+          This is required for global keyboard shortcuts to work.
+        </li>
+        <li>
+          <strong>After every update: re-grant Accessibility access</strong> — macOS ties
+          the permission to the specific app binary. Installing a new version replaces the
+          binary and silently revokes the permission, so global shortcuts stop working.
+          After each update, open <em>System Settings → Privacy &amp; Security → Accessibility</em>,
+          remove LingTeX Tools (− button), then add it again (+ button →
+          <code>/Applications/LingTeX Tools.app</code>).
+        </li>
+      </ol>
+    </div>
+    <div class="windows-note" style="margin-top:1em; padding:0.75em 1em; background:#fff8e1; border-left:4px solid #f59e0b; border-radius:4px; font-size:0.92em;">
+      <strong>🪟 Windows — known limitation:</strong>
+      On Windows, the global shortcut delivers output by writing to the clipboard and
+      simulating Ctrl+V. This means firing the shortcut twice in a row without copying
+      new source text first will attempt to re-convert the already-converted output and
+      produce nothing. <strong>You only need to fire it once</strong> — the converted
+      result stays in your clipboard afterwards, so you can paste again with a plain
+      Ctrl+V as many times as you like.
+    </div>
+  </div>
+
+  <!-- Browser Extension -->
+  <div class="product-card" id="extensions">
+    <h2>⬡ Browser Extension</h2>
+    <p class="card-desc">
+      Adds a toolbar button to your browser. Choose your output mode — <em>LaTeX</em>,
+      <em>Table/Spreadsheet</em>, or (coming soon) <em>XLingPaper</em> — and assign
+      per-profile keyboard shortcuts that insert converted text directly at the cursor
+      in Overleaf, Authorea, or any web-based editor — <em>within the browser only</em>.
+      Shortcuts fire regardless of which mode or tab is currently open.
+      Choose this <em>or</em> the Desktop App, not both.
+    </p>
+    <ul class="card-features">
+      <li>Works in Overleaf, Authorea, and more</li>
+      <li>Multiple output modes: LaTeX, Table/Spreadsheet, XLingPaper (planned)</li>
+      <li>Per-profile keyboard shortcuts, insert at cursor</li>
+      <li>FLEx interlinear + Phonology Assistant + custom TSV profiles</li>
+      <li>Settings sync across browser sessions</li>
+    </ul>
+    <div class="dl-btns">
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-firefox.xpi" class="dl-btn" data-browser="firefox" target="_blank">
+        🦊 Firefox (.xpi)
+      </a>
+      <a href="https://github.com/rulingAnts/LingTeX-Tools/releases/latest/download/lingtex-tools-chrome.zip" class="dl-btn" data-browser="chrome" target="_blank">
+        🌐 Chrome / Edge (.zip)
+      </a>
+    </div>
+    <div class="macos-note" style="margin-top:14px">
+      <strong>Manual install required</strong> — not yet in the browser stores.
+      <ol>
+        <li data-browser-install="chrome">
+          <strong>Chrome / Edge:</strong> unzip the download somewhere permanent,
+          go to <code>chrome://extensions</code>, enable <strong>Developer mode</strong>,
+          click <strong>Load unpacked</strong>, and select the unzipped folder.
+          Pin the icon from the puzzle-piece menu.
+        </li>
+        <li data-browser-install="firefox">
+          <strong>Firefox:</strong> open the downloaded <code>.xpi</code> file
+          (or drag it onto a Firefox tab) and click <strong>Add</strong> when prompted.
+          The extension is permanently installed — no repeat after restart.
+        </li>
+      </ol>
+    </div>
+    <p class="cfg-hint" style="margin-top:10px">
+      🧭 <strong>Safari</strong> support is planned for a future release.
+      Safari users can use the <a href="#download">Desktop App</a> or try the
+      <a href="#try-online">web version</a>.
+    </p>
+  </div>
+
+</section>
+</div>
+
+<!-- ── Linux note ────────────────────────────────────────────────────────── -->
+<div class="linux-note-section">
+  <div class="linux-note-box">
+    <strong>🐧 Linux:</strong> The desktop app has not been tested on Linux — the developer
+    does not have a Linux machine. In principle it should work (Tauri supports Linux, global
+    shortcuts use X11/XWayland, and the system tray requires <code>libappindicator</code>).
+    Pre-built <code>.deb</code> and <code>.AppImage</code> artifacts are available on the
+    <a href="https://github.com/rulingAnts/LingTeX-Tools/releases" target="_blank">releases page</a>.
+    If you try it and find issues — or get it working — please
+    <a href="https://github.com/rulingAnts/LingTeX-Tools/issues" target="_blank">open an issue or PR</a>.
+    Linux contributions are very welcome.
+  </div>
+</div>
+
+<!-- ── Keyboard shortcuts ────────────────────────────────────────────────── -->
+<section id="shortcuts" style="background:#fff; border-top:1px solid var(--slate-200); padding:36px 20px 40px;">
+  <div style="max-width:var(--max-w); margin:0 auto;">
+    <h2 style="font-size:1.0625rem; font-weight:700; color:var(--slate-900); margin-bottom:6px;">⌨ Keyboard Shortcuts</h2>
+    <p style="font-size:0.875rem; color:var(--slate-500); margin-bottom:12px; line-height:1.6;">
+      Applies to the Desktop App and Browser Extension. The web version below does not support shortcuts.
+    </p>
+    <div style="background:#fefce8; border:1px solid #fde047; border-radius:var(--r); padding:12px 16px; margin-bottom:18px; font-size:0.875rem; color:#713f12; line-height:1.6;">
+      <strong>First-time setup required.</strong>
+      Shortcuts must be configured inside the app before they will work.
+      Open the app or extension popup, expand <em>Configuration</em> on the FLEx Interlinear tab,
+      click the shortcut field, and press your desired key combination.
+      The default shortcut for FLEx Interlinear is <strong>Ctrl+Shift+V</strong> (set automatically on first launch).
+      The app will warn you if no shortcuts are configured.
+    </div>
+    <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">
+
+      <div style="background:var(--slate-50); border:1px solid var(--slate-200); border-radius:var(--r); padding:18px 20px;">
+        <h3 style="font-size:0.9375rem; font-weight:600; color:var(--slate-900); margin-bottom:8px;">Shortcuts fire regardless of active mode</h3>
+        <p style="font-size:0.875rem; color:var(--slate-600); line-height:1.6;">
+          Shortcuts are registered globally — they fire based on the key combo alone, not on which output mode
+          or tab is currently open in the app. A shortcut set on the Phonology Assistant profile works
+          whether you are looking at the LaTeX mode, Table/Spreadsheet mode, or anything else.
+        </p>
+      </div>
+
+      <div style="background:var(--slate-50); border:1px solid var(--slate-200); border-radius:var(--r); padding:18px 20px;">
+        <h3 style="font-size:0.9375rem; font-weight:600; color:var(--slate-900); margin-bottom:8px;">Duplicates are resolved automatically</h3>
+        <p style="font-size:0.875rem; color:var(--slate-600); line-height:1.6;">
+          If you assign a key combo that is already used by another tab or profile, the app automatically
+          removes the old binding and shows a brief warning next to the shortcut field. Each combo can only
+          be active for one converter at a time.
+        </p>
+      </div>
+
+      <div style="background:var(--slate-50); border:1px solid var(--slate-200); border-radius:var(--r); padding:18px 20px;">
+        <h3 style="font-size:0.9375rem; font-weight:600; color:var(--slate-900); margin-bottom:8px;">OS and app conflicts (Desktop App)</h3>
+        <p style="font-size:0.875rem; color:var(--slate-600); line-height:1.6;">
+          System-reserved shortcuts (e.g. <code>Cmd+Space</code> for Spotlight, <code>Cmd+Tab</code> for the
+          app switcher on macOS) cannot be captured — the app will warn you if the OS rejects a registration.
+          To avoid silently stealing shortcuts from other apps, prefer three-modifier combos such as
+          <code>Cmd+Opt+Shift+L</code> on macOS or <code>Ctrl+Alt+Shift+L</code> on Windows, which rarely
+          conflict with anything else.
+          <br><br>
+          <em>Browser extension shortcuts only fire within web pages and cannot conflict with OS or desktop-app shortcuts.</em>
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Known issues ──────────────────────────────────────────────────────── -->
+<section style="background:#fff8f0; border-top:1px solid var(--slate-200); padding:36px 20px 40px;">
+  <div style="max-width:760px; margin:0 auto;">
+    <h2 style="font-size:1.0625rem; font-weight:700; color:var(--slate-900); margin-bottom:14px;">⚠ Known Issues</h2>
+    <div style="display:flex; flex-direction:column; gap:12px; font-size:0.9rem; color:var(--slate-700);">
+
+      <div style="padding:10px 14px; background:#fff; border:1px solid var(--slate-200); border-radius:6px;">
+        <strong>FLEx: blank morpheme cells cause column misalignment</strong> —
+        If a morpheme is missing data in the selected writing system, FLEx exports a blank cell for that column,
+        shifting the gloss row out of alignment and producing garbled or phantom tokens in the output.
+        <strong>Workaround:</strong> in FLEx, use a writing system in which all morphemes have forms,
+        or add the missing forms before copying.
+      </div>
+
+      <div style="padding:10px 14px; background:#fff; border:1px solid var(--slate-200); border-radius:6px;">
+        <strong>Header row included in copy</strong> —
+        When selecting from the top of a Phonology Assistant or Dekereke table, the column-header row may be
+        included in the clipboard selection and processed as data, producing a garbled first entry.
+        Delete it from the output manually.
+      </div>
+
+      <div style="padding:10px 14px; background:#fff; border:1px solid var(--slate-200); border-radius:6px;">
+        <strong>Windows: global shortcut can't fire twice in a row</strong> —
+        On Windows the shortcut writes output to the clipboard and simulates Ctrl+V, so the converted result
+        replaces the original source. Firing the shortcut again without copying new source text will produce nothing.
+        You only need to fire it once — the result stays in the clipboard and you can paste again with plain Ctrl+V.
+      </div>
+
+      <div style="padding:10px 14px; background:#fff; border:1px solid var(--slate-200); border-radius:6px;">
+        <strong>macOS: global shortcuts stop working after an update</strong> —
+        macOS ties the Accessibility permission to the specific app binary. After each update, open
+        <em>System Settings → Privacy &amp; Security → Accessibility</em>, remove LingTeX Tools (− button),
+        then add it again (+ → <code>/Applications/LingTeX Tools.app</code>).
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Try it online ─────────────────────────────────────────────────────── -->
+<div class="try-online-bar" id="try-online">
+  <div class="try-online-hdr">
+    <div>
+      <h2>Try it in your browser</h2>
+      <p>
+        No installation needed. Good for occasional use or trying it out before installing.
+        Settings are saved in your browser's local storage.
+      </p>
+    </div>
+    <div class="app-controls">
+      <span class="dot" id="dot"></span>
+      <span id="net-label">Online</span>
+    </div>
+  </div>
+</div>
+
+<nav class="mode-bar" id="mode-nav" role="tablist" aria-label="Output mode">
+  <button class="mode-btn active" role="tab" data-mode="latex" onclick="switchMode('latex')">LaTeX (langsci-gb4e)</button>
+  <button class="mode-btn" role="tab" data-mode="tsv" onclick="switchMode('tsv')">Table/Spreadsheet (tab-separated)</button>
+  <button class="mode-btn" role="tab" data-mode="xlingpaper" onclick="switchMode('xlingpaper')">XLingPaper</button>
+</nav>
+
+<nav class="tabs" id="tab-nav" role="tablist" aria-label="LaTeX converter">
+  <button class="tab active" role="tab" data-panel="flex" onclick="switchTab(this)">FLEx Interlinear</button>
+  <!-- LaTeX profile tabs rendered here by JS -->
+  <button class="tab-add" id="tab-add-btn" title="Add a new LaTeX converter tab" onclick="addProfile()">+</button>
+</nav>
+
+<main>
+
+  <!-- ── FLEx Interlinear ─────────────────────────────────────────────── -->
+  <section id="panel-flex" class="panel active" role="tabpanel">
+
+    <p class="tool-desc">
+      Paste interlinear text copied from <strong>FieldWorks Language Explorer (FLEx)</strong> and
+      convert it to a <code>\gll</code> block for <em>langsci-gb4e</em> or <em>gb4e</em>.
+      Handles morpheme boundary alignment, grammatical gloss tagging, free translations,
+      and source text references.
+    </p>
+
+    <details class="cfg">
+      <summary>Configuration</summary>
+      <div class="cfg-body">
+
+        <div class="cfg-row">
+          <label for="flex-gl">Grammatical gloss command</label>
+          <input type="text" id="flex-gl" value="\textsc"
+            placeholder="\textsc  or  \gl  or leave empty for no wrapping"
+            oninput="convertFlex()">
+        </div>
+        <div class="cfg-hint">
+          Wraps all-caps abbreviations like <code>PST</code>, <code>3SG</code> — e.g. <code>\textsc{Pst}</code>.
+          Use <code>\textsc</code> for standard small-caps (no extra packages).
+          Use <code>\gl</code> or <code>\acrshort</code> to link glosses to an abbreviations list via
+          <a href="https://ctan.org/pkg/glossaries-extra" target="_blank" rel="noopener">glossaries-extra</a>
+          (with <code>\setabbreviationstyle{short-sc}</code> for small-caps output).
+          Leave <strong>empty</strong> to disable wrapping entirely.
+        </div>
+
+        <div class="cfg-row">
+          <label for="flex-gloss-case">Gloss case</label>
+          <select id="flex-gloss-case" onchange="convertFlex(); convertFlexTSV();">
+            <option value="capitalize" selected>Capitalize first letter (Pst)</option>
+            <option value="lowercase">All lowercase (pst)</option>
+            <option value="uppercase">All uppercase (PST)</option>
+            <option value="none">Unmodified (from source)</option>
+          </select>
+        </div>
+        <div class="cfg-hint">
+          Applies to grammatical gloss abbreviations in both LaTeX and Table output.
+        </div>
+
+        <div class="cfg-row">
+          <label for="flex-form-cmd">Object language formatting</label>
+          <input type="text" id="flex-form-cmd" value="\textit"
+            placeholder="\textit  or leave empty for no wrapping"
+            oninput="convertFlex()">
+        </div>
+        <div class="cfg-hint">
+          Wraps each individual word on the object-language tier — e.g. <code>\textit{word1} \textit{word2} \textit{word3}</code>.
+          Leave <strong>empty</strong> to omit. (LaTeX output only.)
+        </div>
+
+        <!-- TODO (future release): wire up \begin{exe} wrapping toggle;
+             currently has no effect so the control is hidden. Always wraps in exe block. -->
+        <select id="flex-wrap-exe" hidden>
+          <option value="yes" selected>Yes — full \begin{exe} … \end{exe} block</option>
+        </select>
+
+        <div class="cfg-row">
+          <label for="flex-txtref">Source ref. command</label>
+          <input type="text" id="flex-txtref" value="%\txtref"
+            placeholder="e.g. \txtref  or %\txtref to comment out"
+            oninput="convertFlex()">
+        </div>
+        <div class="cfg-row">
+          <label for="flex-txtpfx">Source ref. prefix</label>
+          <input type="text" id="flex-txtpfx" value="TXT:"
+            placeholder="TXT:  or leave empty"
+            oninput="convertFlex()">
+        </div>
+        <div class="cfg-hint">
+          When set, appends a source citation to the end of the <code>\glt</code> free-translation line —
+          e.g. command <code>\txtref</code> + prefix <code>TXT:</code> + FLEx example number <code>8</code>
+          produces <code>\txtref{TXT:8}</code>. Default <code>%\txtref</code> leaves it commented out —
+          remove the <code>%</code> to activate. Leave empty to omit entirely.
+        </div>
+
+      </div>
+    </details>
+
+    <div class="io-row">
+      <div class="io-label">
+        <span>Input — paste FLEx interlinear text</span>
+        <div class="io-actions">
+          <button class="btn btn-ghost" onclick="clearTool('flex')">Clear</button>
+        </div>
+      </div>
+      <textarea id="flex-in" class="tall" spellcheck="false"
+        placeholder="Paste interlinear text copied from FLEx here.&#10;&#10;Example:&#10;Morphemes  na -a    ti -o&#10;Lex. Gloss 1SG -COMPL 2SG -INCOMPL&#10;Free Eng   I arrived and you left."
+        oninput="convertFlex()"></textarea>
+    </div>
+
+    <div class="io-row">
+      <div class="io-label">
+        <span>Output — LaTeX</span>
+        <div class="io-actions">
+          <button class="btn btn-secondary" onclick="copyOutput('flex-out', this)">Copy Result</button>
+        </div>
+      </div>
+      <textarea id="flex-out" class="out" readonly spellcheck="false"
+        placeholder="LaTeX output will appear here…"></textarea>
+      <div id="flex-status" class="status"></div>
+    </div>
+
+  </section>
+
+  <!-- ── FLEx TSV ────────────────────────────────────────────────────── -->
+  <section id="panel-flex-tsv" class="panel" role="tabpanel">
+
+    <p class="tool-desc">
+      Paste interlinear text copied from <strong>FLEx</strong> and convert it to
+      morpheme-aligned TSV — each morpheme and boundary marker in its own
+      tab-separated column, ready to paste into a spreadsheet or corpus tool.
+      Uses the same processing as the FLEx Interlinear tab without LaTeX output.
+    </p>
+
+    <div class="io-row">
+      <div class="io-label">
+        <span>Input — paste FLEx interlinear text</span>
+        <div class="io-actions">
+          <button class="btn btn-ghost" onclick="clearTool('flex-tsv')">Clear</button>
+        </div>
+      </div>
+      <textarea id="flex-tsv-in" class="tall" spellcheck="false"
+        placeholder="Paste interlinear text copied from FLEx here.&#10;&#10;Example:&#10;Morphemes  na -a    ti -o&#10;Lex. Gloss 1SG COMPL 2SG INCOMPL&#10;Free Eng   I arrived and you left."
+        oninput="convertFlexTSV()"></textarea>
+    </div>
+
+    <div class="io-row">
+      <div class="io-label">
+        <span>Output — TSV</span>
+        <div class="io-actions">
+          <button class="btn btn-secondary" onclick="copyOutput('flex-tsv-out', this)">Copy Result</button>
+        </div>
+      </div>
+      <textarea id="flex-tsv-out" class="out" readonly spellcheck="false"
+        placeholder="TSV output will appear here…"></textarea>
+      <div id="flex-tsv-status" class="status"></div>
+    </div>
+
+  </section>
+
+  <!-- ── XLingPaper placeholder ──────────────────────────────────────────── -->
+  <section id="panel-xlingpaper" class="panel" role="tabpanel">
+    <div class="placeholder-coming-soon">
+      <p>XLingPaper output support is coming in a future release.</p>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Coming Soon ─────────────────────────────────────────────────────── -->
+<section style="background:#fff; border-top:1px solid var(--slate-200); padding:40px 20px;">
+  <div style="max-width:var(--max-w); margin:0 auto;">
+    <h2 style="font-size:1.1rem; font-weight:700; color:var(--slate-800); margin-bottom:6px;">🔜 Coming in a Future Release</h2>
+    <p style="font-size:0.9rem; color:var(--slate-500); margin-bottom:20px;">Planned features actively in development.</p>
+    <div style="display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr));">
+
+      <div style="background:var(--slate-50); border:1px solid var(--slate-200); border-radius:var(--r); padding:18px 20px;">
+        <div style="font-size:0.72rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--blue-700); margin-bottom:6px;">Extension</div>
+        <h3 style="font-size:1rem; font-weight:600; color:var(--slate-900); margin-bottom:6px;">FLEx Corpus → LaTeX Export</h3>
+        <p style="font-size:0.875rem; color:var(--slate-600); line-height:1.55;">Export an entire FLEx corpus as a structured LaTeX document — ideal for producing a full example appendix or corpus reference directly from FLEx.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-links">
+    <a href="https://github.com/rulingAnts/LingTeX" target="_blank">LingTeX Template</a>
+    <a href="https://github.com/rulingAnts/LingTeX-Tools/releases" target="_blank">Releases</a>
+    <a href="https://github.com/rulingAnts/LingTeX-Tools" target="_blank">GitHub</a>
+    <a href="https://github.com/rulingAnts/LingTeX-Tools/issues" target="_blank">Report an issue</a>
+  </div>
+  <div>LingTeX Tools — AGPL-3.0 &copy; Seth Johnston</div>
+  <div style="font-size:0.75rem; color:var(--slate-400); margin-top:2px">
+    Conversion logic based on original TeXstudio macros by Moss Doerksen (SIL PNG), used by permission.
+  </div>
+</footer>
+
+<script src="../core.js"></script>
+
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// APP
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Mode switching ────────────────────────────────────────────────────────────
+var activeMode = 'latex';
+
+function switchMode(mode) {
+    activeMode = mode;
+    try { localStorage.setItem('lingtex-active-mode', mode); } catch(e) {}
+
+    document.querySelectorAll('.mode-btn').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.mode === mode);
+    });
+
+    var tabNav = document.getElementById('tab-nav');
+    tabNav.style.display = (mode === 'latex') ? '' : 'none';
+
+    if (mode === 'latex') {
+        if (!activePanel || activePanel === 'flex-tsv') activePanel = 'flex';
+        document.querySelectorAll('.tab').forEach(function(b) {
+            b.classList.toggle('active',
+                b.dataset.panel === activePanel || b.dataset.profile === activePanel);
+        });
+        document.querySelectorAll('.panel').forEach(function(p) {
+            p.classList.toggle('active', p.id === 'panel-' + activePanel);
+        });
+    } else {
+        document.querySelectorAll('.tab').forEach(function(b) { b.classList.remove('active'); });
+        var targetId = (mode === 'tsv') ? 'panel-flex-tsv' : 'panel-' + mode;
+        document.querySelectorAll('.panel').forEach(function(p) {
+            p.classList.toggle('active', p.id === targetId);
+        });
+    }
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(btn) {
+    activePanel = btn.dataset.panel;
+    document.querySelectorAll('.tab').forEach(function(b) {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+    });
+    document.querySelectorAll('.panel').forEach(function(p) {
+        p.classList.remove('active');
+    });
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
+}
+
+// ── Clipboard helpers ─────────────────────────────────────────────────────────
+
+// Copy Result button: copies current output without re-reading clipboard
+async function copyOutput(outId, btn) {
+    var text = document.getElementById(outId).value;
+    if (!text.trim()) return;
+    try {
+        await navigator.clipboard.writeText(text);
+        var orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = orig; }, 1500);
+    } catch (e) {
+        alert('Could not copy. Please select the text and copy manually.');
+    }
+}
+
+
+function clearTool(id) {
+    document.getElementById(id + '-in').value  = '';
+    document.getElementById(id + '-out').value = '';
+    var s = document.getElementById(id + '-status');
+    if (s) { s.textContent = ''; s.className = 'status'; }
+    var eb = document.getElementById(id + '-errbox');
+    if (eb) { eb.style.display = 'none'; eb.textContent = ''; }
+}
+
+// ── FLEx converter ────────────────────────────────────────────────────────────
+function convertFlex() {
+    var raw    = document.getElementById('flex-in').value;
+    var outEl  = document.getElementById('flex-out');
+    var statEl = document.getElementById('flex-status');
+
+    if (!raw.trim()) { outEl.value = ''; statEl.textContent = ''; statEl.className = 'status'; return; }
+
+    try {
+        var blocks = LingTeXCore.parseFLExBlocks(raw);
+        if (!blocks.length) {
+            outEl.value = '';
+            setStatus('flex', 'No recognisable interlinear tiers found. ' +
+                'Lines must start with: Word, Morphemes, Lex. Entries, Lex. Gloss, Word Gloss, Free', 'err');
+            return;
+        }
+        var latex = LingTeXCore.renderFLExAuto(blocks, {
+            glCmd:        document.getElementById('flex-gl').value.trim(),
+            glossCase:    document.getElementById('flex-gloss-case').value,
+            formCmd:      document.getElementById('flex-form-cmd').value.trim(),
+            wrapExe:      document.getElementById('flex-wrap-exe').value === 'yes',
+            txtrefCmd:    document.getElementById('flex-txtref').value.trim(),
+            txtrefPrefix: document.getElementById('flex-txtpfx').value
+        });
+        outEl.value = latex;
+        var first = blocks[0];
+        var words = (first.colArrays[0] || []).length - 1;
+        var msg = blocks.length > 1
+            ? 'Converted ' + blocks.length + ' blocks'
+            : 'Converted ' + words + ' word(s)' +
+              (first.freeLines.length ? ' \u00b7 free: \u201c' + first.freeLines[0] + '\u201d' : '');
+        setStatus('flex', msg, 'ok');
+    } catch (e) {
+        outEl.value = '';
+        setStatus('flex', 'Error: ' + e.message, 'err');
+    }
+}
+
+// ── FLEx TSV converter ────────────────────────────────────────────────────────
+function convertFlexTSV() {
+    var raw   = document.getElementById('flex-tsv-in').value;
+    var outEl = document.getElementById('flex-tsv-out');
+
+    if (!raw.trim()) { outEl.value = ''; setStatus('flex-tsv', '', ''); return; }
+
+    try {
+        var blocks = LingTeXCore.parseFLExBlocks(raw);
+        if (!blocks.length) {
+            outEl.value = '';
+            setStatus('flex-tsv', 'No recognisable interlinear tiers found. ' +
+                'Lines must start with: Word, Morphemes, Lex. Entries, Lex. Gloss, Word Gloss, Free', 'err');
+            return;
+        }
+        var tsv = LingTeXCore.renderFLExTSVAuto(blocks, {
+            glossCase: document.getElementById('flex-gloss-case').value
+        });
+        outEl.value = tsv;
+        var first = blocks[0];
+        var words = (first.colArrays[0] || []).length - 1;
+        var msg = blocks.length > 1
+            ? 'Converted ' + blocks.length + ' blocks'
+            : 'Converted ' + words + ' word(s)';
+        setStatus('flex-tsv', msg, 'ok');
+    } catch (e) {
+        outEl.value = '';
+        setStatus('flex-tsv', 'Error: ' + e.message, 'err');
+    }
+}
+
+// ── TSV Profile system ────────────────────────────────────────────────────────
+// Profiles are stored in localStorage. Each profile has: id, name, tmpl, skip.
+// The FLEx tab is static; all TSV converter tabs are dynamic profiles.
+
+// Columns: $WORD=col2  $GLOSS=col3  $ID=col6  $COLn=any column
+// Dekereke default columns: COL1=Reference COL2=Phonetic COL3=Gloss COL4=Category COL5=SoundFile
+var DEFAULT_PROFILES = [
+    { id: 'tsv-pa',  name: 'Phonology Assistant', isDefault: true,
+      tmpl: '\\exampleentry{}{$WORD}{$GLOSS}{\\phonrec{$ID}}', skip: 'referenced', trimLeading: true },
+    { id: 'tsv-dek', name: 'Dekereke',             isDefault: true,
+      tmpl: '\\exampleentry{}{$COL2}{$COL3}{\\phonrec{$COL1}}', skip: 'referenced', trimLeading: false }
+];
+
+var profiles    = [];
+var activePanel = 'flex';   // 'flex' or a profile id
+
+function loadProfiles() {
+    try {
+        var stored = localStorage.getItem('lingtex-tsv-profiles');
+        profiles = stored ? JSON.parse(stored) : DEFAULT_PROFILES.map(cloneProfile);
+    } catch (e) {
+        profiles = DEFAULT_PROFILES.map(cloneProfile);
+    }
+    if (!profiles.length) profiles = DEFAULT_PROFILES.map(cloneProfile);
+    try {
+        var storedMode = localStorage.getItem('lingtex-active-mode');
+        if (storedMode) activeMode = storedMode;
+    } catch(e) {}
+}
+
+function saveProfiles() {
+    try { localStorage.setItem('lingtex-tsv-profiles', JSON.stringify(profiles)); } catch(e) {}
+}
+
+function cloneProfile(p) {
+    return { id: p.id, name: p.name, tmpl: p.tmpl, skip: p.skip, trimLeading: !!p.trimLeading, isDefault: p.isDefault || false };
+}
+
+function getProfile(id) {
+    return profiles.filter(function(p) { return p.id === id; })[0] || null;
+}
+
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Rendering ────────────────────────────────────────────────────────────────
+
+function renderTSVTabs() {
+    var nav    = document.getElementById('tab-nav');
+    var addBtn = document.getElementById('tab-add-btn');
+
+    // Remove previously rendered profile buttons
+    nav.querySelectorAll('[data-profile]').forEach(function(el) { el.remove(); });
+
+    profiles.forEach(function(p) {
+        var btn = document.createElement('button');
+        btn.className = 'tab' + (activePanel === p.id ? ' active' : '');
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('data-profile', p.id);
+        btn.textContent = p.name;
+        btn.onclick = function() { switchToProfile(p.id); };
+        nav.insertBefore(btn, addBtn);
+    });
+}
+
+function renderTSVPanels() {
+    var main = document.querySelector('main');
+
+    // Remove previously rendered profile panels
+    main.querySelectorAll('.tsv-panel').forEach(function(el) { el.remove(); });
+
+    profiles.forEach(function(p) {
+        var sec = document.createElement('section');
+        sec.id        = 'panel-' + p.id;
+        sec.className = 'panel tsv-panel' + (activePanel === p.id ? ' active' : '');
+        sec.setAttribute('role', 'tabpanel');
+        sec.innerHTML  = buildPanelHTML(p);
+        main.appendChild(sec);
+    });
+}
+
+function buildPanelHTML(p) {
+    var id   = escHtml(p.id);
+    var name = escHtml(p.name);
+    var tmpl = escHtml(p.tmpl);
+    var skipOpts = ['referenced','col1','none'];
+    var skipLabels = {
+        referenced: 'any column used in template is empty',
+        col1:       'column 1 is empty',
+        none:       'never skip (include all rows)'
+    };
+    var skipHtml = skipOpts.map(function(v) {
+        return '<option value="' + v + '"' + (p.skip === v ? ' selected' : '') + '>' +
+               skipLabels[v] + '</option>';
+    }).join('');
+
+    return '' +
+        '<details class="cfg">' +
+        '  <summary>Configuration</summary>' +
+        '  <div class="cfg-body">' +
+        (!p.isDefault ?
+        '    <div class="cfg-row">' +
+        '      <label>Tab name</label>' +
+        '      <input class="profile-name-input" type="text" value="' + name + '"' +
+        '        onchange="renameProfile(\'' + id + '\', this.value)">' +
+        '    </div>' : '') +
+        '    <div class="cfg-full">' +
+        '      <label for="' + id + '-tmpl">Row template</label>' +
+        '      <textarea id="' + id + '-tmpl" spellcheck="false"' +
+        '        oninput="updateAndConvert(\'' + id + '\')">' + tmpl + '</textarea>' +
+        '      <div class="cfg-hint">' +
+        '        Named: <code>$WORD</code> = col 2 &nbsp;·&nbsp; <code>$GLOSS</code> = col 3 &nbsp;·&nbsp; <code>$ID</code> = col 6<br>' +
+        '        Positional: <code>$COL<em>n</em></code> = any column by number (1-based). &nbsp;Reorder, repeat, or omit freely.' +
+        '      </div>' +
+        '    </div>' +
+        '    <div class="cfg-row">' +
+        '      <label for="' + id + '-skip">Skip rows where</label>' +
+        '      <select id="' + id + '-skip" onchange="updateAndConvert(\'' + id + '\')">' +
+        skipHtml +
+        '      </select>' +
+        '    </div>' +
+        '    <div class="cfg-row">' +
+        '      <label for="' + id + '-trim-leading">Auto-detect grouped view</label>' +
+        '      <input type="checkbox" id="' + id + '-trim-leading"' +
+        (p.trimLeading ? ' checked' : '') +
+        ' onchange="updateAndConvert(\'' + id + '\')"> ' +
+        '      <span class="cfg-hint">Automatically strips the extra blank leading column that Phonology Assistant adds in grouped/minimal-pair view. Has no effect on normal view rows.</span>' +
+        '    </div>' +
+        (!p.isDefault ?
+        '    <div class="cfg-row">' +
+        '      <label></label>' +
+        '      <button class="btn btn-secondary btn-danger" onclick="deleteProfile(\'' + id + '\')">' +
+        '        Delete this tab' +
+        '      </button>' +
+        '    </div>' : '') +
+        '  </div>' +
+        '</details>' +
+
+        '<div class="io-row">' +
+        '  <div class="io-label">' +
+        '    <span>Input — paste tab-separated rows</span>' +
+        '    <div class="io-actions">' +
+        '      <button class="btn btn-ghost" onclick="clearTool(\'' + id + '\')">Clear</button>' +
+        '    </div>' +
+        '  </div>' +
+        '  <textarea id="' + id + '-in" class="tall" spellcheck="false"' +
+        '    placeholder="Paste tab-separated rows here.&#10;&#10;$1 = column 1  $2 = column 2  $3 = column 3  \u2026"' +
+        '    oninput="convertTSV(\'' + id + '\')"></textarea>' +
+        '</div>' +
+
+        '<div class="io-row">' +
+        '  <div class="io-label">' +
+        '    <span>Output — LaTeX</span>' +
+        '    <div class="io-actions">' +
+        '      <button class="btn btn-secondary" onclick="copyOutput(\'' + id + '-out\', this)">Copy Result</button>' +
+        '    </div>' +
+        '  </div>' +
+        '  <textarea id="' + id + '-out" class="out" readonly spellcheck="false"' +
+        '    placeholder="LaTeX output will appear here\u2026"></textarea>' +
+        '  <div id="' + id + '-status" class="status"></div>' +
+        '  <div id="' + id + '-errbox" style="display:none" class="errbox"></div>' +
+        '</div>';
+}
+
+function renderAll() {
+    renderTSVTabs();
+    renderTSVPanels();
+}
+
+// ── Profile actions ──────────────────────────────────────────────────────────
+
+function switchToProfile(id) {
+    activePanel = id;
+    if (activeMode !== 'latex') switchMode('latex');
+    document.querySelectorAll('.tab').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+    var panel = document.getElementById('panel-' + id);
+    if (panel) panel.classList.add('active');
+    var btn = document.querySelector('[data-profile="' + id + '"]');
+    if (btn) btn.classList.add('active');
+}
+
+function addProfile() {
+    var newP = {
+        id:   'tsv-' + Date.now(),
+        name: 'New Tab',
+        tmpl: '$1',
+        skip: 'referenced',
+        trimLeading: false
+    };
+    profiles.push(newP);
+    saveProfiles();
+    renderAll();
+    switchToProfile(newP.id);
+    setTimeout(function() {
+        var nameIn = document.querySelector('#panel-' + newP.id + ' .profile-name-input');
+        if (nameIn) { nameIn.select(); nameIn.focus(); }
+    }, 30);
+}
+
+function deleteProfile(id) {
+    var p = getProfile(id);
+    if (p && p.isDefault) {
+        alert('The Phonology Assistant and Dekereke tabs are always present.\nYou can rename them or change their templates, but not delete them.');
+        return;
+    }
+    profiles = profiles.filter(function(p) { return p.id !== id; });
+    saveProfiles();
+    if (activePanel === id) activePanel = profiles[0].id;
+    renderAll();
+    switchToProfile(activePanel);
+}
+
+function renameProfile(id, name) {
+    var p = getProfile(id);
+    if (!p) return;
+    p.name = name.trim() || 'Untitled';
+    saveProfiles();
+    var btn = document.querySelector('[data-profile="' + id + '"]');
+    if (btn) btn.textContent = p.name;
+}
+
+function updateAndConvert(id) {
+    var p = getProfile(id);
+    if (!p) return;
+    var tmplEl = document.getElementById(id + '-tmpl');
+    var skipEl = document.getElementById(id + '-skip');
+    var trimEl = document.getElementById(id + '-trim-leading');
+    if (tmplEl) p.tmpl = tmplEl.value;
+    if (skipEl) p.skip = skipEl.value;
+    if (trimEl) p.trimLeading = trimEl.checked;
+    saveProfiles();
+    convertTSV(id);
+}
+
+// ── TSV converter ─────────────────────────────────────────────────────────────
+function convertTSV(id) {
+    var raw   = document.getElementById(id + '-in').value;
+    var outEl = document.getElementById(id + '-out');
+    var errEl = document.getElementById(id + '-errbox');
+    var tmpl  = document.getElementById(id + '-tmpl').value;
+    var skip  = document.getElementById(id + '-skip').value;
+    var p     = getProfile(id);
+    var trimLeading = p ? !!p.trimLeading : false;
+
+    if (!raw.trim()) {
+        outEl.value = ''; errEl.style.display = 'none';
+        setStatus(id, '', ''); return;
+    }
+
+    // Pre-compute which 1-based column numbers are referenced in the template.
+    // Handles: $WORD→2, $GLOSS→3, $ID→6, $COLn→n
+    var usedCols = [];
+    if (skip === 'referenced') {
+        function addCol(n) { if (usedCols.indexOf(n) === -1) usedCols.push(n); }
+        if (/\$WORD\b/.test(tmpl))  addCol(2);
+        if (/\$GLOSS\b/.test(tmpl)) addCol(3);
+        if (/\$ID\b/.test(tmpl))    addCol(6);
+        var m, re = /\$COL(\d+)/g;
+        while ((m = re.exec(tmpl)) !== null) addCol(parseInt(m[1], 10));
+    }
+
+    var lines   = raw.replace(/\r\n?/g, '\n').split('\n')
+                     .filter(function(l) { return l.trim() !== ''; });
+    var results = [], errors = [];
+
+    lines.forEach(function(line, i) {
+        var fields = LingTeXCore.parseTSVRow(line);
+        var rowNum = i + 1;
+
+        if (trimLeading) {
+            if (fields.length >= 2 && fields[0] === '' && fields[1] === '') fields.shift();
+        }
+
+        if (skip === 'referenced' && usedCols.length) {
+            var empty = usedCols.filter(function(n) { return !fields[n - 1]; });
+            if (empty.length) {
+                errors.push('Row ' + rowNum + ': skipped (col ' + empty.join(', ') + ' empty)');
+                return;
+            }
+        }
+        if (skip === 'col1' && !fields[0]) {
+            errors.push('Row ' + rowNum + ': skipped (col 1 empty)');
+            return;
+        }
+
+        results.push(LingTeXCore.applyRowTemplate(tmpl, fields));
+    });
+
+    outEl.value = results.join('\n');
+
+    if (results.length === 0) {
+        setStatus(id, 'No output — ' + errors.length + ' row(s) skipped.', 'err');
+    } else {
+        setStatus(id, 'Converted ' + results.length + ' row(s)' +
+            (errors.length ? ' · ' + errors.length + ' skipped' : ''), errors.length ? '' : 'ok');
+    }
+
+    errEl.textContent   = errors.join('\n');
+    errEl.style.display = errors.length ? 'block' : 'none';
+}
+
+// Initialise profiles, settings, and render
+loadProfiles();
+renderAll();
+switchMode(activeMode);
+
+function setStatus(tool, msg, cls) {
+    var el = document.getElementById(tool + '-status');
+    el.textContent = msg;
+    el.className   = 'status' + (cls ? ' ' + cls : '');
+}
+
+// ── Network status ────────────────────────────────────────────────────────────
+function syncNetStatus() {
+    var dot   = document.getElementById('dot');
+    var label = document.getElementById('net-label');
+    if (navigator.onLine) {
+        dot.classList.remove('offline');
+        label.textContent = 'Online';
+    } else {
+        dot.classList.add('offline');
+        label.textContent = 'Offline';
+    }
+}
+window.addEventListener('online',  syncNetStatus);
+window.addEventListener('offline', syncNetStatus);
+syncNetStatus();
+
+// ── Service worker cleanup ─────────────────────────────────────────────────────
+// The SW has been removed. Register the stub sw.js so existing users get
+// their caches cleared and the SW unregistered automatically.
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('../sw.js', { updateViaCache: 'none' });
+}
+</script>
+</body>
+</html>
