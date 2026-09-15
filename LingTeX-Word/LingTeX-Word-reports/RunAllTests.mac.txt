@@ -60,7 +60,7 @@ Line breaks (CR LF and CR input parse as LF input does)
   PASS  TSV example, CR LF: example 1 is the same
   PASS  TSV example, CR: as many examples
   PASS  TSV example, CR: example 1 is the same
-  FAIL  two FLEx examples: the CR LF input has 5 CR LF pairs and no lone LF
+  PASS  two FLEx examples: the CR LF input has 6 CR LF pairs and no lone LF
   PASS  two FLEx examples: CR LF normalises to the LF text, no break doubled
   PASS  two FLEx examples: routed the same with CR LF
   PASS  two FLEx examples: TextLines gives the same lines with CR LF
@@ -135,5 +135,5 @@ Wrap planner
   PASS  NoBreakFlags never flags the first column
   PASS  NoBreakFlags flags the enclitic columns of example 2
 
-FAILURES -- 115 passed, 1 FAILED
+ALL PASS -- 116 passed
 
