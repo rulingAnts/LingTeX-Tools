@@ -1,3 +1,3 @@
-LingTeXDevPing  2026-09-15 18:55:30
+LingTeXDevPing  2026-09-15 19:04:53
   presentation  /Users/Seth/Documents/LingTeX-PowerPoint-Dev.pptm
   reports       /Users/Seth/Library/Containers/com.microsoft.Powerpoint/Data/Documents/LingTeX-PowerPoint-reports

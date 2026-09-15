@@ -1,14 +1,16 @@
-ImportLingTeXModules  2026-09-15 18:55:28
+ImportLingTeXModules  2026-09-15 19:04:49
   from  /Users/Seth/Library/Containers/com.microsoft.Powerpoint/Data/Documents/LingTeX-PowerPoint-src
   into  /Users/Seth/Documents/LingTeX-PowerPoint-Dev.pptm
   ok       modProbe.bas  modProbe, 784 lines
-  ok       modStartupProbe.bas  modStartupProbe, 188 lines
-  ok       modStartupAutoOpen.bas  modStartupAutoOpen, 38 lines
+  ok       modProbeEvents.bas  modProbeEvents, 192 lines
+  ok       clsProbeEvents.cls  clsProbeEvents, 121 lines, class
 
 components now:
   modLingTeXDev  (443 lines, type 1)
-  modProbe  (784 lines, type 1)
   modStartupProbe  (188 lines, type 1)
   modStartupAutoOpen  (38 lines, type 1)
+  modProbe  (784 lines, type 1)
+  modProbeEvents  (192 lines, type 1)
+  clsProbeEvents  (121 lines, type 2)
 
 ALL IMPORTED -- 3 module(s)

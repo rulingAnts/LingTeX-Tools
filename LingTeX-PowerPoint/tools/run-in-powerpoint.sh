@@ -56,6 +56,8 @@ startup_probe="$HOME/Library/Group Containers/UBF8T346G9.Office/User Content.loc
 # shared with Word will be listed here as ../LingTeX-Word/src/<name>.bas.
 MODULES="
 tools/probe/modProbe.bas
+tools/probe/modProbeEvents.bas
+tools/probe/clsProbeEvents.cls
 "
 
 import=1; commit=0; pres=""; macros=""; want=""
