@@ -174,7 +174,7 @@ The renderers then:
 ```
 Morphemes→zel→vimo→→→rixu→→→=xo→xu→=zevi→Ozivela→ze→:→zel→vimo→→→rixu→→→=xo→Vo→vu→=ve→levo→→→=zi→zo→z→zuvo→=ve→=zi
 →Lex. Gloss→yam→→pick→.CMP→→stack→.CMP→SEQ→3SG→all→P.N.→ACMP→→yam→→pick→.CMP→→stack→.CMP→SEQ→P.N.→fox→ERG→→follow→.CMP→REL→FOC→1SG→dream→ABL→REL
-Free Eng (When) she picked her yams (early)--that is, all of them--her with Uvozi, when they picked the yams and then Voxi was followed by a fox is what I'm talking about.
+Free Eng (When) she picked her yams (early)--that is, all of them--her with Xelvio, when they picked the yams and then Voxi was followed by a fox is what I'm dreaming about.
 ```
 
 **Expected TSV output:**
