@@ -98,6 +98,18 @@ LingTeX-Word/*.docm
 LingTeX-Word/LingTeX.dotm
 LingTeX-Word/LingTeX~*.dotm
 
+# Compiled Office macro artifacts are NEVER tracked: they are build output,
+# they cannot be reviewed in a diff, and their VBA carried language data into
+# public releases. The sources in src/, the build scripts in tools/ and the
+# documented procedure are what the repo keeps; the built template ships as a
+# release asset.
+*.dotm
+*.docm
+*.pptm
+*.potm
+*.ppam
+*.xlsm
+
 # Python bytecode from tools/vba-lint.py
 __pycache__/
 *.pyc
