@@ -57,7 +57,7 @@ WordGloss DEF fox follow.PST P.N.
 
 **Input:**
 ```
-Morphemes zomu -xa -vu
+Morphemes zomu -xa -vi
 LexGloss go DIST NFUT
 ```
 
@@ -109,7 +109,7 @@ LexGloss bark INCMP =SIM CMP
 **Input:**
 ```
 Word zomu-xa-vi
-Morphemes zomu -xa -vu
+Morphemes zomu -xa -vi
 LexGloss go DIST NFUT
 ```
 
