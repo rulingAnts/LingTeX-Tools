@@ -3101,7 +3101,7 @@ Private Function ThreeTierExample() As IgtExample
     SetCell ex, 1, 0, "fox=ERG"
     SetCell ex, 1, 1, "follow.CMP=REL"
     SetCell ex, 1, 2, "dream"
-    AddFreeLine ex, "A fox followed her, is what I am talking about."
+    AddFreeLine ex, "A fox followed her, is what I am dreaming about."
     ThreeTierExample = ex
 End Function
 

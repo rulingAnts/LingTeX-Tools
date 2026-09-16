@@ -239,7 +239,7 @@ the cursor in the example and run `LingTeXRewrapCurrent`.
 
 1. Run `LingTeXAlignByMorpheme`, then insert the sample again into a fresh
    paragraph → one column per morpheme, 22 of them against 15.
-2. **The invariant**: no wrap group may begin with `=xo`, `=vexu`, `=ve` or
+2. **The invariant**: no wrap group may begin with `=xo`, `=zevi`, `=ve` or
    `=zi`, and every enclitic column carries the `=` on *both* the form row and
    the gloss row. Read along the left edge of each group.
 3. `LingTeXAlignByWord`, and insert once more for the split and merge checks.
