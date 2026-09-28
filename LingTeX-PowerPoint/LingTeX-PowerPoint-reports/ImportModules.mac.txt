@@ -1,13 +1,13 @@
-LingTeXDevImport  2026-09-28 22:49:38
+LingTeXDevImport  2026-09-29 08:40:50
   from  /Users/Seth/Library/Containers/com.microsoft.Powerpoint/Data/Documents/LingTeX-PowerPoint-src
   into  /Users/Seth/Documents/LingTeX-PowerPoint-Dev.pptm
   AddFromString takes LF as one line break here
   here vbCrLf is [10+13], vbNewLine is [10], vbLf is [10]
   skipped  modLingTeXDevCore.bas (the importer never replaces itself)
-  ok       modFlexParse.bas  modFlexParse, 1144 lines
-  ok       modIgtModel.bas  modIgtModel, 1122 lines
+  ok       modFlexParse.bas  modFlexParse, 1315 lines
+  ok       modIgtModel.bas  modIgtModel, 1194 lines
   ok       clsIgtWarning.cls  clsIgtWarning, 36 lines, class
-  ok       modLeipzig.bas  modLeipzig, 349 lines
+  ok       modLeipzig.bas  modLeipzig, 390 lines
   ok       modWrap.bas  modWrap, 201 lines
   ok       modPptClipboard.bas  modPptClipboard, 75 lines
   ok       modPptFormat.bas  modPptFormat, 120 lines
@@ -15,7 +15,7 @@ LingTeXDevImport  2026-09-28 22:49:38
   ok       modPptCompose.bas  modPptCompose, 191 lines
   ok       modPptInsert.bas  modPptInsert, 162 lines
   ok       modPptRewrap.bas  modPptRewrap, 250 lines
-  ok       modPptTests.bas  modPptTests, 494 lines
+  ok       modPptTests.bas  modPptTests, 497 lines
   ok       modProbe.bas  modProbe, 784 lines
   ok       modProbeEvents.bas  modProbeEvents, 313 lines
   ok       clsProbeEvents.cls  clsProbeEvents, 73 lines, class
@@ -27,10 +27,10 @@ LingTeXDevImport  2026-09-28 22:49:38
 components now:
   modLingTeXDev  (443 lines, type 1)
   modLingTeXDevCore  (433 lines, type 1)
-  modFlexParse  (1144 lines, type 1)
-  modIgtModel  (1122 lines, type 1)
+  modFlexParse  (1315 lines, type 1)
+  modIgtModel  (1194 lines, type 1)
   clsIgtWarning  (36 lines, type 2)
-  modLeipzig  (349 lines, type 1)
+  modLeipzig  (390 lines, type 1)
   modWrap  (201 lines, type 1)
   modPptClipboard  (75 lines, type 1)
   modPptFormat  (120 lines, type 1)
@@ -38,7 +38,7 @@ components now:
   modPptCompose  (191 lines, type 1)
   modPptInsert  (162 lines, type 1)
   modPptRewrap  (250 lines, type 1)
-  modPptTests  (494 lines, type 1)
+  modPptTests  (497 lines, type 1)
   modProbe  (784 lines, type 1)
   modProbeEvents  (313 lines, type 1)
   clsProbeEvents  (73 lines, type 2)

@@ -490,6 +490,9 @@ Public Function Fixture(ByVal sep As String) As String
          "P.N." & T & "fox" & T & "ERG" & T & T & "follow" & _
          T & ".CMP" & T & "REL" & T & "FOC" & T & "1SG" & _
          T & "dream" & T & "ABL" & T & "REL"
-    r3 = "Free Eng (When) she picked her yams early."
+    ' As FLEx copies a free line shown in one language: direction marks and
+    ' no code (a code appears only when a further language follows; a word
+    ' is never taken for one by its shape -- PROMPT.md rule 10, 2026-09-29).
+    r3 = ChrW(&H200E) & "Free " & ChrW(&H200E) & ChrW(&H200E) & "(When) she picked her yams early."
     Fixture = r1 & sep & r2 & sep & r3 & sep
 End Function
