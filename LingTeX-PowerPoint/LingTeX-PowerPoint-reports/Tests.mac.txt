@@ -1,0 +1,117 @@
+PptTestsRun  2026-09-28 20:34:08
+
+== 1. The shared modules
+  PASS  NormalizeLineBreaks maps CR LF to LF
+  PASS  NormalizeLineBreaks maps CR to LF
+  PASS  NewExample(2, 3)
+  PASS  LooksLikeFlex(fixture)
+  PASS  LooksLikeFlex(plain prose) is False
+  PASS  CheckExample returns a Collection  (warnings: 0)
+  PASS  ComputeWrapLines plans wrap lines  (lines: 2)
+
+== 2. The fixture road (Insert, up to drawing)
+  PASS  ParseFlexBlocks: one block
+  PASS    the block has 2 tiers
+  PASS    and 1 free line
+  PASS  ModelsFromText, word-aligned: one model
+  PASS    tiers
+  PASS    tier 0 is Morphemes
+  PASS    tier 1 is Gloss
+  PASS    15 word-aligned columns (reference.js)
+  PASS    free lines
+  PASS    the free translation
+  PASS    first form cell
+  PASS    first gloss cell
+  PASS  ModelsFromText, morpheme-aligned: one model
+  PASS    22 morpheme-aligned columns (reference.js)
+
+== 3. Line breaks (each: the fixture joined by that sequence)
+  PASS  LF
+  PASS  CR LF (FLEx on Windows)
+  PASS  CR (PowerPoint paragraphs)
+  PASS  CR CR, doubled
+  PASS  LF CR, Mac VBA's vbCrLf
+  PASS  VT between rows, Shift+Return
+  PASS  two examples, blank line, LF
+  PASS  two examples, blank line, CR LF
+  PASS  two examples, doubled: CR CR rows, CR CR CR CR between
+  PASS  two examples, LF CR rows, LF CR LF CR between
+  PASS  not FLEx: a blank line survives NormalizeClipboardText
+  PASS  not FLEx: a vertical tab is left alone
+  PASS  NormalizeClipboardText is idempotent
+  PASS  LineBreakRunProfile on the doubled two-example text
+
+== 4. The clipboard (what run-in-powerpoint.sh put there)
+  PASS  ReadClipboardText returned text
+  arrived: 305 characters; tabs 67, CR 5, LF 0, VT 0; runs 1x1,2x2
+  Morphemes\tzel\tvimo\t\t\trixu\t\t\t=xo\txu\t=zevi\tOzivela\tze\t_\tzel\tvimo\t\t\trixu\t\t\t=xo\tVo\tvu\t=ve\tlevo\t\t\t=zi\tzo\tz\tzuvo\t=ve\t=zi\r\r\tLex. Gl
+  normalised: tabs 67, CR 0, LF 5, VT 0; runs 1x1,2x2
+  PASS    LooksLikeFlex
+  FAIL  the clipboard parses as one example  blocks: 2, want 1  (runs 1x1,2x2 -> 1x1,2x2)
+  PASS    15 word-aligned columns
+
+== 5. Measuring (a scratch presentation with no window)
+  PASS  a form measures to a positive width  (88.4 pt; the probe measured 88.4)
+  PASS    within 80..100 pt of the probe's number
+  PASS    measured again: the cache gives the same width
+  PASS    italic measures (a different key)  (90.6 pt)
+  PASS    empty text measures 0
+  PASS    small capitals (gloss tier) are narrower than full capitals (form tier)  (31.9 < 40.1)
+  PASS    DisplayCellText lowercases the grammatical part only
+  PASS    ...and leaves a form tier alone
+  PASS    initial cap: 3SG -> 3Sg
+  PASS  MeasureExample fills tiers x columns
+  PASS    the first form cell has a width  (22.1 pt for 'zel')
+  PASS    the first gloss cell has a width  (34.4 pt for 'yam')
+  PASS    the shared planner wraps the measured fixture at 400 pt  (4 wrap line(s) for 15 columns)
+
+== 6. Composing (the fixture drawn into a scratch box)
+  PASS  a plan at 400 pt wraps the 15 columns onto more than one line  (4 lines; 4 columns on the first)
+  PASS  no line exceeds 33 columns
+  PASS  paragraphs = wrap lines x 2 tiers + 1 free line
+  PASS  the first paragraph begins with the number and a tab
+  PASS    its indent is the hang
+  PASS    its first line hangs back by the same
+  PASS    its tab stops: one at the hang, then one per column after the first
+  PASS  the gloss paragraph of line 1 has one stop per column after the first
+  PASS    and the continuation indent on line 2
+  PASS  the forms paragraph is italic
+  PASS  the gloss paragraph is not italic
+  PASS  the first gloss cell 'yam' is not small capitals
+  PASS  a grammatical gloss (SEQ) appears lowercased
+  PASS    and is set in small capitals
+  PASS  the last paragraph is the free translation in single quotes
+  PASS    not italic
+  box after autosize: 400 x 225 pt
+
+== 7. Insert (onto a slide of a scratch presentation)
+  PASS  one example from one copy
+  PASS    one shape pasted
+  PASS    it is tagged as ours
+  PASS    its number tag
+  PASS    its TSV tag is the model
+  PASS    its text begins with the number
+  PASS    it sits where asked  (40,40)
+  PASS    its width is the wrap width  (400)
+  PASS    more than one wrap line drawn  (11 paragraphs)
+  PASS  the user's clipboard is what it was
+  PASS  two examples from one copy
+  PASS    numbered (2a)
+  PASS    and (2b)
+  PASS    the second sits below the first
+  PASS  text that is not an example inserts nothing
+
+== 8. Read-back and re-wrap
+  PASS  ReadBackExample reads the box
+  PASS    the number
+  PASS    the model, with capitals restored (ModelToTsv equal)
+  PASS  re-wrap at the same width changes nothing (0 = nothing written)
+  PASS  narrowed to 250 pt: re-wrap writes (1)
+  PASS    and more paragraphs than at 400  (11 -> 17)
+  PASS    the box kept its width  (250)
+  PASS    it still reads back as the same model
+  PASS  widened to 600 pt: re-wrap writes (1)
+  PASS    and fewer paragraphs than at 250  (17 -> 7)
+  PASS    re-wrap again: nothing written
+
+FAILURES -- 93 passed, 1 failed

@@ -39,11 +39,16 @@
 #         LingTeX-PowerPoint-src/       the modules, and modules.txt naming them
 #         LingTeX-PowerPoint-reports/   the reports, copied back into the clone
 #
-# A dialog -- a compile error, a run-time error, the macro prompt -- blocks
+# A dialog -- the macro prompt, a run-time error, a compile error -- blocks
 # "run VB macro". While each macro runs, this reads PowerPoint's windows
-# through System Events and prints and dismisses any dialog, as run-in-word.sh
-# does. That needs Accessibility permission for the terminal this runs in
-# (System Settings > Privacy & Security > Accessibility).
+# through System Events and prints and dismisses what it can see, as
+# run-in-word.sh does; that needs Accessibility permission for Claude Code.
+# LIMIT (macOS 27, measured 2026-09-28): the VBA editor's own windows -- its
+# code window, its compile and run-time error dialogs, its break mode -- are
+# not exposed to accessibility at all ("name of every window" lists only the
+# presentation). So a name that no module defines is caught BEFORE the import
+# by tools/check-names.py, and PowerPoint refusing a macro with -18 means a
+# compile error that only the editor shows.
 #
 # POSIX sh; osascript drives PowerPoint.
 
@@ -161,6 +166,10 @@ case "$macros" in
         echo "== the clipboard now holds the made-up FLEx copy, ${LINGTEX_CLIP_EOL:-crlf} line breaks" ;;
 esac
 
+# Every name the modules call must resolve before anything is imported: a
+# compile error inside PowerPoint is invisible to this script (header).
+python3 "$here/check-names.py" || { echo "run-in-powerpoint: fix the names above before importing" >&2; exit 2; }
+
 #-- Dialogs ------------------------------------------------------------------
 catch_dialog() {
     osascript 2>/dev/null <<'AS'
@@ -194,16 +203,6 @@ return ""
 AS
 }
 
-vbe_in_break() {
-    osascript -e 'tell application "System Events" to tell process "Microsoft PowerPoint" to get name of every window' 2>/dev/null \
-        | grep -q "Visual Basic.*\[break\]"
-}
-
-if vbe_in_break; then
-    echo "   PowerPoint's VBA editor is in break mode from an earlier error, so no macro"
-    echo "   can run. In the editor: OK on any dialog, then Run > Reset. Then run this again."
-    exit 1
-fi
 
 # Run one macro in the background, reading and dismissing dialogs meanwhile.
 # $2: the name as PowerPoint should be given it.
@@ -240,13 +239,16 @@ AS
         fi
     done
     rc=0; wait "$pid" || rc=$?
-    if [ -s "$root/build/.osascript" ]; then sed 's/^/   /' "$root/build/.osascript"; fi
+    oserr=$(cat "$root/build/.osascript" 2>/dev/null) || oserr=""
+    [ -n "$oserr" ] && printf '%s\n' "$oserr" | sed 's/^/   /'
     rm -f "$root/build/.osascript"
-    if vbe_in_break; then
-        echo "   PowerPoint's VBA editor is in BREAK mode after $label: read the dialog and"
-        echo "   the highlighted line there, click OK, then Run > Reset. Nothing after it ran."
-        exit 1
-    fi
+    case "$oserr" in
+        *"(-18)"*)
+            echo "   PowerPoint refused to run $label (-18): a compile error in the imported"
+            echo "   modules. The editor shows the line; this script cannot read it (header)."
+            echo "   Click OK there. Nothing after $label ran."
+            exit 1 ;;
+    esac
     case "$caught" in
         *"Compile error"*|*"Run-time error"*)
             echo "   $label stopped on the dialog above. Nothing after it ran."; exit 1 ;;

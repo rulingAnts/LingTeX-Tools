@@ -128,7 +128,7 @@ End Sub
 ' 3. Line breaks, through NormalizeClipboardText
 '-----------------------------------------------------------------------------
 Private Sub SectionLineBreaks()
-    Dim CR As String, LF As String, VT As String, plain As String, once As String
+    Dim CR As String, LF As String, VT As String, plain As String, once As String, pasted As String
     CR = Chr$(13): LF = Chr$(10): VT = Chr$(11)
     Note ""
     Note "== 3. Line breaks (each: the fixture joined by that sequence)"
@@ -144,6 +144,14 @@ Private Sub SectionLineBreaks()
              Fixture(CR & CR) & CR & CR & Fixture(CR & CR), 2
     RoadCase "two examples, LF CR rows, LF CR LF CR between", _
              Fixture(LF & CR) & LF & CR & Fixture(LF & CR), 2
+    ' What the paste reports for a CR LF copy that ends in a break (section 4 measures it):
+    ' the internal breaks doubled, the trailing one single, because the scratch box's last
+    ' paragraph has no terminator. A run at either end of the payload is a terminator, not
+    ' structure, and must not veto the collapse (the first live run failed here, 2026-09-28).
+    pasted = Fixture(CR & CR): pasted = Left$(pasted, Len(pasted) - 1)
+    RoadCase "one example, CR CR rows, trailing CR (what the paste reports)", pasted, 1
+    RoadCase "two examples, doubled, trailing CR", Fixture(CR & CR) & CR & CR & pasted, 2
+    Eq "LineBreakRunProfile of that", LineBreakRunProfile(Fixture(CR & CR) & CR & CR & pasted), "1x1,2x4,4x1"
     ' The guard: text that is not FLEx keeps its blank line even when every run is even.
     plain = "a" & Chr$(9) & "b" & LF & LF & "c" & Chr$(9) & "d"
     Eq "not FLEx: a blank line survives NormalizeClipboardText", CountLF(NormalizeClipboardText(plain)), 2
@@ -160,11 +168,11 @@ End Sub
 ' 4. The live clipboard
 '-----------------------------------------------------------------------------
 Private Sub SectionClipboard()
-    Dim raw As String, note As String, s As String, n As Long, models() As IgtExample
+    Dim raw As String, clipNote As String, s As String, n As Long, models() As IgtExample
     Note ""
     Note "== 4. The clipboard (what run-in-powerpoint.sh put there)"
-    raw = ReadClipboardText(note)
-    If note <> "" Then Note "  " & note
+    raw = ReadClipboardText(clipNote)
+    If clipNote <> "" Then Note "  " & clipNote
     Ok "ReadClipboardText returned text", raw <> ""
     If raw = "" Then Exit Sub
     Note "  arrived: " & Len(raw) & " characters; " & BreakCounts(raw) & "; runs " & LineBreakRunProfile(raw)
