@@ -147,7 +147,7 @@ examples are tables to Word but not to the user.
 
 | Command | What it does |
 |---|---|
-| **Insert Interlinear** | With nothing selected, reads the clipboard; with text selected, replaces it. Accepts FLEx interlinear text (tab-separated, with tier labels) or plain tab-separated rows. A copy of several examples, as FLEx's Print View gives for several selected lines, inserts every one of them, one under another, each with the next number. The copy's line breaks are normalised first -- CR LF from Windows, breaks doubled on the way between applications, Shift+Return rows -- so a FLEx copy reads as the lines it was, and a blank line between two examples still separates them. |
+| **Insert Interlinear** | With nothing selected, reads the clipboard; with text selected, replaces it. Accepts FLEx interlinear text (tab-separated, with tier labels) or plain tab-separated rows. A copy of several examples, as FLEx's Print View gives for several selected lines, inserts every one of them, one under another, as one numbered group with a letter each (`(3)` and `a.`, then `b.`, `c.`...). A copied Word line gives the columns; every line type copied keeps its row, in FLEx's order. The copy's line breaks are normalised first -- CR LF from Windows, breaks doubled on the way between applications, Shift+Return rows -- so a FLEx copy reads as the lines it was, and a blank line between two examples still separates them. |
 | **Convert Table** | Adopts an ordinary Word table as an auto-wrapping example. |
 | **Text to Interlinear** | Select lines you typed, the words on one line and their glosses on the next with the translation under them, and they become an example. Blank lines are ignored, a leading `(1)` is dropped, and you are asked how many of the last lines are translations. Aligned by word or by morpheme as the document is set. Insert Interlinear takes the same road when its selection is plain lines. |
 | **Re-wrap This** / **Re-wrap All** | Recompute the wrap. Also runs on save. A space typed into an interlinear cell becomes the document's replacement character (`.` or `_`), as on insert; a space would let Word wrap the text inside the cell. |
@@ -633,11 +633,11 @@ edited by us. Still to prove: that a UserForm whose controls are built in code
 opens and lays out on Mac Word. The doc tests prove it headless — New builds
 the controls, LoadFrom and ApplyNow round-trip — but not the pixels.
 
-**Later — several examples in one paste.** A FLEx text copied whole arrives as
-several interlinear blocks and the parser already returns all of them
-(`ModelsFromText`); `LingTeXInsertInterlinear` takes the first. The finishing
-step is to draw them all, one after another with a paragraph between, in one
-undo record.
+**Done — several examples in one paste** (2026-09-29). `ModelsFromText` returns
+every block and `LingTeXInsertInterlinear` draws them all, measured before the
+undo record opens so one Undo takes them all back, as one numbered group with
+a letter each (level 2 of the example-number list style, in a second number
+cell). A copied Word line gives the columns; every line type keeps its row.
 
 **Later — re-wrap on edit.** Word has no "content changed" event, so this is
 built on the selection-change hook that already exists (`clsAppEvents`,
