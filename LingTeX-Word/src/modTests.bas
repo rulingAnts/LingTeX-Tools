@@ -540,6 +540,14 @@ Private Sub TestLineBreaks()
     CheckClipboardVariant "two examples, doubled CR CR", doubled, 2
     CheckClipboardVariant "two examples, LF CR", Replace(lf, Chr$(10), Chr$(10) & Chr$(13)), 2
 
+    ' What PowerPoint's paste reports for a CR LF copy that ends in a break: the
+    ' internal breaks doubled, the trailing one single (the box's last paragraph
+    ' has no terminator). A run at either end of the payload is a terminator,
+    ' not structure, so it must not veto the collapse (2026-09-28).
+    CheckClipboardVariant "one example, doubled CR CR, trailing CR", _
+                          Replace(Vector1Raw(), Chr$(10), Chr$(13) & Chr$(13)) & Chr$(13), 1
+    CheckClipboardVariant "two examples, doubled CR CR, trailing CR", doubled & Chr$(13), 2
+
     ' Five runs of two break characters, one run of four: the blank line between
     ' the examples. Counted in characters, so a CR LF payload reads as 2x too.
     Eq "the run profile of the doubled two-example text", _

@@ -191,20 +191,33 @@ End Function
 
 ' The factor every run of line breaks is a multiple of, when that factor is at
 ' least 2 and every run is an exact multiple of the shortest one; else 0.
+' A run at the very start or end of the payload is a terminator, not
+' structure, and is left out of the test: PowerPoint reports a pasted trailing
+' CR LF as ONE CR after the doubled internal breaks, because the box's last
+' paragraph has no terminator (measured 2026-09-28, section 4 of the
+' PowerPoint tests). The collapse still divides such a run, to nothing.
 Public Function DoublingFactor(ByVal s As String) As Long
     Dim runs() As Long, n As Long
-    Dim i As Long, m As Long
+    Dim i As Long, m As Long, first As Long, last As Long
+    Dim t As String
 
     runs = BreakRunLengths(s, n)
     If n = 0 Then Exit Function
 
-    m = runs(0)
-    For i = 1 To n - 1
+    t = VerticalTabsToLineBreaks(s)
+    first = 0
+    last = n - 1
+    If IsBreakChar(Left$(t, 1)) Then first = 1
+    If IsBreakChar(Right$(t, 1)) Then last = last - 1
+    If last < first Then Exit Function
+
+    m = runs(first)
+    For i = first + 1 To last
         If runs(i) < m Then m = runs(i)
     Next i
     If m < 2 Then Exit Function
 
-    For i = 0 To n - 1
+    For i = first To last
         If runs(i) Mod m <> 0 Then Exit Function
     Next i
     DoublingFactor = m
