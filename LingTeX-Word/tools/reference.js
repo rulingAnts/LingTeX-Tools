@@ -356,9 +356,18 @@ function lineBreakRunProfile(raw) {
         .map(function (len) { return len + 'x' + counts[len]; }).join(',');
 }
 
-/** The factor every run is a multiple of, when it is at least 2; else 0. */
+/** The factor every run is a multiple of, when it is at least 2; else 0.
+ *  A run at the very start or end of the payload is a terminator, not
+ *  structure, and is left out of the test: PowerPoint reports a pasted
+ *  trailing CR LF as ONE CR after the doubled internal breaks, because the
+ *  box's last paragraph has no terminator (measured 2026-09-28). The
+ *  collapse still divides such a run, to nothing. */
 function doublingFactor(raw) {
-    var runs = breakRunLengths(raw);
+    var t = verticalTabsToLineBreaks(raw);
+    var runs = breakRunLengths(t);
+    if (!runs.length) return 0;
+    if (/^[\r\n]/.test(t)) runs.shift();
+    if (/[\r\n]$/.test(t) && runs.length) runs.pop();
     if (!runs.length) return 0;
     var m = Math.min.apply(null, runs);
     if (m < 2) return 0;
@@ -374,7 +383,7 @@ function collapseDoubledLineBreaks(raw) {
     var f = doublingFactor(t);
     if (f < 2) return normalizeLineBreaks(t);
     return t.replace(/[\r\n]+/g, function (run) {
-        return new Array(run.length / f + 1).join('\n');
+        return new Array(Math.floor(run.length / f) + 1).join('\n');   // as VBA's \ does
     });
 }
 

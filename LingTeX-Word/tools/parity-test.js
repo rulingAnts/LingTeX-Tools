@@ -243,6 +243,17 @@ section('Clipboard and selection normalising');
     check('two examples, doubled CR CR', withBreaks(two, '\r\r'), 2);
     check('two examples, LF CR', withBreaks(two, '\n\r'), 2);
 
+    // What PowerPoint's paste reports for a CR LF copy that ends in a break: the
+    // internal breaks doubled, the trailing one single, because the box's last
+    // paragraph has no terminator (measured 2026-09-28, its section 4). A run at
+    // either end of the payload is a terminator, not structure, and must not
+    // veto the collapse.
+    var pasted = withBreaks(lf, '\r\r').replace(/\r\r$/, '\r');
+    check('one example, doubled CR CR, trailing CR', pasted, 1);
+    check('two examples, doubled CR CR, trailing CR', withBreaks(lf, '\r\r') + '\r\r' + pasted, 2);
+    eq('run profile of that two-example text',
+        R.lineBreakRunProfile(withBreaks(lf, '\r\r') + '\r\r' + pasted), '1x1,2x4,4x1');
+
     // The number PowerPoint's rig asserts, on the same fixture.
     eq('run profile of the doubled two-example text',
         R.lineBreakRunProfile(withBreaks(two, '\r\r')), '2x5,4x1');

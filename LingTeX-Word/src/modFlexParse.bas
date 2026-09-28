@@ -191,20 +191,33 @@ End Function
 
 ' The factor every run of line breaks is a multiple of, when that factor is at
 ' least 2 and every run is an exact multiple of the shortest one; else 0.
+' A run at the very start or end of the payload is a terminator, not
+' structure, and is left out of the test: PowerPoint reports a pasted trailing
+' CR LF as ONE CR after the doubled internal breaks, because the box's last
+' paragraph has no terminator (measured 2026-09-28, section 4 of the
+' PowerPoint tests). The collapse still divides such a run, to nothing.
 Public Function DoublingFactor(ByVal s As String) As Long
     Dim runs() As Long, n As Long
-    Dim i As Long, m As Long
+    Dim i As Long, m As Long, first As Long, last As Long
+    Dim t As String
 
     runs = BreakRunLengths(s, n)
     If n = 0 Then Exit Function
 
-    m = runs(0)
-    For i = 1 To n - 1
+    t = VerticalTabsToLineBreaks(s)
+    first = 0
+    last = n - 1
+    If IsBreakChar(Left$(t, 1)) Then first = 1
+    If IsBreakChar(Right$(t, 1)) Then last = last - 1
+    If last < first Then Exit Function
+
+    m = runs(first)
+    For i = first + 1 To last
         If runs(i) < m Then m = runs(i)
     Next i
     If m < 2 Then Exit Function
 
-    For i = 0 To n - 1
+    For i = first To last
         If runs(i) Mod m <> 0 Then Exit Function
     Next i
     DoublingFactor = m
@@ -460,6 +473,51 @@ Public Function IsGramGloss(ByVal seg As String) As Boolean
         If Not ((ch >= "A" And ch <= "Z") Or (ch >= "0" And ch <= "9")) Then Exit Function
     Next i
     IsGramGloss = True
+End Function
+
+'-----------------------------------------------------------------------------
+' In modFlexParse rather than modRender because LingTeX-PowerPoint shares
+' this module and this function (2026-09-28); it touches no Word objects.
+'
+' Split a gloss cell into segments, keeping the delimiters as segments of their
+' own so they can be reassembled unchanged.
+'
+' Splits on the morpheme boundaries AND on Leipzig rule 4's "." and ":" and on
+' ";", because "follow.CMP" is one morpheme whose gloss has a lexical part and a
+' grammatical part, and only the grammatical part takes small caps.
+'
+' Port of the segmentation inside docs\core.js wrapGlosses.
+' Returns the number of segments; parts is filled by reference.
+'-----------------------------------------------------------------------------
+Public Function SplitGlossSegments(ByVal text As String, _
+        ByRef parts() As String) As Long
+
+    Dim i As Long, n As Long, ch As String, cur As String
+
+    ReDim parts(0 To Len(text) * 2 + 1)
+    n = 0
+    cur = ""
+
+    For i = 1 To Len(text)
+        ch = Mid$(text, i, 1)
+        If IsBoundary(ch) Or ch = "." Or ch = ":" Or ch = ";" Then
+            If cur <> "" Then
+                parts(n) = cur
+                n = n + 1
+                cur = ""
+            End If
+            parts(n) = ch
+            n = n + 1
+        Else
+            cur = cur & ch
+        End If
+    Next i
+    If cur <> "" Then
+        parts(n) = cur
+        n = n + 1
+    End If
+
+    SplitGlossSegments = n
 End Function
 
 
