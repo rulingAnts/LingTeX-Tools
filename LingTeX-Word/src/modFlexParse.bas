@@ -29,6 +29,11 @@ Option Explicit
 ' with ChrW() at run time.  VBA's Const cannot hold a ChrW() call (it is a
 ' function, not a literal), which is why these are Property Get / Function
 ' rather than Const.  Do not "tidy" them into Const.
+'
+' Line breaks are character codes too -- Chr$(13) and Chr$(10), through
+' LINE_CR, LINE_LF, LINE_CRLF and NormalizeLineBreaks -- and never vbCrLf or
+' vbNewLine, which are not what their names say on every host.  See LINE
+' BREAKS below.
 ' ---------------------------------------------------------------------------
 '=============================================================================
 
@@ -107,6 +112,219 @@ End Property
 Public Property Get RightSingleQuote() As String
     RightSingleQuote = ChrW(&H2019)
 End Property
+
+
+'=============================================================================
+' -- LINE BREAKS -------------------------------------------------------------
+'=============================================================================
+
+' Line breaks are found, split and normalised with these, never with vbCrLf or
+' vbNewLine.  In the VBA of Word and of PowerPoint for Mac 16.112, vbCrLf is LF
+' then CR -- the reverse of a real CR LF -- and vbNewLine is LF alone (measured
+' 2026-09-15; RunAllTests records them on every host it runs on).  So
+' Replace(s, vbCrLf, vbLf) matched no CR LF, and the vbCr pass after it turned
+' each one into two line breaks: a blank line after every tier row, which
+' ParseFlexBlocks reads as the end of an example.  Word hands these modules
+' text from a document, where a paragraph ends in CR, so it never met the bug;
+' LingTeX-PowerPoint, which shares them, would have.  Property Get, not Const,
+' for the reason in the header: a Const cannot hold Chr$().
+Public Property Get LINE_CR() As String
+    LINE_CR = Chr$(13)
+End Property
+
+Public Property Get LINE_LF() As String
+    LINE_LF = Chr$(10)
+End Property
+
+Public Property Get LINE_CRLF() As String
+    LINE_CRLF = Chr$(13) & Chr$(10)
+End Property
+
+' Every line break as LF: CR LF (Windows text), CR (a Word paragraph mark) and
+' LF.  CR LF goes first, or each one would become two.
+Public Function NormalizeLineBreaks(ByVal s As String) As String
+    NormalizeLineBreaks = Replace(Replace(s, LINE_CRLF, LINE_LF), LINE_CR, LINE_LF)
+End Function
+
+' Chr$(11), the manual line break Shift+Return leaves, as a line break.
+' In a Word DOCUMENT that character means "the same line", which is why
+' CleanTextLine turns it into a space -- right for prose, wrong for a FLEx tier
+' row.  The same byte, opposite meanings, decided by where the text came from:
+' hence this conversion belongs at the boundary and not in the parser.
+Public Function VerticalTabsToLineBreaks(ByVal s As String) As String
+    VerticalTabsToLineBreaks = Replace(s, Chr$(11), LINE_LF)
+End Function
+
+'-----------------------------------------------------------------------------
+' A UNIFORMLY DOUBLED PASTE, HALVED.
+'
+' PowerPoint for Mac's TextRange2.Paste turns each CR LF into CR CR, so a
+' Windows FLEx copy arrives with every line break doubled; text built with
+' vbCrLf on the Mac is LF CR and looks the same.  Doubled, the blank line that
+' ParseFlexBlocks reads as the end of an example appears after EVERY tier row,
+' and one example becomes one block per row.
+'
+' Runs are measured in BREAK CHARACTERS, before CR LF is paired into one break.
+' It has to be that way round: two adjacent LF CR breaks spell LF CR LF CR,
+' whose inner CR LF the pairing rule merges, so a blank line between two
+' examples measured three breaks instead of four and that one odd run disproved
+' the doubling for the entire payload (found by the parity vectors, 2026-09-28).
+' Counting characters makes a run of two mean ONE break whether it is a real
+' CR LF or a doubled single break, which is exactly the equivalence wanted here.
+'
+' The test is over the WHOLE payload, never one run at a time, because a single
+' run is ambiguous: in an LF-sourced payload a genuine blank line between two
+' examples also arrives as two breaks, and halving it merges the two examples.
+' What distinguishes them is the rest of the text -- a FLEx payload has tier
+' rows separated by ONE break, so one odd run disproves uniform doubling.
+'
+' When the payload does not pass the test, nothing is collapsed.  That way
+' round on purpose: an over-split example is visible on the page and can be put
+' right by hand, while a silently merged one is neither visible nor
+' recoverable.  (The asymmetry, and the whole-payload form, are the importer
+' session's, 2026-09-28.)
+'
+' Its one blind spot is a payload whose EVERY gap is a blank line, which cannot
+' be FLEx output once any block has two tier rows, since those are adjacent --
+' which is why NormalizeClipboardText applies this only to FLEx-shaped text.
+'-----------------------------------------------------------------------------
+
+' The factor every run of line breaks is a multiple of, when that factor is at
+' least 2 and every run is an exact multiple of the shortest one; else 0.
+Public Function DoublingFactor(ByVal s As String) As Long
+    Dim runs() As Long, n As Long
+    Dim i As Long, m As Long
+
+    runs = BreakRunLengths(s, n)
+    If n = 0 Then Exit Function
+
+    m = runs(0)
+    For i = 1 To n - 1
+        If runs(i) < m Then m = runs(i)
+    Next i
+    If m < 2 Then Exit Function
+
+    For i = 0 To n - 1
+        If runs(i) Mod m <> 0 Then Exit Function
+    Next i
+    DoublingFactor = m
+End Function
+
+' Every line break as LF, with each run of break characters divided by the
+' doubling factor when there is one.  Idempotent: a collapse leaves runs of one
+' character, so the factor is 0 and a second pass changes nothing.  With no
+' factor the conventions are normalised the ordinary way, CR LF included.
+Public Function CollapseDoubledLineBreaks(ByVal s As String) As String
+    Dim t As String, out As String, ch As String
+    Dim f As Long, i As Long, run As Long
+
+    t = VerticalTabsToLineBreaks(s)
+    f = DoublingFactor(t)
+    If f < 2 Then
+        CollapseDoubledLineBreaks = NormalizeLineBreaks(t)
+        Exit Function
+    End If
+
+    For i = 1 To Len(t)
+        ch = Mid$(t, i, 1)
+        If IsBreakChar(ch) Then
+            run = run + 1
+        Else
+            If run > 0 Then out = out & String$(run \ f, LINE_LF)
+            run = 0
+            out = out & ch
+        End If
+    Next i
+    If run > 0 Then out = out & String$(run \ f, LINE_LF)
+    CollapseDoubledLineBreaks = out
+End Function
+
+' CR or LF.  A vertical tab is converted to LF before any of this.
+Private Function IsBreakChar(ByVal ch As String) As Boolean
+    IsBreakChar = (ch = LINE_LF Or ch = LINE_CR)
+End Function
+
+' The runs of BREAK CHARACTERS in a text, as their lengths: CR and LF each count
+' one, and a vertical tab is converted first.  Not pairs -- see the note above
+' CollapseDoubledLineBreaks for why pairing first broke the LF CR payload.
+' n is how many runs there are.
+Private Function BreakRunLengths(ByVal s As String, ByRef n As Long) As Long()
+    Dim out() As Long
+    Dim t As String
+    Dim i As Long, run As Long
+
+    t = VerticalTabsToLineBreaks(s)
+    ReDim out(0 To Len(t))                   ' at most one run per character
+    n = 0
+    For i = 1 To Len(t)
+        If IsBreakChar(Mid$(t, i, 1)) Then
+            run = run + 1
+        ElseIf run > 0 Then
+            out(n) = run
+            n = n + 1
+            run = 0
+        End If
+    Next i
+    If run > 0 Then
+        out(n) = run
+        n = n + 1
+    End If
+    BreakRunLengths = out
+End Function
+
+' The run lengths as "<length>x<count>", shortest first: "2x5,4x1" is five runs
+' of two break CHARACTERS and one run of four -- so a Windows payload, whose
+' every break is CR LF, reads as 2x... and not 1x...  Diagnostics: the probe
+' reports print it, and a failed assertion reads better beside it.
+Public Function LineBreakRunProfile(ByVal s As String) As String
+    Dim runs() As Long, n As Long
+    Dim lengths() As Long, counts() As Long, nLen As Long
+    Dim i As Long, j As Long, k As Long, tmp As Long
+    Dim seen As Boolean
+    Dim out As String
+
+    runs = BreakRunLengths(s, n)
+    If n = 0 Then Exit Function
+
+    ReDim lengths(0 To n - 1)
+    ReDim counts(0 To n - 1)
+    For i = 0 To n - 1
+        seen = False
+        For j = 0 To nLen - 1
+            If lengths(j) = runs(i) Then
+                counts(j) = counts(j) + 1
+                seen = True
+                Exit For
+            End If
+        Next j
+        If Not seen Then
+            lengths(nLen) = runs(i)
+            counts(nLen) = 1
+            nLen = nLen + 1
+        End If
+    Next i
+
+    For i = 0 To nLen - 2
+        k = i
+        For j = i + 1 To nLen - 1
+            If lengths(j) < lengths(k) Then k = j
+        Next j
+        If k <> i Then
+            tmp = lengths(i)
+            lengths(i) = lengths(k)
+            lengths(k) = tmp
+            tmp = counts(i)
+            counts(i) = counts(k)
+            counts(k) = tmp
+        End If
+    Next i
+
+    For i = 0 To nLen - 1
+        If i > 0 Then out = out & ","
+        out = out & CStr(lengths(i)) & "x" & CStr(counts(i))
+    Next i
+    LineBreakRunProfile = out
+End Function
 
 
 '=============================================================================
@@ -343,8 +561,8 @@ Public Function ParseFlexBlocks(ByVal raw As String) As FlexBlock()
     Dim b As FlexBlock
     Dim blank As Boolean, started As Boolean
 
-    raw = Replace(Replace(raw, vbCrLf, vbLf), vbCr, vbLf)
-    lines = Split(raw, vbLf)
+    raw = NormalizeLineBreaks(raw)
+    lines = Split(raw, LINE_LF)
 
     ReDim chunks(0 To UBound(lines) + 1)
     nChunks = 0
@@ -364,7 +582,7 @@ Public Function ParseFlexBlocks(ByVal raw As String) As FlexBlock()
                 nChunks = nChunks + 1
                 chunks(nChunks) = ""
             End If
-            If Len(chunks(nChunks)) > 0 Then chunks(nChunks) = chunks(nChunks) & vbLf
+            If Len(chunks(nChunks)) > 0 Then chunks(nChunks) = chunks(nChunks) & LINE_LF
             chunks(nChunks) = chunks(nChunks) & lines(i)
             started = True
         End If
@@ -402,8 +620,8 @@ Public Function ParseFlexBlock(ByVal text As String) As FlexBlock
     Dim seenFree As Boolean
     Dim numPart As String
 
-    text = Replace(Replace(text, vbCrLf, vbLf), vbCr, vbLf)
-    lines = Split(text, vbLf)
+    text = NormalizeLineBreaks(text)
+    lines = Split(text, LINE_LF)
 
     ReDim res.LineTypes(0 To UBound(lines))
     ReDim res.ColArrays(0 To UBound(lines))

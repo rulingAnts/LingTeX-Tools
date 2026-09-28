@@ -322,6 +322,68 @@ function looksLikeFlex(raw) {
     return false;
 }
 
+// ── text arriving from outside the model ─────────────────────────────────────
+
+/** Chr(11), a manual line break, as a line break. See modFlexParse. */
+function verticalTabsToLineBreaks(raw) {
+    return String(raw).replace(/\u000B/g, '\n');
+}
+
+/** Every break convention as LF. */
+function normalizeLineBreaks(raw) {
+    return String(raw).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+/**
+ * The lengths of the runs of BREAK CHARACTERS: CR and LF each count one, and a
+ * vertical tab is converted first. Before CR LF pairing, on purpose -- two
+ * adjacent LF CR breaks spell LF CR LF CR, and pairing the inner CR LF made a
+ * blank line measure 3 rather than 4, whose odd run disproved the doubling for
+ * the whole payload. A run of two then means ONE break, CR LF or doubled alike.
+ */
+function breakRunLengths(raw) {
+    var t = verticalTabsToLineBreaks(raw);
+    var runs = [], m, re = /[\r\n]+/g;
+    while ((m = re.exec(t)) !== null) runs.push(m[0].length);
+    return runs;
+}
+
+/** "2x5,4x1": five runs of two line breaks and one run of four. */
+function lineBreakRunProfile(raw) {
+    var counts = {};
+    breakRunLengths(raw).forEach(function (r) { counts[r] = (counts[r] || 0) + 1; });
+    return Object.keys(counts).map(Number).sort(function (a, b) { return a - b; })
+        .map(function (len) { return len + 'x' + counts[len]; }).join(',');
+}
+
+/** The factor every run is a multiple of, when it is at least 2; else 0. */
+function doublingFactor(raw) {
+    var runs = breakRunLengths(raw);
+    if (!runs.length) return 0;
+    var m = Math.min.apply(null, runs);
+    if (m < 2) return 0;
+    for (var i = 0; i < runs.length; i++) {
+        if (runs[i] % m !== 0) return 0;
+    }
+    return m;
+}
+
+/** Each run of line breaks divided by the doubling factor, if there is one. */
+function collapseDoubledLineBreaks(raw) {
+    var t = verticalTabsToLineBreaks(raw);
+    var f = doublingFactor(t);
+    if (f < 2) return normalizeLineBreaks(t);
+    return t.replace(/[\r\n]+/g, function (run) {
+        return new Array(run.length / f + 1).join('\n');
+    });
+}
+
+/** The one call a clipboard or selection reader makes. */
+function normalizeClipboardText(raw) {
+    if (!looksLikeFlex(raw)) return normalizeLineBreaks(raw);
+    return collapseDoubledLineBreaks(verticalTabsToLineBreaks(raw));
+}
+
 /** Build a model from plain TSV: one row per tier, roles assigned positionally. */
 function modelFromTsv(raw) {
     var lines = String(raw).replace(/\r\n?/g, '\n').split('\n');
@@ -681,6 +743,12 @@ module.exports = {
     makeModel: makeModel, colCount: colCount, isInterlinearTier: isInterlinearTier,
     modelFromBlock: modelFromBlock, buildModels: buildModels,
     looksLikeFlex: looksLikeFlex, modelFromTsv: modelFromTsv, modelToTsv: modelToTsv,
+    verticalTabsToLineBreaks: verticalTabsToLineBreaks,
+    normalizeLineBreaks: normalizeLineBreaks,
+    lineBreakRunProfile: lineBreakRunProfile,
+    doublingFactor: doublingFactor,
+    collapseDoubledLineBreaks: collapseDoubledLineBreaks,
+    normalizeClipboardText: normalizeClipboardText,
     mergeColumns: mergeColumns, splitColumn: splitColumn,
     insertColumn: insertColumn, deleteColumn: deleteColumn,
     leadChar: leadChar, trailChar: trailChar, countBoundaries: countBoundaries,
