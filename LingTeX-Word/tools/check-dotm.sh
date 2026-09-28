@@ -245,13 +245,29 @@ else
     fail "word/document.xml is missing -- the package is invalid"
 fi
 nvars=0
+varnames=""
 if [ -f "$work/word/settings.xml" ]; then
     nvars=$(grep -o '<w:docVar ' "$work/word/settings.xml" | wc -l | tr -d ' ')
+    # Names are safe to print and identify the cause; values are not printed.
+    varnames=$(grep -o '<w:docVar w:name="[^"]*"' "$work/word/settings.xml" | sed 's/.*w:name="//; s/"$//' | sort -u)
 fi
 if [ "$nvars" -eq 0 ]; then
     pass "the template carries no document variables"
 else
-    fail "the template carries $nvars document variable(s) -- settings and the dev template's clone path belong in documents, never in the release template"
+    fail "the template carries $nvars document variable(s): $(printf '%s' "$varnames" | tr '\n' ' ')"
+    if printf '%s\n' "$varnames" | grep -qx 'LingTeX_DevRoot'; then
+        # The likeliest way this ever fires: SetDevRoot run against the ENGINE
+        # (LingTeX.dotm) instead of the dev template, so the clone path rode
+        # into the rebuilt release. Re-saving from an empty document would not
+        # help; the variable has to come out of the engine.
+        echo "        LingTeX_DevRoot is the DEV template's clone path: SetDevRoot was run against"
+        echo "        the engine (LingTeX.dotm) instead of LingTeX-Dev.dotm. Remove the variable"
+        echo "        from the engine, or rebuild from an engine that never had one, then save"
+        echo "        the template again."
+    else
+        echo "        Settings live in documents, never in the release template: remove the"
+        echo "        variable(s) from the engine and save the template again."
+    fi
 fi
 extra=""
 for p in word/comments.xml word/footnotes.xml word/endnotes.xml word/glossary/document.xml; do

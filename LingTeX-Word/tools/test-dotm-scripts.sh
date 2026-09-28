@@ -267,6 +267,12 @@ rm -f "$dotm"
 ( cd "$work/mut" && find . -type f ! -name '[Content_Types].xml' -print \
     | sed 's|^\./||' | sort | zip -q -X -@ "$dotm" )
 expect_fail "a document variable in the template" "document variable(s)"
+# ...and names it, with the remedy for the likeliest cause rather than a generic one.
+if grep -q "LingTeX_DevRoot" "$work/neg" && grep -q "SetDevRoot was run against" "$work/neg"; then
+    pass "check-dotm names the variable and says SetDevRoot hit the engine"
+else
+    fail "check-dotm caught the variable but did not name it or give the SetDevRoot remedy"
+fi
 cp "$work/keep.dotm" "$dotm"
 
 #-- and clean again -----------------------------------------------------------
