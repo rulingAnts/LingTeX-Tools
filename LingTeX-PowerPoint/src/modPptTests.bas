@@ -26,6 +26,9 @@ Option Explicit
 '   4. The live clipboard: what run-in-powerpoint.sh put there (the same
 '      fixture, CR LF unless LINGTEX_CLIP_EOL=lf), read through the paste,
 '      its counts and run profile reported, then parsed.
+'   5. Measuring: modPptMeasure and modPptFormat against the probe's numbers
+'      ("neighbor-F" at 20 pt was 88.4 pt), the cache, small capitals, and
+'      the whole fixture measured and handed to the shared planner.
 '
 ' Pure ASCII apart from ChrW$ in the generated fixture.  Break characters are
 ' Chr$(13), Chr$(10), Chr$(11); never vbCrLf.
@@ -41,6 +44,7 @@ Public Sub PptTestsRun()
     SectionFixtureRoad
     SectionLineBreaks
     SectionClipboard
+    SectionMeasure
     Note ""
     If mFail = 0 Then
         Note "ALL PASS -- " & mPass & " passed"
@@ -158,6 +162,54 @@ Private Sub SectionClipboard()
     RoadCase "the clipboard parses as one example", raw, 1
     models = ModelsFromText(s, igtWordAligned, n)
     If n >= 1 Then Eq "  15 word-aligned columns", models(LBound(models)).ColCount, 15
+End Sub
+
+'-----------------------------------------------------------------------------
+' 5. Measuring
+'-----------------------------------------------------------------------------
+Private Sub SectionMeasure()
+    Dim tf As PptTierFont, w1 As Double, w2 As Double, w3 As Double, wCaps As Double, wSc As Double
+    Dim ex As IgtExample, widths() As Double, fonts() As PptTierFont, t As Long
+    Dim cw() As Double, nb() As Boolean, lines() As Long
+    Note ""
+    Note "== 5. Measuring (a scratch presentation with no window)"
+    On Error GoTo Fail
+    tf.Name = "Times New Roman": tf.Size = 20: tf.Italic = False
+    w1 = MeasureText("neighbor-F", ROLE_VERNACULAR, tf)
+    Ok "a form measures to a positive width", w1 > 0, Format$(w1, "0.0") & " pt; the probe measured 88.4"
+    Ok "  within 80..100 pt of the probe's number", w1 > 80 And w1 < 100
+    w2 = MeasureText("neighbor-F", ROLE_VERNACULAR, tf)
+    Eq "  measured again: the cache gives the same width", w2, w1
+    tf.Italic = True
+    w3 = MeasureText("neighbor-F", ROLE_VERNACULAR, tf)
+    Ok "  italic measures (a different key)", w3 > 0, Format$(w3, "0.0") & " pt"
+    Eq "  empty text measures 0", MeasureText("", ROLE_VERNACULAR, tf), 0
+    tf.Italic = False
+    wCaps = MeasureText("ERG", ROLE_VERNACULAR, tf)
+    wSc = MeasureText("ERG", ROLE_GLOSS, tf)
+    Ok "  small capitals (gloss tier) are narrower than full capitals (form tier)", wSc < wCaps, Format$(wSc, "0.0") & " < " & Format$(wCaps, "0.0")
+    Eq "  DisplayCellText lowercases the grammatical part only", DisplayCellText("follow.CMP=REL", ROLE_GLOSS, True, False), "follow.cmp=rel"
+    Eq "  ...and leaves a form tier alone", DisplayCellText("follow.CMP", ROLE_MORPHEMES, True, False), "follow.CMP"
+    Eq "  initial cap: 3SG -> 3Sg", DisplayCellText("3SG", ROLE_GLOSS, True, True), "3Sg"
+    ex = ModelFromText(Fixture(Chr$(10)), igtWordAligned)
+    ReDim fonts(0 To ex.TierCount - 1)
+    For t = 0 To ex.TierCount - 1
+        fonts(t) = tf
+        fonts(t).Italic = (t = 0)
+    Next t
+    MeasureExample ex, fonts, widths
+    Ok "MeasureExample fills tiers x columns", UBound(widths, 1) = ex.TierCount - 1 And UBound(widths, 2) = ex.ColCount - 1
+    Ok "  the first form cell has a width", widths(0, 0) > 0, Format$(widths(0, 0), "0.0") & " pt for 'zel'"
+    Ok "  the first gloss cell has a width", widths(1, 0) > 0, Format$(widths(1, 0), "0.0") & " pt for 'yam'"
+    cw = ColumnWidths(ex, widths, 6)
+    nb = NoBreakFlags(ex)
+    lines = ComputeWrapLines(cw, nb, 400, 0, 0)
+    Ok "  the shared planner wraps the measured fixture at 400 pt", UBound(lines) >= 0, (UBound(lines) - LBound(lines) + 1) & " wrap line(s) for " & ex.ColCount & " columns"
+    ReleaseScratch
+    Exit Sub
+Fail:
+    Fail "measuring", Err.Number & ": " & Err.Description
+    ReleaseScratch
 End Sub
 
 '-----------------------------------------------------------------------------

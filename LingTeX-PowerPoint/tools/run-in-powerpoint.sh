@@ -72,6 +72,8 @@ build/shared/clsIgtWarning.cls
 build/shared/modLeipzig.bas
 build/shared/modWrap.bas
 src/modPptClipboard.bas
+src/modPptFormat.bas
+src/modPptMeasure.bas
 src/modPptTests.bas
 tools/probe/modProbe.bas
 tools/probe/modProbeEvents.bas
