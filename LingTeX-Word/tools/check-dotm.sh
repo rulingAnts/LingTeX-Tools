@@ -11,9 +11,16 @@
 #     so the shipped template contains code that is nowhere in the repository;
 #   * someone edits src/customUI14.xml, or redraws an icon in src/icons/, and
 #     does not re-run build-dotm.sh, so the reviewable ribbon is not the ribbon
-#     that ships.
+#     that ships;
+#   * the import itself changes the code -- the classes went in double-spaced
+#     for a week (2026-09-15) -- or the template holds text that is in no source
+#     file at all (2026-09-16: language data a text scrub of src/ could not
+#     reach, because module text sits compressed inside an OLE file inside the
+#     zip, where nothing greps it).
 #
-# Neither shows up in a diff. Both show up here.
+# None shows up in a diff. All show up here. Step 4d reads the compiled module
+# text out of word/vbaProject.bin and compares it with src/ line for line, so
+# the template is clean BY CONSTRUCTION rather than by a word list.
 #
 # Usage:  sh LingTeX-Word/tools/check-dotm.sh [path/to/file.dotm]
 # Exit:   0 all checks pass, 1 otherwise.
@@ -196,6 +203,23 @@ if command -v python3 >/dev/null 2>&1; then
     if python3 "$here/check-vba-refs.py" "$dotm"; then :; else fails=$((fails + 1)); fi
 else
     echo "  SKIP  python3 is not available; VBA references not checked"
+fi
+
+#-- 4d. every VBA module in the template IS its committed source ---------------
+# The manifest (step 6) proves src/ has not changed since build-dotm.sh ran. It
+# does not prove the compiled modules equal src/: a fix typed into the VBA editor
+# and never exported passes it, and so did the classes the importer installed
+# double-spaced (2026-09-15) and the template that carried language data no scrub
+# of src/ could reach (2026-09-16). tools/check-dotm-sources.py reads the module
+# text out of word/vbaProject.bin and compares it with src/ line for line, case-
+# insensitively (the one rewrite Word makes on import), and also fails on a module
+# with no source or a source with no module. No word list -- a list of the
+# sensitive words in a public repository would itself be the leak. Same needs as
+# 4c: python3 and olefile; the release workflow requires both.
+if command -v python3 >/dev/null 2>&1; then
+    if python3 "$here/check-dotm-sources.py" "$dotm" "$src"; then :; else fails=$((fails + 1)); fi
+else
+    echo "  SKIP  python3 is not available; VBA modules not compared with src/"
 fi
 
 #-- 5. the ribbon is well-formed, and every onAction resolves ----------------
