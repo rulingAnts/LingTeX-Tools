@@ -20,7 +20,9 @@
 #
 # None shows up in a diff. All show up here. Step 4d reads the compiled module
 # text out of word/vbaProject.bin and compares it with src/ line for line, so
-# the template is clean BY CONSTRUCTION rather than by a word list.
+# the template is clean BY CONSTRUCTION rather than by a word list; step 4e then
+# checks that the rest of the package -- body, document variables, notes,
+# AutoText -- carries no text at all, so nothing but code and ribbon ships.
 #
 # Usage:  sh LingTeX-Word/tools/check-dotm.sh [path/to/file.dotm]
 # Exit:   0 all checks pass, 1 otherwise.
@@ -220,6 +222,48 @@ if command -v python3 >/dev/null 2>&1; then
     if python3 "$here/check-dotm-sources.py" "$dotm" "$src"; then :; else fails=$((fails + 1)); fi
 else
     echo "  SKIP  python3 is not available; VBA modules not compared with src/"
+fi
+
+#-- 4e. nothing but code and ribbon: no text in the body, no document variables -
+# 4d proves the modules are their sources; this proves the REST of the package
+# carries no text at all. A template's own document body, its document variables
+# (LingTeX keeps its settings there in USER documents, and the dev template keeps
+# its clone path there), AutoText (word/glossary), comments, headers, footers and
+# notes can all hold prose, and a text scrub of src/ reaches none of them. The
+# release template is code and ribbon and nothing else, so any of these is a
+# failure to look at, not a warning. It also tells a release template from a dev
+# template saved under the wrong name. No Python needed: the parts are XML.
+body="$work/word/document.xml"
+if [ -f "$body" ]; then
+    chars=$(sed -e 's/<[^>]*>//g' "$body" | tr -d ' \t\r\n' | wc -c | tr -d ' ')
+    if [ "$chars" -eq 0 ]; then
+        pass "the template's document body holds no text"
+    else
+        fail "the template's document body holds $chars characters of text -- a release template is code and ribbon only; re-save it from an empty document"
+    fi
+else
+    fail "word/document.xml is missing -- the package is invalid"
+fi
+nvars=0
+if [ -f "$work/word/settings.xml" ]; then
+    nvars=$(grep -o '<w:docVar ' "$work/word/settings.xml" | wc -l | tr -d ' ')
+fi
+if [ "$nvars" -eq 0 ]; then
+    pass "the template carries no document variables"
+else
+    fail "the template carries $nvars document variable(s) -- settings and the dev template's clone path belong in documents, never in the release template"
+fi
+extra=""
+for p in word/comments.xml word/footnotes.xml word/endnotes.xml word/glossary/document.xml; do
+    [ -f "$work/$p" ] && extra="$extra $p"
+done
+for p in "$work"/word/header*.xml "$work"/word/footer*.xml; do
+    [ -f "$p" ] && extra="$extra word/$(basename "$p")"
+done
+if [ -z "$extra" ]; then
+    pass "no comments, notes, headers, footers or AutoText parts in the template"
+else
+    fail "parts that can hold prose are in the template:$extra -- re-save it from an empty document"
 fi
 
 #-- 5. the ribbon is well-formed, and every onAction resolves ----------------
