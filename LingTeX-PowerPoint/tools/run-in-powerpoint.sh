@@ -15,6 +15,10 @@
 #           --tests        run the test suite (PptTestsRun) instead of the probe
 #           --no-import    run the macros without importing first
 #           --no-stage     do not refresh build/shared from LingTeX-Word first
+#           --undo-check   after the macros: read the Edit menu's first item,
+#                          press Cmd+Z once in PowerPoint, read it again, and
+#                          append both to the last report (the undo count, with
+#                          nobody at the keyboard; needs Accessibility)
 #           --commit       commit the reports afterwards (default: do not)
 #           --remove-startup-probe
 #                          delete the test add-in MakeStartupProbeAddIn put in
@@ -75,9 +79,10 @@ tools/probe/modProbeEvents.bas
 tools/probe/clsProbeEvents.cls
 tools/probe/modProbePaste.bas
 tools/probe/modProbeSave.bas
+tools/probe/modProbeClipboard.bas
 "
 
-import=1; commit=0; pres=""; macros=""; want=""; stage_shared=1
+import=1; commit=0; pres=""; macros=""; want=""; stage_shared=1; undo_check=0
 for a in "$@"; do
     if [ "$want" = macro ]; then macros="$macros $a"; want=""; continue; fi
     case "$a" in
@@ -85,6 +90,7 @@ for a in "$@"; do
         --tests)      macros="$macros PptTestsRun" ;;
         --no-import)  import=0 ;;
         --no-stage)   stage_shared=0 ;;
+        --undo-check) undo_check=1 ;;
         --commit)     commit=1 ;;
         --remove-startup-probe)
             rm -f "$startup_probe" && echo "removed $startup_probe"; exit 0 ;;
@@ -302,6 +308,28 @@ for m in $all; do
         exit 1
     fi
 done
+
+#-- The undo count, mechanically ------------------------------------------------
+# What the Edit menu offers to undo, before and after one Cmd+Z in PowerPoint.
+# The frontmost presentation is the probe's (it has a window); the label is
+# what the user would read, "Undo Paste" after round 5's one paste.
+if [ "$undo_check" = 1 ]; then
+    u=$(osascript 2>&1 <<'AS'
+tell application "Microsoft PowerPoint" to activate
+delay 1
+tell application "System Events" to tell process "Microsoft PowerPoint"
+    set before to name of menu item 1 of menu "Edit" of menu bar 1
+    keystroke "z" using command down
+    delay 1
+    set after to name of menu item 1 of menu "Edit" of menu bar 1
+    return "Edit menu offered: '" & before & "'; after one Cmd+Z it offers: '" & after & "'"
+end tell
+AS
+)
+    echo "== undo check: $u"
+    last=$(ls -t "$boxreports"/*.mac.txt 2>/dev/null | grep -v Ping | head -1)
+    [ -n "$last" ] && printf '\n== undo check (run-in-powerpoint.sh --undo-check)\n%s\n' "$u" >> "$last"
+fi
 
 #-- Reports ------------------------------------------------------------------
 echo ""
