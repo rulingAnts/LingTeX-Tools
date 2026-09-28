@@ -385,14 +385,18 @@ folder and in `~/Documents/Custom Office Templates`; they compile, prove
 nothing, and are worth moving aside.
 
 The dev template's `modImport` must be **re-pasted whenever
-`tools/ImportModules.bas` changes** (last: 2026-09-14, the form is reused
-rather than removed and re-added). It is what creates the form component;
+`tools/ImportModules.bas` changes** (last: 2026-09-15, the classes and the
+form no longer go in double-spaced, and the import log gives every module's
+line count beside its source's). It is what creates the form component;
 with an older copy the import brings in fourteen, and every module that
 names the form — modLingTeX, modDocTests — fails to compile whole, which
 shows as "Compile error in hidden module" on Settings, on every ribbon
 toggle, and at the start of RunDocTests. The import log
 (`LingTeX-Word-reports/ImportModules.txt`) says "14 of 15" and names the
-reason when that has happened.
+reason when that has happened. A current copy also logs which line break
+AddFromString took (`breaks   AddFromString takes LF as one line break
+here`), and marks FAILED any module that does not hold its source line for
+line.
 
 ## If the engine will not compile at Word start
 
