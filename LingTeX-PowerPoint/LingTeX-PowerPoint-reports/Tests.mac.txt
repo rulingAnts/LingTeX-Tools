@@ -1,4 +1,4 @@
-PptTestsRun  2026-09-28 20:40:25
+PptTestsRun  2026-09-28 21:10:15
 
 == 1. The shared modules
   PASS  NormalizeLineBreaks maps CR LF to LF
@@ -46,8 +46,8 @@ PptTestsRun  2026-09-28 20:40:25
 
 == 4. The clipboard (what run-in-powerpoint.sh put there)
   PASS  ReadClipboardText returned text
-  arrived: 302 characters; tabs 67, CR 2, LF 0, VT 0; runs 1x2
-  Morphemes\tzel\tvimo\t\t\trixu\t\t\t=xo\txu\t=zevi\tOzivela\tze\t_\tzel\tvimo\t\t\trixu\t\t\t=xo\tVo\tvu\t=ve\tlevo\t\t\t=zi\tzo\tz\tzuvo\t=ve\t=zi\r\tLex. Glos
+  arrived: 305 characters; tabs 67, CR 5, LF 0, VT 0; runs 1x1,2x2
+  Morphemes\tzel\tvimo\t\t\trixu\t\t\t=xo\txu\t=zevi\tOzivela\tze\t_\tzel\tvimo\t\t\trixu\t\t\t=xo\tVo\tvu\t=ve\tlevo\t\t\t=zi\tzo\tz\tzuvo\t=ve\t=zi\r\r\tLex. Gl
   normalised: tabs 67, CR 0, LF 2, VT 0; runs 1x2
   PASS    LooksLikeFlex
   PASS  the clipboard parses as one example
@@ -89,7 +89,7 @@ PptTestsRun  2026-09-28 20:40:25
 
 == 7. Insert (onto a slide of a scratch presentation)
   PASS  one example from one copy
-  PASS    one shape pasted
+  PASS    one box added
   PASS    it is tagged as ours
   PASS    its number tag
   PASS    its TSV tag is the model

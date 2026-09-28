@@ -1,0 +1,7 @@
+Many-writes undo probe (round 8), existing presentation  2026-09-28 21:07:39
+  LingTeX-PowerPoint-Dev.pptm, slide 1: shapes before 2
+  in one macro run: 3 x AddShape, each tagged and given a text -- 9 writes
+  now: shapes on slide 1: 5
+
+== undo check (run-in-powerpoint.sh --undo-check)
+PowerPoint's menu bar: Edit offered 'Undo Typing'; pressed it; now it offers 'Can't Undo'

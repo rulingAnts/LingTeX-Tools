@@ -3,22 +3,21 @@ Option Explicit
 '=============================================================================
 ' modPptInsert  --  LingTeX-PowerPoint
 '
-' INSERT: clipboard -> parser -> measure -> plan -> compose out of sight ->
-' ONE paste onto the user's slide.  The PowerPoint counterpart of Word's
+' INSERT: clipboard -> parser -> measure -> plan -> compose IN PLACE, in a
+' text box on the user's slide.  The PowerPoint counterpart of Word's
 ' LingTeXInsertInterlinear.
 '
-' ONE UNDO ENTRY.  Every object-model write is its own undo entry here and
-' there is no UndoRecord (probe rounds 4 and 6, and the type library).  So the
-' example is built COMPLETE in a scratch presentation -- text, formatting,
-' tags, name, position -- and put on the slide with one Shapes.Paste, which is
-' one entry.  (A re-wrap, where the box already exists, is one TextRange2.Paste
-' into it: round 5.)  Making the box on the slide first and pasting text into
-' it would be two.
-'
-' THE USER'S CLIPBOARD is saved before the paste (a paste into a scratch box)
-' and restored after (a Copy); neither touches the user's presentation, so
-' neither is an undo entry.  For Insert the clipboard was the input, so a
-' failed save is tolerable; probe round 7 measures what the save keeps.
+' ONE UNDO ENTRY.  PowerPoint for Mac keeps ONE undo entry per MACRO RUN,
+' not one per object-model write: probe round 8 (2026-09-28, measured by the
+' rig, nobody at the keyboard) made seven writes in one run -- into a new
+' presentation and into an existing one -- and one Undo took all of them
+' back, leaving "Can't Undo".  (Round 4's per-write reading was a manual
+' Cmd+Z on 2026-09-15; confirm round 8 once more from the ribbon when the
+' add-in exists.)  So the example is composed straight into a text box on
+' the slide -- text, formatting, tags, name -- with no scratch presentation,
+' no paste and NO CLIPBOARD TRAFFIC: the user's clipboard is never touched.
+' PowerPoint labels the entry after the last write ("Undo Typing"); there is
+' no UndoRecord to name it (the type library, PLAN.md).
 '
 ' TAGS identify the example and hold what read-back and re-wrap need
 ' (Shape.Tags survive copy and paste: probe round 1):
@@ -102,16 +101,15 @@ Public Function InsertExamples(ByVal text As String, ByVal sld As Object, _
 End Function
 
 '-----------------------------------------------------------------------------
-' One example, composed complete in a scratch presentation and pasted onto sld
+' One example, composed in place in a new text box on sld
 ' as a shape: ONE undo entry.  Returns the pasted shape, or Nothing.
 '-----------------------------------------------------------------------------
 Public Function InsertOne(ex As IgtExample, ByVal sld As Object, ByVal x0 As Double, _
         ByVal y0 As Double, ByVal boxWidth As Double, ByVal numberText As String, _
         ByVal gran As IgtGranularity) As Object
-    Dim app As Object, scratch As Object, sbox As Object, saved As Object, pasted As Object
+    Dim box As Object
     Dim fonts() As PptTierFont, widths() As Double, cw() As Double, nb() As Boolean, lines() As Long
-    Dim lay As PptLayout, t As Long, numW As Double, before As Long, tf As PptTierFont
-    Set app = Application
+    Dim lay As PptLayout, t As Long, numW As Double, tf As PptTierFont
     If ex.TierCount = 0 Or ex.ColCount = 0 Then Exit Function
 
     ' Fonts and layout.
@@ -139,67 +137,23 @@ Public Function InsertOne(ex As IgtExample, ByVal sld As Object, ByVal x0 As Dou
     nb = NoBreakFlags(ex)
     lines = LimitLineColumns(ComputeWrapLines(cw, nb, boxWidth, lay.NumberHang, lay.ContIndent), ex.ColCount)
 
-    ' Compose the complete box out of sight.
+    ' Compose straight into a box on the slide: the run is the undo entry.
     On Error GoTo Fail
-    Set scratch = app.Presentations.Add(0)
-    Set sbox = scratch.Slides.Add(1, 12).Shapes.AddTextbox(1, x0, y0, boxWidth, 40)
-    PrepareExampleBox sbox
-    ComposeExample sbox, ex, fonts, cw, lines, numberText, lay
-    sbox.Name = "LingTeX Example " & numberText
-    sbox.Tags.Add TAG_LINGTEX, "1"
-    sbox.Tags.Add TAG_TSV, ModelToTsv(ex)
-    sbox.Tags.Add TAG_NUMBER, numberText
-    sbox.Tags.Add TAG_GRAN, CStr(gran)
-
-    ' Save the user's clipboard, paste the shape (THE undo entry), restore.
-    Set saved = SaveClipboard(scratch)
-    before = sld.Shapes.Count
-    sbox.Copy
-    sld.Shapes.Paste
-    If sld.Shapes.Count = before + 1 Then Set pasted = sld.Shapes(sld.Shapes.Count)
-    RestoreClipboard saved
-    scratch.Saved = -1
-    scratch.Close
-    Set InsertOne = pasted
+    Set box = sld.Shapes.AddTextbox(1, x0, y0, boxWidth, 40)
+    PrepareExampleBox box
+    ComposeExample box, ex, fonts, cw, lines, numberText, lay
+    box.Name = "LingTeX Example " & numberText
+    box.Tags.Add TAG_LINGTEX, "1"
+    box.Tags.Add TAG_TSV, ModelToTsv(ex)
+    box.Tags.Add TAG_NUMBER, numberText
+    box.Tags.Add TAG_GRAN, CStr(gran)
+    Set InsertOne = box
     Exit Function
 Fail:
     On Error Resume Next
-    RestoreClipboard saved
-    If Not scratch Is Nothing Then
-        scratch.Saved = -1
-        scratch.Close
-    End If
+    If Not box Is Nothing Then box.Delete
     Set InsertOne = Nothing
 End Function
-
-'-----------------------------------------------------------------------------
-' The clipboard, kept in a text box of the scratch presentation: a paste into
-' it (nothing in the user's presentation changes), and a Copy from it to put
-' the clipboard back.  Nothing when there is nothing to keep.  What this keeps
-' of a shape or a picture is what probe round 7 measures.
-'-----------------------------------------------------------------------------
-Public Function SaveClipboard(ByVal scratch As Object) As Object
-    Dim box As Object
-    On Error Resume Next
-    Set box = scratch.Slides(1).Shapes.AddTextbox(1, 0, 400, 700, 40)
-    box.Name = "LingTeX ClipboardKeep"
-    box.TextFrame2.TextRange.Paste
-    If Err.Number <> 0 Or Len(box.TextFrame2.TextRange.Text) = 0 Then
-        Err.Clear
-        box.Delete
-        Set SaveClipboard = Nothing
-    Else
-        Set SaveClipboard = box
-    End If
-    Err.Clear
-End Function
-
-Public Sub RestoreClipboard(ByVal saved As Object)
-    On Error Resume Next
-    If saved Is Nothing Then Exit Sub
-    saved.TextFrame2.TextRange.Copy
-    Err.Clear
-End Sub
 
 ' Is this shape one of ours?
 Public Function IsLingTeXExample(ByVal shp As Object) As Boolean

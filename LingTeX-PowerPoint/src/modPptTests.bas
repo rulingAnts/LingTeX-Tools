@@ -320,7 +320,7 @@ Private Sub SectionInsert()
     before = sld.Shapes.Count
     n = InsertExamples(Fixture(Chr$(10)), sld, 40, 40, 400)
     Eq "one example from one copy", n, 1
-    Eq "  one shape pasted", sld.Shapes.Count - before, 1
+    Eq "  one box added", sld.Shapes.Count - before, 1
     If sld.Shapes.Count = before + 1 Then
         Set shp = sld.Shapes(sld.Shapes.Count)
         Ok "  it is tagged as ours", IsLingTeXExample(shp)

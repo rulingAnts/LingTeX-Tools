@@ -118,6 +118,45 @@ Fail:
     WriteDevReport "ManyWritesUndo", s & "  ERR " & Err.Number & ": " & Err.Description & Chr$(10)
 End Sub
 
+'-----------------------------------------------------------------------------
+' The same writes into an EXISTING presentation -- the dev presentation's
+' slide 1, whose undo stack predates the macro. Probe round 4 (2026-09-15,
+' Seth at the keyboard) saw one Cmd+Z take back only the last of six writes
+' on an existing shape; the runs above wrote into a presentation the macro
+' had just created. This tells the two apart. The After macro leaves this
+' presentation open (tag LINGTEX_PROBE_KEEP) and deletes what is left of
+' the probe's shapes (tag LINGTEXPROBE).
+'-----------------------------------------------------------------------------
+Public Sub ProbeManyWritesExisting()
+    Dim app As Object, pres As Object, sld As Object, shp As Object
+    Dim i As Long, s As String, nBefore As Long
+    Set app = Application
+    s = "Many-writes undo probe (round 8), existing presentation  " & Format$(Now, "yyyy-mm-dd hh:nn:ss") & Chr$(10)
+    On Error GoTo Fail
+    Set pres = app.Presentations("LingTeX-PowerPoint-Dev.pptm")
+    Set sld = pres.Slides(1)
+    nBefore = sld.Shapes.Count
+    pres.Tags.Add "LINGTEX_PROBE_BEFORE", CStr(nBefore)
+    pres.Tags.Add "LINGTEX_PROBE_KEEP", "1"
+    pres.Windows(1).Activate
+    s = s & "  " & pres.Name & ", slide 1: shapes before " & nBefore & Chr$(10)
+    For i = 1 To 3
+        Set shp = sld.Shapes.AddShape(1, 60 + 120 * i, 300, 100, 60)
+        shp.Tags.Add "LINGTEXPROBE", "1"
+        shp.TextFrame2.TextRange.Text = "write " & i
+    Next i
+    s = s & "  in one macro run: 3 x AddShape, each tagged and given a text -- 9 writes" & Chr$(10)
+    s = s & "  now: shapes on slide 1: " & sld.Shapes.Count & Chr$(10)
+    On Error Resume Next
+    app.VBE.MainWindow.Visible = False
+    pres.Windows(1).Activate
+    On Error GoTo Fail
+    WriteDevReport "ManyWritesExisting", s
+    Exit Sub
+Fail:
+    WriteDevReport "ManyWritesExisting", s & "  ERR " & Err.Number & ": " & Err.Description & Chr$(10)
+End Sub
+
 Public Sub ProbeInsertUndoAfter()
     Dim app As Object, pres As Object, sld As Object
     Dim i As Long, ours As Long, s As String
@@ -126,6 +165,30 @@ Public Sub ProbeInsertUndoAfter()
     On Error GoTo Fail
     Set pres = app.ActivePresentation
     s = s & "  " & pres.Name & ": slides " & pres.Slides.Count & Chr$(10)
+    On Error Resume Next
+    If pres.Tags("LINGTEX_PROBE_KEEP") = "1" Then
+        On Error GoTo Fail
+        Set sld = pres.Slides(1)
+        s = s & "  shapes on slide 1: " & sld.Shapes.Count & " (before the writes: " & pres.Tags("LINGTEX_PROBE_BEFORE") & ")" & Chr$(10)
+        For i = sld.Shapes.Count To 1 Step -1
+            If sld.Shapes(i).Tags("LINGTEXPROBE") = "1" Then ours = ours + 1
+        Next i
+        s = s & "  probe shapes still there: " & ours & " of 3" & Chr$(10)
+        If ours = 0 Then
+            s = s & "  VERDICT: the one Undo removed all three writes -- one entry per macro run, in an existing presentation too" & Chr$(10)
+        ElseIf ours = 3 Then
+            s = s & "  VERDICT: the one Undo removed none of the shapes (only a later write, if anything) -- per-write entries" & Chr$(10)
+        Else
+            s = s & "  VERDICT: the one Undo removed " & (3 - ours) & " of the 3 shapes" & Chr$(10)
+        End If
+        For i = sld.Shapes.Count To 1 Step -1
+            If sld.Shapes(i).Tags("LINGTEXPROBE") = "1" Then sld.Shapes(i).Delete
+        Next i
+        pres.Tags.Delete "LINGTEX_PROBE_KEEP"
+        WriteDevReport "InsertUndoAfter", s
+        Exit Sub
+    End If
+    On Error GoTo Fail
     If pres.Slides.Count = 0 Then
         s = s & "  VERDICT: the one Undo removed the slide the macro added, and everything on it" & Chr$(10)
         s = s & "  -- the whole macro run was one undo entry" & Chr$(10)

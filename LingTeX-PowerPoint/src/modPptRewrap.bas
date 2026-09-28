@@ -19,11 +19,13 @@ Option Explicit
 ' reads back False and is left alone, with a message from the command.
 '
 ' RE-WRAP measures, plans for the box's current width, composes in a scratch
-' box of the same width, and -- only if the result differs from what the box
-' holds -- saves the clipboard, pastes ONCE into the box (round 5: one undo
-' entry, position, size and Tags untouched), and restores the clipboard.  A
-' re-wrap that changes nothing writes nothing: no undo entry, no clipboard
-' round trip, and no resize event from our own change (PLAN.md, step 2).
+' box of the same width to see whether anything would change, and -- only
+' if the result differs from what the box holds (BoxSignature) -- composes
+' again, IN PLACE, into the box: position, size and Tags untouched, and no
+' clipboard traffic at all.  One macro run is one undo entry (probe round 8,
+' modPptInsert's header), so the many writes of a composition are one
+' entry.  A re-wrap that changes nothing writes nothing: no undo entry, and
+' no resize event from our own change (PLAN.md, step 2).
 '
 ' Pure ASCII apart from the quotes from modFlexParse.
 '=============================================================================
@@ -71,7 +73,7 @@ Public Function RewrapExample(ByVal shp As Object) As Long
     Dim app As Object, ex As IgtExample, numberText As String, gran As Long
     Dim fonts() As PptTierFont, tf As PptTierFont, t As Long, lay As PptLayout, numW As Double
     Dim widths() As Double, cw() As Double, nb() As Boolean, lines() As Long
-    Dim scratch As Object, sbox As Object, saved As Object, w As Double
+    Dim scratch As Object, sbox As Object, w As Double
     Set app = Application
     If Not ReadBackExample(shp, ex, numberText, gran) Then
         RewrapExample = -1
@@ -108,18 +110,15 @@ Public Function RewrapExample(ByVal shp As Object) As Long
         RewrapExample = 0
         Exit Function
     End If
-    Set saved = SaveClipboard(scratch)
-    sbox.TextFrame2.TextRange.Copy
-    shp.TextFrame2.TextRange.Paste
-    RestoreClipboard saved
     scratch.Saved = -1
     scratch.Close
+    Set scratch = Nothing
+    ComposeExample shp, ex, fonts, cw, lines, numberText, lay
     shp.Tags.Add TAG_TSV, ModelToTsv(ex)
     RewrapExample = 1
     Exit Function
 Fail:
     On Error Resume Next
-    RestoreClipboard saved
     If Not scratch Is Nothing Then
         scratch.Saved = -1
         scratch.Close
