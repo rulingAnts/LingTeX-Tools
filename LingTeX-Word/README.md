@@ -86,7 +86,7 @@ has one right answer:
 
 Rule 4's `.` and `:` are never counted as morpheme breaks and never split on:
 they mark one morpheme glossed with several meta-language words, so they need no
-counterpart in the object-language form. `stack.CMP=SEQ` against `rixu=xo` is
+counterpart in the object-language form. `buy-PST.3PL` against `compr-aron` is
 correct and is not flagged.
 
 ---
@@ -166,8 +166,8 @@ examples itself. The one thing the text cannot say is which of its last lines
 are free translations, so you are asked, with a guess already filled in: the
 trailing lines whose word count differs from the first line's. With the
 document set to morpheme alignment, every column whose form and gloss both
-carry a morpheme boundary is split at it, tier by tier, so `Ozwum-vex` over
-`Cord-3.POSS` becomes two columns while `zovemi` over `what-PP` stays one
+carry a morpheme boundary is split at it, tier by tier, so `vecin-a` over
+`neighbor-F` becomes two columns while `del` over `of-DEF.M.SG` stays one
 (Check Glossing reports that mismatch, as it always has).
 
 ### The ribbon's toggles
@@ -583,7 +583,7 @@ line padding the shorter), and convert-table takes it from there.
 **Later — switch an example's alignment in place.** Today the alignment
 (by word or by morpheme) is chosen when an example is inserted; changing it
 means inserting again. The data supports switching without that: a
-word-aligned cell still holds its boundaries (`rixu=xo` / `stack.CMP=SEQ`), so
+word-aligned cell still holds its boundaries (`compr-aron` / `buy-PST.3PL`), so
 word to morpheme is the split at every boundary, on every tier, column by
 column; and morpheme to word is merging every continuation column (the ones
 `NoBreakFlags` marks) into the one before it. Both are the proven split and
