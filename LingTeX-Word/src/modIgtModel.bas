@@ -181,6 +181,34 @@ NextLine:
     Next i
 End Function
 
+'-----------------------------------------------------------------------------
+' Text arriving from OUTSIDE the model -- off the clipboard, or out of a
+' selection in a document -- made ready for the parser.  One call, made once,
+' at the boundary; the parser itself keeps using NormalizeLineBreaks.
+'
+' For FLEx-shaped text: vertical tabs become line breaks, every break
+' convention becomes LF, and a uniformly doubled paste is halved
+' (CollapseDoubledLineBreaks in modFlexParse carries the reasoning).
+'
+' For anything else -- plain TSV, prose -- only the break conventions are
+' normalised, which loses nothing.  Neither of the other two repairs is
+' justified there: both rest on a fact about FLEx output, that the tier rows of
+' one block are separated by a single break, and ModelFromTsv ignores blank
+' lines anyway.  So a blank line in a hand-built table survives, and a manual
+' line break in prose stays the same line as CleanTextLine reads it.
+'
+' Not inside NormalizeLineBreaks, which is a lossless mapping of conventions
+' and runs several times per parse: a repair must not be applied twice, and
+' must not touch text that never had the fault.
+'-----------------------------------------------------------------------------
+Public Function NormalizeClipboardText(ByVal s As String) As String
+    If Not LooksLikeFlex(s) Then
+        NormalizeClipboardText = NormalizeLineBreaks(s)
+        Exit Function
+    End If
+    NormalizeClipboardText = CollapseDoubledLineBreaks(VerticalTabsToLineBreaks(s))
+End Function
+
 ' First example in raw text, routed by inspection to the FLEx or plain-TSV path.
 Public Function ModelFromText(ByVal raw As String, _
         ByVal granularity As IgtGranularity) As IgtExample

@@ -203,6 +203,63 @@ section('Line breaks (CR LF and CR input parse as LF input does)');
     sameExamples('two FLEx examples', vectors[0].raw + '\n\n' + vectors[1].raw, 2);
 })();
 
+// ── 2d. text arriving from outside the model ─────────────────────────────────
+
+section('Clipboard and selection normalising');
+
+(function () {
+    // LingTeX-PowerPoint's acceptance vectors (modPptTests.bas SectionLineBreaks),
+    // run here because VBA cannot run in CI and PowerPoint's rig is blocked on a
+    // container grant. The fixture is the one its rig uses.
+    var fixture = fs.readFileSync(path.join(__dirname, '..', 'samples', 'checklist-sample.txt'), 'utf8');
+    var lf = normalize(fixture);                       // as LF, trailing break kept
+    function normalize(s) { return String(s).replace(/\r\n/g, '\n').replace(/\r/g, '\n'); }
+    function withBreaks(text, seq) { return text.replace(/\n/g, seq); }
+
+    function blocks(raw) {
+        return core.parseFLExBlocks(R.normalizeClipboardText(raw));
+    }
+    function check(name, raw, wantBlocks) {
+        var bs = blocks(raw);
+        if (!ok(name + ': blocks', bs.length === wantBlocks, 'got ' + bs.length)) return;
+        ok(name + ': every block has its tiers and its free line',
+            bs.every(function (b) { return b.lineTypes.length >= 2 && b.freeLines.length === 1; }),
+            JSON.stringify(bs.map(function (b) { return [b.lineTypes.length, b.freeLines.length]; })));
+    }
+
+    // One example, every convention. CR CR is what TextRange2.Paste produces on
+    // the Mac; LF CR is what vbCrLf IS there.
+    check('one example, LF', lf, 1);
+    check('one example, CR LF', withBreaks(lf, '\r\n'), 1);
+    check('one example, CR', withBreaks(lf, '\r'), 1);
+    check('one example, doubled CR CR', withBreaks(lf, '\r\r'), 1);
+    check('one example, LF CR', withBreaks(lf, '\n\r'), 1);
+    check('one example, rows split by a vertical tab', withBreaks(lf, '\u000B'), 1);
+
+    // Two examples with one blank line between them: two blocks, never one.
+    var two = lf + '\n' + lf;
+    check('two examples, LF', two, 2);
+    check('two examples, CR LF', withBreaks(two, '\r\n'), 2);
+    check('two examples, doubled CR CR', withBreaks(two, '\r\r'), 2);
+    check('two examples, LF CR', withBreaks(two, '\n\r'), 2);
+
+    // The number PowerPoint's rig asserts, on the same fixture.
+    eq('run profile of the doubled two-example text',
+        R.lineBreakRunProfile(withBreaks(two, '\r\r')), '2x5,4x1');
+
+    // Applied twice is applied once: after a collapse the shortest run is 1.
+    eq('normalising twice equals normalising once',
+        R.normalizeClipboardText(R.normalizeClipboardText(withBreaks(two, '\r\r'))),
+        R.normalizeClipboardText(withBreaks(two, '\r\r')));
+
+    // Not FLEx: the blank line is left alone. Halving is justified by a fact
+    // about FLEx output, so it may not be applied to a hand-built table.
+    var tsv = 'one\ttwo\n\nthree\tfour';
+    eq('a blank line in plain TSV survives', R.normalizeClipboardText(tsv), tsv);
+    eq('a doubled-looking TSV is not collapsed either',
+        R.normalizeClipboardText('one\ttwo\r\r\rthree\tfour'), 'one\ttwo\n\n\nthree\tfour');
+})();
+
 // ── 3. column editing ─────────────────────────────────────────────────────────
 
 section('Column split and merge');

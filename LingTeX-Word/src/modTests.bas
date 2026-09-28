@@ -492,6 +492,8 @@ End Sub
 Private Sub TestLineBreaks()
     Dim lf As String
     Dim mixed As String
+    Dim doubled As String
+    Dim tsv As String
 
     Section "Line breaks (CR LF and CR input parse as LF input does)"
     Emit "  note  " & LineBreakConstantsLine()
@@ -513,6 +515,69 @@ Private Sub TestLineBreaks()
     lf = Vector1Raw() & vbLf & vbLf & Vector2Raw()
     CheckLineBreakVariants "two FLEx examples", lf, 6, 2
     CheckTwoExamplesCrLf lf
+
+    ' -- Text arriving from outside the model ---------------------------------
+    ' NormalizeClipboardText, the one call the clipboard and selection readers
+    ' make. CR CR is what PowerPoint's TextRange2.Paste leaves of a Windows
+    ' CR LF on the Mac; LF CR is what vbCrLf IS there, so text built with it
+    ' looks the same; a vertical tab is what Shift+Return leaves in a Word
+    ' selection. All of them must give the blocks the LF form gives.
+    ' Mirrors "Clipboard and selection normalising" in tools/parity-test.js and
+    ' SectionLineBreaks in LingTeX-PowerPoint's modPptTests.
+    lf = Vector1Raw()
+    CheckClipboardVariant "one example, LF", lf, 1
+    CheckClipboardVariant "one example, CR LF", Replace(lf, Chr$(10), Chr$(13) & Chr$(10)), 1
+    CheckClipboardVariant "one example, CR", Replace(lf, Chr$(10), Chr$(13)), 1
+    CheckClipboardVariant "one example, doubled CR CR", Replace(lf, Chr$(10), Chr$(13) & Chr$(13)), 1
+    CheckClipboardVariant "one example, LF CR", Replace(lf, Chr$(10), Chr$(10) & Chr$(13)), 1
+    CheckClipboardVariant "one example, rows split by a vertical tab", _
+                          Replace(lf, Chr$(10), Chr$(11)), 1
+
+    lf = Vector1Raw() & vbLf & vbLf & Vector2Raw()
+    doubled = Replace(lf, Chr$(10), Chr$(13) & Chr$(13))
+    CheckClipboardVariant "two examples, LF", lf, 2
+    CheckClipboardVariant "two examples, CR LF", Replace(lf, Chr$(10), Chr$(13) & Chr$(10)), 2
+    CheckClipboardVariant "two examples, doubled CR CR", doubled, 2
+    CheckClipboardVariant "two examples, LF CR", Replace(lf, Chr$(10), Chr$(10) & Chr$(13)), 2
+
+    ' Five runs of two break characters, one run of four: the blank line between
+    ' the examples. Counted in characters, so a CR LF payload reads as 2x too.
+    Eq "the run profile of the doubled two-example text", _
+       LineBreakRunProfile(doubled), "2x4,4x1"
+    Eq "normalising twice is normalising once", _
+       ShowBreaks(NormalizeClipboardText(NormalizeClipboardText(doubled))), _
+       ShowBreaks(NormalizeClipboardText(doubled))
+
+    ' Not FLEx, so neither repair applies: halving is justified by a fact about
+    ' FLEx output -- that the tier rows of one block are separated by a single
+    ' break -- and a hand-built table keeps its blank line.
+    tsv = "one" & T & "two" & vbLf & vbLf & "three" & T & "four"
+    Eq "a blank line in plain TSV survives", _
+       ShowBreaks(NormalizeClipboardText(tsv)), ShowBreaks(tsv)
+    Eq "a doubled-looking plain TSV is left alone", _
+       ShowBreaks(NormalizeClipboardText("one" & T & "two" & Chr$(13) & Chr$(13) & Chr$(13) & "three" & T & "four")), _
+       "one<TAB>two<LF><LF><LF>three<TAB>four"
+End Sub
+
+' One payload, in one break convention, through NormalizeClipboardText: the
+' blocks the parser then finds, and that each carries its tiers and its free
+' line rather than having been cut up or run together.
+Private Sub CheckClipboardVariant(ByVal name As String, ByVal raw As String, _
+        ByVal wantBlocks As Long)
+    Dim blocks() As FlexBlock
+    Dim i As Long
+    Dim shaped As Boolean
+
+    blocks = ParseFlexBlocks(NormalizeClipboardText(raw))
+    Eq name & ": blocks", CStr(UBound(blocks) + 1), CStr(wantBlocks)
+    If UBound(blocks) + 1 <> wantBlocks Then Exit Sub
+
+    shaped = True
+    For i = 0 To UBound(blocks)
+        If blocks(i).TierCount <> 2 Then shaped = False
+        If blocks(i).FreeCount <> 1 Then shaped = False
+    Next i
+    Ok name & ": every block has its two tiers and its free line", shaped
 End Sub
 
 ' The same text with LF, CR LF and CR line breaks must give the same examples:

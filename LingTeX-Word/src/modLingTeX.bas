@@ -315,7 +315,12 @@ Public Sub LingTeXInsertInterlinear()
         raw = target.Text
     End If
 
-    ex = ModelFromText(raw, SettingGranularity(doc))
+    ' NormalizeClipboardText, not raw: the clipboard and a selection both come
+    ' from outside the model, and a selection keeps Chr$(11) where a row was
+    ' broken with Shift+Return. The fallbacks below read the original raw on
+    ' purpose -- plain prose is not FLEx text, and its line breaks mean what
+    ' CleanTextLine says they mean.
+    ex = ModelFromText(NormalizeClipboardText(raw), SettingGranularity(doc))
     If ex.TierCount = 0 Or ex.ColCount = 0 Then
         ' Not FLEx text and not tab-separated rows. Selected lines of plain
         ' text -- words on one line, glosses on the next -- take the Text to
