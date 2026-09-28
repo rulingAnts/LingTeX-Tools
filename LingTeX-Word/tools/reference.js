@@ -383,7 +383,7 @@ function collapseDoubledLineBreaks(raw) {
     var f = doublingFactor(t);
     if (f < 2) return normalizeLineBreaks(t);
     return t.replace(/[\r\n]+/g, function (run) {
-        return new Array(run.length / f + 1).join('\n');
+        return new Array(Math.floor(run.length / f) + 1).join('\n');   // as VBA's \ does
     });
 }
 
