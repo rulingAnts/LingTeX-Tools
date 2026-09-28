@@ -87,7 +87,7 @@ End Function
 Public Sub WriteCell(ByVal tr As Object, ByVal text As String, ByVal role As String, _
         tf As PptTierFont, Optional ByVal lowercaseGram As Boolean = True, _
         Optional ByVal initialCap As Boolean = False)
-    Dim shown As String, parts() As String, n As Long, i As Long, pos As Long
+    Dim shown As String
     shown = DisplayCellText(text, role, lowercaseGram, initialCap)
     tr.Text = shown
     With tr.Font
@@ -97,11 +97,21 @@ Public Sub WriteCell(ByVal tr As Object, ByVal text As String, ByVal role As Str
         .Smallcaps = 0
     End With
     If Len(shown) = 0 Then Exit Sub
+    ApplyGramGlossRuns tr, text, role, 1
+End Sub
+
+' Set the grammatical segments of one cell in small capitals, the cell's text
+' beginning at character startPos of tr (1-based).  Segments are those of the
+' ORIGINAL text; SmallCapsForm keeps lengths, so the positions carry over to
+' the text as shown.  Nothing happens on tiers that take no small caps.  The
+' composer calls this once per cell of a paragraph; WriteCell once per cell box.
+Public Sub ApplyGramGlossRuns(ByVal tr As Object, ByVal text As String, _
+        ByVal role As String, ByVal startPos As Long)
+    Dim parts() As String, n As Long, i As Long, pos As Long
     If Not TierTakesSmallCaps(role) Then Exit Sub
-    ' Segments of the ORIGINAL text; SmallCapsForm keeps lengths, so the
-    ' positions carry over to the shown text.
+    If Len(text) = 0 Then Exit Sub
     n = SplitGlossSegments(text, parts)
-    pos = 1
+    pos = startPos
     For i = 0 To n - 1
         If IsGramGloss(parts(i)) Then
             tr.Characters(pos, Len(parts(i))).Font.Smallcaps = -1

@@ -29,6 +29,9 @@ Option Explicit
 '   5. Measuring: modPptMeasure and modPptFormat against the probe's numbers
 '      ("neighbor-F" at 20 pt was 88.4 pt), the cache, small capitals, and
 '      the whole fixture measured and handed to the shared planner.
+'   6. Composing: the fixture drawn into a scratch box by modPptCompose and
+'      inspected paragraph by paragraph -- count, the hanging number, tab
+'      stops per line, italics, small capitals, the quoted free translation.
 '
 ' Pure ASCII apart from ChrW$ in the generated fixture.  Break characters are
 ' Chr$(13), Chr$(10), Chr$(11); never vbCrLf.
@@ -45,6 +48,7 @@ Public Sub PptTestsRun()
     SectionLineBreaks
     SectionClipboard
     SectionMeasure
+    SectionCompose
     Note ""
     If mFail = 0 Then
         Note "ALL PASS -- " & mPass & " passed"
@@ -209,6 +213,74 @@ Private Sub SectionMeasure()
     Exit Sub
 Fail:
     Fail "measuring", Err.Number & ": " & Err.Description
+    ReleaseScratch
+End Sub
+
+'-----------------------------------------------------------------------------
+' 6. Composing
+'-----------------------------------------------------------------------------
+Private Sub SectionCompose()
+    Dim ex As IgtExample, fonts() As PptTierFont, widths() As Double, tf As PptTierFont
+    Dim cw() As Double, nb() As Boolean, lines() As Long, lay As PptLayout
+    Dim app As Object, scratch As Object, box As Object, tr As Object, p As Object
+    Dim t As Long, nLines As Long, cols1 As Long, i As Long, hit As Long, s As String
+    Note ""
+    Note "== 6. Composing (the fixture drawn into a scratch box)"
+    On Error GoTo Fail
+    tf.Name = "Times New Roman": tf.Size = 20: tf.Italic = False
+    ex = ModelFromText(Fixture(Chr$(10)), igtWordAligned)
+    ReDim fonts(0 To ex.TierCount - 1)
+    For t = 0 To ex.TierCount - 1
+        fonts(t) = tf
+        fonts(t).Italic = (t = 0)
+    Next t
+    MeasureExample ex, fonts, widths
+    cw = ColumnWidths(ex, widths, 6)
+    nb = NoBreakFlags(ex)
+    lay.Gap = 6: lay.NumberHang = 36: lay.ContIndent = 36: lay.LowercaseGram = True: lay.InitialCap = False
+    lay.FreeFont = tf
+    lines = LimitLineColumns(ComputeWrapLines(cw, nb, 400, lay.NumberHang, lay.ContIndent), ex.ColCount)
+    nLines = UBound(lines) - LBound(lines) + 1
+    cols1 = WrapLineEnd(lines, LBound(lines), ex.ColCount) - lines(LBound(lines)) + 1
+    Ok "a plan at 400 pt wraps the 15 columns onto more than one line", nLines > 1, nLines & " lines; " & cols1 & " columns on the first"
+    Ok "no line exceeds 33 columns", MaxColumnsPerLine(lines, ex.ColCount) <= 33
+
+    Set app = Application
+    Set scratch = app.Presentations.Add(0)
+    Set box = scratch.Slides.Add(1, 12).Shapes.AddTextbox(1, 0, 0, 400, 80)
+    PrepareExampleBox box
+    ComposeExample box, ex, fonts, cw, lines, "(1)", lay
+    Set tr = box.TextFrame2.TextRange
+    Eq "paragraphs = wrap lines x 2 tiers + 1 free line", tr.Paragraphs.Count, nLines * 2 + 1
+    Ok "the first paragraph begins with the number and a tab", Left$(tr.Paragraphs(1).Text, 4) = "(1)" & Chr$(9)
+    Eq "  its indent is the hang", tr.Paragraphs(1).ParagraphFormat.LeftIndent, lay.NumberHang
+    Eq "  its first line hangs back by the same", tr.Paragraphs(1).ParagraphFormat.FirstLineIndent, -lay.NumberHang
+    Eq "  its tab stops: one at the hang, then one per column after the first", tr.Paragraphs(1).ParagraphFormat.TabStops.Count, cols1
+    Eq "the gloss paragraph of line 1 has one stop per column after the first", tr.Paragraphs(2).ParagraphFormat.TabStops.Count, cols1 - 1
+    Eq "  and the continuation indent on line 2", tr.Paragraphs(3).ParagraphFormat.LeftIndent, lay.ContIndent
+    Ok "the forms paragraph is italic", tr.Paragraphs(1).Characters(5, 1).Font.Italic = -1
+    Ok "the gloss paragraph is not italic", tr.Paragraphs(2).Characters(1, 1).Font.Italic = 0
+    Ok "the first gloss cell 'yam' is not small capitals", tr.Paragraphs(2).Characters(1, 3).Font.Smallcaps = 0
+    hit = 0
+    For i = 1 To tr.Paragraphs.Count
+        s = tr.Paragraphs(i).Text
+        If InStr(1, s, "seq") > 0 Then hit = i: Exit For
+    Next i
+    Ok "a grammatical gloss (SEQ) appears lowercased", hit > 0
+    If hit > 0 Then Ok "  and is set in small capitals", tr.Paragraphs(hit).Characters(InStr(1, tr.Paragraphs(hit).Text, "seq"), 3).Font.Smallcaps = -1
+    s = tr.Paragraphs(tr.Paragraphs.Count).Text
+    s = Replace(Replace(s, Chr$(13), ""), Chr$(11), "")
+    Eq "the last paragraph is the free translation in single quotes", s, LeftSingleQuote & "(When) she picked her yams early." & RightSingleQuote
+    Ok "  not italic", tr.Paragraphs(tr.Paragraphs.Count).Characters(2, 1).Font.Italic = 0
+    Note "  box after autosize: " & Format$(box.Width, "0") & " x " & Format$(box.Height, "0") & " pt"
+    scratch.Saved = -1
+    scratch.Close
+    ReleaseScratch
+    Exit Sub
+Fail:
+    Fail "composing", Err.Number & ": " & Err.Description
+    On Error Resume Next
+    If Not scratch Is Nothing Then scratch.Saved = -1: scratch.Close
     ReleaseScratch
 End Sub
 

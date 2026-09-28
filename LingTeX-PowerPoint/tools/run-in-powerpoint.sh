@@ -74,6 +74,7 @@ build/shared/modWrap.bas
 src/modPptClipboard.bas
 src/modPptFormat.bas
 src/modPptMeasure.bas
+src/modPptCompose.bas
 src/modPptTests.bas
 tools/probe/modProbe.bas
 tools/probe/modProbeEvents.bas
