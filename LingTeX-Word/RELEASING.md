@@ -28,6 +28,14 @@ Any later change to `src/` means doing this again before the next release:
 `check-dotm.sh` fails (in CI too) when the committed template and `src/`
 disagree.
 
+**`check-dotm.sh` also reads every compiled module out of the template and
+compares it with `src/` line for line** (`tools/check-dotm-sources.py`), so the
+template is proven to be the committed sources by construction — no word list.
+It needs `python3` and `olefile`; run `pip install olefile` once locally, or the
+step says SKIP and proves nothing. The release workflow requires it and cannot
+skip. It also fails a class or form that went in double-spaced, and a template
+built with the old `modImport` (2026-09-15).
+
 ## 2. Publish
 
 Push a tag from the commit that holds the template:

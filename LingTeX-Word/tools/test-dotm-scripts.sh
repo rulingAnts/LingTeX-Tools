@@ -19,6 +19,16 @@ fails=0
 pass() { echo "  PASS  $1"; }
 fail() { echo "  FAIL  $1"; fails=$((fails + 1)); }
 
+# The synthetic package's vbaProject.bin is a stand-in, not an OLE file, because
+# only Word can write a real one. Tell the two Python checks in check-dotm.sh
+# (4c, the VBA references; 4d, the modules against src/) so they SKIP it: with
+# olefile installed they would otherwise reject every package this script
+# builds, which is not what is under test here. That is exactly what happened
+# on machines with olefile before this line existed -- CI stayed green only
+# because its lint job never installs olefile. A real template must never be
+# checked with this set.
+export LINGTEX_VBA_STANDIN=1
+
 work=$(mktemp -d 2>/dev/null || mktemp -d -t lingtextest)
 
 # Two of the negative cases deliberately mutate the repository -- a stale manifest
