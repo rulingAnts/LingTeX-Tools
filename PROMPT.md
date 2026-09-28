@@ -17,7 +17,8 @@ When FLEx copies interlinear text to the clipboard it produces **tab-separated c
 3. **Morpheme boundary markers are embedded as *prefixes* on the morpheme text**, not standalone columns. Examples: `=ve` (the `=` is the boundary, `ve` is the morpheme), `=zi`, `=xo`. There is no format like `levo | = | zi` — the actual format is `levo | =zi` (boundary attached to the enclitic).
 4. **Tier labels:** The `Morphemes` row label may appear at absolute column 0. The `Lex. Gloss` row may have a leading tab (label at absolute column 1). When aligning columns across tiers, strip the label and treat the *data* columns 0-indexed.
 5. **Free translation:** Lines starting with `Free` (or a language tag after `Free`) are free-translation text, not interlinear tiers.
-6. **Blocks:** Multiple examples are separated by blank lines. Each block starts with an optional example number (digits).
+6. **Blocks:** Multiple examples are separated by blank lines, or by a line that starts with a new example number: a FLEx Print View copy of consecutive lines has no blank line between them. Each block starts with an optional example number (digits, `1.1` style allowed).
+7. **Trailing cells and the section sign:** trailing tabs are columns and are never stripped (only trailing spaces are). A cell that is exactly `§`, FLEx's end-of-segment sign, is dropped, and a column that is empty on every tier is dropped with it.
 
 ---
 
@@ -182,6 +183,30 @@ Free Eng (When) she picked her yams (early)--that is, all of them--her with Xelv
 zel	vimo	rixu=xo	xu=zevi	Ozivela	ze:	zel	vimo	rixu=xo	Vo	vu=ve	levo=zi	zo	z	zuvo=ve=zi
 yam	pick.CMP	stack.CMP=SEQ	3SG=all	P.N.	ACMP	yam	pick.CMP	stack.CMP=SEQ	P.N.	fox=ERG	follow.CMP=REL	FOC	1SG	dream=ABL=REL
 (When) she picked her yams (early)--that is, all of them...
+```
+
+---
+
+## Example 3 for verification
+
+A gloss spread over the cells AFTER its morpheme's, at the END of the row: the
+morpheme's own gloss cell is empty, the pieces follow under empty morpheme
+cells, and the morpheme row ends in those empty cells. FLEx copies this shape
+for the last morpheme of a line (seen live 2026-09-28). The trailing tabs are
+columns; stripping them loses the gloss.
+
+**Input:**
+```
+Morphemes→vu→=ve→zo→zuvo→→
+→Lex. Gloss→fox→ERG→dream→→follow→.CMP
+Free Eng The fox's dream was followed.
+```
+
+**Expected TSV output:**
+```
+vu=ve	zo	zuvo
+fox=ERG	dream	follow.CMP
+The fox's dream was followed.
 ```
 
 ---

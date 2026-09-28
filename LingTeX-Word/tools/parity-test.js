@@ -91,7 +91,25 @@ function loadVectors() {
 var vectors = loadVectors();
 
 section('Golden vectors (derived from PROMPT.md)');
-ok('found 2 input vectors in PROMPT.md', vectors.length === 2, 'found ' + vectors.length);
+ok('found 3 input vectors in PROMPT.md', vectors.length === 3, 'found ' + vectors.length);
+
+// FLEx's end-of-segment sign "\u00A7" ends a line in some copies (its .flextext
+// importer adds it; seen live 2026-09-28). A cell that is exactly "\u00A7" is
+// dropped, with the column it leaves empty on every tier -- here the gloss
+// row's trailing tab -- and a leading example number reads as Print View
+// copies it.
+(function () {
+    var v2 = vectors[1];
+    var ls = v2.raw.split('\n');
+    var raw = '1.1\t' + ls[0] + '\t\u00A7\n' + ls[1] + '\t\n' + ls.slice(2).join('\n');
+    var models = R.buildModels(raw, R.WORD_ALIGNED);
+    ok('example 2 with a number and a trailing section sign parses to one block', models.length === 1, 'got ' + models.length);
+    if (models.length === 1) {
+        var rows = R.modelToTsv(models[0]).split('\n');
+        eq('  its form row is example 2\'s', rows[0], v2.expected[0]);
+        eq('  its gloss row is example 2\'s', rows[1], v2.expected[1]);
+    }
+})();
 
 vectors.forEach(function (v) {
     var models = R.buildModels(v.raw, R.WORD_ALIGNED);

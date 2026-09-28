@@ -359,12 +359,47 @@ Private Function Vector2Glosses() As String
         T & "dream=ABL=REL"
 End Function
 
+' PROMPT.md example 3, input.  A gloss spread over the cells after its
+' morpheme's at the END of the row: the morpheme row ends in empty cells, which
+' the parser must keep as columns (seen live 2026-09-28).
+Private Function Vector3Raw() As String
+    Vector3Raw = _
+        "Morphemes" & T & "vu" & T & "=ve" & T & "zo" & T & "zuvo" & T & T & vbLf & _
+        T & "Lex. Gloss" & T & "fox" & T & "ERG" & T & "dream" & T & T & "follow" & T & ".CMP" & vbLf & _
+        "Free Eng The fox's dream was followed."
+End Function
+
+Private Function Vector3Forms() As String
+    Vector3Forms = "vu=ve" & T & "zo" & T & "zuvo"
+End Function
+
+Private Function Vector3Glosses() As String
+    Vector3Glosses = "fox=ERG" & T & "dream" & T & "follow.CMP"
+End Function
+
+' A vector with a leading example number, as Print View copies it, and FLEx's
+' end-of-segment sign as a last cell of the first row with an empty gloss cell
+' under it: both must fall away.  Pure ASCII source, so ChrW(&HA7).
+Private Function WithSectionSign(ByVal raw As String) As String
+    Dim p1 As Long, p2 As Long
+    p1 = InStr(raw, vbLf)
+    p2 = InStr(p1 + 1, raw, vbLf)
+    WithSectionSign = "1.1" & T & Left$(raw, p1 - 1) & T & ChrW(&HA7) & _
+                      Mid$(raw, p1, p2 - p1) & T & Mid$(raw, p2)
+End Function
+
 Private Sub TestGoldenVectors()
     Section "Golden vectors (PROMPT.md)"
     CheckVector "example 1", Vector1Raw(), Vector1Forms(), Vector1Glosses(), _
                 "Concerning what I'm dreaming about."
     CheckVector "example 2", Vector2Raw(), Vector2Forms(), Vector2Glosses(), _
                 "(When) she picked her yams."
+    CheckVector "example 3 (a gloss spread to the row's end)", Vector3Raw(), Vector3Forms(), Vector3Glosses(), _
+                "The fox's dream was followed."
+    ' A cell that is exactly "section sign" is dropped, and the column it
+    ' leaves empty on every tier with it (Seth, 2026-09-15; seen live 2026-09-28).
+    CheckVector "example 2 with a number and a trailing section sign", WithSectionSign(Vector2Raw()), _
+                Vector2Forms(), Vector2Glosses(), "(When) she picked her yams."
 End Sub
 
 Private Sub CheckVector(ByVal name As String, ByVal raw As String, _

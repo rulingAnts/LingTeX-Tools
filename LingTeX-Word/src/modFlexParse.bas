@@ -670,6 +670,43 @@ End Function
 ' Parse one block into tier labels and raw column arrays.
 ' Port of docs\core.js parseFLExBlock.
 '-----------------------------------------------------------------------------
+' Drop every data column that is empty on every tier: what a dropped "section
+' sign" leaves, or a stray trailing tab.  Index 0 is the tier label and stays.
+' Tiers may be ragged; a tier too short for a column counts as empty there.
+' Port of docs/core.js dropEmptyColumns.
+Private Sub DropEmptyColumns(ByRef b As FlexBlock)
+    Dim t As Long, j As Long, k As Long, maxU As Long, allEmpty As Boolean
+    Dim cols() As String
+
+    If b.TierCount = 0 Then Exit Sub
+    maxU = 0
+    For t = 0 To b.TierCount - 1
+        cols = b.ColArrays(t)
+        If UBound(cols) > maxU Then maxU = UBound(cols)
+    Next t
+    For j = maxU To 1 Step -1
+        allEmpty = True
+        For t = 0 To b.TierCount - 1
+            cols = b.ColArrays(t)
+            If j <= UBound(cols) Then
+                If cols(j) <> "" Then allEmpty = False
+            End If
+        Next t
+        If allEmpty Then
+            For t = 0 To b.TierCount - 1
+                cols = b.ColArrays(t)
+                If j <= UBound(cols) Then
+                    For k = j To UBound(cols) - 1
+                        cols(k) = cols(k + 1)
+                    Next k
+                    ReDim Preserve cols(0 To UBound(cols) - 1)
+                    b.ColArrays(t) = cols
+                End If
+            Next t
+        End If
+    Next j
+End Sub
+
 Public Function ParseFlexBlock(ByVal text As String) As FlexBlock
     Dim res As FlexBlock
     Dim lines() As String, i As Long, j As Long
@@ -690,16 +727,19 @@ Public Function ParseFlexBlock(ByVal text As String) As FlexBlock
 
     For i = 0 To UBound(lines)
         ln = lines(i)
-        ' Strip trailing blanks but keep interior tabs: an empty trailing
-        ' column is meaningful, an empty trailing run of spaces is not.
+        ' Strip trailing SPACES and keep every tab: an empty cell at the end
+        ' of a row is a column.  FLEx spreads a gloss over the cells after its
+        ' morpheme's, and for the last morpheme of a line those cells END the
+        ' morpheme row -- stripping them lost the gloss (seen live 2026-09-28;
+        ' PROMPT.md example 3).  A line of nothing but blanks and tabs is blank.
         Do While Len(ln) > 0
-            If Right$(ln, 1) = " " Or Right$(ln, 1) = vbTab Then
+            If Right$(ln, 1) = " " Then
                 ln = Left$(ln, Len(ln) - 1)
             Else
                 Exit Do
             End If
         Loop
-        If Trim$(ln) = "" Then GoTo NextLine
+        If Trim$(Replace(ln, vbTab, "")) = "" Then GoTo NextLine
 
         ' An example number on the first line becomes the block's reference.
         If res.LineNum = "" Then
@@ -730,6 +770,8 @@ Public Function ParseFlexBlock(ByVal text As String) As FlexBlock
             cols = Split(NormalizeLabels(StripInvisible(ln)), vbTab)
             For j = 0 To UBound(cols)
                 cols(j) = Trim$(cols(j))
+                ' FLEx's end-of-segment sign is not data (Seth, 2026-09-15).
+                If cols(j) = ChrW(&HA7) Then cols(j) = ""
             Next j
             ' The Lex. Gloss row often has its label in column 1, not 0, so a
             ' leading empty column is dropped.  The bounds test has to come
@@ -754,6 +796,7 @@ NextLine:
     If res.TierCount > 0 Then
         ReDim Preserve res.LineTypes(0 To res.TierCount - 1)
         ReDim Preserve res.ColArrays(0 To res.TierCount - 1)
+        DropEmptyColumns res
     End If
     If res.FreeCount > 0 Then
         ReDim Preserve res.FreeLines(0 To res.FreeCount - 1)

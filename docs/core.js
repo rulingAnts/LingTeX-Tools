@@ -185,8 +185,12 @@
         var lineNum    = null;
         var seenFree   = false;
 
+        // Trailing SPACES go; trailing TABS stay. An empty cell at the end of
+        // a row is a column: FLEx spreads a gloss over the cells after its
+        // morpheme's, and for the last morpheme of a line those cells END
+        // the morpheme row (seen live 2026-09-28; PROMPT.md example 3).
         var rawLines = text.split('\n')
-            .map(function (l) { return String(l).replace(/[ \t]+$/, ''); })
+            .map(function (l) { return String(l).replace(/ +$/, ''); })
             .filter(function (l) { return l.replace(/^\s+/, '') !== ''; });
 
         for (var i = 0; i < rawLines.length; i++) {
@@ -225,7 +229,11 @@
                     .replace(/Lex\. Gloss/g,   'LexGloss')
                     .replace(/Word Gloss/g,    'WordGloss')
                     .replace(/Word Cat\./g,    'WordCat');
-                cols = normalized.split('\t').map(function (c) { return c.trim(); });
+                cols = normalized.split('\t').map(function (c) {
+                    c = c.trim();
+                    // FLEx's end-of-segment sign is not data (Seth, 2026-09-15).
+                    return c === '\u00A7' ? '' : c;
+                });
 
                 // If first column is empty, shift left (skip the leading empty column
                 // that occurs when the tier label is in column 1)
@@ -243,8 +251,24 @@
             colArrays.push(cols);
         }
 
+        dropEmptyColumns(colArrays);
         return { lineTypes: lineTypes, colArrays: colArrays,
                  freeLines: freeLines, lineNum: lineNum };
+    }
+
+    /**
+     * Drop every data column that is empty on every tier: what a dropped
+     * "\u00A7" leaves, or a stray trailing tab. Index 0 is the tier label and
+     * stays. Tiers may be ragged; a tier too short for a column counts as
+     * empty there.
+     */
+    function dropEmptyColumns(colArrays) {
+        var max = 0;
+        colArrays.forEach(function (c) { if (c.length > max) max = c.length; });
+        for (var j = max - 1; j >= 1; j--) {
+            var empty = colArrays.every(function (c) { return j >= c.length || c[j] === ''; });
+            if (empty) colArrays.forEach(function (c) { if (j < c.length) c.splice(j, 1); });
+        }
     }
 
     // ── Word-grouping algorithm (tab-format columns) ──────────────────────────
