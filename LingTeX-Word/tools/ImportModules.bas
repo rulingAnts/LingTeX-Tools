@@ -162,6 +162,10 @@ Private mEngineDoc As Document
 ' True while ImportLingTeXModulesQuiet runs the steps itself, so the individual
 ' commands do not each close and reload the engine.
 Private mBatch As Boolean
+' The line break CodeModule.AddFromString counts as ONE break in this editor,
+' asked at the start of each import (AskLineBreak). "" when it is none of
+' CR LF, LF and CR.
+Private mSep As String
 
 Private Function SrcFolder() As String
     SrcFolder = SRC_FOLDER
@@ -377,6 +381,7 @@ Public Sub ImportLingTeXModules()
 
     log = log & "  from     " & SrcFolder() & vbCr
     log = log & "  into     " & EnginePath() & vbCr
+    AskLineBreak vbp, log
     ' From the days when this module lived inside the engine: it must not ship.
     RemoveComponent vbp, "modImport"
     '-- the twelve standard modules: Import, which is reliable for these ------
@@ -429,6 +434,7 @@ Private Sub ImportGroup(vbp As Object, ByVal fileList As String, _
     Dim i As Long
     Dim leaf As String, fullPath As String, compName As String
     Dim note As String
+    Dim got As Long, want As Long, counts As String
 
     names = Split(fileList, "|")
     For i = 0 To UBound(names)
@@ -453,14 +459,26 @@ Private Sub ImportGroup(vbp As Object, ByVal fileList As String, _
             End If
 
             note = ImportOne(vbp, fullPath, compName, kind)
-            If note = "" Then
-                log = log & "  ok       " & leaf & KindNote(kind) & vbCr
-                okCount = okCount + 1
-            ElseIf Left$(note, 5) = "NOTE:" Then
+            If note = "" Or Left$(note, 5) = "NOTE:" Then
+                ' In. Does it hold as many lines as its source? A class given
+                ' the wrong line breaks comes out double-spaced and passes
+                ' every other check here: until 2026-09-15 both classes and the
+                ' form did, and were reported ok. One line over is let through,
+                ' so an editor's empty last line cannot fail an import whose
+                ' fix has to be pasted by hand; doubling is hundreds of lines.
+                got = LineCount(vbp, compName)
+                want = SourceLineCount(fullPath)
+                counts = "  " & CStr(got) & " lines, source " & CStr(want)
+                If got < want Or got > want + 1 Then
+                    log = log & "  FAILED   " & leaf & counts & KindNote(kind) & vbCr
+                    log = log & "           it does not hold its source line for line" & vbCr
+                    failCount = failCount + 1
+                Else
+                    log = log & "  ok       " & leaf & counts & KindNote(kind) & vbCr
+                    okCount = okCount + 1
+                End If
                 ' In, with something to check (the MSForms reference, below).
-                log = log & "  ok       " & leaf & KindNote(kind) & vbCr
-                log = log & "           " & Mid$(note, 6) & vbCr
-                okCount = okCount + 1
+                If note <> "" Then log = log & "           " & Mid$(note, 6) & vbCr
             ElseIf kind > 1 Then
                 ' A class or form that could not be created from code is not a
                 ' failure to argue with -- it is two minutes of pasting. Say which.
@@ -630,8 +648,8 @@ Public Sub VerifyLingTeXModules()
     If problems = 0 Then
         Report "All " & CStr(UBound(names) + 1) & " modules present and of the " & _
                "right kind." & vbCr & vbCr & log & vbCr & _
-               "Next:  RunAllTests    (expect ALL PASS, 79 checks)" & vbCr & _
-               "then:  RunDocTests    (expect ALL PASS, about 400 checks)" & vbCr & _
+               "Next:  RunAllTests    (expect ALL PASS, 116 checks)" & vbCr & _
+               "then:  RunDocTests    (expect ALL PASS, about 490 checks)" & vbCr & _
                "then:  LingTeXStart   (arms the hooks; any command does too)", True
     Else
         Report CStr(problems) & " problem(s) with the project:" & vbCr & vbCr & log & _
@@ -768,6 +786,10 @@ Private Function ImportOne(vbp As Object, ByVal fullPath As String, _
         Exit Function
     End If
     code = StripVbaMetadata(code)
+    If mSep = "" Then
+        ImportOne = "AddFromString took none of CR LF, LF and CR as one line break"
+        Exit Function
+    End If
 
     On Error Resume Next
     ' A UserForm that is already there is reused (see ImportGroup).
@@ -818,10 +840,11 @@ Private Function ImportOne(vbp As Object, ByVal fullPath As String, _
 
     ' A new class module may already carry Option Explicit, depending on the
     ' editor's "Require Variable Declaration" setting, and a second one is a
-    ' compile error. Clear it out before adding the source.
+    ' compile error. Clear it out before adding the source. Its lines are
+    ' joined with LF; they go in with the break AddFromString counts as one.
     With comp.CodeModule
         If .CountOfLines > 0 Then .DeleteLines 1, .CountOfLines
-        .AddFromString code
+        .AddFromString Replace(code, ChLF(), mSep)
     End With
     If Err.Number <> 0 Then
         ImportOne = "could not add the code (" & CStr(Err.Number) & ": " & _
@@ -904,11 +927,23 @@ Private Function IsFormFile(ByVal leaf As String) As Boolean
 End Function
 
 '-----------------------------------------------------------------------------
-' A whole text file as one string, with this platform's line endings.
+' A whole text file as one string, every line break in it an LF.
 '
 ' Read as binary rather than with Line Input so the file's own line endings do
-' not matter: both are normalised here. That is the point of doing it this way --
-' the bug being avoided is a line-ending bug.
+' not matter: CR LF (the repository's, see .gitattributes), CR and LF all
+' become LF here, and ImportOne puts in the break AddFromString wants.
+'
+' By character code, never with vbCrLf or vbNewLine: in the VBA of Word for Mac
+' 16.112, vbCrLf is LF then CR and vbNewLine is LF alone (measured 2026-09-15).
+' This used to be Replace(buf, vbCrLf, vbLf), which on the Mac matched no CR LF
+' in the file, then Replace(buf, vbCr, vbLf), which made each CR LF an LF LF.
+' Both classes and the form went in double-spaced (the engine saved on
+' 2026-09-15 holds 521 lines of clsAppEvents for its 272), and that was put
+' down to AddFromString counting CR and LF as two breaks -- but no CR ever
+' reached AddFromString: the text was LF LF already. The blank lines did no
+' harm until a "_" continuation was followed by one, a syntax error
+' (clsAppEvents, 2026-09-12). The .bas files never had the problem: Import
+' reads the file itself.
 '-----------------------------------------------------------------------------
 Private Function ReadTextFile(ByVal fullPath As String) As String
     Dim fn As Integer
@@ -923,16 +958,7 @@ Private Function ReadTextFile(ByVal fullPath As String) As String
     End If
     Close #fn
 
-    ' CRLF -> LF -> CR -> LF collapses every convention to LF, then one pass
-    ' back to THIS platform's newline: CRLF on Windows, CR on Mac (vbNewLine).
-    ' Mac Word's AddFromString treats CR and LF as two line breaks, so a CRLF
-    ' string arrives double-spaced -- harmless until a "_" continuation is
-    ' followed by one of those blank lines, which is a syntax error (found in
-    ' clsAppEvents, 2026-09-12). Doing it in this order means a CRLF file is not
-    ' turned into CR CR LF.
-    buf = Replace(buf, vbCrLf, vbLf)
-    buf = Replace(buf, vbCr, vbLf)
-    ReadTextFile = Replace(buf, vbLf, vbNewLine)
+    ReadTextFile = BreaksToLF(buf)
     Exit Function
 
 Failed:
@@ -954,14 +980,12 @@ Private Function StripVbaMetadata(ByVal code As String) As String
     Dim inPre As Boolean, started As Boolean
     Dim out As String
 
-    ' Whatever newline the text arrived with. ReadTextFile ends lines with the
-    ' platform's (CR on Mac); splitting on CRLF here turned a Mac class file
-    ' into ONE line beginning "VERSION 1.0 CLASS", which this then skipped
-    ' whole -- and both classes were created empty and reported ok
-    ' (2026-09-12). Lines are joined back with the platform's newline.
-    code = Replace(code, vbCrLf, vbLf)
-    code = Replace(code, vbCr, vbLf)
-    lines = Split(code, vbLf)
+    ' Whatever line breaks the text arrived with, found by character code (see
+    ' ReadTextFile), and the lines joined back with LF. Splitting on vbCrLf
+    ' here once turned a Mac class file into ONE line beginning "VERSION 1.0
+    ' CLASS", which this then skipped whole -- and both classes were created
+    ' empty and reported ok (2026-09-12).
+    lines = Split(BreaksToLF(code), ChLF())
     For i = 0 To UBound(lines)
         ln = lines(i)
         t = Trim$(ln)
@@ -986,11 +1010,16 @@ Private Function StripVbaMetadata(ByVal code As String) As String
             If out = "" Then
                 out = ln
             Else
-                out = out & vbNewLine & ln
+                out = out & ChLF() & ln
             End If
         End If
     Next i
 
+    ' Not the empty line after the file's last line break: the line count
+    ' checked after the import is of the code alone.
+    Do While Right$(out, 1) = ChLF()
+        out = Left$(out, Len(out) - 1)
+    Loop
     StripVbaMetadata = out
 End Function
 
@@ -1002,6 +1031,127 @@ Private Function IsPreambleBegin(ByVal t As String) As Boolean
         IsPreambleBegin = True
     End If
 End Function
+
+'-----------------------------------------------------------------------------
+' LINE BREAKS, BY CHARACTER CODE
+'
+' Never vbCrLf or vbNewLine to find, split or join lines: in the VBA of Word
+' for Mac 16.112, vbCrLf is LF then CR and vbNewLine is LF alone (2026-09-15;
+' vbCr and vbLf are what they say). The engine has LINE_CR, LINE_LF and
+' LINE_CRLF in modFlexParse for this; this module is pasted alone and may use
+' nothing of the engine's, so it has its own. tools/vba-lint.py checks both.
+'-----------------------------------------------------------------------------
+Private Function ChCR() As String
+    ChCR = Chr$(13)
+End Function
+
+Private Function ChLF() As String
+    ChLF = Chr$(10)
+End Function
+
+Private Function ChCRLF() As String
+    ChCRLF = Chr$(13) & Chr$(10)
+End Function
+
+' Every line break in s -- CR LF, CR or LF -- as LF. CR LF first, so that it
+' does not become two.
+Private Function BreaksToLF(ByVal s As String) As String
+    BreaksToLF = Replace(Replace(s, ChCRLF(), ChLF()), ChCR(), ChLF())
+End Function
+
+Private Function HasBreak(ByVal s As String) As Boolean
+    HasBreak = (InStr(s, ChCR()) > 0 Or InStr(s, ChLF()) > 0)
+End Function
+
+' Lines in text joined with LF; 0 for none.
+Private Function CodeLineCount(ByVal code As String) As Long
+    If code = "" Then Exit Function
+    CodeLineCount = Len(code) - Len(Replace(code, ChLF(), "")) + 1
+End Function
+
+' The lines a component made from this file should hold: its code, without the
+' preamble and the Attribute lines, which the editor keeps out of sight.
+Private Function SourceLineCount(ByVal fullPath As String) As Long
+    SourceLineCount = CodeLineCount(StripVbaMetadata(ReadTextFile(fullPath)))
+End Function
+
+' The character codes of a string: "[13+10]".
+Private Function CharCodes(ByVal s As String) As String
+    Dim i As Long, out As String
+    For i = 1 To Len(s)
+        If i > 1 Then out = out & "+"
+        out = out & CStr(AscW(Mid$(s, i, 1)))
+    Next i
+    CharCodes = "[" & out & "]"
+End Function
+
+Private Function SepName(ByVal sep As String) As String
+    If sep = ChCRLF() Then
+        SepName = "CR LF"
+    ElseIf sep = ChLF() Then
+        SepName = "LF"
+    ElseIf sep = ChCR() Then
+        SepName = "CR"
+    Else
+        SepName = "none of CR LF, LF and CR"
+    End If
+End Function
+
+'-----------------------------------------------------------------------------
+' Ask CodeModule.AddFromString which line break it counts as ONE: CR LF, LF or
+' CR, tried in that order in a scratch module that is removed again. Sets mSep
+' ("" if none gives three lines with no break left inside them) and logs the
+' answer, with what vbCr, vbLf, vbCrLf and vbNewLine are here.
+'
+' Asked, not assumed, as LingTeX-PowerPoint's importer does. CR LF first,
+' because it is what Windows was always given here. Word and PowerPoint for
+' Mac 16.112 take LF (2026-09-15).
+'-----------------------------------------------------------------------------
+Private Sub AskLineBreak(vbp As Object, ByRef log As String)
+    Dim comp As Object
+    Dim seps(2) As String
+    Dim i As Long
+    Dim nm As String, probe As String
+
+    seps(0) = ChCRLF()
+    seps(1) = ChLF()
+    seps(2) = ChCR()
+    mSep = ""
+
+    On Error Resume Next
+    Set comp = vbp.VBComponents.Add(1)          ' 1 = vbext_ct_StdModule
+    If Err.Number <> 0 Or comp Is Nothing Then
+        log = log & "  breaks   could not add a scratch module to ask AddFromString (" & _
+              CStr(Err.Number) & ": " & Err.Description & ")" & vbCr
+        Err.Clear
+        On Error GoTo 0
+        Exit Sub
+    End If
+    nm = comp.Name
+    For i = 0 To 2
+        probe = ""
+        With comp.CodeModule
+            If .CountOfLines > 0 Then .DeleteLines 1, .CountOfLines
+            .AddFromString "' one" & seps(i) & "' two" & seps(i) & "' three"
+            ' Two steps, because under Resume Next an error inside an If's
+            ' condition runs its Then part.
+            If .CountOfLines = 3 Then probe = .Lines(1, 1) & .Lines(2, 1)
+        End With
+        If Err.Number = 0 And probe <> "" And Not HasBreak(probe) Then mSep = seps(i)
+        Err.Clear
+        If mSep <> "" Then Exit For
+    Next i
+    vbp.VBComponents.Remove comp
+    If Err.Number <> 0 Then
+        log = log & "  STRAY    the scratch module " & nm & " could not be removed: delete it" & vbCr
+        Err.Clear
+    End If
+    On Error GoTo 0
+
+    log = log & "  breaks   AddFromString takes " & SepName(mSep) & " as one line break here" & vbCr
+    log = log & "           vbCr " & CharCodes(vbCr) & ", vbLf " & CharCodes(vbLf) & _
+          ", vbCrLf " & CharCodes(vbCrLf) & ", vbNewLine " & CharCodes(vbNewLine) & vbCr
+End Sub
 
 Private Function GetProject() As Object
     Dim vbp As Object
@@ -1123,7 +1273,11 @@ Private Function AppendReport(ByVal text As String) As Boolean
     On Error GoTo Failed
     fn = FreeFile
     Open path For Append As #fn
-    Print #fn, text
+    ' Built with vbCr between lines; written with this platform's newline,
+    ' vbNewLine (CR LF on Windows, LF on Mac), as modTests.WriteReportFile
+    ' does. A bare CR is "back to the start of the line" in a terminal, so
+    ' run-in-word.sh's printout of this file would draw each line over the last.
+    Print #fn, Replace(text, vbCr, vbNewLine)
     Print #fn, ""
     Close #fn
     AppendReport = True

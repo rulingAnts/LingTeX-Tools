@@ -42,7 +42,12 @@
 .wm-group-label { margin-top: .25cqw; color: #605e5c; font: .92cqw 'Segoe UI', system-ui, sans-serif; white-space: nowrap; }
 
 /* FLEx: menu bar, the Texts & Words sidebar, and a text's tabs */
-.wm-menubar { display: flex; gap: 1.5cqw; flex-shrink: 0; padding: .45cqw 1.2cqw; background: #fff; border-bottom: 1px solid #e5e5e5; color: #1f1f1f; font: 1.08cqw 'Segoe UI', system-ui, sans-serif; white-space: nowrap; overflow: hidden; }
+.wm-menubar { position: relative; z-index: 4; display: flex; gap: 1.5cqw; flex-shrink: 0; padding: .45cqw 1.2cqw; background: #fff; border-bottom: 1px solid #e5e5e5; color: #1f1f1f; font: 1.08cqw 'Segoe UI', system-ui, sans-serif; white-space: nowrap; }
+/* A menu-bar item with a drop-down inside it, so the menu hangs under the item
+   at every size. FLEx has no Copy on its right-click menu: Edit > Copy is how
+   an interlinear text leaves FLEx, so that is what the demos show. */
+.wm-menu-item { position: relative; margin: -.15cqw -.45cqw; padding: .15cqw .45cqw; }
+.wm-dropdown { left: 0; top: calc(100% + .3cqw); width: 17cqw; text-align: left; }
 .wm-flex-main { flex: 1; display: flex; min-height: 0; }
 .wm-sidebar { display: flex; flex-direction: column; flex-shrink: 0; width: 14.5cqw; background: #f4f6f9; border-right: 1px solid #d5dae2; color: #1f2937; font: 1.02cqw 'Segoe UI', system-ui, sans-serif; white-space: nowrap; }
 .wm-side-head { padding: .55cqw 1cqw; background: linear-gradient(#e9eef6, #d9e2ef); border-bottom: 1px solid #c9d2df; font-weight: 600; }
@@ -61,7 +66,43 @@
 
 /* A Windows context menu; each demo places it and animates it */
 .wm-ctx { position: absolute; z-index: 3; width: 19cqw; padding: .35cqw 0; opacity: 0; background: #f9f9f9; border: 1px solid #ccc; box-shadow: .25cqw .25cqw .7cqw rgba(0,0,0,.28); color: #1f1f1f; font: 1.12cqw 'Segoe UI', system-ui, sans-serif; }
+.wm-ctx div, .wm-ctx hr { box-sizing: border-box; }
 .wm-ctx div { display: flex; justify-content: space-between; margin: 0 .3cqw; padding: .4cqw 1.2cqw .4cqw 2.6cqw; border: 1px solid transparent; }
 .wm-ctx kbd { color: #6b6b6b; font: inherit; }
 .wm-ctx .dim, .wm-ctx .dim kbd { color: #a8a8a8; }
 .wm-ctx hr { margin: .3cqw .3cqw .3cqw 2.6cqw; border: 0; border-top: 1px solid #d9d9d9; }
+
+/* FLEx: Tools > Configure submenu, the Print View's bold label pile, and the
+   Configure Interlinear Lines dialog.  From FieldWorks 9.3's own sources
+   (ConfigureInterlinDialog .resx/.Designer.cs/.cs, ConfigureInterlinear.css,
+   InterlinVc): title, one-line instruction, a grid of checkboxes -- lines as
+   rows, writing systems as columns (Baseline, vernaculars, Best Analysis,
+   analyses) -- mauve morpheme rows, drag handles, empty cells where a line
+   cannot use a writing system, and OK / Cancel / Help.  Each demo animates it
+   with its own classes (mock-*, td-*). */
+.wm-submenu-host { position: relative; }
+.wm-submenu { left: calc(100% - .3cqw); top: -.4cqw; width: 24cqw; }
+.wm-arrow { align-self: center; width: 0; height: 0; margin-right: -.7cqw; border-top: .33cqw solid transparent; border-bottom: .33cqw solid transparent; border-left: .38cqw solid currentColor; }
+
+.wm-labels > div:first-child, .wm-labels span { color: #000 !important; font: 700 1.2cqw/2.08cqw 'Segoe UI', system-ui, sans-serif !important; }
+.wm-labels span:last-child { line-height: normal !important; font-size: 1.25cqw !important; }
+
+.wm-dlg { position: absolute; inset: 0; z-index: 5; width: 64.3cqw; height: 37.9cqw; margin: auto; display: flex; flex-direction: column; background: #f0f0f0; border: 1px solid #7a7a7a; box-shadow: 0 1cqw 3cqw rgba(0,0,0,.35); opacity: 0; text-align: left; }
+.wm-dlg .wm-titlebar { height: 2.8cqw; gap: .8cqw; padding-left: .9cqw; font-size: 1.05cqw; }
+.wm-dlg .wm-icon { width: 1.5cqw; height: 1.5cqw; font-size: .9cqw; }
+.wm-dlg .wm-controls i { width: 4cqw; }
+.wm-dlg-client { position: relative; flex: 1; min-height: 0; display: grid; grid-template-rows: 2.16cqw minmax(0, 1fr) 2.7cqw; color: #000; font: 1cqw/1.3 'Microsoft Sans Serif', Tahoma, Arial, sans-serif; }
+.wm-dlg-desc { padding: .1cqw 0 0 .27cqw; white-space: nowrap; overflow: hidden; }
+.wm-dlg-web { min-height: 0; margin: .9cqw; overflow: hidden; background: #fff; }
+.wm-dlg-grid, .wm-dlg-grp { display: grid; grid-template-columns: 2em 2em 8em repeat(4, 4em); }
+.wm-dlg-grid { font: 1.44cqw/1.15 Arial, 'Liberation Sans', sans-serif; white-space: nowrap; }
+.wm-dlg-grp { grid-column: 1 / -1; }
+.wm-dlg-grp > span, .wm-dlg-row > span { color: #555; text-align: center; }
+.wm-dlg-row { grid-column: 2 / -1; display: grid; grid-template-columns: 2em 8em repeat(4, 4em); }
+.wm-dlg-row.morph { background: #c18cb1; }
+.wm-dlg-grid .gc { min-height: 2.1cqw; border-top: 1px solid #dfdfdf; border-left: 1px solid #dfdfdf; text-align: center; }
+.wm-cb { position: relative; display: inline-block; vertical-align: top; width: 1.17cqw; height: 1.17cqw; margin: .27cqw .27cqw 0 .36cqw; background: #fff; border: 1px solid #333; }
+.wm-cb.on::after { content: ''; position: absolute; left: 30%; top: 5%; width: 35%; height: 65%; border: solid #1f1f1f; border-width: 0 .16cqw .16cqw 0; transform: rotate(45deg); }
+.wm-dlg-btns { display: flex; flex-direction: row-reverse; gap: .54cqw; padding: .27cqw .54cqw 0 0; }
+.wm-dlg-btns span { position: relative; display: grid; place-items: center; width: 6.75cqw; height: 2.07cqw; background: #e1e1e1; border: 1px solid #adadad; }
+.wm-dlg-grip { position: absolute; right: .1cqw; bottom: .1cqw; width: 1.1cqw; height: 1.1cqw; background: radial-gradient(circle, #9a9a9a 30%, transparent 40%) 0 0 / .37cqw .37cqw; clip-path: polygon(100% 0, 100% 100%, 0 100%); }

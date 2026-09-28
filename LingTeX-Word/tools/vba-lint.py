@@ -41,6 +41,19 @@ WINDOWS_ONLY = {
     r"\bDeclare\s+(PtrSafe\s+)?(Function|Sub)\b": "Win32 Declare needs an #If Mac Then guard",
 }
 
+# Line breaks found, split or normalised with vbCrLf or vbNewLine. Those are not
+# what their names say on every host: in the VBA of Word and PowerPoint for Mac
+# 16.112, vbCrLf is LF then CR and vbNewLine is LF alone (2026-09-15), so
+# Replace(s, vbCrLf, vbLf) matched no real CR LF and the vbCr pass after it
+# doubled every line break. Only the FIND argument is checked (Replace's and
+# Split's second, InStr's second or third): writing output with them is not
+# finding anything.
+_ARG = r'(?:[^,()"]|\([^()]*\)|"[^"]*")*'
+FIND_BY_NEWLINE_CONST = [
+    re.compile(r"\b(?:Replace|Split)\$?\s*\(" + _ARG + r",\s*(?:vbCrLf|vbNewLine)\b", re.I),
+    re.compile(r"\bInStr(?:Rev)?\s*\((?:" + _ARG + r",\s*){1,2}(?:vbCrLf|vbNewLine)\b", re.I),
+]
+
 # VBA keywords and statement names that must not be used as a procedure name.
 # Declaring e.g. "Private Sub Line(...)" compiles in some contexts and then
 # collides with the Line Input statement in a way that reads as nonsense. Only
@@ -199,6 +212,14 @@ def check(path):
         for pat, msg in WINDOWS_ONLY.items():
             if re.search(pat, t, re.I):
                 problems.append((n, msg))
+        # The engine, and the importer that installs it: tools/ImportModules.bas
+        # is pasted alone, so it has its own ChCRLF / ChCR / ChLF.
+        if path.parent.name == "src" or path.name == "ImportModules.bas":
+            if any(p.search(mask_strings(t)) for p in FIND_BY_NEWLINE_CONST):
+                fix = ("use ChCRLF, ChCR, ChLF or BreaksToLF (its own: it is pasted alone)"
+                       if path.name == "ImportModules.bas" else
+                       "use LINE_CRLF, LINE_CR, LINE_LF or NormalizeLineBreaks (modFlexParse)")
+                problems.append((n, "vbCrLf / vbNewLine used to find, split or normalise line breaks; " + fix))
         # VBA does NOT short-circuit And/Or: every operand is evaluated. So a
         # bounds guard written as `If i <= UBound(a) And a(i) = x` still
         # evaluates a(i) and raises "subscript out of range". The guard has to be
@@ -864,11 +885,14 @@ def check_wd_constants(files):
 
 def check_no_continuation_in_classes(files):
     """No line continuation in a .cls or a .frm. The classes are installed by the bootstrap
-    from a string, and on Mac Word that arrives double-spaced (see ReadTextFile in
-    ImportModules.bas), so a "_" followed by a blank line is a compile error that
-    surfaces only when the class is first used -- the events section, after
-    everything else passed (clsAppEvents, 2026-09-12). Build long strings with
-    several statements instead. The form's code goes in the same way."""
+    from a string, and until 2026-09-15 that string arrived double-spaced on Mac Word:
+    ImportModules.bas normalised line breaks with vbCrLf, which is LF CR there (see
+    ReadTextFile). A "_" followed by one of those blank lines was a compile error that
+    surfaced only when the class was first used -- the events section, after
+    everything else passed (clsAppEvents, 2026-09-12). The rule can go once an import
+    with the re-pasted modImport logs both classes and the form at their source's line
+    count; until then, build long strings with several statements. The form's code
+    goes in the same way."""
     problems = []
     for f in files:
         if f.suffix.lower() not in (".cls", ".frm"):

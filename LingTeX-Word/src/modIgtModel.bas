@@ -145,8 +145,8 @@ Public Function LooksLikeFlex(ByVal raw As String) As Boolean
     Dim lines() As String, i As Long, j As Long
     Dim ln As String, fields() As String, first As String
 
-    raw = Replace(Replace(raw, vbCrLf, vbLf), vbCr, vbLf)
-    lines = Split(raw, vbLf)
+    raw = NormalizeLineBreaks(raw)
+    lines = Split(raw, LINE_LF)
 
     For i = 0 To UBound(lines)
         ln = NormalizeLabels(StripInvisible(lines(i)))
@@ -543,8 +543,8 @@ Public Function ModelFromTsv(ByVal tsv As String) As IgtExample
     Dim cols() As String, maxCols As Long
     Dim freeAcc() As String, nFree As Long
 
-    tsv = Replace(Replace(tsv, vbCrLf, vbLf), vbCr, vbLf)
-    lines = Split(tsv, vbLf)
+    tsv = NormalizeLineBreaks(tsv)
+    lines = Split(tsv, LINE_LF)
 
     ReDim rows(0 To UBound(lines))
     ReDim roles(0 To UBound(lines))
@@ -846,8 +846,8 @@ Public Function TextLines(ByVal raw As String) As String()
     Dim i As Long, n As Long
     Dim ln As String
 
-    raw = Replace(Replace(raw, vbCrLf, vbLf), vbCr, vbLf)
-    parts = Split(raw, vbLf)
+    raw = NormalizeLineBreaks(raw)
+    parts = Split(raw, LINE_LF)
     If UBound(parts) < 0 Then                ' "" splits to nothing at all
         ReDim out(-1 To -1)
         TextLines = out
