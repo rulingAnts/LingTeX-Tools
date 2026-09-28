@@ -32,6 +32,9 @@ Option Explicit
 '   6. Composing: the fixture drawn into a scratch box by modPptCompose and
 '      inspected paragraph by paragraph -- count, the hanging number, tab
 '      stops per line, italics, small capitals, the quoted free translation.
+'   7. Insert: the fixture onto a slide of a scratch presentation as ONE
+'      pasted shape, tagged; two examples in one copy as two boxes numbered
+'      (1a), (1b); and the user's clipboard the same after as before.
 '
 ' Pure ASCII apart from ChrW$ in the generated fixture.  Break characters are
 ' Chr$(13), Chr$(10), Chr$(11); never vbCrLf.
@@ -49,6 +52,7 @@ Public Sub PptTestsRun()
     SectionClipboard
     SectionMeasure
     SectionCompose
+    SectionInsert
     Note ""
     If mFail = 0 Then
         Note "ALL PASS -- " & mPass & " passed"
@@ -281,6 +285,63 @@ Fail:
     Fail "composing", Err.Number & ": " & Err.Description
     On Error Resume Next
     If Not scratch Is Nothing Then scratch.Saved = -1: scratch.Close
+    ReleaseScratch
+End Sub
+
+'-----------------------------------------------------------------------------
+' 7. Insert
+'-----------------------------------------------------------------------------
+Private Sub SectionInsert()
+    Dim app As Object, host As Object, sld As Object, keep As Object, chk As Object, shp As Object
+    Dim n As Long, before As Long, ex As IgtExample, s As String, t As String
+    Note ""
+    Note "== 7. Insert (onto a slide of a scratch presentation)"
+    On Error GoTo Fail
+    Set app = Application
+    Set host = app.Presentations.Add(0)
+    Set sld = host.Slides.Add(1, 12)
+    ' Something of the user's on the clipboard first: a known string.
+    Set keep = sld.Shapes.AddTextbox(1, 0, 500, 300, 30)
+    keep.TextFrame2.TextRange.Text = "the user's own copy"
+    keep.TextFrame2.TextRange.Copy
+    before = sld.Shapes.Count
+    n = InsertExamples(Fixture(Chr$(10)), sld, 40, 40, 400)
+    Eq "one example from one copy", n, 1
+    Eq "  one shape pasted", sld.Shapes.Count - before, 1
+    If sld.Shapes.Count = before + 1 Then
+        Set shp = sld.Shapes(sld.Shapes.Count)
+        Ok "  it is tagged as ours", IsLingTeXExample(shp)
+        Eq "  its number tag", shp.Tags.Item(TAG_NUMBER), "(1)"
+        ex = ModelFromText(Fixture(Chr$(10)), igtWordAligned)
+        Eq "  its TSV tag is the model", shp.Tags.Item(TAG_TSV), ModelToTsv(ex)
+        Ok "  its text begins with the number", Left$(shp.TextFrame2.TextRange.Text, 4) = "(1)" & Chr$(9)
+        Ok "  it sits where asked", Abs(shp.Left - 40) < 0.5 And Abs(shp.Top - 40) < 0.5, Format$(shp.Left, "0") & "," & Format$(shp.Top, "0")
+        Ok "  its width is the wrap width", Abs(shp.Width - 400) < 0.5, Format$(shp.Width, "0")
+        Ok "  more than one wrap line drawn", shp.TextFrame2.TextRange.Paragraphs.Count > 3, shp.TextFrame2.TextRange.Paragraphs.Count & " paragraphs"
+    End If
+    ' The user's clipboard, after.
+    Set chk = sld.Shapes.AddTextbox(1, 0, 550, 300, 30)
+    chk.TextFrame2.TextRange.Paste
+    s = Replace(chk.TextFrame2.TextRange.Text, Chr$(13), "")
+    Eq "the user's clipboard is what it was", s, "the user's own copy"
+    ' Two examples in one copy.
+    before = sld.Shapes.Count
+    n = InsertExamples(Fixture(Chr$(10)) & Chr$(10) & Fixture(Chr$(10)), sld, 40, 300, 400, 2)
+    Eq "two examples from one copy", n, 2
+    If sld.Shapes.Count = before + 2 Then
+        Eq "  numbered (2a)", sld.Shapes(before + 1).Tags.Item(TAG_NUMBER), "(2a)"
+        Eq "  and (2b)", sld.Shapes(before + 2).Tags.Item(TAG_NUMBER), "(2b)"
+        Ok "  the second sits below the first", sld.Shapes(before + 2).Top > sld.Shapes(before + 1).Top + sld.Shapes(before + 1).Height - 0.5
+    End If
+    Eq "text that is not an example inserts nothing", InsertExamples("just a sentence", sld, 40, 40, 400), 0
+    host.Saved = -1
+    host.Close
+    ReleaseScratch
+    Exit Sub
+Fail:
+    Fail "insert", Err.Number & ": " & Err.Description
+    On Error Resume Next
+    If Not host Is Nothing Then host.Saved = -1: host.Close
     ReleaseScratch
 End Sub
 
