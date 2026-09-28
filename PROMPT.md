@@ -19,6 +19,9 @@ When FLEx copies interlinear text to the clipboard it produces **tab-separated c
 5. **Free translation:** Lines starting with `Free` (or a language tag after `Free`) are free-translation text, not interlinear tiers.
 6. **Blocks:** Multiple examples are separated by blank lines, or by a line that starts with a new example number: a FLEx Print View copy of consecutive lines has no blank line between them. Each block starts with an optional example number (digits, `1.1` style allowed).
 8. **Prefixes and proclitics:** a morpheme whose form ENDS with a boundary character (`ka=`, `un-`) is joined to the morpheme after it, its host, as a leading boundary joins a morpheme to the one before it. The boundary stays on the clitic's side on both tiers in a morpheme-aligned table (`ka=` over `DAT=`), and a boundary present on both sides of a seam is written once in a word-aligned cell (`ka=` + `=be` is `ka=be`, not `ka==be`).
+10. **Free, Lit. and Note lines:** FLEx writes `MARK Free SPACE MARK MARK text` for one writing system and `MARK Free SPACE MARK Eng MARK SPACE MARK MARK text` for the first of several, a further one being `MARK SPACE MARK Ind MARK SPACE MARK MARK text` (MARK is U+200E, or U+200F right-to-left). The text is what follows the last pair of adjacent marks. Without marks (Graphite on), a code follows the label only when a further-language line follows, starting with a space; the first word of the text is never taken for a code by its shape.
+11. **Tier labels with a writing-system code, and every line type:** the label cell may read `Lex. Gloss Eng` or `Morphemes xyz-ort`, base label and code separated by a space. Every row is kept, in FLEx's order. The first Morphemes row gives the segments and so the columns; a further Morphemes row, a further Lex. Gloss row and `Lex. Gram. Info.` are laid out on those segments (a gloss-like row takes the segments' boundary characters where it has a piece, a form row carries its own); `Word`, `Word Gloss` and `Word Cat.` are laid out per word span; glossing the words as written, they carry no morpheme boundary and take no part in the break-character agreement, its repair, or a split's precondition (they stay whole on the left). A partly filled column is judged on the segmented form row and the first gloss row only: a further gloss row may be sparse.
+12. **A copied baseline establishes the columns:** when a `Word` line is present, its non-empty cells start the word spans and its empty cells continue them; every row is laid out on those spans. The baseline itself is not segmented: it takes no part in the break-character checks, keeps any space it has, and a split leaves it whole in the left-hand column.
 9. **Ownership of a boundary across a fold and a split:** folding two cells into one word-aligned cell writes U+2060 WORD JOINER right after a boundary the left morpheme owns (`be=⁠dai`), and on both sides of one that both own (`ka⁠=⁠be`); a split reads it, hands the boundary back to its owner, and consumes it, so By Word and By Morpheme round-trip losslessly. Exports strip the mark, and LingTeX-Word never writes it to the page: there the boundary glyph carries a character style (`LingTeX Left Boundary`, `LingTeX Shared Boundary`) and read-back restores the mark from it, so Find matches the plain spelling. A boundary with no mark stays the right-hand morpheme's.
 7. **Trailing cells and the section sign:** trailing tabs are columns and are never stripped (only trailing spaces are). A cell that is exactly `§`, FLEx's end-of-segment sign, is dropped, and a column that is empty on every tier is dropped with it.
 
@@ -30,7 +33,7 @@ When FLEx copies interlinear text to the clipboard it produces **tab-separated c
 ```
 Morphemes→z→zuvo→ixo→→vu→=ve→levo→→→=zi→zo→z→zuvo
 →Lex. Gloss→1SG→dream→DEM→***→fox→ERG→→follow→.CMP→REL→FOC→1SG→dream
-Free Eng Concerning what I'm dreaming about, Voxi getting followed by a fox is what I'm dreaming about.
+Free Concerning what I'm dreaming about, Voxi getting followed by a fox is what I'm dreaming about.
 ```
 
 **Data columns (0-indexed, after stripping labels):**
@@ -177,7 +180,7 @@ The renderers then:
 ```
 Morphemes→zel→vimo→→→rixu→→→=xo→xu→=zevi→Ozivela→ze→:→zel→vimo→→→rixu→→→=xo→Vo→vu→=ve→levo→→→=zi→zo→z→zuvo→=ve→=zi
 →Lex. Gloss→yam→→pick→.CMP→→stack→.CMP→SEQ→3SG→all→P.N.→ACMP→→yam→→pick→.CMP→→stack→.CMP→SEQ→P.N.→fox→ERG→→follow→.CMP→REL→FOC→1SG→dream→ABL→REL
-Free Eng (When) she picked her yams (early)--that is, all of them--her with Xelvio, when they picked the yams and then Voxi was followed by a fox is what I'm dreaming about.
+Free (When) she picked her yams (early)--that is, all of them--her with Xelvio, when they picked the yams and then Voxi was followed by a fox is what I'm dreaming about.
 ```
 
 **Expected TSV output:**
@@ -201,7 +204,7 @@ columns; stripping them loses the gloss.
 ```
 Morphemes→vu→=ve→zo→zuvo→→
 →Lex. Gloss→fox→ERG→dream→→follow→.CMP
-Free Eng The fox's dream was followed.
+Free The fox's dream was followed.
 ```
 
 **Expected TSV output:**
@@ -225,7 +228,7 @@ zero-morpheme slots (seen live 2026-09-28: one column, `hi=di` over
 ```
 Morphemes→vu→=ve→zo→=zi→→
 →Lex. Gloss→fox→ERG→dream→→follow→.CMP
-Free Eng The fox dreamt of following.
+Free The fox dreamt of following.
 ```
 
 **Expected TSV output:**
@@ -247,7 +250,7 @@ next morpheme; the seam between `xu=` and `=ve` carries one boundary.
 ```
 Morphemes→xu=→=ve→zo→ze=→zuvo→→→-a→=zi
 →Lex. Gloss→3SG→ERG→dream→DAT→→follow→.CMP→lnk→REL
-Free Eng She dreamt of following him.
+Free She dreamt of following him.
 ```
 
 **Expected TSV output:**
@@ -255,6 +258,66 @@ Free Eng She dreamt of following him.
 xu=ve	zo	ze=zuvo-a=zi
 3SG=ERG	dream	DAT=follow.CMP-lnk=REL
 She dreamt of following him.
+```
+
+---
+
+## Example 6 for verification
+
+A copied baseline (`Word`), one writing system. The baseline's words are the
+columns: `ve` and `te` are words of their own, `zuvoa` spans a morpheme and its
+spread gloss and a suffix. A number cell, and the end-of-segment sign.
+
+**Input:**
+```
+1.1→Word→vu→ve→zo→zuvoa→→→→te→§
+→Morphemes→vu→=ve→zo→zuvo→→→-a→=te→
+→Lex. Gloss→fox→ERG→dream→→follow→.CMP→lnk→SEQ→
+Free The fox dreamt of following and then
+```
+
+**Expected TSV output:**
+```
+vu	ve	zo	zuvoa	te
+vu	=ve	zo	zuvo-a	=te
+fox	=ERG	dream	follow.CMP-lnk	=SEQ
+The fox dreamt of following and then
+```
+
+## Example 7 for verification
+
+Everything a copy may hold: two writing systems on the Morphemes line, two
+analysis languages on the Lex. Gloss line, Lex. Gram. Info., Word Gloss in
+two languages, Word Cat., and two free translations, without marks (the
+further-language line starts with a space). The second gloss row is sparse.
+
+**Input:**
+```
+1.1→Word→vu→ve→zo→zuvoa→→→→te→§
+→Morphemes xyz→wu→=we→so→suwo→→→-a→=tee→
+→Morphemes xyz-ort→vu→=ve→zo→zuvo→→→-a→=te→
+→Lex. Gloss Eng→fox→ERG→dream→→follow→.CMP→lnk→SEQ→
+→Lex. Gloss Ind→→→mimpi→→→.CMP→→→
+→Lex. Gram. Info. Eng→n→adp→n→v→→→v:(lnk)→cosub→
+→Word Gloss Eng→fox→by→dream→followed→→→→then→
+→Word Gloss Ind→rubah→oleh→mimpi→diikuti→→→→lalu→
+→Word Cat. Eng→n→adp→n→v→→→→cosub→
+Free Eng The fox dreamt of following and then
+ Ind rubah mimpi ikut lalu
+```
+
+**Expected TSV output:**
+```
+vu	ve	zo	zuvoa	te
+wu	=we	so	suwo-a	=tee
+vu	=ve	zo	zuvo-a	=te
+fox	=ERG	dream	follow.CMP-lnk	=SEQ
+		mimpi	.CMP	
+n	=adp	n	v-v:(lnk)	=cosub
+fox	by	dream	followed	then
+rubah	oleh	mimpi	diikuti	lalu
+n	adp	n	v	cosub
+The fox dreamt of following and then / rubah mimpi ikut lalu
 ```
 
 ---

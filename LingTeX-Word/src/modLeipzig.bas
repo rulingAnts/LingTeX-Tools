@@ -65,6 +65,40 @@ Public Const WARN_EMPTY_CELL     As String = "empty-cell"
 ' Check an example.  Returns a Collection of clsIgtWarning, never Nothing, and
 ' never mutates the model.
 '-----------------------------------------------------------------------------
+'-----------------------------------------------------------------------------
+' The baseline -- a Vernacular row above a Morphemes row -- is words as
+' written, not segmented: it takes no part in the break-character checks and
+' repairs, keeps its spaces, and stays whole when a column splits (PROMPT.md
+' rule 12; Seth, 2026-09-29).
+'-----------------------------------------------------------------------------
+Public Function IsBaselineTier(ex As IgtExample, ByVal t As Long) As Boolean
+    If t < 0 Or t >= ex.TierCount Then Exit Function
+    If ex.Tiers(t) <> ROLE_VERNACULAR Then Exit Function
+    IsBaselineTier = (TierIndex(ex, ROLE_MORPHEMES) >= 0)
+End Function
+
+'-----------------------------------------------------------------------------
+' A row laid out per word rather than per morpheme: the baseline, a Word Gloss
+' row, a Word Cat. row.  It glosses the words as written, so it carries no
+' morpheme boundary and takes no part in the break-character agreement, its
+' repair, the split's precondition, or the check for a partly filled column.
+' (Lex. Gram. Info. shares Word Cat.'s role for now and is exempt with it;
+' it gets a role of its own later.)
+'-----------------------------------------------------------------------------
+Public Function IsWordLevelTier(ex As IgtExample, ByVal t As Long) As Boolean
+    If IsBaselineTier(ex, t) Then
+        IsWordLevelTier = True
+    Else
+        IsWordLevelTier = (ex.Tiers(t) = ROLE_WORDGLOSS Or ex.Tiers(t) = ROLE_CATEGORY)
+    End If
+End Function
+
+' The segmented form tier the gloss must agree with: Morphemes when present.
+Public Function SegmentedFormTierIndex(ex As IgtExample) As Long
+    SegmentedFormTierIndex = TierIndex(ex, ROLE_MORPHEMES)
+    If SegmentedFormTierIndex < 0 Then SegmentedFormTierIndex = FormTierIndex(ex)
+End Function
+
 Public Function CheckExample(ex As IgtExample) As Collection
     Dim res As New Collection
     Dim c As Long, t As Long
@@ -76,12 +110,14 @@ Public Function CheckExample(ex As IgtExample) As Collection
     Set CheckExample = res
     If ex.TierCount = 0 Or ex.ColCount = 0 Then Exit Function
 
-    formIdx = FormTierIndex(ex)
+    formIdx = SegmentedFormTierIndex(ex)
     glossIdx = TierIndex(ex, ROLE_GLOSS)
 
-    For t = 0 To ex.TierCount - 1
-        If IsInterlinearTier(ex.Tiers(t)) Then nInterlinear = nInterlinear + 1
-    Next t
+    ' A partly filled column is judged on the rows that must be filled: the
+    ' segmented form row and the first gloss row (every morpheme glossed,
+    ' Leipzig rule 2).  A further gloss row may be sparse; a per-word row too.
+    If formIdx >= 0 Then nInterlinear = nInterlinear + 1
+    If glossIdx >= 0 And glossIdx <> formIdx Then nInterlinear = nInterlinear + 1
 
     For c = 0 To ex.ColCount - 1
         nFilled = 0
@@ -90,7 +126,8 @@ Public Function CheckExample(ex As IgtExample) As Collection
         For t = 0 To ex.TierCount - 1
             If Not IsInterlinearTier(ex.Tiers(t)) Then GoTo NextTier
             cell = ex.Cells(t, c)
-            If cell <> "" Then nFilled = nFilled + 1
+            If cell <> "" And (t = formIdx Or t = glossIdx) Then nFilled = nFilled + 1
+            If IsBaselineTier(ex, t) Then GoTo NextTier   ' words as written
 
             ' Invariant 2.  A space would break the column alignment the whole
             ' layout depends on, so it is never allowed in an interlinear cell.
@@ -146,6 +183,7 @@ Private Sub CheckColumnEnd(ex As IgtExample, ByVal c As Long, _
 
     For t = 0 To ex.TierCount - 1
         If Not IsInterlinearTier(ex.Tiers(t)) Then GoTo NextTier
+        If IsWordLevelTier(ex, t) Then GoTo NextTier    ' words as written carry no boundary
         cell = ex.Cells(t, c)
         If cell = "" Then GoTo NextTier          ' an empty cell claims nothing
 
@@ -246,6 +284,7 @@ Private Function FixColumnEnd(ByRef ex As IgtExample, ByVal col As Long, _
 
     For t = 0 To ex.TierCount - 1
         If Not IsInterlinearTier(ex.Tiers(t)) Then GoTo Scan
+        If IsWordLevelTier(ex, t) Then GoTo Scan      ' words as written carry no boundary
         cell = ex.Cells(t, col)
         If cell = "" Then GoTo Scan
         If atStart Then
@@ -267,6 +306,7 @@ Scan:
 
     For t = 0 To ex.TierCount - 1
         If Not IsInterlinearTier(ex.Tiers(t)) Then GoTo NextTier
+        If IsWordLevelTier(ex, t) Then GoTo NextTier    ' words as written carry no boundary
         cell = ex.Cells(t, col)
         If cell = "" Then GoTo NextTier
         If atStart Then
@@ -302,6 +342,7 @@ Public Function FixCellSpaces(ByRef ex As IgtExample, _
 
     For t = 0 To ex.TierCount - 1
         If Not IsInterlinearTier(ex.Tiers(t)) Then GoTo NextTier
+        If IsBaselineTier(ex, t) Then GoTo NextTier     ' a baseline is words as written
         For c = 0 To ex.ColCount - 1
             cell = ex.Cells(t, c)
             If InStr(cell, " ") = 0 Then GoTo NextCol

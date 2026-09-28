@@ -81,7 +81,7 @@ function loadVectors() {
             raw: inp.body.join('\n').replace(/→/g, '\t'),
             // Only the interlinear rows are compared; the free-translation row
             // is abbreviated with an ellipsis in the spec for example 2.
-            expected: (expects[n] ? expects[n].body : []).slice(0, 2),
+            expected: (expects[n] ? expects[n].body : []).filter(function (l) { return l.indexOf('\t') !== -1; }),
         };
     });
 }
@@ -91,7 +91,7 @@ function loadVectors() {
 var vectors = loadVectors();
 
 section('Golden vectors (derived from PROMPT.md)');
-ok('found 5 input vectors in PROMPT.md', vectors.length === 5, 'found ' + vectors.length);
+ok('found 7 input vectors in PROMPT.md', vectors.length === 7, 'found ' + vectors.length);
 
 // FLEx's end-of-segment sign "\u00A7" ends a line in some copies (its .flextext
 // importer adds it; seen live 2026-09-28). A cell that is exactly "\u00A7" is
@@ -118,15 +118,19 @@ vectors.forEach(function (v) {
 
     var rows = R.modelToTsv(models[0]).split('\n');
 
-    // (a) against the expected output written in the spec
-    eq(v.name + ': form row matches PROMPT.md',  rows[0], v.expected[0]);
-    eq(v.name + ': gloss row matches PROMPT.md', rows[1], v.expected[1]);
+    // (a) against the expected output written in the spec: every row of it
+    v.expected.forEach(function (e, r) {
+        eq(v.name + ': row ' + r + ' matches PROMPT.md', rows[r], e);
+    });
 
-    // (b) against the live reference implementation in docs/core.js
+    // (b) against the live reference implementation in docs/core.js, which
+    // renders the segmented form row and the first gloss row only
+    var fi = models[0].tiers.indexOf(R.ROLE_MORPHEMES); if (fi < 0) fi = 0;
+    var gi = models[0].tiers.indexOf(R.ROLE_GLOSS);
     var coreRows = core.renderFLExTSVAuto(core.parseFLExBlocks(v.raw),
                                           { glossCase: 'none' }).split('\n');
-    eq(v.name + ': form row matches docs/core.js',  rows[0], coreRows[0]);
-    eq(v.name + ': gloss row matches docs/core.js', rows[1], coreRows[1]);
+    eq(v.name + ': form row matches docs/core.js',  rows[fi], coreRows[0]);
+    if (gi >= 0) eq(v.name + ': gloss row matches docs/core.js', rows[gi], coreRows[1]);
 });
 
 // ── 2. projections ────────────────────────────────────────────────────────────
@@ -150,6 +154,9 @@ vectors.forEach(function (v) {
 
     // Merging every column of a word back down must reproduce word-alignment:
     // the two projections are views of one segment list, not separate parsers.
+    // Not with a baseline: there the columns are the baseline's words, and a
+    // clitic's column, though never a wrap-line start, is a word of its own.
+    if (morph.tiers.indexOf(R.ROLE_VERNACULAR) >= 0) return;
     var flags = R.noBreakFlags(morph);
     var rebuilt = JSON.parse(JSON.stringify(morph));
     for (var c = R.colCount(rebuilt) - 1; c > 0; c--) {
@@ -160,6 +167,33 @@ vectors.forEach(function (v) {
     eq(v.name + ': merging continuations reproduces word-aligned glosses',
         rebuilt.cells[1].join('\t'), word.cells[1].join('\t'));
 });
+
+// ── 2 free lines, further writing systems, a baseline ────────────────────────
+
+section('Free lines, codes, further writing systems, a baseline');
+
+(function () {
+    var M = '\u200E';
+    var two = 'Morphemes\tvu\t=ve\n\tLex. Gloss\tfox\tERG\n';
+    function free(raw) { return R.buildModels(raw, R.WORD_ALIGNED)[0].freeLines; }
+    eq('with marks, no code: the text is whole', free(two + M + 'Free ' + M + M + 'came back.').join('|'), 'came back.');
+    eq('with marks and a code', free(two + M + 'Free ' + M + 'Eng' + M + ' ' + M + M + 'came back.\n' + M + ' ' + M + 'Ind' + M + ' ' + M + M + 'dia kembali.').join('|'), 'came back.|dia kembali.');
+    eq('without marks, no further line: the first word stays', free(two + 'Free came back.').join('|'), 'came back.');
+    eq('without marks, a further line follows: the code goes', free(two + 'Free Eng came back.\n Ind dia kembali.').join('|'), 'came back.|dia kembali.');
+    eq('Lit. is a line of its own', free(two + 'Free came back.\nLit. come back again.').join('|'), 'came back.|come back again.');
+
+    var v7 = vectors[6];
+    var m7 = R.buildModels(v7.raw, R.WORD_ALIGNED)[0];
+    eq('example 7 keeps nine rows in FLEx\'s order', m7.tiers.join(','),
+        [R.ROLE_VERNACULAR, R.ROLE_MORPHEMES, R.ROLE_MORPHEMES, R.ROLE_GLOSS, R.ROLE_GLOSS, R.ROLE_CATEGORY, R.ROLE_WORDGLOSS, R.ROLE_WORDGLOSS, R.ROLE_CATEGORY].join(','));
+    eq('  both free lines', m7.freeLines.join(' / '), 'The fox dreamt of following and then / rubah mimpi ikut lalu');
+    var m7m = R.buildModels(v7.raw, R.MORPHEME_ALIGNED)[0];
+    eq('  by morpheme, the second form row splits with the first', m7m.cells[2].join('\t'), 'vu\t=ve\tzo\tzuvo\t-a\t=te');
+    eq('  the baseline sits in each word\'s first column', m7m.cells[0].join('\t'), 'vu\tve\tzo\tzuvoa\t\tte');
+    eq('  Lex. Gram. Info. per segment, with the boundaries', m7m.cells[5].join('\t'), 'n\t=adp\tn\tv\t-v:(lnk)\t=cosub');
+    ok('  no warning at all: the baseline takes no part in the checks', R.checkExample(m7).length === 0,
+        JSON.stringify(R.checkExample(m7).map(function (w) { return w.code + ' col ' + w.col; })));
+})();
 
 // ── 2a. ownership of a boundary across By Word and By Morpheme ───────────────
 

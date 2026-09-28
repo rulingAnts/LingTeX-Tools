@@ -93,7 +93,7 @@ function groupSegments(morphemes, lexGlosses, startIdx) {
             // a zero-morpheme slot that gets its own alignment column.
             flush();
             if (g !== '') {
-                words.push({ segments: [{ bd: '', form: '', tb: '', gloss: g }],
+                words.push({ segments: [{ bd: '', form: '', tb: '', gloss: g, colStart: col, colEnd: col }],
                              startCol: col, endCol: col });
             }
             continue;
@@ -118,7 +118,7 @@ function groupSegments(morphemes, lexGlosses, startIdx) {
             }
         }
 
-        var seg = { bd: bd, form: form, tb: tb, gloss: g };
+        var seg = { bd: bd, form: form, tb: tb, gloss: g, colStart: at, colEnd: col };
         var pending = cur ? cur.segments[cur.segments.length - 1].tb : '';
         if (cur && (bd !== '' || pending !== '')) {
             cur.segments.push(seg);
@@ -130,6 +130,34 @@ function groupSegments(morphemes, lexGlosses, startIdx) {
     }
 
     flush();
+    return words;
+}
+
+/**
+ * Words from a copied baseline (PROMPT.md rule 12): a non-empty Word cell
+ * starts a span, an empty one continues it, and the morphemes of each span make
+ * one word whatever their boundary characters say. Port of GroupByBaseline.
+ */
+function groupByBaseline(morphemes, lexGlosses, wordArr, startIdx) {
+    var words = [];
+    var n = Math.max(morphemes.length, wordArr.length);
+    var s = startIdx;
+    while (s <= n - 1) {
+        var e = s;
+        while (e + 1 <= n - 1 && (wordArr[e + 1] || '').trim() === '') e++;
+        var sub = groupSegments(morphemes.slice(s, e + 1), lexGlosses.slice(s, e + 1), 0);
+        var w;
+        if (!sub.length) {
+            w = { segments: [{ bd: '', form: '', tb: '', gloss: '', colStart: s, colEnd: e }], startCol: s, endCol: e };
+        } else {
+            w = sub[0];
+            for (var j = 1; j < sub.length; j++) sub[j].segments.forEach(function (sg) { w.segments.push(sg); });
+            w.segments.forEach(function (sg) { sg.colStart += s; sg.colEnd += s; });
+            w.startCol = s; w.endCol = e;
+        }
+        words.push(w);
+        s = e + 1;
+    }
     return words;
 }
 
@@ -272,20 +300,17 @@ function modelFromBlock(block, granularity) {
     var dataStart = 1;
     if (/^\d+$/.test(formArr[dataStart] || '')) dataStart++;
 
-    var words = groupSegments(formArr, glossArr, dataStart);
+    // With a copied baseline its words are the columns (PROMPT.md rule 12);
+    // without one the boundary characters group the morphemes.
+    var words = (wordIdx >= 0 && morphIdx >= 0)
+        ? groupByBaseline(formArr, glossArr, colArrays[wordIdx], dataStart)
+        : groupSegments(formArr, glossArr, dataStart);
     handleStandalonePunctuation(words);
 
     var proj = projectColumns(words, granularity);
     var n    = proj.forms.length;
 
     var tiers = [], cells = [];
-
-    // The form tier keeps the role FLEx gave it, so the rendered paragraph
-    // style says whether this row is surface words or a morpheme breakdown.
-    tiers.push(morphIdx >= 0 ? ROLE_MORPHEMES : ROLE_VERNACULAR);
-    cells.push(proj.forms);
-
-    if (glossIdx >= 0) { tiers.push(ROLE_GLOSS); cells.push(proj.glosses); }
 
     // Per-word tiers: collect the non-empty source cells inside each column's
     // span. core.js emits a placeholder here instead; this renders them properly.
@@ -304,13 +329,53 @@ function modelFromBlock(block, granularity) {
         return out;
     }
 
-    if (wordGlossIdx >= 0) { tiers.push(ROLE_WORDGLOSS); cells.push(perWordTier(wordGlossIdx)); }
-    if (catIdx       >= 0) { tiers.push(ROLE_CATEGORY);  cells.push(perWordTier(catIdx)); }
-    if (morphIdx >= 0 && wordIdx >= 0) {
-        // Both a surface-word tier and a morpheme tier are present: keep the
-        // surface words as their own row above the breakdown.
-        tiers.unshift(ROLE_VERNACULAR);
-        cells.unshift(perWordTier(wordIdx));
+    // A further writing system of the form or gloss line, and Lex. Gram.
+    // Info.: laid out on the first row's segments. A gloss-like row takes the
+    // segments' boundary characters where it has a piece; a form row carries
+    // its own and takes none.
+    function perSegmentTier(srcIdx, isGloss) {
+        var src = colArrays[srcIdx], out = [];
+        words.forEach(function (w) {
+            var acc = '';
+            w.segments.forEach(function (s, i) {
+                var piece = '';
+                for (var k = s.colStart; k <= s.colEnd && k < src.length; k++) piece += (src[k] || '').trim();
+                if (granularity === MORPHEME_ALIGNED) {
+                    out.push(isGloss && piece !== '' ? s.bd + piece + s.tb : piece);
+                } else if (isGloss && piece !== '') {
+                    var bd = (i > 0 && s.bd !== '' && s.bd === w.segments[i - 1].tb) ? '' : s.bd;
+                    acc += bd + piece + trailPart(w.segments, i);
+                } else {
+                    acc += piece;
+                }
+            });
+            if (granularity !== MORPHEME_ALIGNED) out.push(acc);
+        });
+        return out;
+    }
+
+    // The rows in FLEx's order. The first Morphemes row (or the Word row when
+    // there is none) gave the segments and so the columns; every other row is
+    // laid out on them. Port of modIgtModel.ModelFromBlock.
+    for (var t2 = 0; t2 < lineTypes.length; t2++) {
+        var lt2 = lineTypes[t2];
+        if (t2 === formIdx) {
+            tiers.push(morphIdx >= 0 ? ROLE_MORPHEMES : ROLE_VERNACULAR); cells.push(proj.forms);
+        } else if (t2 === glossIdx) {
+            tiers.push(ROLE_GLOSS); cells.push(proj.glosses);
+        } else if (lt2 === 'Word') {
+            tiers.push(ROLE_VERNACULAR); cells.push(perWordTier(t2));
+        } else if (lt2 === 'Morphemes' || lt2 === 'LexEntries') {
+            tiers.push(ROLE_MORPHEMES); cells.push(perSegmentTier(t2, false));
+        } else if (lt2 === 'LexGloss') {
+            tiers.push(ROLE_GLOSS); cells.push(perSegmentTier(t2, true));
+        } else if (lt2 === 'LexGramInfo') {
+            tiers.push(ROLE_CATEGORY); cells.push(perSegmentTier(t2, true));
+        } else if (lt2 === 'WordGloss') {
+            tiers.push(ROLE_WORDGLOSS); cells.push(perWordTier(t2));
+        } else if (lt2 === 'WordCat') {
+            tiers.push(ROLE_CATEGORY); cells.push(perWordTier(t2));
+        }
     }
 
     // Drop tiers that ended up with no data at all.
@@ -489,7 +554,7 @@ function joinAtSeams(cells) {
 function columnSplitsEverywhere(model, col) {
     var any = false;
     for (var t = 0; t < model.tiers.length; t++) {
-        if (!isInterlinearTier(model.tiers[t])) continue;
+        if (!isInterlinearTier(model.tiers[t]) || isWordLevelTier(model, t)) continue;
         var cell = model.cells[t][col] || '';
         if (cell === '') continue;
         any = true;
@@ -549,6 +614,7 @@ function splitColumn(model, col, occurrence) {
 
     var pieces = model.cells.map(function (row, t) {
         if (!isInterlinearTier(model.tiers[t])) return [row[col], row[col]];
+        if (isWordLevelTier(model, t)) return [row[col], ''];  // words as written: whole, on the left
         var cell = row[col] || '', seen = 0, at = -1;
         // Start at 1: a leading boundary belongs to this column, not a split.
         for (var i = 1; i < cell.length; i++) {
@@ -609,6 +675,36 @@ function countBoundaries(s) {
 }
 
 /** Rows subject to the invariants, as [tierIndex, role] pairs. */
+/**
+ * The baseline -- a Vernacular row above a Morphemes row -- is words as
+ * written, not segmented: no part in the break-character checks and repairs,
+ * keeps its spaces, stays whole when a column splits (PROMPT.md rule 12).
+ */
+function isBaselineTier(model, t) {
+    return model.tiers[t] === ROLE_VERNACULAR && model.tiers.indexOf(ROLE_MORPHEMES) >= 0;
+}
+
+/**
+ * A row laid out per word rather than per morpheme: the baseline, a Word
+ * Gloss row, a Word Cat. row. It glosses the words as written, so it carries
+ * no morpheme boundary and takes no part in the break-character agreement,
+ * its repair, the split's precondition, or the partly-filled-column check.
+ * (Lex. Gram. Info. shares Word Cat.'s role for now and is exempt with it.)
+ */
+function isWordLevelTier(model, t) {
+    return isBaselineTier(model, t) || model.tiers[t] === ROLE_WORDGLOSS || model.tiers[t] === ROLE_CATEGORY;
+}
+
+/** Interlinear rows that carry segmentation: the baseline left out. */
+function segmentedRows(model) {
+    return interlinearRows(model).filter(function (t) { return !isBaselineTier(model, t); });
+}
+
+/** Interlinear rows that take part in the break-character agreement. */
+function boundaryRows(model) {
+    return interlinearRows(model).filter(function (t) { return !isWordLevelTier(model, t); });
+}
+
 function interlinearRows(model) {
     var out = [];
     model.tiers.forEach(function (role, t) {
@@ -630,6 +726,13 @@ function checkExample(model) {
     var warnings = [];
     var rows = interlinearRows(model);
     var n = colCount(model);
+    var mIdx = model.tiers.indexOf(ROLE_MORPHEMES);
+    // The rows that must be filled: the segmented form row and the first
+    // gloss row (every morpheme glossed, Leipzig rule 2). A further gloss row
+    // may be sparse; a per-word row too.
+    var fIdx = mIdx >= 0 ? mIdx : rows[0];
+    var gIdx = model.tiers.indexOf(ROLE_GLOSS);
+    var required = (gIdx >= 0 && gIdx !== fIdx) ? 2 : 1;
 
     function warn(code, col, tier, message) {
         warnings.push({ code: code, col: col, tier: tier, message: message });
@@ -640,9 +743,12 @@ function checkExample(model) {
 
         rows.forEach(function (t) {
             var cell = model.cells[t][c] || '';
-            if (cell !== '') nonEmpty.push(t);
-            leads.push({ t: t, ch: leadChar(cell), empty: cell === '' });
-            trails.push({ t: t, ch: trailChar(cell), empty: cell === '' });
+            if (cell !== '' && (t === fIdx || t === gIdx)) nonEmpty.push(t);
+            if (isBaselineTier(model, t)) return;       // words as written
+            if (!isWordLevelTier(model, t)) {           // per-word rows carry no boundary
+                leads.push({ t: t, ch: leadChar(cell), empty: cell === '' });
+                trails.push({ t: t, ch: trailChar(cell), empty: cell === '' });
+            }
 
             if (cell.indexOf(' ') !== -1) {
                 warn('space-in-cell', c, model.tiers[t],
@@ -682,8 +788,6 @@ function checkExample(model) {
 
         // Leipzig rule 2: the form and its gloss must show the same number of
         // segmentable boundaries inside the cell.
-        var fIdx = rows[0];
-        var gIdx = model.tiers.indexOf(ROLE_GLOSS);
         if (gIdx >= 0 && fIdx !== gIdx) {
             var fc = model.cells[fIdx][c] || '', gc = model.cells[gIdx][c] || '';
             if (fc !== '' && gc !== '' && countBoundaries(fc) !== countBoundaries(gc)) {
@@ -693,7 +797,7 @@ function checkExample(model) {
             }
         }
 
-        if (nonEmpty.length && nonEmpty.length < rows.length) {
+        if (nonEmpty.length && nonEmpty.length < required) {
             warn('empty-cell', c, null,
                 'Some interlinear tiers are empty in this column.');
         }
@@ -709,7 +813,7 @@ function checkExample(model) {
  * that needs a human decision.
  */
 function fixColumnBreakChars(model, col) {
-    var rows = interlinearRows(model);
+    var rows = boundaryRows(model);
     var changed = false;
 
     [['lead', leadChar], ['trail', trailChar]].forEach(function (pair) {
@@ -736,7 +840,7 @@ function fixColumnBreakChars(model, col) {
 function fixCellSpaces(model, replacement) {
     replacement = replacement === undefined ? '.' : replacement;
     var fixed = 0;
-    interlinearRows(model).forEach(function (t) {
+    segmentedRows(model).forEach(function (t) {           // a baseline keeps its spaces
         model.cells[t].forEach(function (cell, c) {
             if (cell.indexOf(' ') === -1) return;
             model.cells[t][c] = cell.split(' ').filter(function (p) {
@@ -843,7 +947,7 @@ module.exports = {
     ROLE_CATEGORY: ROLE_CATEGORY, ROLE_FREE: ROLE_FREE,
     WORD_ALIGNED: WORD_ALIGNED, MORPHEME_ALIGNED: MORPHEME_ALIGNED,
     isBoundary: isBoundary, isGramGloss: core._isGramGloss,
-    OWN_MARK: OWN_MARK, stripOwnMarks: stripOwnMarks,
+    OWN_MARK: OWN_MARK, stripOwnMarks: stripOwnMarks, isBaselineTier: isBaselineTier, isWordLevelTier: isWordLevelTier,
     projectToMorphemes: projectToMorphemes, columnSplitsEverywhere: columnSplitsEverywhere,
     groupSegments: groupSegments,
     handleStandalonePunctuation: handleStandalonePunctuation,

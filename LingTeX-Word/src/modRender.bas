@@ -973,6 +973,9 @@ Public Sub WriteCellText(rng As Range, ByVal text As String, _
     ' The model's ownership marks never reach the page: the text is written
     ' plain, and the boundary glyphs they sat on get a character style.
     plain = StripOwnMarks(text)
+    ' A baseline keeps its spaces; on the page they are no-break spaces, so
+    ' Word never wraps inside the cell.  Read-back turns them back.
+    If role = ROLE_VERNACULAR Then plain = Replace(plain, " ", ChrW(&HA0))
     rng.Text = TransformedCellText(plain, role, srcDoc)
     ApplyGramGlossRuns rng, plain, role, directFormat
     If Not directFormat Then ApplyOwnershipStyles rng, text

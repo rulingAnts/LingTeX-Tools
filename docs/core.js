@@ -135,7 +135,8 @@
     }
 
     function massageLine(line) {
-        line = line.replace(/Lex\. Entries/g, 'LexEntries');
+        line = line.replace(/Lex\. Entries/g, 'LexEntries')
+                    .replace(/Lex\. Gram\. Info\./g, 'LexGramInfo');
         line = line.replace(/Lex\. Gloss/g,  'LexGloss');
         line = line.replace(/Word Gloss/g,   'WordGloss');
         line = line.replace(/Word Cat\./g,   'WordCat');
@@ -174,12 +175,57 @@
      * @param  {string} raw
      * @returns {{ lineTypes: string[], colArrays: string[][], freeLines: string[], lineNum: string|null }}
      */
+    function isMark(ch) { return ch === '\u200E' || ch === '\u200F'; }
+
+    function isFurtherLanguageLine(raw) {
+        var s = String(raw);
+        while (s.length && isMark(s.charAt(0))) s = s.substring(1);
+        return s.charAt(0) === ' ' && stripInvisible(s).trim() !== '';
+    }
+
+    function nextNonBlank(lines, i) {
+        for (var k = i + 1; k < lines.length; k++) {
+            if (stripInvisible(lines[k]).trim() !== '') return lines[k];
+        }
+        return '';
+    }
+
+    /**
+     * The text of a free-translation line, label and code removed. With marks:
+     * what follows the LAST pair of adjacent marks. Without: past the label,
+     * and past a code only when a further-language line follows; a
+     * further-language line always carries a code.
+     */
+    function freeLineText(raw, nextRaw, hasLabel) {
+        var s = String(raw), lastPair = -1;
+        for (var i = 0; i < s.length - 1; i++) {
+            if (isMark(s.charAt(i)) && isMark(s.charAt(i + 1))) lastPair = i;
+        }
+        if (lastPair >= 0) return stripInvisible(s.substring(lastPair + 2)).trim();
+        s = stripInvisible(s).trim();
+        if (hasLabel) s = s.substring(4).trim();
+        if (hasLabel && !isFurtherLanguageLine(nextRaw)) return s;
+        var sp = s.indexOf(' ');
+        return sp < 0 ? '' : s.substring(sp + 1).trim();
+    }
+
+    /** "LexGloss Eng" -> base "LexGloss", code "Eng"; a bare label keeps no code. */
+    function splitLabel(cell) {
+        var known = ['Word', 'Morphemes', 'LexEntries', 'LexGloss', 'WordGloss', 'WordCat', 'LexGramInfo'];
+        for (var i = 0; i < known.length; i++) {
+            if (cell === known[i]) return { base: cell, code: '' };
+            if (cell.indexOf(known[i] + ' ') === 0) return { base: known[i], code: cell.substring(known[i].length + 1).trim() };
+        }
+        return { base: cell, code: '' };
+    }
+
     function parseFLExBlock(raw) {
         var text     = raw.replace(/\r\n?/g, '\n');
         var blockEnd = text.indexOf('\n\n');
         if (blockEnd >= 0) text = text.substring(0, blockEnd);
 
         var lineTypes  = [];
+        var lineTags   = [];
         var colArrays  = [];
         var freeLines  = [];
         var lineNum    = null;
@@ -208,15 +254,23 @@
 
             var lClean = stripInvisible(l).trim();
 
-            if (/^Free\b/i.test(lClean)) {
+            // A free translation, a literal translation or a note: label, a
+            // writing-system code when the line type is shown in more than one
+            // writing system, then the text. FLEx marks the structure with
+            // direction marks (U+200E): the text follows TWO of them. Without
+            // marks the next line decides. The first word of the text is never
+            // taken for a code by its shape ("came back." lost "came", 2026-09-29).
+            if (/^(Free|Lit\.|Note)(\s|$)/i.test(lClean)) {
                 seenFree = true;
-                var ft = lClean.replace(/^Free\b(\s+[A-Za-z]{2,8})?\s*/i, '').trim();
+                var ft = freeLineText(l, nextNonBlank(rawLines, i), true);
                 if (ft) freeLines.push(ft);
                 continue;
             }
 
-            if (seenFree && /^[A-Za-z]{2,8}(\s|$)/.test(lClean)) {
-                var ft2 = lClean.replace(/^[A-Za-z]{2,8}\s*/, '').trim();
+            // The same line type in a further writing system: FLEx starts it
+            // with a mark and a space, or a space alone when marks are off.
+            if (seenFree && isFurtherLanguageLine(l)) {
+                var ft2 = freeLineText(l, nextNonBlank(rawLines, i), false);
                 if (ft2) freeLines.push(ft2);
                 continue;
             }
@@ -226,6 +280,7 @@
                 // Tab-column FLEx format: parse as raw column array
                 var normalized = stripInvisible(l)
                     .replace(/Lex\. Entries/g, 'LexEntries')
+                    .replace(/Lex\. Gram\. Info\./g, 'LexGramInfo')
                     .replace(/Lex\. Gloss/g,   'LexGloss')
                     .replace(/Word Gloss/g,    'WordGloss')
                     .replace(/Word Cat\./g,    'WordCat');
@@ -234,16 +289,22 @@
                     // FLEx's end-of-segment sign is not data (Seth, 2026-09-15).
                     return c === '\u00A7' ? '' : c;
                 });
-
                 // If first column is empty, shift left (skip the leading empty column
                 // that occurs when the tier label is in column 1)
                 if (cols.length > 0 && cols[0] === '') {
                     cols.shift();
                 }
+                // "LexGloss Eng": the label cell carries a writing-system code
+                // after a space when the line type is shown in several. Keep the
+                // base label so the row is recognised; the code goes to lineTags.
+                var split = splitLabel(cols[0] || '');
+                cols[0] = split.base;
+                lineTags.push(split.code);
             } else {
                 // Space-separated fallback (legacy / non-FLEx sources)
                 var massaged = massageLine(stripInvisible(l));
                 cols = massaged.trim().split(/\s+/).filter(function (t) { return t !== ''; });
+                lineTags.push('');
             }
 
             if (!cols || cols.length === 0) continue;
@@ -252,7 +313,7 @@
         }
 
         dropEmptyColumns(colArrays);
-        return { lineTypes: lineTypes, colArrays: colArrays,
+        return { lineTypes: lineTypes, lineTags: lineTags, colArrays: colArrays,
                  freeLines: freeLines, lineNum: lineNum };
     }
 
@@ -342,6 +403,36 @@
     }
 
     /**
+     * A copied baseline ("Word" line) gives the words (PROMPT.md rule 12): a
+     * non-empty cell of it starts a word, an empty one continues the word
+     * before. The morphemes inside each span are grouped as usual and joined.
+     * @param  {string[]} morphemes   Column array for the Morphemes tier
+     * @param  {string[]} lexGlosses  Column array for the LexGloss tier
+     * @param  {string[]} wordArr     Column array for the Word tier
+     * @param  {number}  startIdx     Index of first data column (after label)
+     * @returns {Array<{ form: string, glossParts: string[] }>}
+     */
+    function groupByBaseline(morphemes, lexGlosses, wordArr, startIdx) {
+        var words = [];
+        var n = Math.max(morphemes.length, wordArr.length);
+        var s = startIdx;
+        while (s <= n - 1) {
+            var e = s;
+            while (e + 1 <= n - 1 && (wordArr[e + 1] || '').trim() === '') e++;
+            var sub = groupWordsFromColumns(morphemes.slice(s, e + 1), lexGlosses.slice(s, e + 1), 0);
+            var w = { form: '', glossParts: [], tb: '' };
+            for (var j = 0; j < sub.length; j++) {
+                w.form += sub[j].form;
+                w.glossParts = w.glossParts.concat(sub[j].glossParts);
+                w.tb = sub[j].tb;
+            }
+            words.push(w);
+            s = e + 1;
+        }
+        return words;
+    }
+
+    /**
      * Special case: standalone punctuation (single char, empty gloss) appends
      * to preceding word's form only, no gloss contribution.
      * @param {Array} words  Mutated in place
@@ -415,7 +506,10 @@
         var wordGlossesArr = wordGlossIdx >= 0 ? colArrays[wordGlossIdx] : [];
 
         // Run word-grouping algorithm on tab-format columns
-        var words = groupWordsFromColumns(morphemesArr, lexGlossesArr, dataStart);
+        var wordIdx = lineTypes.indexOf('Word');
+        var words = (wordIdx >= 0 && wordIdx !== morphIdx)
+            ? groupByBaseline(morphemesArr, lexGlossesArr, colArrays[wordIdx], dataStart)
+            : groupWordsFromColumns(morphemesArr, lexGlossesArr, dataStart);
         handleStandalonePunctuation(words);
 
         var tier1 = [];
@@ -628,7 +722,10 @@
         var wordGlossesArr = wordGlossIdx >= 0 ? colArrays[wordGlossIdx] : [];
 
         // Run word-grouping algorithm
-        var words = groupWordsFromColumns(morphemesArr, lexGlossesArr, dataStart);
+        var wordIdx = lineTypes.indexOf('Word');
+        var words = (wordIdx >= 0 && wordIdx !== morphIdx)
+            ? groupByBaseline(morphemesArr, lexGlossesArr, colArrays[wordIdx], dataStart)
+            : groupWordsFromColumns(morphemesArr, lexGlossesArr, dataStart);
         handleStandalonePunctuation(words);
 
         var formCols  = [];

@@ -47,6 +47,7 @@ Public Const TIER_LEXENTRIES As String = "LexEntries"
 Public Const TIER_LEXGLOSS  As String = "LexGloss"
 Public Const TIER_WORDGLOSS As String = "WordGloss"
 Public Const TIER_WORDCAT   As String = "WordCat"
+Public Const TIER_LEXGRAM   As String = "LexGramInfo"   ' Lex. Gram. Info., per morpheme
 
 '-- One morpheme inside a word -----------------------------------------------
 ' Bd     the boundary character introducing this segment ("" for the first)
@@ -59,6 +60,8 @@ Public Type IgtSegment
     Form  As String
     Tb    As String     ' trailing boundary: a prefix or proclitic, host to follow
     Gloss As String
+    ColStart As Long    ' the morpheme's own source column ...
+    ColEnd   As Long    ' ... and the last of the empty columns its gloss spread over
 End Type
 
 '-- One word: a run of segments, and the source columns it came from ---------
@@ -72,7 +75,8 @@ End Type
 '-- One parsed interlinear block --------------------------------------------
 ' ColArrays(i) is a String() holding tier i's cells, cell 0 being the label.
 Public Type FlexBlock
-    LineTypes()  As String
+    LineTypes()  As String      ' the base label: Morphemes, LexGloss, Word ...
+    LineTags()   As String      ' the writing-system code after it, if any: "Eng"
     ColArrays()  As Variant
     TierCount    As Long
     FreeLines()  As String
@@ -557,6 +561,7 @@ Public Function NormalizeLabels(ByVal s As String) As String
     s = Replace(s, "Lex. Gloss", TIER_LEXGLOSS)
     s = Replace(s, "Word Gloss", TIER_WORDGLOSS)
     s = Replace(s, "Word Cat.", TIER_WORDCAT)
+    s = Replace(s, "Lex. Gram. Info.", TIER_LEXGRAM)
     NormalizeLabels = s
 End Function
 
@@ -745,6 +750,7 @@ Public Function ParseFlexBlock(ByVal text As String) As FlexBlock
     lines = Split(text, LINE_LF)
 
     ReDim res.LineTypes(0 To UBound(lines))
+    ReDim res.LineTags(0 To UBound(lines))
     ReDim res.ColArrays(0 To UBound(lines))
     ReDim res.FreeLines(0 To UBound(lines))
     res.TierCount = 0
@@ -779,15 +785,22 @@ Public Function ParseFlexBlock(ByVal text As String) As FlexBlock
 
         clean = Trim$(StripInvisible(ln))
 
-        ' Free translation: "Free", optionally followed by a language tag.
-        If LCase$(Left$(clean, 4)) = "free" Then
+        ' A free translation, a literal translation or a note: "Free", then
+        ' a writing-system code when the line type is shown in more than one
+        ' writing system, then the text.  FLEx marks the structure with
+        ' direction marks (U+200E), and the text always follows TWO of them;
+        ' without marks the next line decides (FreeLineText).  The first word
+        ' of the text is never taken for a code by its shape: "came back."
+        ' lost "came" that way (Seth, 2026-09-29).
+        If IsFreeLabel(clean) Then
             seenFree = True
-            AddFreeLine res, StripFreeLabel(clean)
+            AddFreeLine res, FreeLineText(ln, NextRawLine(lines, i), True)
             GoTo NextLine
         End If
-        ' After a Free line, a bare language tag introduces another one.
-        If seenFree And IsShortTag(clean) Then
-            AddFreeLine res, Trim$(Mid$(clean, InStr(clean, " ") + 1))
+        ' After one, a line that starts with a space (or a mark and a space)
+        ' is the same line type in a further writing system: code, then text.
+        If seenFree And IsFurtherLanguageLine(ln) Then
+            AddFreeLine res, FreeLineText(ln, NextRawLine(lines, i), False)
             GoTo NextLine
         End If
 
@@ -812,7 +825,12 @@ Public Function ParseFlexBlock(ByVal text As String) As FlexBlock
         End If
 
         If UBound(cols) < 0 Then GoTo NextLine
-        res.LineTypes(res.TierCount) = cols(0)
+        ' The label cell may carry a writing-system code after a space --
+        ' "LexGloss Eng", "Morphemes xyz-ort" -- when that line type is shown
+        ' in several writing systems.  Base label and code are kept apart, so
+        ' the row is recognised and the model keeps every writing system.
+        SplitLabel cols(0), res.LineTypes(res.TierCount), res.LineTags(res.TierCount)
+        cols(0) = res.LineTypes(res.TierCount)
         res.ColArrays(res.TierCount) = cols
         res.TierCount = res.TierCount + 1
 
@@ -821,6 +839,7 @@ NextLine:
 
     If res.TierCount > 0 Then
         ReDim Preserve res.LineTypes(0 To res.TierCount - 1)
+        ReDim Preserve res.LineTags(0 To res.TierCount - 1)
         ReDim Preserve res.ColArrays(0 To res.TierCount - 1)
         DropEmptyColumns res
     End If
@@ -837,27 +856,103 @@ Private Sub AddFreeLine(ByRef res As FlexBlock, ByVal s As String)
     res.FreeCount = res.FreeCount + 1
 End Sub
 
-' "Free" or "Free Eng" prefix removed.
-Private Function StripFreeLabel(ByVal s As String) As String
-    Dim rest As String, tag As String, sp As Long
-    rest = Trim$(Mid$(s, 5))                      ' past "Free"
-    sp = InStr(rest, " ")
-    If sp > 0 Then
-        tag = Left$(rest, sp - 1)
-    Else
-        tag = rest
-    End If
-    If IsAlphaTag(tag) Then
-        If sp > 0 Then
-            rest = Trim$(Mid$(rest, sp + 1))
-        Else
-            rest = ""
+' A free translation line, a literal translation or a note, by its label.
+Private Function IsFreeLabel(ByVal clean As String) As Boolean
+    Dim l As String
+    l = LCase$(clean)
+    IsFreeLabel = (Left$(l, 4) = "free" Or Left$(l, 4) = "lit." Or Left$(l, 4) = "note")
+    If IsFreeLabel Then
+        If Len(clean) > 4 Then
+            If Mid$(clean, 5, 1) <> " " Then IsFreeLabel = False
         End If
     End If
-    StripFreeLabel = rest
 End Function
 
-' A 2-to-8 letter writing-system tag such as "Eng" or "Tok".
+' A direction mark FLEx writes around labels and codes.
+Private Function IsMark(ByVal ch As String) As Boolean
+    IsMark = (ch = ChrW(&H200E) Or ch = ChrW(&H200F))
+End Function
+
+' The same line type in a further writing system: FLEx starts it with a mark
+' and a space, or with a space alone when marks are off.
+Private Function IsFurtherLanguageLine(ByVal raw As String) As Boolean
+    Dim s As String
+    s = raw
+    Do While Len(s) > 0
+        If Not IsMark(Left$(s, 1)) Then Exit Do
+        s = Mid$(s, 2)
+    Loop
+    If Len(s) = 0 Then Exit Function
+    If Left$(s, 1) <> " " Then Exit Function
+    IsFurtherLanguageLine = (Trim$(StripInvisible(s)) <> "")
+End Function
+
+' The next non-blank raw line after index i, or "".
+Private Function NextRawLine(lines() As String, ByVal i As Long) As String
+    Dim k As Long
+    For k = i + 1 To UBound(lines)
+        If Trim$(StripInvisible(lines(k))) <> "" Then
+            NextRawLine = lines(k)
+            Exit Function
+        End If
+    Next k
+End Function
+
+'-----------------------------------------------------------------------------
+' The text of a free-translation line, label and writing-system code removed.
+'
+' With FLEx's marks the structure is explicit: MARK Free SPACE MARK MARK text
+' (no code), or MARK Free SPACE MARK Eng MARK SPACE MARK MARK text; a further
+' language is MARK SPACE MARK Ind MARK SPACE MARK MARK text.  The text is what
+' follows the LAST pair of adjacent marks.  Without marks (a writing system
+' with Graphite on) the label is followed by a code only when the line type
+' is shown in more than one writing system, and then a further-language line
+' follows, starting with a space: so the next line decides.  A further-
+' language line always carries a code.
+'-----------------------------------------------------------------------------
+Private Function FreeLineText(ByVal raw As String, ByVal nextRaw As String, _
+        ByVal hasLabel As Boolean) As String
+    Dim i As Long, lastPair As Long, s As String, sp As Long
+
+    lastPair = 0
+    For i = 1 To Len(raw) - 1
+        If IsMark(Mid$(raw, i, 1)) And IsMark(Mid$(raw, i + 1, 1)) Then lastPair = i
+    Next i
+    If lastPair > 0 Then
+        FreeLineText = Trim$(StripInvisible(Mid$(raw, lastPair + 2)))
+        Exit Function
+    End If
+
+    s = Trim$(StripInvisible(raw))
+    If hasLabel Then s = Trim$(Mid$(s, 5))            ' past "Free", "Lit.", "Note"
+    If hasLabel And Not IsFurtherLanguageLine(nextRaw) Then
+        FreeLineText = s                              ' no code: one writing system
+        Exit Function
+    End If
+    sp = InStr(s, " ")
+    If sp > 0 Then
+        FreeLineText = Trim$(Mid$(s, sp + 1))         ' past the code
+    Else
+        FreeLineText = ""
+    End If
+End Function
+
+' "LexGloss Eng" -> base "LexGloss", code "Eng"; a bare label keeps no code.
+Private Sub SplitLabel(ByVal cell As String, ByRef base As String, ByRef code As String)
+    Dim known As Variant, k As Variant
+    known = Array(TIER_WORD, TIER_MORPHEMES, TIER_LEXENTRIES, TIER_LEXGLOSS, TIER_WORDGLOSS, TIER_WORDCAT, TIER_LEXGRAM)
+    base = cell
+    code = ""
+    For Each k In known
+        If cell = k Then Exit Sub
+        If Left$(cell, Len(k) + 1) = k & " " Then
+            base = k
+            code = Trim$(Mid$(cell, Len(k) + 2))
+            Exit Sub
+        End If
+    Next k
+End Sub
+
 Private Function IsAlphaTag(ByVal s As String) As Boolean
     Dim i As Long, ch As String
     If Len(s) < 2 Or Len(s) > 8 Then Exit Function
@@ -976,6 +1071,8 @@ Public Function GroupSegmentsFromColumns(morphemes() As String, _
             End If
             If g <> "" Then
                 words(nWords) = NewWord("", "", "", g, col)
+                words(nWords).Segments(0).ColStart = col
+                words(nWords).Segments(0).ColEnd = col
                 nWords = nWords + 1
             End If
             GoTo NextCol
@@ -1007,6 +1104,8 @@ Public Function GroupSegmentsFromColumns(morphemes() As String, _
         If haveCur Then pending = cur.Segments(cur.SegCount - 1).Tb
         If haveCur And (bd <> "" Or pending <> "") Then
             AddSegment cur, bd, form, tb, g
+            cur.Segments(cur.SegCount - 1).ColStart = at
+            cur.Segments(cur.SegCount - 1).ColEnd = col
             cur.EndCol = col
         Else
             If haveCur Then
@@ -1014,6 +1113,8 @@ Public Function GroupSegmentsFromColumns(morphemes() As String, _
                 nWords = nWords + 1
             End If
             cur = NewWord(bd, form, tb, g, at)
+            cur.Segments(0).ColStart = at
+            cur.Segments(0).ColEnd = col
             cur.EndCol = col
             haveCur = True
         End If
@@ -1032,6 +1133,76 @@ NextCol:
         ReDim Preserve words(0 To nWords - 1)
     End If
     GroupSegmentsFromColumns = words
+End Function
+
+'-----------------------------------------------------------------------------
+' Words from a copied baseline (PROMPT.md rule 12): a non-empty Word cell
+' starts a span, an empty one continues it, and the morphemes of each span
+' make one word whatever their boundary characters say -- "de" is a word of
+' its own when the baseline writes it so, "kabe" one word when it does.
+' Within a span the segments are read as GroupSegmentsFromColumns reads them.
+'-----------------------------------------------------------------------------
+Public Function GroupByBaseline(morphemes() As String, lexGlosses() As String, _
+        wordV As Variant, ByVal startIdx As Long, ByRef outCount As Long) As IgtWord()
+    Dim wordArr() As String
+    Dim words() As IgtWord, nWords As Long
+    Dim n As Long, k As Long, s As Long, e As Long, j As Long, q As Long, nSub As Long
+    Dim subM() As String, subG() As String, subW() As IgtWord
+    Dim w As IgtWord
+
+    wordArr = wordV
+    n = UBound(morphemes) + 1
+    If UBound(wordArr) + 1 > n Then n = UBound(wordArr) + 1
+    ReDim words(0 To IIf(n > 0, n, 1))
+    nWords = 0
+    s = startIdx
+    Do While s <= n - 1
+        e = s
+        Do While e + 1 <= n - 1
+            If Trim$(CellAt(wordArr, e + 1)) <> "" Then Exit Do
+            e = e + 1
+        Loop
+        ReDim subM(0 To e - s)
+        ReDim subG(0 To e - s)
+        For k = s To e
+            subM(k - s) = CellAt(morphemes, k)
+            subG(k - s) = CellAt(lexGlosses, k)
+        Next k
+        subW = GroupSegmentsFromColumns(subM, subG, 0, nSub)
+        If nSub = 0 Then
+            ' Nothing under the baseline word: the column is still its own.
+            w = NewWord("", "", "", "", s)
+            w.Segments(0).ColStart = s
+            w.Segments(0).ColEnd = e
+        Else
+            w = subW(0)
+            For j = 1 To nSub - 1
+                For q = 0 To subW(j).SegCount - 1
+                    AddSegment w, subW(j).Segments(q).Bd, subW(j).Segments(q).Form, _
+                               subW(j).Segments(q).Tb, subW(j).Segments(q).Gloss
+                    w.Segments(w.SegCount - 1).ColStart = subW(j).Segments(q).ColStart
+                    w.Segments(w.SegCount - 1).ColEnd = subW(j).Segments(q).ColEnd
+                Next q
+            Next j
+            For q = 0 To w.SegCount - 1
+                w.Segments(q).ColStart = w.Segments(q).ColStart + s
+                w.Segments(q).ColEnd = w.Segments(q).ColEnd + s
+            Next q
+        End If
+        w.StartCol = s
+        w.EndCol = e
+        words(nWords) = w
+        nWords = nWords + 1
+        s = e + 1
+    Loop
+
+    outCount = nWords
+    If nWords = 0 Then
+        ReDim words(-1 To -1)
+    Else
+        ReDim Preserve words(0 To nWords - 1)
+    End If
+    GroupByBaseline = words
 End Function
 
 Private Function CellAt(arr() As String, ByVal i As Long) As String
@@ -1103,7 +1274,7 @@ End Sub
 ' Word-aligned form: every segment of the word joined into one cell.
 ' A boundary present on both sides of a seam -- the proclitic's trailing "="
 ' and the enclitic's leading one -- is written once.
-Private Function SeamBd(w As IgtWord, ByVal i As Long) As String
+Public Function SeamBd(w As IgtWord, ByVal i As Long) As String
     SeamBd = w.Segments(i).Bd
     If i > 0 And SeamBd <> "" Then
         If SeamBd = w.Segments(i - 1).Tb Then SeamBd = ""
@@ -1113,7 +1284,7 @@ End Function
 ' What a segment writes for its trailing boundary: bare when it is the word's
 ' last segment; followed by the ownership mark when it alone owns the seam;
 ' the mark on both sides when the next segment owns it too.
-Private Function TrailPart(w As IgtWord, ByVal i As Long) As String
+Public Function TrailPart(w As IgtWord, ByVal i As Long) As String
     If w.Segments(i).Tb = "" Then Exit Function
     If i = w.SegCount - 1 Then
         TrailPart = w.Segments(i).Tb

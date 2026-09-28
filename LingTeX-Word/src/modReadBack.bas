@@ -428,6 +428,7 @@ Private Function CleanCellText(ByVal s As String) As String
     s = Replace(s, vbCr, "")
     s = Replace(s, vbLf, "")
     s = Replace(s, vbTab, "")
+    s = Replace(s, ChrW(&HA0), " ")          ' a baseline's no-break spaces
     CleanCellText = Trim$(s)
 End Function
 

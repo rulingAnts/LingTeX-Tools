@@ -340,7 +340,13 @@ Public Function ModelFromBlock(b As FlexBlock, _
         If IsAllDigits(formArr(dataStart)) Then dataStart = dataStart + 1
     End If
 
-    words = GroupSegmentsFromColumns(formArr, glossArr, dataStart, nWords)
+    ' With a copied baseline its words are the columns (PROMPT.md rule 12);
+    ' without one the boundary characters group the morphemes.
+    If wordIdx >= 0 And morphIdx >= 0 Then
+        words = GroupByBaseline(formArr, glossArr, b.ColArrays(wordIdx), dataStart, nWords)
+    Else
+        words = GroupSegmentsFromColumns(formArr, glossArr, dataStart, nWords)
+    End If
     HandleStandalonePunctuation words, nWords
     If nWords = 0 Then Exit Function
 
@@ -377,45 +383,62 @@ Public Function ModelFromBlock(b As FlexBlock, _
         End If
     Next i
 
-    '-- Assemble the tier rows ----------------------------------------------
-    ReDim tierRoles(0 To 5)
-    ReDim tierCols(0 To 5)
+    '-- Assemble the tier rows, in FLEx's order --------------------------------
+    ' The first Morphemes row (or the Word row when there is none) gave the
+    ' segments and so the columns; every other row is laid out on them: a
+    ' Word row and the word-level rows (Word Gloss, Word Cat.) per word span,
+    ' a further Morphemes or Lex. Gloss row and Lex. Gram. Info. per segment.
+    ' A row's writing-system code is not kept; the rows keep FLEx's order.
+    ReDim tierRoles(0 To 5 + b.TierCount)
+    ReDim tierCols(0 To 5 + b.TierCount)
     nTiers = 0
 
-    ' A surface-word tier, when FLEx supplied one alongside the morpheme tier.
-    If morphIdx >= 0 And wordIdx >= 0 Then
-        tierRoles(nTiers) = ROLE_VERNACULAR
-        tierCols(nTiers) = PerWordTier(b.ColArrays(wordIdx), spanStart, spanEnd, nCols)
-        nTiers = nTiers + 1
-    End If
-
-    ' The form tier keeps the role FLEx gave it, so the paragraph style in the
-    ' rendered table says whether the row is surface words or a breakdown.
-    If morphIdx >= 0 Then
-        tierRoles(nTiers) = ROLE_MORPHEMES
-    Else
-        tierRoles(nTiers) = ROLE_VERNACULAR
-    End If
-    tierCols(nTiers) = forms
-    nTiers = nTiers + 1
-
-    If glossIdx >= 0 Then
-        tierRoles(nTiers) = ROLE_GLOSS
-        tierCols(nTiers) = glosses
-        nTiers = nTiers + 1
-    End If
-
-    If wgIdx >= 0 Then
-        tierRoles(nTiers) = ROLE_WORDGLOSS
-        tierCols(nTiers) = PerWordTier(b.ColArrays(wgIdx), spanStart, spanEnd, nCols)
-        nTiers = nTiers + 1
-    End If
-
-    If catIdx >= 0 Then
-        tierRoles(nTiers) = ROLE_CATEGORY
-        tierCols(nTiers) = PerWordTier(b.ColArrays(catIdx), spanStart, spanEnd, nCols)
-        nTiers = nTiers + 1
-    End If
+    For t = 0 To b.TierCount - 1
+        If t = formIdx Then
+            ' The form tier keeps the role FLEx gave it, so the paragraph style
+            ' in the rendered table says whether the row is words or a breakdown.
+            If morphIdx >= 0 Then
+                tierRoles(nTiers) = ROLE_MORPHEMES
+            Else
+                tierRoles(nTiers) = ROLE_VERNACULAR
+            End If
+            tierCols(nTiers) = forms
+            nTiers = nTiers + 1
+        ElseIf t = glossIdx Then
+            tierRoles(nTiers) = ROLE_GLOSS
+            tierCols(nTiers) = glosses
+            nTiers = nTiers + 1
+        Else
+            Select Case b.LineTypes(t)
+                Case TIER_WORD
+                    tierRoles(nTiers) = ROLE_VERNACULAR
+                    tierCols(nTiers) = PerWordTier(b.ColArrays(t), spanStart, spanEnd, nCols)
+                    nTiers = nTiers + 1
+                Case TIER_MORPHEMES, TIER_LEXENTRIES
+                    tierRoles(nTiers) = ROLE_MORPHEMES
+                    tierCols(nTiers) = PerSegmentTier(b.ColArrays(t), words, nWords, granularity, False, nCols)
+                    nTiers = nTiers + 1
+                Case TIER_LEXGLOSS
+                    tierRoles(nTiers) = ROLE_GLOSS
+                    tierCols(nTiers) = PerSegmentTier(b.ColArrays(t), words, nWords, granularity, True, nCols)
+                    nTiers = nTiers + 1
+                Case TIER_LEXGRAM
+                    ' Its own style, based on Word Cat.'s, is agreed and still
+                    ' to come; until then it takes Word Cat.'s.
+                    tierRoles(nTiers) = ROLE_CATEGORY
+                    tierCols(nTiers) = PerSegmentTier(b.ColArrays(t), words, nWords, granularity, True, nCols)
+                    nTiers = nTiers + 1
+                Case TIER_WORDGLOSS
+                    tierRoles(nTiers) = ROLE_WORDGLOSS
+                    tierCols(nTiers) = PerWordTier(b.ColArrays(t), spanStart, spanEnd, nCols)
+                    nTiers = nTiers + 1
+                Case TIER_WORDCAT
+                    tierRoles(nTiers) = ROLE_CATEGORY
+                    tierCols(nTiers) = PerWordTier(b.ColArrays(t), spanStart, spanEnd, nCols)
+                    nTiers = nTiers + 1
+            End Select
+        End If
+    Next t
 
     ex = NewExample(nTiers, nCols)
     For t = 0 To nTiers - 1
@@ -434,6 +457,53 @@ Public Function ModelFromBlock(b As FlexBlock, _
 
     DropEmptyTiers ex
     ModelFromBlock = ex
+End Function
+
+'-----------------------------------------------------------------------------
+' A further writing system of the form or gloss line, projected on the same
+' segments as the first: each segment takes the row's cells over the columns
+' the segment came from (its own and the ones its gloss spread over).  A gloss
+' row takes the segments' boundary characters where it has a piece, as
+' JoinGloss gives the first gloss; a form row carries its own and takes none.
+'-----------------------------------------------------------------------------
+Private Function PerSegmentTier(srcV As Variant, words() As IgtWord, ByVal nWords As Long, _
+        ByVal granularity As IgtGranularity, ByVal isGloss As Boolean, ByVal nCols As Long) As String()
+    Dim src() As String, out() As String
+    Dim i As Long, s As Long, k As Long, n As Long, piece As String, acc As String
+
+    src = srcV
+    ReDim out(0 To IIf(nCols > 0, nCols - 1, 0))
+    n = 0
+    For i = 0 To nWords - 1
+        acc = ""
+        For s = 0 To words(i).SegCount - 1
+            piece = ""
+            For k = words(i).Segments(s).ColStart To words(i).Segments(s).ColEnd
+                If k >= LBound(src) Then
+                    If k <= UBound(src) Then piece = piece & Trim$(src(k))
+                End If
+            Next k
+            If granularity = igtMorphemeAligned Then
+                If isGloss And piece <> "" Then
+                    out(n) = words(i).Segments(s).Bd & piece & words(i).Segments(s).Tb
+                Else
+                    out(n) = piece
+                End If
+                n = n + 1
+            Else
+                If isGloss And piece <> "" Then
+                    acc = acc & SeamBd(words(i), s) & piece & TrailPart(words(i), s)
+                Else
+                    acc = acc & piece
+                End If
+            End If
+        Next s
+        If granularity <> igtMorphemeAligned Then
+            out(n) = acc
+            n = n + 1
+        End If
+    Next i
+    PerSegmentTier = out
 End Function
 
 Private Function CountProjected(words() As IgtWord, ByVal nWords As Long, _
@@ -750,8 +820,10 @@ Public Function SplitColumn(ByRef ex As IgtExample, ByVal colIdx As Long, _
 
     For t = 0 To ex.TierCount - 1
         cell = ex.Cells(t, colIdx)
-        If Not IsInterlinearTier(ex.Tiers(t)) Then
-            ' A free-translation row has no column structure to split.
+        If Not IsInterlinearTier(ex.Tiers(t)) Or IsWordLevelTier(ex, t) Then
+            ' A free-translation row has no column structure to split; a row
+            ' laid out per word (the baseline, Word Gloss, Word Cat.) glosses
+            ' the words as written and stays whole on the left.
             leftPart(t) = cell
             rightPart(t) = ""
         Else
@@ -1104,7 +1176,7 @@ Public Function ColumnSplitsEverywhere(ex As IgtExample, ByVal colIdx As Long) A
 
     If colIdx < 0 Or colIdx >= ex.ColCount Then Exit Function
     For t = 0 To ex.TierCount - 1
-        If IsInterlinearTier(ex.Tiers(t)) Then
+        If IsInterlinearTier(ex.Tiers(t)) And Not IsWordLevelTier(ex, t) Then
             cell = ex.Cells(t, colIdx)
             If cell <> "" Then
                 anyCell = True
