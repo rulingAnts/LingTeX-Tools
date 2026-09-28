@@ -7,32 +7,42 @@ Golden vectors (PROMPT.md)
   PASS  example 1: word-aligned forms
   PASS  example 1: word-aligned glosses
   PASS  example 1: free translation captured
-  PASS  example 1: free translation text
+  PASS  example 1: first free translation text
   PASS  example 2: parsed
   PASS  example 2: word-aligned forms
   PASS  example 2: word-aligned glosses
   PASS  example 2: free translation captured
-  PASS  example 2: free translation text
+  PASS  example 2: first free translation text
   PASS  example 3 (a gloss spread to the row's end): parsed
   PASS  example 3 (a gloss spread to the row's end): word-aligned forms
   PASS  example 3 (a gloss spread to the row's end): word-aligned glosses
   PASS  example 3 (a gloss spread to the row's end): free translation captured
-  PASS  example 3 (a gloss spread to the row's end): free translation text
+  PASS  example 3 (a gloss spread to the row's end): first free translation text
   PASS  example 4 (a clitic's gloss spread to the row's end): parsed
   PASS  example 4 (a clitic's gloss spread to the row's end): word-aligned forms
   PASS  example 4 (a clitic's gloss spread to the row's end): word-aligned glosses
   PASS  example 4 (a clitic's gloss spread to the row's end): free translation captured
-  PASS  example 4 (a clitic's gloss spread to the row's end): free translation text
+  PASS  example 4 (a clitic's gloss spread to the row's end): first free translation text
   PASS  example 5 (proclitics: a trailing boundary joins the host): parsed
   PASS  example 5 (proclitics: a trailing boundary joins the host): word-aligned forms
   PASS  example 5 (proclitics: a trailing boundary joins the host): word-aligned glosses
   PASS  example 5 (proclitics: a trailing boundary joins the host): free translation captured
-  PASS  example 5 (proclitics: a trailing boundary joins the host): free translation text
+  PASS  example 5 (proclitics: a trailing boundary joins the host): first free translation text
+  PASS  example 6 (a copied baseline gives the columns): parsed
+  PASS  example 6 (a copied baseline gives the columns): word-aligned forms
+  PASS  example 6 (a copied baseline gives the columns): word-aligned glosses
+  PASS  example 6 (a copied baseline gives the columns): free translation captured
+  PASS  example 6 (a copied baseline gives the columns): first free translation text
+  PASS  example 7 (every line type, a code on every line): parsed
+  PASS  example 7 (every line type, a code on every line): word-aligned forms
+  PASS  example 7 (every line type, a code on every line): word-aligned glosses
+  PASS  example 7 (every line type, a code on every line): free translation captured
+  PASS  example 7 (every line type, a code on every line): first free translation text
   PASS  example 2 with a number and a trailing section sign: parsed
   PASS  example 2 with a number and a trailing section sign: word-aligned forms
   PASS  example 2 with a number and a trailing section sign: word-aligned glosses
   PASS  example 2 with a number and a trailing section sign: free translation captured
-  PASS  example 2 with a number and a trailing section sign: free translation text
+  PASS  example 2 with a number and a trailing section sign: first free translation text
 
 Projections (word-aligned vs morpheme-aligned)
   PASS  example 1: morpheme-aligned has at least as many columns
@@ -55,6 +65,10 @@ Projections (word-aligned vs morpheme-aligned)
   PASS  example 5 (proclitics): morpheme-aligned satisfies break-char agreement
   PASS  example 5 (proclitics): merging continuations reproduces word-aligned forms
   PASS  example 5 (proclitics): merging continuations reproduces word-aligned glosses
+  PASS  example 6 (a baseline): morpheme-aligned has at least as many columns
+  PASS  example 6 (a baseline): morpheme-aligned satisfies break-char agreement
+  PASS  example 7 (every line type): morpheme-aligned has at least as many columns
+  PASS  example 7 (every line type): morpheme-aligned satisfies break-char agreement
   PASS  a proclitic's boundary is marked in the word-aligned cell
   PASS    and in its gloss
   PASS  an enclitic's is not
@@ -65,6 +79,22 @@ Projections (word-aligned vs morpheme-aligned)
   PASS  merging back reproduces the word-aligned cells, marks and all
   PASS  without a mark the right-hand morpheme keeps the boundary, as it always did
   PASS  an export shows no mark
+  PASS  with marks, no code: the text is whole
+  PASS  with marks and a code, two languages
+  PASS  without marks, no further line: the first word stays
+  PASS  without marks, a further line follows: the code goes
+  PASS  Lit. is a line of its own
+  PASS  example 7 keeps nine rows
+  PASS    in FLEx's order
+  PASS    the first gloss row on the baseline's columns
+  PASS    the second gloss row, sparse, on the same segments
+  PASS    Lex. Gram. Info. per segment, with the boundaries
+  PASS    Word Gloss per baseline word
+  PASS    Word Cat. per baseline word
+  PASS    both free lines
+  PASS    by morpheme, the second form row splits with the first
+  PASS    the baseline sits in each word's first column
+  PASS    no warning at all: the baseline takes no part in the checks
 
 Input routing
   PASS  recognises FLEx text by its tier labels
@@ -205,5 +235,5 @@ Wrap planner
   PASS  NoBreakFlags never flags the first column
   PASS  NoBreakFlags flags the enclitic columns of example 2
 
-ALL PASS -- 186 passed
+ALL PASS -- 216 passed
 
