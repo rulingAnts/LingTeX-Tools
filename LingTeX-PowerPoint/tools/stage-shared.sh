@@ -8,7 +8,8 @@
 #
 #     sh LingTeX-PowerPoint/tools/stage-shared.sh [REV] [OUTDIR]
 #
-# REV defaults to origin/claude/lingtex-word-crlf (the line-break fix; this
+# REV defaults to origin/main, which carries the clipboard normaliser and the
+# 2026-09-28 parser fixes (it was origin/claude/lingtex-word-crlf; this
 # branch's own LingTeX-Word/src still has the old modFlexParse and
 # modIgtModel, which double every CR LF on the Mac).  All five come from the
 # SAME revision: the crlf modIgtModel calls NormalizeLineBreaks and LINE_LF,
@@ -25,7 +26,7 @@
 # not convert in every setup, so the CRLF is made here, explicitly.
 
 set -e
-rev=${1:-origin/claude/lingtex-word-crlf}
+rev=${1:-origin/main}
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
 out=${2:-"$root/build/shared"}
