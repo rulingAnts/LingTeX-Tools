@@ -35,6 +35,10 @@ Option Explicit
 '   7. Insert: the fixture onto a slide of a scratch presentation as ONE
 '      pasted shape, tagged; two examples in one copy as two boxes numbered
 '      (1a), (1b); and the user's clipboard the same after as before.
+'   8. Read-back and re-wrap: the inserted example reads back as the model
+'      it came from (capitals restored from the small-cap runs); narrowing
+'      the box re-wraps onto more lines, widening onto fewer, and a re-wrap
+'      that changes nothing writes nothing.
 '
 ' Pure ASCII apart from ChrW$ in the generated fixture.  Break characters are
 ' Chr$(13), Chr$(10), Chr$(11); never vbCrLf.
@@ -53,6 +57,7 @@ Public Sub PptTestsRun()
     SectionMeasure
     SectionCompose
     SectionInsert
+    SectionRewrap
     Note ""
     If mFail = 0 Then
         Note "ALL PASS -- " & mPass & " passed"
@@ -343,6 +348,55 @@ Fail:
     On Error Resume Next
     If Not host Is Nothing Then host.Saved = -1: host.Close
     ReleaseScratch
+End Sub
+
+'-----------------------------------------------------------------------------
+' 8. Read-back and re-wrap
+'-----------------------------------------------------------------------------
+Private Sub SectionRewrap()
+    Dim app As Object, host As Object, sld As Object, shp As Object
+    Dim ex As IgtExample, back As IgtExample, num As String, gran As Long
+    Dim n1 As Long, n2 As Long, n3 As Long, r As Long
+    Note ""
+    Note "== 8. Read-back and re-wrap"
+    On Error GoTo Fail
+    Set app = Application
+    Set host = app.Presentations.Add(0)
+    Set sld = host.Slides.Add(1, 12)
+    If InsertExamples(Fixture(Chr$(10)), sld, 40, 40, 400) <> 1 Then
+        Fail "read-back: the fixture did not insert", ""
+        GoTo Tidy
+    End If
+    Set shp = sld.Shapes(sld.Shapes.Count)
+    ex = ModelFromText(Fixture(Chr$(10)), igtWordAligned)
+    Ok "ReadBackExample reads the box", ReadBackExample(shp, back, num, gran)
+    Eq "  the number", num, "(1)"
+    Eq "  the model, with capitals restored (ModelToTsv equal)", ModelToTsv(back), ModelToTsv(ex)
+    n1 = shp.TextFrame2.TextRange.Paragraphs.Count
+    r = RewrapExample(shp)
+    Eq "re-wrap at the same width changes nothing (0 = nothing written)", r, 0
+    shp.Width = 250
+    r = RewrapExample(shp)
+    n2 = shp.TextFrame2.TextRange.Paragraphs.Count
+    Eq "narrowed to 250 pt: re-wrap writes (1)", r, 1
+    Ok "  and more paragraphs than at 400", n2 > n1, n1 & " -> " & n2
+    Ok "  the box kept its width", Abs(shp.Width - 250) < 0.5, Format$(shp.Width, "0")
+    Ok "  it still reads back as the same model", ReadBackExample(shp, back, num, gran) And ModelToTsv(back) = ModelToTsv(ex)
+    shp.Width = 600
+    r = RewrapExample(shp)
+    n3 = shp.TextFrame2.TextRange.Paragraphs.Count
+    Eq "widened to 600 pt: re-wrap writes (1)", r, 1
+    Ok "  and fewer paragraphs than at 250", n3 < n2, n2 & " -> " & n3
+    Eq "  re-wrap again: nothing written", RewrapExample(shp), 0
+Tidy:
+    On Error Resume Next
+    host.Saved = -1
+    host.Close
+    ReleaseScratch
+    Exit Sub
+Fail:
+    Fail "read-back / re-wrap", Err.Number & ": " & Err.Description
+    Resume Tidy
 End Sub
 
 '-----------------------------------------------------------------------------

@@ -76,6 +76,7 @@ src/modPptFormat.bas
 src/modPptMeasure.bas
 src/modPptCompose.bas
 src/modPptInsert.bas
+src/modPptRewrap.bas
 src/modPptTests.bas
 tools/probe/modProbe.bas
 tools/probe/modProbeEvents.bas
