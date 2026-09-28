@@ -80,7 +80,7 @@ Private Const INDENT_STEP As Double = 36
 ' The first run: what the add-in does for itself the first time Word loads
 ' it from STARTUP, recorded in the Normal template so it happens once. Bump
 ' to run it again on every machine at the next start.
-Private Const SETUP_VERSION As String = "5"      ' 5: the 2026-09-28 rebuild from the scrubbed sources by the fixed importer; 4: beta.6, a real template with no reference to Normal
+Private Const SETUP_VERSION As String = "6"      ' 6: the clipboard normaliser (CR CR and LF CR copies, Shift+Return rows); 5: beta.7, the 2026-09-28 rebuild from the scrubbed sources by the fixed importer; 4: beta.6, a real template with no reference to Normal
 Private Const SETUP_VAR As String = "LingTeX_Setup"
 
 '-----------------------------------------------------------------------------
