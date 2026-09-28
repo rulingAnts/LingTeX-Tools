@@ -397,6 +397,16 @@ and left a flag set. Run `LingTeXStart` from the macro list, or restart Word.
 expects FLEx text, tab-separated rows, or lines of plain text. Select the
 lines and try Text to Interlinear, which asks about the translation lines.
 
+**One copy became two examples, or came out as one long line.** The line
+breaks of a copy are read before the text is parsed: a copy from FLEx on
+Windows arrives with CR LF endings, some routes between applications double
+every break, and rows ended with Shift+Return arrive as vertical tabs. All
+of these are read as the plain lines they were, so one example stays one
+example and two examples separated by a blank line stay two. Plain
+tab-separated text that is not FLEx output is left exactly as typed, blank
+lines included. If a copy still misreads, paste it into a plain-text editor
+and send what you see there with the report.
+
 **A style of the wrong kind.** If the document already has a style called,
 say, *LingTeX Gloss* that is not a paragraph style, the add-in says so and
 draws nothing until it is renamed or deleted: it would otherwise draw

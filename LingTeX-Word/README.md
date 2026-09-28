@@ -147,7 +147,7 @@ examples are tables to Word but not to the user.
 
 | Command | What it does |
 |---|---|
-| **Insert Interlinear** | With nothing selected, reads the clipboard; with text selected, replaces it. Accepts FLEx interlinear text (tab-separated, with tier labels) or plain tab-separated rows. |
+| **Insert Interlinear** | With nothing selected, reads the clipboard; with text selected, replaces it. Accepts FLEx interlinear text (tab-separated, with tier labels) or plain tab-separated rows. The copy's line breaks are normalised first -- CR LF from Windows, breaks doubled on the way between applications, Shift+Return rows -- so a FLEx copy reads as the lines it was, and a blank line between two examples still separates them. |
 | **Convert Table** | Adopts an ordinary Word table as an auto-wrapping example. |
 | **Text to Interlinear** | Select lines you typed, the words on one line and their glosses on the next with the translation under them, and they become an example. Blank lines are ignored, a leading `(1)` is dropped, and you are asked how many of the last lines are translations. Aligned by word or by morpheme as the document is set. Insert Interlinear takes the same road when its selection is plain lines. |
 | **Re-wrap This** / **Re-wrap All** | Recompute the wrap. Also runs on save. A space typed into an interlinear cell becomes the document's replacement character (`.` or `_`), as on insert; a space would let Word wrap the text inside the cell. |
