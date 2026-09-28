@@ -12,7 +12,9 @@
 #
 # Options:  --macro NAME   run NAME after the import; repeatable. With none,
 #                          the probe runs (ProbePowerPointQuiet).
+#           --tests        run the test suite (PptTestsRun) instead of the probe
 #           --no-import    run the macros without importing first
+#           --no-stage     do not refresh build/shared from LingTeX-Word first
 #           --commit       commit the reports afterwards (default: do not)
 #           --remove-startup-probe
 #                          delete the test add-in MakeStartupProbeAddIn put in
@@ -52,10 +54,22 @@ boxreports="$box/LingTeX-PowerPoint-reports"
 reports="$root/LingTeX-PowerPoint-reports"
 startup_probe="$HOME/Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/PowerPoint/LingTeXStartupProbe.ppam"
 
-# What is imported, in order, relative to LingTeX-PowerPoint/. The modules
-# shared with Word will be listed here as ../LingTeX-Word/src/<name>.bas.
+# What is imported, in order, relative to LingTeX-PowerPoint/. The five modules
+# shared with LingTeX-Word come from build/shared, which tools/stage-shared.sh
+# fills from one git revision of LingTeX-Word (see its header); src/ holds
+# PowerPoint's own. modClipboardBreaks is a STUB of the shared clipboard
+# normaliser and is left out automatically once build/shared's modFlexParse
+# defines NormalizeClipboardText (below).
 MODULES="
 tools/modLingTeXDevCore.bas
+build/shared/modFlexParse.bas
+build/shared/modIgtModel.bas
+build/shared/clsIgtWarning.cls
+build/shared/modLeipzig.bas
+build/shared/modWrap.bas
+src/modClipboardBreaks.bas
+src/modPptClipboard.bas
+src/modPptTests.bas
 tools/probe/modProbe.bas
 tools/probe/modProbeEvents.bas
 tools/probe/clsProbeEvents.cls
@@ -63,12 +77,14 @@ tools/probe/modProbePaste.bas
 tools/probe/modProbeSave.bas
 "
 
-import=1; commit=0; pres=""; macros=""; want=""
+import=1; commit=0; pres=""; macros=""; want=""; stage_shared=1
 for a in "$@"; do
     if [ "$want" = macro ]; then macros="$macros $a"; want=""; continue; fi
     case "$a" in
         --macro)      want=macro ;;
+        --tests)      macros="$macros PptTestsRun" ;;
         --no-import)  import=0 ;;
+        --no-stage)   stage_shared=0 ;;
         --commit)     commit=1 ;;
         --remove-startup-probe)
             rm -f "$startup_probe" && echo "removed $startup_probe"; exit 0 ;;
@@ -103,23 +119,38 @@ stage_modules() {
         basename "$m" >> "$stage/modules.txt"
     done
 }
+# The shared modules, fresh from LingTeX-Word; then drop the stub if the real
+# normaliser has arrived (two Public procedures of one name would not compile).
+if [ "$stage_shared" = 1 ]; then
+    sh "$here/stage-shared.sh" || exit 2
+fi
+if grep -q 'Function NormalizeClipboardText' "$root/build/shared/modFlexParse.bas" 2>/dev/null; then
+    MODULES=$(printf '%s\n' $MODULES | grep -v '^src/modClipboardBreaks.bas$')
+    echo "== build/shared's modFlexParse defines NormalizeClipboardText: the stub modClipboardBreaks is left out"
+fi
 for m in $MODULES; do
     [ -f "$root/$m" ] || { echo "run-in-powerpoint: missing module $m" >&2; exit 2; }
 done
 mkdir -p "$boxreports" "$reports"
 rm -f "$boxreports"/*.mac.txt
 
-# The probe's clipboard section reads what is on the clipboard: make that a
-# FLEx-shaped sample, with tabs, Windows line breaks and a non-ASCII letter.
+# The probe's clipboard section and the tests read what is on the clipboard:
+# put the made-up FLEx copy there, the same one the tests hold as Fixture()
+# (LingTeX-Word/samples/checklist-sample.txt: real FLEx shape, a free line
+# with no leading tab, a non-ASCII length mark). LINGTEX_CLIP_EOL=lf for
+# Mac/Unix line breaks; Windows (CR LF) otherwise, as FLEx on Windows copies.
+# pbcopy reads its input in the locale's encoding: without a UTF-8 locale a
+# non-ASCII letter arrived as two MacRoman characters (2026-09-15).
+sample="$root/../LingTeX-Word/samples/checklist-sample.txt"
 case "$macros" in
-    *Probe*)
-        # LINGTEX_CLIP_EOL=lf for Mac/Unix line breaks; Windows (CR LF) otherwise,
-        # as FLEx running on Windows copies. pbcopy reads its input in the
-        # locale's encoding: without a UTF-8 locale the n-tilde arrived as two
-        # MacRoman characters (2026-09-15).
-        if [ "${LINGTEX_CLIP_EOL:-crlf}" = lf ]; then eol='\n'; else eol='\r\n'; fi
-        printf "Word\tLos\tni\303\261os${eol}Morphemes\tLos\tni\303\261\t-o\t-s${eol}Free\tThe children.${eol}" | LC_ALL=en_US.UTF-8 pbcopy
-        echo "== the clipboard now holds a FLEx-shaped sample, ${LINGTEX_CLIP_EOL:-crlf} line breaks (for the probe)" ;;
+    *Probe*|*PptTests*)
+        [ -f "$sample" ] || { echo "run-in-powerpoint: missing $sample" >&2; exit 2; }
+        if [ "${LINGTEX_CLIP_EOL:-crlf}" = lf ]; then
+            LC_ALL=en_US.UTF-8 pbcopy < "$sample"
+        else
+            awk '{ printf "%s\r\n", $0 }' "$sample" | LC_ALL=en_US.UTF-8 pbcopy
+        fi
+        echo "== the clipboard now holds the made-up FLEx copy, ${LINGTEX_CLIP_EOL:-crlf} line breaks" ;;
 esac
 
 #-- Dialogs ------------------------------------------------------------------
