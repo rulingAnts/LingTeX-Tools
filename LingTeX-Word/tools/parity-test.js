@@ -161,6 +161,39 @@ vectors.forEach(function (v) {
         rebuilt.cells[1].join('\t'), word.cells[1].join('\t'));
 });
 
+// ── 2a. ownership of a boundary across By Word and By Morpheme ───────────────
+
+section('Ownership of a boundary across By Word and By Morpheme');
+
+(function () {
+    var v5 = vectors[4];
+    var word  = R.buildModels(v5.raw, R.WORD_ALIGNED)[0];
+    var morph = R.buildModels(v5.raw, R.MORPHEME_ALIGNED)[0];
+    var encl  = R.buildModels(vectors[1].raw, R.WORD_ALIGNED)[0];
+    ok('a proclitic\'s boundary is marked in the word-aligned cell', word.cells[0][2].indexOf(R.OWN_MARK) !== -1);
+    ok('  and in its gloss', word.cells[1][2].indexOf(R.OWN_MARK) !== -1);
+    ok('an enclitic\'s is not', encl.cells[0][2].indexOf(R.OWN_MARK) === -1);
+    ok('one both sides own carries the mark on both sides', word.cells[0][0].indexOf(R.OWN_MARK + '=' + R.OWN_MARK) !== -1);
+
+    var back = JSON.parse(JSON.stringify(word));
+    R.projectToMorphemes(back);
+    eq('re-splitting the word-aligned cells reproduces the morpheme-aligned forms', back.cells[0].join('\t'), morph.cells[0].join('\t'));
+    eq('  and glosses', back.cells[1].join('\t'), morph.cells[1].join('\t'));
+    ok('  and consumes every mark', (back.cells[0].join('') + back.cells[1].join('')).indexOf(R.OWN_MARK) === -1);
+
+    var flags = R.noBreakFlags(back);
+    for (var c = R.colCount(back) - 1; c > 0; c--) if (flags[c]) R.mergeColumns(back, c - 1, c);
+    eq('merging back reproduces the word-aligned cells, marks and all',
+        back.cells[0].join('\t') + '|' + back.cells[1].join('\t'),
+        word.cells[0].join('\t') + '|' + word.cells[1].join('\t'));
+
+    var legacy = JSON.parse(JSON.stringify(word));
+    legacy.cells = legacy.cells.map(function (row) { return row.map(R.stripOwnMarks); });
+    R.projectToMorphemes(legacy);
+    eq('without a mark the right-hand morpheme keeps the boundary, as it always did', legacy.cells[0][3] + '|' + legacy.cells[0][4], 'ze|=zuvo');
+    eq('an export shows no mark', R.modelToTsv(word).split('\n')[0], v5.expected[0]);
+})();
+
 // ── 2b. FLEx vs plain TSV routing ────────────────────────────────────────────
 
 section('Input routing');

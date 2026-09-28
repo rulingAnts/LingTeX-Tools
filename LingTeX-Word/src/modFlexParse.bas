@@ -353,16 +353,41 @@ Public Function IsBoundary(ch As String) As Boolean
     IsBoundary = (InStr(MORPH_DIVS, ch) > 0)
 End Function
 
-' The boundary character a cell starts with, or "".
-Public Function LeadChar(s As String) As String
-    If Len(s) = 0 Then Exit Function
-    If IsBoundary(Left$(s, 1)) Then LeadChar = Left$(s, 1)
+'-----------------------------------------------------------------------------
+' THE OWNERSHIP MARK.  A boundary character belongs to the affix or clitic,
+' never to its host, and FLEx keeps that by the side of the cell it sits on.
+' Folding two cells into one word-aligned cell loses it: "be=dai" no longer
+' says whose "=" it is, and a later split can only guess.  So the fold writes
+' U+2060 WORD JOINER right after a boundary the LEFT morpheme owns (a prefix
+' or proclitic), and on both sides of one that both own (a proclitic meeting
+' an enclitic); a split reads it and consumes it.  Zero width, no line break
+' inside the word, invisible in any font.  The cost, documented in the guide:
+' Find in Word will not match the plain spelling of such a word, and a copy
+' carries the mark until an export strips it.  Cells the user retyped have no
+' mark, and the gloss then decides (modIgtModel SplitOwnsLeft).
+'-----------------------------------------------------------------------------
+Public Function OwnMark() As String
+    OwnMark = ChrW(&H2060)
 End Function
 
-' The boundary character a cell ends with, or "".
+Public Function StripOwnMarks(ByVal s As String) As String
+    StripOwnMarks = Replace(s, ChrW(&H2060), "")
+End Function
+
+' The boundary character a cell starts with, or "".  Marks are looked through.
+Public Function LeadChar(s As String) As String
+    Dim u As String
+    u = StripOwnMarks(s)
+    If Len(u) = 0 Then Exit Function
+    If IsBoundary(Left$(u, 1)) Then LeadChar = Left$(u, 1)
+End Function
+
+' The boundary character a cell ends with, or "".  Marks are looked through.
 Public Function TrailChar(s As String) As String
-    If Len(s) = 0 Then Exit Function
-    If IsBoundary(Right$(s, 1)) Then TrailChar = Right$(s, 1)
+    Dim u As String
+    u = StripOwnMarks(s)
+    If Len(u) = 0 Then Exit Function
+    If IsBoundary(Right$(u, 1)) Then TrailChar = Right$(u, 1)
 End Function
 
 ' Number of segmentable boundaries in a cell.  Leipzig rule 4's "." and ":"
@@ -501,7 +526,7 @@ Public Function SplitGlossSegments(ByVal text As String, _
 
     For i = 1 To Len(text)
         ch = Mid$(text, i, 1)
-        If IsBoundary(ch) Or ch = "." Or ch = ":" Or ch = ";" Then
+        If IsBoundary(ch) Or ch = "." Or ch = ":" Or ch = ";" Or ch = OwnMark() Then
             If cur <> "" Then
                 parts(n) = cur
                 n = n + 1
@@ -1085,10 +1110,24 @@ Private Function SeamBd(w As IgtWord, ByVal i As Long) As String
     End If
 End Function
 
+' What a segment writes for its trailing boundary: bare when it is the word's
+' last segment; followed by the ownership mark when it alone owns the seam;
+' the mark on both sides when the next segment owns it too.
+Private Function TrailPart(w As IgtWord, ByVal i As Long) As String
+    If w.Segments(i).Tb = "" Then Exit Function
+    If i = w.SegCount - 1 Then
+        TrailPart = w.Segments(i).Tb
+    ElseIf w.Segments(i + 1).Bd = w.Segments(i).Tb Then
+        TrailPart = OwnMark() & w.Segments(i).Tb & OwnMark()
+    Else
+        TrailPart = w.Segments(i).Tb & OwnMark()
+    End If
+End Function
+
 Public Function JoinForm(w As IgtWord) As String
     Dim i As Long, s As String
     For i = 0 To w.SegCount - 1
-        s = s & SeamBd(w, i) & w.Segments(i).Form & w.Segments(i).Tb
+        s = s & SeamBd(w, i) & w.Segments(i).Form & TrailPart(w, i)
     Next i
     JoinForm = s
 End Function
@@ -1100,7 +1139,7 @@ End Function
 Public Function JoinGloss(w As IgtWord) As String
     Dim i As Long, s As String
     For i = 0 To w.SegCount - 1
-        s = s & SeamBd(w, i) & w.Segments(i).Gloss & w.Segments(i).Tb
+        s = s & SeamBd(w, i) & w.Segments(i).Gloss & TrailPart(w, i)
     Next i
     JoinGloss = s
 End Function

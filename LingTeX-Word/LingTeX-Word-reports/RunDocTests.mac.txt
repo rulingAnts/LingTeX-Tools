@@ -263,9 +263,11 @@ Open documents at start: 1
 
 -- several ---------------------------------------------------
   PASS   two examples from one copy draw two tables
-  PASS     the first: three columns by word
+  PASS     the first: two columns by word, the proclitic joined to its host
   PASS     its first cell
-  PASS     its last gloss, spread to the row's end in the copy
+  PASS     its last gloss, spread to the row's end in the copy, behind the proclitic's
+  PASS     the page holds no ownership mark: the owner is a character style
+  PASS     and read-back restores the mark from the style
   PASS     its translation is under it
   PASS     the second: two columns, the section sign gone
   PASS     its last gloss
@@ -275,6 +277,9 @@ Open documents at start: 1
   PASS   LingTeXInsertInterlinear (several) leaves ScreenUpdating on
   PASS   LingTeXInsertInterlinear (several) leaks no document
   PASS   LingTeXInsertInterlinear (several) leaves no undo record open
+  PASS     Split Column gives the proclitic its boundary: ze= then zuvo
+  PASS       and the gloss likewise
+  PASS     Merge Columns writes the owner back
 
 -- measure ---------------------------------------------------
   PASS   widths are strictly increasing for i < iii < WWW
@@ -579,5 +584,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 505 passed
+ALL PASS -- 510 passed
 

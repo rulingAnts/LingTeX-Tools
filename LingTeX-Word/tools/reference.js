@@ -158,13 +158,26 @@ function handleStandalonePunctuation(words) {
 // ── projections ──────────────────────────────────────────────────────────────
 
 /** Word-aligned form: every segment of the word joined into one cell. */
+/**
+ * What a segment writes for its trailing boundary: bare when it is the word's
+ * last; followed by the ownership mark when it alone owns the seam; the mark
+ * on both sides when the next segment owns it too.
+ */
+function trailPart(segments, i) {
+    var s = segments[i];
+    if (s.tb === '') return '';
+    if (i === segments.length - 1) return s.tb;
+    if (segments[i + 1].bd === s.tb) return OWN_MARK + s.tb + OWN_MARK;
+    return s.tb + OWN_MARK;
+}
+
 function joinForm(segments) {
     var out = '';
     segments.forEach(function (s, i) {
         // A boundary present on both sides of a seam is written once: the
         // proclitic's trailing "=" and the enclitic's leading one.
         var bd = (i > 0 && s.bd !== '' && s.bd === segments[i - 1].tb) ? '' : s.bd;
-        out += bd + s.form + s.tb;
+        out += bd + s.form + trailPart(segments, i);
     });
     return out;
 }
@@ -178,7 +191,7 @@ function joinGloss(segments) {
     var out = '';
     segments.forEach(function (s, i) {
         var bd = (i > 0 && s.bd !== '' && s.bd === segments[i - 1].tb) ? '' : s.bd;
-        out += bd + s.gloss + s.tb;
+        out += bd + s.gloss + trailPart(segments, i);
     });
     return out;
 }
@@ -441,7 +454,8 @@ function buildModels(raw, granularity) {
 
 /** Render a model back to TSV: one row per tier, then the free lines. */
 function modelToTsv(model) {
-    var rows = model.cells.map(function (row) { return row.join('\t'); });
+    // An export: the ownership marks stay in the model, never in its text form.
+    var rows = model.cells.map(function (row) { return row.map(stripOwnMarks).join('\t'); });
     if (model.freeLines.length) rows.push(model.freeLines.join(' / '));
     return rows.join('\n');
 }
@@ -457,11 +471,44 @@ function joinAtSeams(cells) {
     cells.forEach(function (v) {
         if (out !== '' && v !== '') {
             var tc = trailChar(out);
-            if (tc !== '' && tc === leadChar(v)) v = v.substring(1);
+            if (tc !== '' && tc === leadChar(v)) {
+                // Both own it: written once, the mark on both sides.
+                out = out.substring(0, out.length - 1) + OWN_MARK + tc + OWN_MARK;
+                v = v.substring(1);
+            } else if (tc !== '') {
+                // The left owns it: a prefix or proclitic and its host.
+                out += OWN_MARK;
+            }
         }
         out += v;
     });
     return out;
+}
+
+/** True when every non-empty interlinear cell of the column has a boundary to split on. */
+function columnSplitsEverywhere(model, col) {
+    var any = false;
+    for (var t = 0; t < model.tiers.length; t++) {
+        if (!isInterlinearTier(model.tiers[t])) continue;
+        var cell = model.cells[t][col] || '';
+        if (cell === '') continue;
+        any = true;
+        var found = false;
+        for (var i = 1; i < cell.length; i++) if (isBoundary(cell.charAt(i))) { found = true; break; }
+        if (!found) return false;
+    }
+    return any;
+}
+
+/** Split every column that splits everywhere, left to right. Port of ProjectToMorphemes. */
+function projectToMorphemes(model) {
+    var c = 0, guard = 0;
+    while (c < colCount(model) && guard++ < 4000) {
+        if (columnSplitsEverywhere(model, c)) {
+            if (!splitColumn(model, c, 1).ok) break;
+        }
+        c++;
+    }
 }
 
 /** Concatenate columns first..last into one. Free rows are left alone. */
@@ -511,6 +558,14 @@ function splitColumn(model, col, occurrence) {
             }
         }
         if (at < 0) { shortTiers.push(model.tiers[t]); return [cell, '']; }
+        // The ownership marks say whose the boundary is; without one it is
+        // the right-hand morpheme's, as it always was.
+        var before = at > 0 && cell.charAt(at - 1) === OWN_MARK;
+        var after = cell.charAt(at + 1) === OWN_MARK;
+        if (before && after) {
+            return [cell.substring(0, at - 1) + cell.charAt(at), cell.charAt(at) + cell.substring(at + 2)];
+        }
+        if (after) return [cell.substring(0, at + 1), cell.substring(at + 2)];
         return [cell.substring(0, at), cell.substring(at)];
     });
 
@@ -531,8 +586,20 @@ function deleteColumn(model, at) {
 
 // ── Leipzig checks ───────────────────────────────────────────────────────────
 
-function leadChar(s)  { return s && isBoundary(s.charAt(0))            ? s.charAt(0) : ''; }
-function trailChar(s) { return s && isBoundary(s.charAt(s.length - 1)) ? s.charAt(s.length - 1) : ''; }
+/**
+ * THE OWNERSHIP MARK. A boundary character belongs to the affix or clitic,
+ * never to its host. Folding two cells into one word-aligned cell loses which
+ * side it belonged to, so the fold writes U+2060 WORD JOINER after a boundary
+ * the LEFT morpheme owns (a prefix or proclitic), and on both sides of one
+ * that both own; a split reads and consumes it. Exports strip it, and
+ * LingTeX-Word writes it to the page as a character style, never as text.
+ * A boundary with no mark stays the right-hand morpheme's. PROMPT.md rule 9.
+ */
+var OWN_MARK = '\u2060';
+function stripOwnMarks(s) { return String(s).split(OWN_MARK).join(''); }
+
+function leadChar(s)  { s = stripOwnMarks(s || ''); return s && isBoundary(s.charAt(0))            ? s.charAt(0) : ''; }
+function trailChar(s) { s = stripOwnMarks(s || ''); return s && isBoundary(s.charAt(s.length - 1)) ? s.charAt(s.length - 1) : ''; }
 
 /** Count only segmentable boundaries: `.` and `:` are rule 4, not rule 2. */
 function countBoundaries(s) {
@@ -776,6 +843,8 @@ module.exports = {
     ROLE_CATEGORY: ROLE_CATEGORY, ROLE_FREE: ROLE_FREE,
     WORD_ALIGNED: WORD_ALIGNED, MORPHEME_ALIGNED: MORPHEME_ALIGNED,
     isBoundary: isBoundary, isGramGloss: core._isGramGloss,
+    OWN_MARK: OWN_MARK, stripOwnMarks: stripOwnMarks,
+    projectToMorphemes: projectToMorphemes, columnSplitsEverywhere: columnSplitsEverywhere,
     groupSegments: groupSegments,
     handleStandalonePunctuation: handleStandalonePunctuation,
     joinForm: joinForm, joinGloss: joinGloss, projectColumns: projectColumns,

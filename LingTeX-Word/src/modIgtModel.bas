@@ -671,11 +671,15 @@ Public Function MergeColumns(ByRef ex As IgtExample, _
         acc = ""
         For c = firstIdx To lastIdx
             If acc <> "" And ex.Cells(t, c) <> "" And sep <> "" Then acc = acc & sep
-            ' A boundary present on both sides of the seam is written once:
-            ' "ze=" and "=zuvo" merge to "ze=zuvo" (PROMPT.md rule 8).
+            ' The seam keeps who owns the boundary (PROMPT.md rules 8 and 9):
+            ' a boundary present on both sides is written once with the
+            ' ownership mark on both sides of it; one the left cell ends with
+            ' gets the mark after it; one the right cell starts with is bare.
             If sep = "" And acc <> "" And ex.Cells(t, c) <> "" Then
                 If TrailChar(acc) <> "" And TrailChar(acc) = LeadChar(ex.Cells(t, c)) Then
-                    acc = acc & Mid$(ex.Cells(t, c), 2)
+                    acc = Left$(acc, Len(acc) - 1) & OwnMark() & TrailChar(acc) & OwnMark() & Mid$(ex.Cells(t, c), 2)
+                ElseIf TrailChar(acc) <> "" Then
+                    acc = acc & OwnMark() & ex.Cells(t, c)
                 Else
                     acc = acc & ex.Cells(t, c)
                 End If
@@ -720,6 +724,7 @@ Public Function SplitColumn(ByRef ex As IgtExample, ByVal colIdx As Long, _
     Dim t As Long, c As Long, i As Long
     Dim leftPart() As String, rightPart() As String
     Dim cell As String, seen As Long, at As Long
+    Dim markBefore As Boolean, markAfter As Boolean
 
     ' Each early exit names its own reason. The caller reports
     ' "No morpheme break was found in: " & outShortTiers, so an empty string here
@@ -737,6 +742,11 @@ Public Function SplitColumn(ByRef ex As IgtExample, ByVal colIdx As Long, _
 
     ReDim leftPart(0 To ex.TierCount - 1)
     ReDim rightPart(0 To ex.TierCount - 1)
+
+    ' Who owns the boundary being split on: the ownership marks, written by
+    ' every fold (PROMPT.md rule 9).  A cell with no mark at the boundary gives
+    ' it to the right-hand morpheme, as it always did -- predictable, and right
+    ' for every suffix and enclitic.
 
     For t = 0 To ex.TierCount - 1
         cell = ex.Cells(t, colIdx)
@@ -764,8 +774,21 @@ Public Function SplitColumn(ByRef ex As IgtExample, ByVal colIdx As Long, _
                     outShortTiers = outShortTiers & ex.Tiers(t)
                 End If
             Else
-                leftPart(t) = Left$(cell, at - 1)
-                rightPart(t) = Mid$(cell, at)
+                markBefore = (at > 1 And Mid$(cell, at - 1, 1) = OwnMark())
+                markAfter = (Mid$(cell, at + 1, 1) = OwnMark())
+                If markBefore And markAfter Then
+                    ' Both own it: "xu=" and "=ve".  The marks are consumed.
+                    leftPart(t) = Left$(cell, at - 2) & Mid$(cell, at, 1)
+                    rightPart(t) = Mid$(cell, at, 1) & Mid$(cell, at + 2)
+                ElseIf markAfter Then
+                    ' The left owns it: a prefix or proclitic and its host.
+                    leftPart(t) = Left$(cell, at)
+                    rightPart(t) = Mid$(cell, at + 2)
+                Else
+                    ' The right owns it: a suffix, enclitic or reduplicant.
+                    leftPart(t) = Left$(cell, at - 1)
+                    rightPart(t) = Mid$(cell, at)
+                End If
             End If
         End If
     Next t

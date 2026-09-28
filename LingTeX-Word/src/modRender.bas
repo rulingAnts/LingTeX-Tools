@@ -969,8 +969,52 @@ End Function
 ' belong to the user's.
 Public Sub WriteCellText(rng As Range, ByVal text As String, _
         ByVal role As String, ByVal directFormat As Boolean, srcDoc As Document)
-    rng.Text = TransformedCellText(text, role, srcDoc)
-    ApplyGramGlossRuns rng, text, role, directFormat
+    Dim plain As String
+    ' The model's ownership marks never reach the page: the text is written
+    ' plain, and the boundary glyphs they sat on get a character style.
+    plain = StripOwnMarks(text)
+    rng.Text = TransformedCellText(plain, role, srcDoc)
+    ApplyGramGlossRuns rng, plain, role, directFormat
+    If Not directFormat Then ApplyOwnershipStyles rng, text
+End Sub
+
+'-----------------------------------------------------------------------------
+' A boundary glyph the LEFT morpheme owns (the mark after it in the model)
+' gets STYLE_LEFT_BD; one both neighbours own (the mark on both sides) gets
+' STYLE_SHARED_BD.  Offsets are over the plain text, which is what is in the
+' range; lowercasing for small caps never changes a length.  modReadBack turns
+' the styles back into marks, so a split hands the boundary to its owner.
+'-----------------------------------------------------------------------------
+Private Sub ApplyOwnershipStyles(rng As Range, ByVal text As String)
+    Dim i As Long, p As Long, ch As String, styleName As String
+    Dim sub_ As Range, doc As Document
+
+    If InStr(text, OwnMark()) = 0 Then Exit Sub
+    Set doc = rng.Document
+    p = 0
+    For i = 1 To Len(text)
+        ch = Mid$(text, i, 1)
+        If ch = OwnMark() Then GoTo NextCh
+        p = p + 1
+        If IsBoundary(ch) Then
+            styleName = ""
+            If Mid$(text, i + 1, 1) = OwnMark() Then
+                If i > 1 Then
+                    If Mid$(text, i - 1, 1) = OwnMark() Then styleName = STYLE_SHARED_BD
+                End If
+                If styleName = "" Then styleName = STYLE_LEFT_BD
+            End If
+            If styleName <> "" Then
+                Set sub_ = rng.Duplicate
+                On Error Resume Next
+                sub_.SetRange rng.Start + p - 1, rng.Start + p
+                sub_.Style = doc.Styles(styleName)
+                Err.Clear
+                On Error GoTo 0
+            End If
+        End If
+NextCh:
+    Next i
 End Sub
 
 '-----------------------------------------------------------------------------

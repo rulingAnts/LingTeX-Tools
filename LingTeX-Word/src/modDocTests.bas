@@ -1283,8 +1283,8 @@ Private Function TwoFlexExamples() As String
     t = vbTab
     lrm = ChrW(&H200E)
     TwoFlexExamples = _
-        "1.1" & t & "Morphemes" & t & "vu" & t & "=ve" & t & "zo" & t & "zuvo" & t & t & vbCr & _
-        t & "Lex. Gloss" & t & "fox" & t & "ERG" & t & "dream" & t & t & "follow" & t & ".CMP" & vbCr & _
+        "1.1" & t & "Morphemes" & t & "vu" & t & "=ve" & t & "ze=" & t & "zuvo" & t & t & vbCr & _
+        t & "Lex. Gloss" & t & "fox" & t & "ERG" & t & "DAT" & t & t & "follow" & t & ".CMP" & vbCr & _
         lrm & "Free " & lrm & lrm & "The fox's dream was followed." & vbCr & _
         "1.2" & t & "Morphemes" & t & "zel" & t & "vimo" & t & "=xo" & t & ChrW(&HA7) & vbCr & _
         t & "Lex. Gloss" & t & "yam" & t & "pick" & t & "SEQ" & t & vbCr & _
@@ -1294,6 +1294,7 @@ End Function
 Private Sub TestInsertSeveralExamples()
     Dim doc As Document
     Dim back As IgtExample
+    Dim tbl As Table
     Dim docsBefore As Long
     Dim savedQuiet As Boolean, savedText As String
 
@@ -1318,9 +1319,14 @@ Private Sub TestInsertSeveralExamples()
     Ok "two examples from one copy draw two tables", (doc.Tables.Count = 2)
     If doc.Tables.Count = 2 Then
         back = ReadExampleFromTable(doc.Tables(1))
-        Ok "  the first: three columns by word", (back.ColCount = 3)
+        Ok "  the first: two columns by word, the proclitic joined to its host", (back.ColCount = 2)
         Eq "  its first cell", back.Cells(0, 0), "vu=ve"
-        Eq "  its last gloss, spread to the row's end in the copy", back.Cells(1, 2), "follow.CMP"
+        Eq "  its last gloss, spread to the row's end in the copy, behind the proclitic's", _
+            StripOwnMarks(back.Cells(1, 1)), "DAT=follow.CMP"
+        Ok "  the page holds no ownership mark: the owner is a character style", _
+            (InStr(doc.Tables(1).Range.Text, OwnMark()) = 0)
+        Ok "  and read-back restores the mark from the style", _
+            (back.Cells(0, 1) = "ze=" & OwnMark() & "zuvo")
         Ok "  its translation is under it", _
             (InStr(ParagraphAfterTable(doc.Tables(1)).Range.Text, "fox") > 0)
         back = ReadExampleFromTable(doc.Tables(2))
@@ -1338,6 +1344,41 @@ Private Sub TestInsertSeveralExamples()
     ' hidden test document does nothing at all (measured 2026-09-28), so the
     ' one-press check is not made here.
     CheckStateIsClean "LingTeXInsertInterlinear (several)", docsBefore
+
+    ' Split Column hands the boundary to its owner, and Merge Columns writes
+    ' the owner back: the proclitic cell round-trips through the page.
+    If doc.Tables.Count = 2 Then
+        On Error Resume Next
+        doc.Tables(1).Cell(1, 2 + NumberColumns(doc.Tables(1))).Range.Select
+        Err.Clear
+        On Error GoTo 0
+        gLastMessage = ""
+        RunCommandByName "LingTeXSplitColumn"
+        Set tbl = FindExampleAt(Selection.Range)
+        If tbl Is Nothing Then
+            Ok "  Split Column on the proclitic cell: the example survived", False
+            Emit "         said: " & gLastMessage
+        Else
+            back = ReadExampleFromTable(tbl)
+            Eq "  Split Column gives the proclitic its boundary: ze= then zuvo", _
+                back.Cells(0, 1) & "|" & back.Cells(0, 2), "ze=|zuvo"
+            Eq "    and the gloss likewise", back.Cells(1, 1) & "|" & back.Cells(1, 2), "DAT=|follow.CMP"
+            On Error Resume Next
+            tbl.Cell(1, 2 + NumberColumns(tbl)).Range.Select
+            Err.Clear
+            On Error GoTo 0
+            gLastMessage = ""
+            RunCommandByName "LingTeXMergeColumns"
+            Set tbl = FindExampleAt(Selection.Range)
+            If tbl Is Nothing Then
+                Ok "  Merge Columns: the example survived", False
+                Emit "         said: " & gLastMessage
+            Else
+                back = ReadExampleFromTable(tbl)
+                Ok "  Merge Columns writes the owner back", (back.Cells(0, 1) = "ze=" & OwnMark() & "zuvo")
+            End If
+        End If
+    End If
 
     gQuiet = savedQuiet
     gQuietText = savedText

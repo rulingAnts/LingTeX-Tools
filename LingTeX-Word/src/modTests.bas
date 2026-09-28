@@ -70,6 +70,7 @@ Public Sub RunAllTests()
     ' which section died and the run CONTINUES to the next one.
     RunSection "golden"
     RunSection "projections"
+    RunSection "ownership"
     RunSection "routing"
     RunSection "linebreaks"
     RunSection "columns"
@@ -105,6 +106,7 @@ Private Sub RunSection(ByVal which As String)
     Select Case which
         Case "golden":      TestGoldenVectors
         Case "projections": TestProjections
+        Case "ownership":   TestOwnership
         Case "routing":     TestRouting
         Case "linebreaks":  TestLineBreaks
         Case "columns":     TestColumnEditing
@@ -458,14 +460,68 @@ Private Sub CheckVector(ByVal name As String, ByVal raw As String, _
     If ex.FreeCount = 1 Then Eq name & ": free translation text", ex.FreeLines(0), wantFree
 End Sub
 
+' A tier's cells, tab-joined, as an export shows them: ownership marks out.
 Private Function RowText(ex As IgtExample, ByVal t As Long) As String
+    RowText = StripOwnMarks(RawRow(ex, t))
+End Function
+
+' A tier's cells exactly as the model holds them, marks and all.
+Private Function RawRow(ex As IgtExample, ByVal t As Long) As String
     Dim c As Long, s As String
     For c = 0 To ex.ColCount - 1
         If c > 0 Then s = s & vbTab
         s = s & ex.Cells(t, c)
     Next c
-    RowText = s
+    RawRow = s
 End Function
+
+'=============================================================================
+' -- OWNERSHIP OF A BOUNDARY ACROSS BY WORD AND BY MORPHEME ------------------
+'=============================================================================
+' A fold writes the mark, a split consumes it, so the toggle is lossless both
+' ways; without a mark the right-hand morpheme keeps the boundary (PROMPT.md
+' rule 9).
+
+Private Sub TestOwnership()
+    Dim word As IgtExample, morph As IgtExample, back As IgtExample, legacy As IgtExample
+    Dim encl As IgtExample
+    Dim flags() As Boolean, c As Long, t As Long
+
+    word = ModelFromText(Vector5Raw(), igtWordAligned)
+    morph = ModelFromText(Vector5Raw(), igtMorphemeAligned)
+    encl = ModelFromText(Vector2Raw(), igtWordAligned)
+    Ok "a proclitic's boundary is marked in the word-aligned cell", _
+       (InStr(word.Cells(0, 2), OwnMark()) > 0)
+    Ok "  and in its gloss", (InStr(word.Cells(1, 2), OwnMark()) > 0)
+    Ok "an enclitic's is not", (InStr(encl.Cells(0, 2), OwnMark()) = 0)
+    Ok "one both sides own carries the mark on both sides", _
+       (InStr(word.Cells(0, 0), OwnMark() & "=" & OwnMark()) > 0)
+
+    back = word
+    ProjectToMorphemes back
+    Eq "re-splitting the word-aligned cells reproduces the morpheme-aligned forms", _
+       RawRow(back, 0), RawRow(morph, 0)
+    Eq "  and glosses", RawRow(back, 1), RawRow(morph, 1)
+    Ok "  and consumes every mark", (InStr(RawRow(back, 0) & RawRow(back, 1), OwnMark()) = 0)
+
+    flags = NoBreakFlags(back)
+    For c = back.ColCount - 1 To 1 Step -1
+        If flags(c) Then MergeColumns back, c - 1, c
+    Next c
+    Eq "merging back reproduces the word-aligned cells, marks and all", _
+       RawRow(back, 0) & "|" & RawRow(back, 1), RawRow(word, 0) & "|" & RawRow(word, 1)
+
+    legacy = word
+    For t = 0 To legacy.TierCount - 1
+        For c = 0 To legacy.ColCount - 1
+            legacy.Cells(t, c) = StripOwnMarks(legacy.Cells(t, c))
+        Next c
+    Next t
+    ProjectToMorphemes legacy
+    Eq "without a mark the right-hand morpheme keeps the boundary, as it always did", _
+       legacy.Cells(0, 3) & "|" & legacy.Cells(0, 4), "ze|=zuvo"
+    Eq "an export shows no mark", RowText(word, 0), Vector5Forms()
+End Sub
 
 
 '=============================================================================

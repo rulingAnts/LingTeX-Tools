@@ -55,6 +55,16 @@ Projections (word-aligned vs morpheme-aligned)
   PASS  example 5 (proclitics): morpheme-aligned satisfies break-char agreement
   PASS  example 5 (proclitics): merging continuations reproduces word-aligned forms
   PASS  example 5 (proclitics): merging continuations reproduces word-aligned glosses
+  PASS  a proclitic's boundary is marked in the word-aligned cell
+  PASS    and in its gloss
+  PASS  an enclitic's is not
+  PASS  one both sides own carries the mark on both sides
+  PASS  re-splitting the word-aligned cells reproduces the morpheme-aligned forms
+  PASS    and glosses
+  PASS    and consumes every mark
+  PASS  merging back reproduces the word-aligned cells, marks and all
+  PASS  without a mark the right-hand morpheme keeps the boundary, as it always did
+  PASS  an export shows no mark
 
 Input routing
   PASS  recognises FLEx text by its tier labels
@@ -195,5 +205,5 @@ Wrap planner
   PASS  NoBreakFlags never flags the first column
   PASS  NoBreakFlags flags the enclitic columns of example 2
 
-ALL PASS -- 176 passed
+ALL PASS -- 186 passed
 

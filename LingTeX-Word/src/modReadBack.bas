@@ -305,6 +305,7 @@ Public Function CellTextRestored(tbl As Table, ByVal r As Long, ByVal c As Long)
     Dim ch As Range
     Dim out As String
     Dim nm As String
+    Dim hasOwn As Boolean
 
     On Error Resume Next
     Set rng = tbl.Cell(r, c).Range
@@ -317,13 +318,22 @@ Public Function CellTextRestored(tbl As Table, ByVal r As Long, ByVal c As Long)
     raw = CleanCellText(raw)
     If raw = "" Then Exit Function
 
+    ' A boundary glyph carrying an ownership style (modRender) comes back with
+    ' the model's mark beside it.  Two Find calls settle whether the cell has
+    ' any, and only a cell with a boundary is asked at all.
+    hasOwn = False
+    If CountBoundaries(raw) > 0 Then
+        hasOwn = CellHasStyle(rng, STYLE_LEFT_BD)
+        If Not hasOwn Then hasOwn = CellHasStyle(rng, STYLE_SHARED_BD)
+    End If
+
     sc = WD_UNDEFINED
     On Error Resume Next
     sc = rng.Font.SmallCaps
     Err.Clear
     On Error GoTo 0
 
-    If sc = 0 Then
+    If sc = 0 And Not hasOwn Then
         ' Nothing is in small caps, so nothing was lowercased.
         CellTextRestored = raw
         Exit Function
@@ -359,7 +369,7 @@ Public Function CellTextRestored(tbl As Table, ByVal r As Long, ByVal c As Long)
     nm = rng.Style
     Err.Clear
     On Error GoTo 0
-    If nm = STYLE_GRAM And Not gForceSlowRestore Then
+    If nm = STYLE_GRAM And Not gForceSlowRestore And Not hasOwn Then
         CellTextRestored = UCase$(raw)
         Exit Function
     End If
@@ -377,6 +387,10 @@ Public Function CellTextRestored(tbl As Table, ByVal r As Long, ByVal c As Long)
 
         If nm = STYLE_GRAM Then
             out = out & UCase$(ch.Text)
+        ElseIf nm = STYLE_LEFT_BD Then
+            out = out & ch.Text & OwnMark()
+        ElseIf nm = STYLE_SHARED_BD Then
+            out = out & OwnMark() & ch.Text & OwnMark()
         Else
             out = out & ch.Text
         End If
@@ -386,6 +400,25 @@ NextChar:
     ' Cleaned only at the end, so the control characters Word keeps in cell text
     ' never take part in the indexing above.
     CellTextRestored = CleanCellText(out)
+End Function
+
+' True when some run inside the range carries the named character style: one
+' formatting-only Find, confined to the range, instead of a walk.
+Private Function CellHasStyle(rng As Range, ByVal styleName As String) As Boolean
+    Dim f As Range
+    On Error Resume Next
+    Set f = rng.Duplicate
+    With f.Find
+        .ClearFormatting
+        .Text = ""
+        .Style = rng.Document.Styles(styleName)
+        .Format = True
+        .Forward = True
+        .Wrap = 0                            ' wdFindStop
+        .MatchWildcards = False
+        CellHasStyle = .Execute
+    End With
+    Err.Clear
 End Function
 
 ' Strip the control characters Word puts in cell text, and any stray whitespace.

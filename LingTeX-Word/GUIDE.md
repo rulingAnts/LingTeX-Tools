@@ -397,6 +397,16 @@ and left a flag set. Run `LingTeXStart` from the macro list, or restart Word.
 expects FLEx text, tab-separated rows, or lines of plain text. Select the
 lines and try Text to Interlinear, which asks about the translation lines.
 
+**Prefixes and proclitics.** A boundary mark belongs to the affix or clitic,
+never to the word it attaches to: in `be=dai` the `=` is the proclitic's. When
+two morphemes are folded into one By Word cell, the add-in records whose the
+boundary is as a character style on that one character, *LingTeX Left
+Boundary* or *LingTeX Shared Boundary*, with no formatting of its own. So
+Split Column gives the boundary back to its owner, the cell's text stays
+plain and Find matches it as typed. Retyping a cell drops the style; a
+boundary with no record is treated as the right-hand morpheme's, as a suffix
+or enclitic is.
+
 **Several examples in one copy.** Select several lines in FLEx's Print View
 and copy: Insert Interlinear draws every example, one under another, each with
 the next number. FLEx's end-of-segment sign, `§`, is dropped, and a gloss FLEx

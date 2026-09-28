@@ -667,6 +667,12 @@ recorded so the module boundaries are not lost.
 
 ## Known issues
 
+- **A By Word cell that holds a prefix or proclitic records the boundary's
+  owner as a character style** on that one character (*LingTeX Left
+  Boundary*, *LingTeX Shared Boundary*, no formatting of their own), so that
+  Split Column can hand the boundary back to the right side. The text stays
+  plain and Find matches it. Retyping the cell drops the style; a boundary
+  with no record is treated as the right-hand morpheme's.
 - **Re-wrap All over many examples shows the busy cursor for a few seconds.**
   VBA is single-threaded; the status bar reports progress meanwhile. The time
   is text measurement, which the width cache reduces on repeat runs.
