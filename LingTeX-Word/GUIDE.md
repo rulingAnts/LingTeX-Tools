@@ -397,6 +397,12 @@ and left a flag set. Run `LingTeXStart` from the macro list, or restart Word.
 expects FLEx text, tab-separated rows, or lines of plain text. Select the
 lines and try Text to Interlinear, which asks about the translation lines.
 
+**Several examples in one copy.** Select several lines in FLEx's Print View
+and copy: Insert Interlinear draws every example, one under another, each with
+the next number. FLEx's end-of-segment sign, `§`, is dropped, and a gloss FLEx
+spreads over the cells after its morpheme's, at the end of a row too, is read
+whole.
+
 **One copy became two examples, or came out as one long line.** The line
 breaks of a copy are read before the text is parsed: a copy from FLEx on
 Windows arrives with CR LF endings, some routes between applications double

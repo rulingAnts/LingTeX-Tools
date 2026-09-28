@@ -377,6 +377,43 @@ Private Function Vector3Glosses() As String
     Vector3Glosses = "fox=ERG" & T & "dream" & T & "follow.CMP"
 End Function
 
+' PROMPT.md example 4, input.  The same spread after a CLITIC: its own gloss
+' cell empty, the pieces under empty morpheme cells ending the row; they join
+' behind its boundary character (seen live 2026-09-28).
+Private Function Vector4Raw() As String
+    Vector4Raw = _
+        "Morphemes" & T & "vu" & T & "=ve" & T & "zo" & T & "=zi" & T & T & vbLf & _
+        T & "Lex. Gloss" & T & "fox" & T & "ERG" & T & "dream" & T & T & "follow" & T & ".CMP" & vbLf & _
+        "Free Eng The fox dreamt of following."
+End Function
+
+Private Function Vector4Forms() As String
+    Vector4Forms = "vu=ve" & T & "zo=zi"
+End Function
+
+Private Function Vector4Glosses() As String
+    Vector4Glosses = "fox=ERG" & T & "dream=follow.CMP"
+End Function
+
+' PROMPT.md example 5, input.  A proclitic before an enclitic, a proclitic
+' before a stem whose gloss is spread, then a suffix and an enclitic: a
+' TRAILING boundary joins the morpheme after it, and a seam that carries the
+' boundary on both sides writes it once.
+Private Function Vector5Raw() As String
+    Vector5Raw = _
+        "Morphemes" & T & "xu=" & T & "=ve" & T & "zo" & T & "ze=" & T & "zuvo" & T & T & T & "-a" & T & "=zi" & vbLf & _
+        T & "Lex. Gloss" & T & "3SG" & T & "ERG" & T & "dream" & T & "DAT" & T & T & "follow" & T & ".CMP" & T & "lnk" & T & "REL" & vbLf & _
+        "Free Eng She dreamt of following him."
+End Function
+
+Private Function Vector5Forms() As String
+    Vector5Forms = "xu=ve" & T & "zo" & T & "ze=zuvo-a=zi"
+End Function
+
+Private Function Vector5Glosses() As String
+    Vector5Glosses = "3SG=ERG" & T & "dream" & T & "DAT=follow.CMP-lnk=REL"
+End Function
+
 ' A vector with a leading example number, as Print View copies it, and FLEx's
 ' end-of-segment sign as a last cell of the first row with an empty gloss cell
 ' under it: both must fall away.  Pure ASCII source, so ChrW(&HA7).
@@ -396,6 +433,10 @@ Private Sub TestGoldenVectors()
                 "(When) she picked her yams."
     CheckVector "example 3 (a gloss spread to the row's end)", Vector3Raw(), Vector3Forms(), Vector3Glosses(), _
                 "The fox's dream was followed."
+    CheckVector "example 4 (a clitic's gloss spread to the row's end)", Vector4Raw(), Vector4Forms(), Vector4Glosses(), _
+                "The fox dreamt of following."
+    CheckVector "example 5 (proclitics: a trailing boundary joins the host)", Vector5Raw(), Vector5Forms(), Vector5Glosses(), _
+                "She dreamt of following him."
     ' A cell that is exactly "section sign" is dropped, and the column it
     ' leaves empty on every tier with it (Seth, 2026-09-15; seen live 2026-09-28).
     CheckVector "example 2 with a number and a trailing section sign", WithSectionSign(Vector2Raw()), _
@@ -435,6 +476,9 @@ Private Sub TestProjections()
     Section "Projections (word-aligned vs morpheme-aligned)"
     CheckProjection "example 1", Vector1Raw()
     CheckProjection "example 2", Vector2Raw()
+    CheckProjection "example 3", Vector3Raw()
+    CheckProjection "example 4", Vector4Raw()
+    CheckProjection "example 5 (proclitics)", Vector5Raw()
 End Sub
 
 Private Sub CheckProjection(ByVal name As String, ByVal raw As String)

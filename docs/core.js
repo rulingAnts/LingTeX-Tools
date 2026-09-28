@@ -287,44 +287,53 @@
         var currentWord = null;
         var N = morphemes.length;
 
+        function isDiv(ch) { return ch !== '' && MORPH_DIVS.indexOf(ch) !== -1; }
+
         for (var col = startIdx; col < N; col++) {
             var m = (morphemes[col] || '').trim();
             var g = (lexGlosses[col] || '').trim();
 
-            if (m !== '') {
-                // Non-empty morpheme: check for boundary marker at start
-                var boundary = m.length > 0 && MORPH_DIVS.indexOf(m[0]) !== -1 ? m[0] : '';
-                var suffix   = boundary ? m.substring(1) : m;
-
-                if (boundary !== '') {
-                    // Attach to current word (suffix/enclitic or prefix boundary)
-                    if (currentWord) {
-                        currentWord.form += boundary + suffix;
-                        if (g !== '') {
-                            currentWord.glossParts.push(boundary + g);
-                        } else {
-                            currentWord.glossParts.push(boundary);
-                        }
-                    }
-                } else {
-                    // Start a new word (no boundary marker)
-                    if (currentWord) words.push(currentWord);
-                    currentWord = { form: m, glossParts: g !== '' ? [g] : [] };
-
-                    // If direct gloss is empty, collect from following empty-morpheme columns
-                    if (g === '') {
-                        while (col + 1 < N && (morphemes[col + 1] || '').trim() === '') {
-                            col++;
-                            var nextG = (lexGlosses[col] || '').trim();
-                            if (nextG !== '') currentWord.glossParts.push(nextG);
-                        }
-                    }
-                }
-            } else {
-                // Empty morpheme: zero-morpheme standalone word slot
+            if (m === '') {
+                // Empty morpheme whose predecessor's gloss was already given:
+                // a zero-morpheme slot with a column of its own.
                 if (currentWord) words.push(currentWord);
-                if (g !== '') words.push({ form: '', glossParts: [g] });
+                if (g !== '') words.push({ form: '', glossParts: [g], tb: '' });
                 currentWord = null;
+                continue;
+            }
+
+            // A LEADING boundary makes a suffix, enclitic or reduplicant, which
+            // joins the word before it; a TRAILING one makes a prefix or
+            // proclitic, whose host is the morpheme after it (PROMPT.md 5).
+            var boundary = isDiv(m.charAt(0)) ? m.charAt(0) : '';
+            var body = boundary ? m.substring(1) : m;
+            var tb = body.length > 1 && isDiv(body.charAt(body.length - 1))
+                   ? body.charAt(body.length - 1) : '';
+            if (tb) body = body.substring(0, body.length - 1);
+
+            // A morpheme whose own gloss cell is empty has its gloss spread over
+            // the empty-morpheme cells after it (PROMPT.md examples 1, 3, 4).
+            if (g === '') {
+                while (col + 1 < N && (morphemes[col + 1] || '').trim() === '') {
+                    col++;
+                    g += (lexGlosses[col] || '').trim();
+                }
+            }
+
+            var pending = currentWord ? currentWord.tb : '';
+            if (currentWord && (boundary !== '' || pending !== '')) {
+                // A boundary present on both sides of the seam is written once.
+                var join = (boundary !== '' && boundary === pending) ? '' : boundary;
+                currentWord.form += join + body + tb;
+                if (join + g + tb !== '') currentWord.glossParts.push(join + g + tb);
+                currentWord.tb = tb;
+            } else {
+                if (currentWord) words.push(currentWord);
+                // No part for an empty gloss: a bare punctuation word is told
+                // apart below by having none.
+                currentWord = { form: boundary + body + tb,
+                                glossParts: (boundary + g + tb !== '') ? [boundary + g + tb] : [],
+                                tb: tb };
             }
         }
 

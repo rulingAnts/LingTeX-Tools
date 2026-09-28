@@ -18,6 +18,7 @@ When FLEx copies interlinear text to the clipboard it produces **tab-separated c
 4. **Tier labels:** The `Morphemes` row label may appear at absolute column 0. The `Lex. Gloss` row may have a leading tab (label at absolute column 1). When aligning columns across tiers, strip the label and treat the *data* columns 0-indexed.
 5. **Free translation:** Lines starting with `Free` (or a language tag after `Free`) are free-translation text, not interlinear tiers.
 6. **Blocks:** Multiple examples are separated by blank lines, or by a line that starts with a new example number: a FLEx Print View copy of consecutive lines has no blank line between them. Each block starts with an optional example number (digits, `1.1` style allowed).
+8. **Prefixes and proclitics:** a morpheme whose form ENDS with a boundary character (`ka=`, `un-`) is joined to the morpheme after it, its host, as a leading boundary joins a morpheme to the one before it. The boundary stays on the clitic's side on both tiers in a morpheme-aligned table (`ka=` over `DAT=`), and a boundary present on both sides of a seam is written once in a word-aligned cell (`ka=` + `=be` is `ka=be`, not `ka==be`).
 7. **Trailing cells and the section sign:** trailing tabs are columns and are never stripped (only trailing spaces are). A cell that is exactly `§`, FLEx's end-of-segment sign, is dropped, and a column that is empty on every tier is dropped with it.
 
 ---
@@ -207,6 +208,52 @@ Free Eng The fox's dream was followed.
 vu=ve	zo	zuvo
 fox=ERG	dream	follow.CMP
 The fox's dream was followed.
+```
+
+---
+
+## Example 4 for verification
+
+The same spread, after a CLITIC: the enclitic's own gloss cell is empty and
+its gloss pieces follow under empty morpheme cells that end the row. They
+belong to the clitic, joined behind its boundary character, not to standalone
+zero-morpheme slots (seen live 2026-09-28: one column, `hi=di` over
+`come.CMP=BNDRY.CMP`, in a real copy of that shape).
+
+**Input:**
+```
+Morphemes→vu→=ve→zo→=zi→→
+→Lex. Gloss→fox→ERG→dream→→follow→.CMP
+Free Eng The fox dreamt of following.
+```
+
+**Expected TSV output:**
+```
+vu=ve	zo=zi
+fox=ERG	dream=follow.CMP
+The fox dreamt of following.
+```
+
+---
+
+## Example 5 for verification
+
+A proclitic before an enclitic, a proclitic before a stem whose gloss is spread,
+then a suffix and an enclitic. The trailing boundary of `xu=` and `ze=` joins the
+next morpheme; the seam between `xu=` and `=ve` carries one boundary.
+
+**Input:**
+```
+Morphemes→xu=→=ve→zo→ze=→zuvo→→→-a→=zi
+→Lex. Gloss→3SG→ERG→dream→DAT→→follow→.CMP→lnk→REL
+Free Eng She dreamt of following him.
+```
+
+**Expected TSV output:**
+```
+xu=ve	zo	ze=zuvo-a=zi
+3SG=ERG	dream	DAT=follow.CMP-lnk=REL
+She dreamt of following him.
 ```
 
 ---

@@ -91,6 +91,7 @@ Public Sub RunDocTests()
     RunSection "spacefix"
     RunSection "rows"
     RunSection "fromtext"
+    RunSection "several"
     RunSection "measure"
     RunSection "agreement"
     RunSection "rendering"
@@ -135,6 +136,7 @@ Private Sub RunSection(ByVal which As String)
         Case "spacefix":     TestSpaceFix
         Case "rows":         TestRowGeometry
         Case "fromtext":     TestTextToInterlinear
+        Case "several":      TestInsertSeveralExamples
         Case "measure":      TestMeasure
         Case "agreement":    TestRenderMeasureAgreement
         Case "rendering":    TestRendering
@@ -1261,6 +1263,81 @@ Private Sub TestTextToInterlinear()
         Ok "  and the whole translation is under it", _
             (InStr(ParagraphAfterTable(doc.Tables(1)).Range.Text, "sesuatu") > 0)
     End If
+
+    gQuiet = savedQuiet
+    gQuietText = savedText
+    CloseNoSave doc
+End Sub
+
+'=============================================================================
+' -- INSERT: SEVERAL EXAMPLES FROM ONE COPY ---------------------------------
+'=============================================================================
+' A FLEx Print View copy of consecutive lines: each example with its number
+' cell, no blank line between them, a gloss spread to the end of a row, and
+' FLEx's end-of-segment sign closing the second (all seen live 2026-09-28,
+' made up here).  Every example is inserted (Seth, 2026-09-16), one under
+' another, and one Undo takes them all back.
+
+Private Function TwoFlexExamples() As String
+    Dim t As String, lrm As String
+    t = vbTab
+    lrm = ChrW(&H200E)
+    TwoFlexExamples = _
+        "1.1" & t & "Morphemes" & t & "vu" & t & "=ve" & t & "zo" & t & "zuvo" & t & t & vbCr & _
+        t & "Lex. Gloss" & t & "fox" & t & "ERG" & t & "dream" & t & t & "follow" & t & ".CMP" & vbCr & _
+        lrm & "Free " & lrm & lrm & "The fox's dream was followed." & vbCr & _
+        "1.2" & t & "Morphemes" & t & "zel" & t & "vimo" & t & "=xo" & t & ChrW(&HA7) & vbCr & _
+        t & "Lex. Gloss" & t & "yam" & t & "pick" & t & "SEQ" & t & vbCr & _
+        lrm & "Free " & lrm & lrm & "She picked yams and then"
+End Function
+
+Private Sub TestInsertSeveralExamples()
+    Dim doc As Document
+    Dim back As IgtExample
+    Dim docsBefore As Long
+    Dim savedQuiet As Boolean, savedText As String
+
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "several: could create a blank document", False
+        Exit Sub
+    End If
+    EnsureStyles doc, True
+    ClearCache
+    savedQuiet = gQuiet
+    savedText = gQuietText
+    gQuiet = True
+    SetSettingGranularity doc, igtWordAligned
+
+    doc.Content.Text = TwoFlexExamples()
+    doc.Content.Select
+    ReleaseScratch
+    docsBefore = Documents.Count
+    gLastMessage = ""
+    RunCommandByName "LingTeXInsertInterlinear"
+    Ok "two examples from one copy draw two tables", (doc.Tables.Count = 2)
+    If doc.Tables.Count = 2 Then
+        back = ReadExampleFromTable(doc.Tables(1))
+        Ok "  the first: three columns by word", (back.ColCount = 3)
+        Eq "  its first cell", back.Cells(0, 0), "vu=ve"
+        Eq "  its last gloss, spread to the row's end in the copy", back.Cells(1, 2), "follow.CMP"
+        Ok "  its translation is under it", _
+            (InStr(ParagraphAfterTable(doc.Tables(1)).Range.Text, "fox") > 0)
+        back = ReadExampleFromTable(doc.Tables(2))
+        Ok "  the second: two columns, the section sign gone", (back.ColCount = 2)
+        Eq "  its last gloss", back.Cells(1, 1), "pick=SEQ"
+        Ok "  its translation is under it", _
+            (InStr(ParagraphAfterTable(doc.Tables(2)).Range.Text, "yams") > 0)
+        Ok "  no warning was reported", (gLastMessage = "")
+        If gLastMessage <> "" Then Emit "         said: " & gLastMessage
+    Else
+        Emit "         said: " & gLastMessage
+    End If
+    ' The two are drawn inside one BeginUndo/EndUndo, the call every command
+    ' uses; "leaves no undo record open" above covers it.  Document.Undo on the
+    ' hidden test document does nothing at all (measured 2026-09-28), so the
+    ' one-press check is not made here.
+    CheckStateIsClean "LingTeXInsertInterlinear (several)", docsBefore
 
     gQuiet = savedQuiet
     gQuietText = savedText

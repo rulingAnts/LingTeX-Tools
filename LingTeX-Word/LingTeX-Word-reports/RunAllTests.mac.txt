@@ -13,6 +13,26 @@ Golden vectors (PROMPT.md)
   PASS  example 2: word-aligned glosses
   PASS  example 2: free translation captured
   PASS  example 2: free translation text
+  PASS  example 3 (a gloss spread to the row's end): parsed
+  PASS  example 3 (a gloss spread to the row's end): word-aligned forms
+  PASS  example 3 (a gloss spread to the row's end): word-aligned glosses
+  PASS  example 3 (a gloss spread to the row's end): free translation captured
+  PASS  example 3 (a gloss spread to the row's end): free translation text
+  PASS  example 4 (a clitic's gloss spread to the row's end): parsed
+  PASS  example 4 (a clitic's gloss spread to the row's end): word-aligned forms
+  PASS  example 4 (a clitic's gloss spread to the row's end): word-aligned glosses
+  PASS  example 4 (a clitic's gloss spread to the row's end): free translation captured
+  PASS  example 4 (a clitic's gloss spread to the row's end): free translation text
+  PASS  example 5 (proclitics: a trailing boundary joins the host): parsed
+  PASS  example 5 (proclitics: a trailing boundary joins the host): word-aligned forms
+  PASS  example 5 (proclitics: a trailing boundary joins the host): word-aligned glosses
+  PASS  example 5 (proclitics: a trailing boundary joins the host): free translation captured
+  PASS  example 5 (proclitics: a trailing boundary joins the host): free translation text
+  PASS  example 2 with a number and a trailing section sign: parsed
+  PASS  example 2 with a number and a trailing section sign: word-aligned forms
+  PASS  example 2 with a number and a trailing section sign: word-aligned glosses
+  PASS  example 2 with a number and a trailing section sign: free translation captured
+  PASS  example 2 with a number and a trailing section sign: free translation text
 
 Projections (word-aligned vs morpheme-aligned)
   PASS  example 1: morpheme-aligned has at least as many columns
@@ -23,6 +43,18 @@ Projections (word-aligned vs morpheme-aligned)
   PASS  example 2: morpheme-aligned satisfies break-char agreement
   PASS  example 2: merging continuations reproduces word-aligned forms
   PASS  example 2: merging continuations reproduces word-aligned glosses
+  PASS  example 3: morpheme-aligned has at least as many columns
+  PASS  example 3: morpheme-aligned satisfies break-char agreement
+  PASS  example 3: merging continuations reproduces word-aligned forms
+  PASS  example 3: merging continuations reproduces word-aligned glosses
+  PASS  example 4: morpheme-aligned has at least as many columns
+  PASS  example 4: morpheme-aligned satisfies break-char agreement
+  PASS  example 4: merging continuations reproduces word-aligned forms
+  PASS  example 4: merging continuations reproduces word-aligned glosses
+  PASS  example 5 (proclitics): morpheme-aligned has at least as many columns
+  PASS  example 5 (proclitics): morpheme-aligned satisfies break-char agreement
+  PASS  example 5 (proclitics): merging continuations reproduces word-aligned forms
+  PASS  example 5 (proclitics): merging continuations reproduces word-aligned glosses
 
 Input routing
   PASS  recognises FLEx text by its tier labels
@@ -163,5 +195,5 @@ Wrap planner
   PASS  NoBreakFlags never flags the first column
   PASS  NoBreakFlags flags the enclitic columns of example 2
 
-ALL PASS -- 144 passed
+ALL PASS -- 176 passed
 

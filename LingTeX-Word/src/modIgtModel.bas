@@ -356,8 +356,8 @@ Public Function ModelFromBlock(b As FlexBlock, _
             For s = 0 To words(i).SegCount - 1
                 ' The boundary character leads BOTH cells, which is exactly
                 ' invariant 1 satisfied by construction.
-                forms(nCols) = words(i).Segments(s).Bd & words(i).Segments(s).Form
-                glosses(nCols) = words(i).Segments(s).Bd & words(i).Segments(s).Gloss
+                forms(nCols) = words(i).Segments(s).Bd & words(i).Segments(s).Form & words(i).Segments(s).Tb
+                glosses(nCols) = words(i).Segments(s).Bd & words(i).Segments(s).Gloss & words(i).Segments(s).Tb
                 If s = 0 Then
                     ' Only a word's first column carries its word-level tiers.
                     spanStart(nCols) = words(i).StartCol
@@ -671,7 +671,17 @@ Public Function MergeColumns(ByRef ex As IgtExample, _
         acc = ""
         For c = firstIdx To lastIdx
             If acc <> "" And ex.Cells(t, c) <> "" And sep <> "" Then acc = acc & sep
-            acc = acc & ex.Cells(t, c)
+            ' A boundary present on both sides of the seam is written once:
+            ' "ze=" and "=zuvo" merge to "ze=zuvo" (PROMPT.md rule 8).
+            If sep = "" And acc <> "" And ex.Cells(t, c) <> "" Then
+                If TrailChar(acc) <> "" And TrailChar(acc) = LeadChar(ex.Cells(t, c)) Then
+                    acc = acc & Mid$(ex.Cells(t, c), 2)
+                Else
+                    acc = acc & ex.Cells(t, c)
+                End If
+            Else
+                acc = acc & ex.Cells(t, c)
+            End If
         Next c
         ex.Cells(t, firstIdx) = acc
         ' Shift the tail left over the columns just consumed.

@@ -55,8 +55,9 @@ Public Const TIER_WORDCAT   As String = "WordCat"
 '        in: FLEx spreads "follow" and ".CMP" over two columns but both belong
 '        to the single morpheme "levo".
 Public Type IgtSegment
-    Bd    As String
+    Bd    As String     ' leading boundary: a suffix, enclitic or reduplicant
     Form  As String
+    Tb    As String     ' trailing boundary: a prefix or proclitic, host to follow
     Gloss As String
 End Type
 
@@ -929,7 +930,7 @@ Public Function GroupSegmentsFromColumns(morphemes() As String, _
     Dim cur As IgtWord, haveCur As Boolean
     Dim col As Long, n As Long
     Dim m As String, g As String, bd As String, form As String
-    Dim contG As String
+    Dim tb As String, pending As String, at As Long
 
     n = UBound(morphemes) + 1
     ReDim words(0 To IIf(n > 0, n, 1))
@@ -940,45 +941,7 @@ Public Function GroupSegmentsFromColumns(morphemes() As String, _
         m = Trim$(CellAt(morphemes, col))
         g = Trim$(CellAt(lexGlosses, col))
 
-        If m <> "" Then
-            bd = LeadChar(m)
-            If bd <> "" Then
-                form = Mid$(m, 2)
-            Else
-                form = m
-            End If
-
-            If bd <> "" Then
-                ' Suffix, enclitic or reduplicant: another segment of this word.
-                If haveCur Then
-                    AddSegment cur, bd, form, g
-                    cur.EndCol = col
-                End If
-            Else
-                ' No boundary character, so this starts a new word.
-                If haveCur Then
-                    words(nWords) = cur
-                    nWords = nWords + 1
-                End If
-                cur = NewWord(form, g, col)
-                haveCur = True
-
-                If g = "" Then
-                    ' The morpheme's own gloss column is empty, so the
-                    ' following empty-morpheme columns are one-to-many gloss
-                    ' continuations belonging to THIS morpheme, not new ones.
-                    Do While col + 1 <= n - 1
-                        If Trim$(CellAt(morphemes, col + 1)) <> "" Then Exit Do
-                        col = col + 1
-                        contG = Trim$(CellAt(lexGlosses, col))
-                        If contG <> "" Then
-                            cur.Segments(0).Gloss = cur.Segments(0).Gloss & contG
-                        End If
-                        cur.EndCol = col
-                    Loop
-                End If
-            End If
-        Else
+        If m = "" Then
             ' Empty morpheme column whose predecessor's gloss was already
             ' satisfied: a zero-morpheme slot with an alignment column to itself.
             If haveCur Then
@@ -987,10 +950,49 @@ Public Function GroupSegmentsFromColumns(morphemes() As String, _
                 haveCur = False
             End If
             If g <> "" Then
-                words(nWords) = NewWord("", g, col)
+                words(nWords) = NewWord("", "", "", g, col)
                 nWords = nWords + 1
             End If
+            GoTo NextCol
         End If
+
+        ' A LEADING boundary makes a suffix, enclitic or reduplicant, which
+        ' joins the word before it; a TRAILING one makes a prefix or proclitic,
+        ' whose host is the morpheme after it (PROMPT.md example 5).
+        bd = LeadChar(m)
+        If bd <> "" Then form = Mid$(m, 2) Else form = m
+        tb = ""
+        If Len(form) > 1 Then
+            tb = TrailChar(form)
+            If tb <> "" Then form = Left$(form, Len(form) - 1)
+        End If
+
+        ' A morpheme whose own gloss column is empty has its gloss spread over
+        ' the empty-morpheme columns after it (PROMPT.md examples 1, 3, 4).
+        at = col
+        If g = "" Then
+            Do While col + 1 <= n - 1
+                If Trim$(CellAt(morphemes, col + 1)) <> "" Then Exit Do
+                col = col + 1
+                g = g & Trim$(CellAt(lexGlosses, col))
+            Loop
+        End If
+
+        pending = ""
+        If haveCur Then pending = cur.Segments(cur.SegCount - 1).Tb
+        If haveCur And (bd <> "" Or pending <> "") Then
+            AddSegment cur, bd, form, tb, g
+            cur.EndCol = col
+        Else
+            If haveCur Then
+                words(nWords) = cur
+                nWords = nWords + 1
+            End If
+            cur = NewWord(bd, form, tb, g, at)
+            cur.EndCol = col
+            haveCur = True
+        End If
+NextCol:
     Next col
 
     If haveCur Then
@@ -1012,12 +1014,13 @@ Private Function CellAt(arr() As String, ByVal i As Long) As String
     CellAt = arr(i)
 End Function
 
-Private Function NewWord(ByVal form As String, ByVal gloss As String, _
-        ByVal col As Long) As IgtWord
+Private Function NewWord(ByVal bd As String, ByVal form As String, ByVal tb As String, _
+        ByVal gloss As String, ByVal col As Long) As IgtWord
     Dim w As IgtWord
     ReDim w.Segments(0 To 7)
-    w.Segments(0).Bd = ""
+    w.Segments(0).Bd = bd
     w.Segments(0).Form = form
+    w.Segments(0).Tb = tb
     w.Segments(0).Gloss = gloss
     w.SegCount = 1
     w.StartCol = col
@@ -1026,12 +1029,13 @@ Private Function NewWord(ByVal form As String, ByVal gloss As String, _
 End Function
 
 Private Sub AddSegment(ByRef w As IgtWord, ByVal bd As String, _
-        ByVal form As String, ByVal gloss As String)
+        ByVal form As String, ByVal tb As String, ByVal gloss As String)
     If w.SegCount > UBound(w.Segments) Then
         ReDim Preserve w.Segments(0 To UBound(w.Segments) * 2 + 1)
     End If
     w.Segments(w.SegCount).Bd = bd
     w.Segments(w.SegCount).Form = form
+    w.Segments(w.SegCount).Tb = tb
     w.Segments(w.SegCount).Gloss = gloss
     w.SegCount = w.SegCount + 1
 End Sub
@@ -1072,10 +1076,19 @@ End Sub
 '=============================================================================
 
 ' Word-aligned form: every segment of the word joined into one cell.
+' A boundary present on both sides of a seam -- the proclitic's trailing "="
+' and the enclitic's leading one -- is written once.
+Private Function SeamBd(w As IgtWord, ByVal i As Long) As String
+    SeamBd = w.Segments(i).Bd
+    If i > 0 And SeamBd <> "" Then
+        If SeamBd = w.Segments(i - 1).Tb Then SeamBd = ""
+    End If
+End Function
+
 Public Function JoinForm(w As IgtWord) As String
     Dim i As Long, s As String
     For i = 0 To w.SegCount - 1
-        s = s & w.Segments(i).Bd & w.Segments(i).Form
+        s = s & SeamBd(w, i) & w.Segments(i).Form & w.Segments(i).Tb
     Next i
     JoinForm = s
 End Function
@@ -1087,11 +1100,7 @@ End Function
 Public Function JoinGloss(w As IgtWord) As String
     Dim i As Long, s As String
     For i = 0 To w.SegCount - 1
-        If i = 0 Then
-            s = s & w.Segments(i).Gloss
-        Else
-            s = s & w.Segments(i).Bd & w.Segments(i).Gloss
-        End If
+        s = s & SeamBd(w, i) & w.Segments(i).Gloss & w.Segments(i).Tb
     Next i
     JoinGloss = s
 End Function

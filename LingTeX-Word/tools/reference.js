@@ -88,43 +88,44 @@ function groupSegments(morphemes, lexGlosses, startIdx) {
         var m = (morphemes[col]  || '').trim();
         var g = (lexGlosses[col] || '').trim();
 
-        if (m !== '') {
-            var bd     = isBoundary(m.charAt(0)) ? m.charAt(0) : '';
-            var form   = bd ? m.substring(1) : m;
-
-            if (bd !== '') {
-                // Suffix, enclitic or reduplicant: another segment of this word.
-                if (cur) {
-                    cur.segments.push({ bd: bd, form: form, gloss: g });
-                    cur.endCol = col;
-                }
-                continue;
-            }
-
-            // No boundary character: this starts a new word.
-            flush();
-            cur = { segments: [{ bd: '', form: form, gloss: g }],
-                    startCol: col, endCol: col };
-
-            if (g === '') {
-                // The morpheme's own gloss column is empty, so the following
-                // empty-morpheme columns are one-to-many continuation slots:
-                // their glosses belong to THIS morpheme, not to new ones.
-                while (col + 1 < N && (morphemes[col + 1] || '').trim() === '') {
-                    col++;
-                    var contG = (lexGlosses[col] || '').trim();
-                    if (contG !== '') cur.segments[0].gloss += contG;
-                    cur.endCol = col;
-                }
-            }
-        } else {
+        if (m === '') {
             // Empty morpheme column with the previous gloss already satisfied:
             // a zero-morpheme slot that gets its own alignment column.
             flush();
             if (g !== '') {
-                words.push({ segments: [{ bd: '', form: '', gloss: g }],
+                words.push({ segments: [{ bd: '', form: '', tb: '', gloss: g }],
                              startCol: col, endCol: col });
             }
+            continue;
+        }
+
+        // A LEADING boundary makes a suffix, enclitic or reduplicant, which
+        // joins the word before it; a TRAILING one makes a prefix or proclitic,
+        // whose host is the morpheme after it (PROMPT.md example 5).
+        var bd   = isBoundary(m.charAt(0)) ? m.charAt(0) : '';
+        var form = bd ? m.substring(1) : m;
+        var tb   = form.length > 1 && isBoundary(form.charAt(form.length - 1))
+                 ? form.charAt(form.length - 1) : '';
+        if (tb) form = form.substring(0, form.length - 1);
+
+        // A morpheme whose own gloss column is empty has its gloss spread over
+        // the empty-morpheme columns after it (PROMPT.md examples 1, 3, 4).
+        var at = col;
+        if (g === '') {
+            while (col + 1 < N && (morphemes[col + 1] || '').trim() === '') {
+                col++;
+                g += (lexGlosses[col] || '').trim();
+            }
+        }
+
+        var seg = { bd: bd, form: form, tb: tb, gloss: g };
+        var pending = cur ? cur.segments[cur.segments.length - 1].tb : '';
+        if (cur && (bd !== '' || pending !== '')) {
+            cur.segments.push(seg);
+            cur.endCol = col;
+        } else {
+            flush();
+            cur = { segments: [seg], startCol: at, endCol: col };
         }
     }
 
@@ -158,7 +159,14 @@ function handleStandalonePunctuation(words) {
 
 /** Word-aligned form: every segment of the word joined into one cell. */
 function joinForm(segments) {
-    return segments.map(function (s) { return s.bd + s.form; }).join('');
+    var out = '';
+    segments.forEach(function (s, i) {
+        // A boundary present on both sides of a seam is written once: the
+        // proclitic's trailing "=" and the enclitic's leading one.
+        var bd = (i > 0 && s.bd !== '' && s.bd === segments[i - 1].tb) ? '' : s.bd;
+        out += bd + s.form + s.tb;
+    });
+    return out;
 }
 
 /**
@@ -167,9 +175,12 @@ function joinForm(segments) {
  * affix still leaves its boundary visible. Matches core.js glossParts.join('').
  */
 function joinGloss(segments) {
-    return segments.map(function (s, i) {
-        return i === 0 ? s.gloss : s.bd + s.gloss;
-    }).join('');
+    var out = '';
+    segments.forEach(function (s, i) {
+        var bd = (i > 0 && s.bd !== '' && s.bd === segments[i - 1].tb) ? '' : s.bd;
+        out += bd + s.gloss + s.tb;
+    });
+    return out;
 }
 
 /**
@@ -186,8 +197,8 @@ function projectColumns(words, granularity) {
             w.segments.forEach(function (s, i) {
                 // The boundary character leads BOTH cells, which is exactly
                 // invariant 1 (column break-character agreement) by construction.
-                forms.push(s.bd + s.form);
-                glosses.push(s.bd + s.gloss);
+                forms.push(s.bd + s.form + s.tb);
+                glosses.push(s.bd + s.gloss + s.tb);
                 // Only the first segment of a word carries the word-level tiers.
                 spans.push(i === 0 ? [w.startCol, w.endCol] : null);
             });
@@ -437,12 +448,28 @@ function modelToTsv(model) {
 
 // ── column editing ───────────────────────────────────────────────────────────
 
+/**
+ * Concatenate cells, writing a boundary present on both sides of a seam once:
+ * "ze=" + "=zuvo" is "ze=zuvo", the proclitic's mark and the host's being one.
+ */
+function joinAtSeams(cells) {
+    var out = '';
+    cells.forEach(function (v) {
+        if (out !== '' && v !== '') {
+            var tc = trailChar(out);
+            if (tc !== '' && tc === leadChar(v)) v = v.substring(1);
+        }
+        out += v;
+    });
+    return out;
+}
+
 /** Concatenate columns first..last into one. Free rows are left alone. */
 function mergeColumns(model, first, last) {
     if (last <= first) return false;
     model.cells.forEach(function (row, t) {
         if (!isInterlinearTier(model.tiers[t])) return;
-        row.splice(first, last - first + 1, row.slice(first, last + 1).join(''));
+        row.splice(first, last - first + 1, joinAtSeams(row.slice(first, last + 1)));
     });
     // Free rows are prose, not aligned slots, but their length must stay in
     // step with the grid. Empty cells are dropped so the join cannot leave
@@ -674,6 +701,9 @@ function noBreakFlags(model) {
         var flag = false;
         for (var r = 0; r < rows.length && !flag; r++) {
             var cell = model.cells[rows[r]][c] || '';
+            // The column after a prefix or proclitic is that word's host.
+            var prev = c > 0 ? (model.cells[rows[r]][c - 1] || '') : '';
+            if (prev !== '' && trailChar(prev) !== '') flag = true;
             if (cell === '') continue;
             if (leadChar(cell) !== '') flag = true;
             else if (Array.from(cell).length === 1 && ATTACH_PUNCT.indexOf(cell) !== -1) flag = true;

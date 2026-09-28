@@ -279,7 +279,7 @@ End Sub
 Public Sub LingTeXInsertInterlinear()
     Dim doc As Document
     Dim raw As String
-    Dim ex As IgtExample
+    Dim models() As IgtExample, n As Long
     Dim target As Range
     Dim fromClipboard As Boolean
     Dim lines() As String
@@ -320,8 +320,10 @@ Public Sub LingTeXInsertInterlinear()
     ' broken with Shift+Return. The fallbacks below read the original raw on
     ' purpose -- plain prose is not FLEx text, and its line breaks mean what
     ' CleanTextLine says they mean.
-    ex = ModelFromText(NormalizeClipboardText(raw), SettingGranularity(doc))
-    If ex.TierCount = 0 Or ex.ColCount = 0 Then
+    ' Every example in the text: a FLEx Print View copy of several lines
+    ' carries several, one after another (Seth, 2026-09-16: all are inserted).
+    models = ModelsFromText(NormalizeClipboardText(raw), SettingGranularity(doc), n)
+    If n = 0 Then
         ' Not FLEx text and not tab-separated rows. Selected lines of plain
         ' text -- words on one line, glosses on the next -- take the Text to
         ' Interlinear road, with its one question (Seth, 2026-09-14).
@@ -342,11 +344,88 @@ Public Sub LingTeXInsertInterlinear()
         Exit Sub
     End If
 
-    DrawParsedExample ex, target, doc, "Insert interlinear"
+    If n = 1 Then
+        DrawParsedExample models(0), target, doc, "Insert interlinear"
+    Else
+        DrawParsedExamples models, n, target, doc, "Insert interlinear"
+    End If
     Exit Sub
 
 Fail:
     Report "Error " & CStr(Err.Number) & ": " & Err.Description, vbCritical
+End Sub
+
+'-----------------------------------------------------------------------------
+' Several examples from one copy, one under another, inside ONE undo record.
+' The first replaces the target as DrawParsedExample does; each next one is
+' drawn in a fresh paragraph after the previous example's last translation
+' line -- which also keeps two tables apart, since Word would merge tables
+' that touch.  Each gets the next number; one number for the group with
+' sub-numbers (a), (b) is the agreed shape and is still to come.  Warnings
+' are collected and reported once, by example.
+'-----------------------------------------------------------------------------
+Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target As Range, _
+        doc As Document, ByVal label As String)
+    Dim errNum As Long, errDesc As String
+    Dim i As Long, k As Long, drawn As Long
+    Dim tbl As Table, p As Paragraph
+    Dim nextTarget As Range
+    Dim warnings As Collection, allText As String
+
+    On Error GoTo Fail
+    gBusy = True
+    BeginUndo label
+    Application.ScreenUpdating = False
+    Set nextTarget = target
+    For i = 0 To n - 1
+        FixCellSpaces models(i), SettingSpaceReplacement(doc)
+        Set tbl = RenderExample(models(i), nextTarget)
+        If tbl Is Nothing Then Exit For
+        drawn = drawn + 1
+        Set warnings = CheckExample(models(i))
+        If Not warnings Is Nothing Then
+            If warnings.Count > 0 Then
+                If allText <> "" Then allText = allText & vbCr & vbCr
+                allText = allText & "Example " & CStr(i + 1) & ":" & vbCr & WarningText(warnings)
+            End If
+        End If
+        If i < n - 1 Then
+            ' The paragraph after the table is the first translation line, or
+            ' Word's own paragraph when there is none; the last translation
+            ' line is FreeCount - 1 paragraphs on.  A new paragraph after it
+            ' is where the next example goes.
+            Set p = doc.Range(tbl.Range.End, tbl.Range.End).Paragraphs(1)
+            For k = 2 To models(i).FreeCount
+                If p.Next Is Nothing Then Exit For
+                Set p = p.Next
+            Next k
+            p.Range.InsertParagraphAfter
+            Set nextTarget = p.Next.Range
+            nextTarget.Collapse 1                 ' wdCollapseStart
+        End If
+    Next i
+    Application.ScreenUpdating = True
+    EndUndo
+    gBusy = False
+    ReleaseScratch
+
+    If drawn < n Then
+        Report CStr(drawn) & " of " & CStr(n) & " examples were drawn; the next could not be." & _
+               IIf(gRenderError = "", "", vbCr & vbCr & gRenderError), vbExclamation
+    ElseIf gRenderError <> "" Then
+        Report "The examples were drawn, but not exactly as planned:" & vbCr & vbCr & _
+               gRenderError & vbCr & vbCr & "Re-wrapping them may fix the layout.", vbExclamation
+    End If
+    If allText <> "" Then Report allText, vbExclamation
+    Exit Sub
+
+Fail:
+    errNum = Err.Number: errDesc = Err.Description
+    Application.ScreenUpdating = True
+    EndUndo
+    gBusy = False
+    ReleaseScratch
+    Report "Error " & errNum & ": " & errDesc, vbCritical
 End Sub
 
 '-----------------------------------------------------------------------------

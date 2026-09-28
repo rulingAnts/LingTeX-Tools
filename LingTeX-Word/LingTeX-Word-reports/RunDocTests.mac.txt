@@ -261,6 +261,21 @@ Open documents at start: 1
   PASS     the first word is in the table, not erased
   PASS     and the whole translation is under it
 
+-- several ---------------------------------------------------
+  PASS   two examples from one copy draw two tables
+  PASS     the first: three columns by word
+  PASS     its first cell
+  PASS     its last gloss, spread to the row's end in the copy
+  PASS     its translation is under it
+  PASS     the second: two columns, the section sign gone
+  PASS     its last gloss
+  PASS     its translation is under it
+  PASS     no warning was reported
+  PASS   LingTeXInsertInterlinear (several) leaves gBusy clear
+  PASS   LingTeXInsertInterlinear (several) leaves ScreenUpdating on
+  PASS   LingTeXInsertInterlinear (several) leaks no document
+  PASS   LingTeXInsertInterlinear (several) leaves no undo record open
+
 -- measure ---------------------------------------------------
   PASS   widths are strictly increasing for i < iii < WWW
          i=2.75  iii=8.30000019073486  WWW=27.7000007629395
@@ -564,5 +579,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 492 passed
+ALL PASS -- 505 passed
 

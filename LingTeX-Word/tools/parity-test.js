@@ -91,7 +91,7 @@ function loadVectors() {
 var vectors = loadVectors();
 
 section('Golden vectors (derived from PROMPT.md)');
-ok('found 3 input vectors in PROMPT.md', vectors.length === 3, 'found ' + vectors.length);
+ok('found 5 input vectors in PROMPT.md', vectors.length === 5, 'found ' + vectors.length);
 
 // FLEx's end-of-segment sign "\u00A7" ends a line in some copies (its .flextext
 // importer adds it; seen live 2026-09-28). A cell that is exactly "\u00A7" is
