@@ -75,6 +75,34 @@ Line breaks (CR LF and CR input parse as LF input does)
   PASS  two FLEx examples, CR: example 2 is the same
   PASS  two FLEx examples, CR LF: the first is example 1
   PASS  two FLEx examples, CR LF: the second is example 2
+  PASS  one example, LF: blocks
+  PASS  one example, LF: every block has its two tiers and its free line
+  PASS  one example, CR LF: blocks
+  PASS  one example, CR LF: every block has its two tiers and its free line
+  PASS  one example, CR: blocks
+  PASS  one example, CR: every block has its two tiers and its free line
+  PASS  one example, doubled CR CR: blocks
+  PASS  one example, doubled CR CR: every block has its two tiers and its free line
+  PASS  one example, LF CR: blocks
+  PASS  one example, LF CR: every block has its two tiers and its free line
+  PASS  one example, rows split by a vertical tab: blocks
+  PASS  one example, rows split by a vertical tab: every block has its two tiers and its free line
+  PASS  two examples, LF: blocks
+  PASS  two examples, LF: every block has its two tiers and its free line
+  PASS  two examples, CR LF: blocks
+  PASS  two examples, CR LF: every block has its two tiers and its free line
+  PASS  two examples, doubled CR CR: blocks
+  PASS  two examples, doubled CR CR: every block has its two tiers and its free line
+  PASS  two examples, LF CR: blocks
+  PASS  two examples, LF CR: every block has its two tiers and its free line
+  PASS  one example, doubled CR CR, trailing CR: blocks
+  PASS  one example, doubled CR CR, trailing CR: every block has its two tiers and its free line
+  PASS  two examples, doubled CR CR, trailing CR: blocks
+  PASS  two examples, doubled CR CR, trailing CR: every block has its two tiers and its free line
+  PASS  the run profile of the doubled two-example text
+  PASS  normalising twice is normalising once
+  PASS  a blank line in plain TSV survives
+  PASS  a doubled-looking plain TSV is left alone
 
 Column split and merge
   PASS  split: reports success
@@ -135,5 +163,5 @@ Wrap planner
   PASS  NoBreakFlags never flags the first column
   PASS  NoBreakFlags flags the enclitic columns of example 2
 
-ALL PASS -- 116 passed
+ALL PASS -- 144 passed
 
