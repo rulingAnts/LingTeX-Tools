@@ -19,10 +19,10 @@ Option Explicit
 '      2026-09-28): one block, tiers Morphemes and Gloss, 15 word-aligned
 '      columns, 22 morpheme-aligned, one free line.
 '   3. Line breaks.  The same fixture joined with every break sequence a paste
-'      can produce, through NormalizeClipboardText and ParseFlexBlocks.  The
-'      cases marked "awaits CollapseDoubledLineBreaks" FAIL until the shared
-'      collapse lands (modClipboardBreaks is a stub); they are the acceptance
-'      test for it, and the measurement of what PowerPoint still gets wrong.
+'      can produce, through NormalizeClipboardText (shared, in modIgtModel since
+'      2026-09-28: vertical tabs to LF and the doubled-break collapse, both only
+'      for FLEx text; runs counted in break characters, before CR LF pairing)
+'      and ParseFlexBlocks.  These are that normaliser's acceptance test.
 '   4. The live clipboard: what run-in-powerpoint.sh put there (the same
 '      fixture, CR LF unless LINGTEX_CLIP_EOL=lf), read through the paste,
 '      its counts and run profile reported, then parsed.
@@ -118,18 +118,21 @@ Private Sub SectionLineBreaks()
     RoadCase "LF", Fixture(LF), 1
     RoadCase "CR LF (FLEx on Windows)", Fixture(CR & LF), 1
     RoadCase "CR (PowerPoint paragraphs)", Fixture(CR), 1
-    RoadCase "CR CR, doubled  (awaits CollapseDoubledLineBreaks)", Fixture(CR & CR), 1
-    RoadCase "LF CR, Mac VBA's vbCrLf  (awaits CollapseDoubledLineBreaks)", Fixture(LF & CR), 1
+    RoadCase "CR CR, doubled", Fixture(CR & CR), 1
+    RoadCase "LF CR, Mac VBA's vbCrLf", Fixture(LF & CR), 1
     RoadCase "VT between rows, Shift+Return", Fixture(VT), 1
     RoadCase "two examples, blank line, LF", Fixture(LF) & LF & Fixture(LF), 2
     RoadCase "two examples, blank line, CR LF", Fixture(CR & LF) & CR & LF & Fixture(CR & LF), 2
-    RoadCase "two examples, doubled: CR CR rows, CR CR CR CR between  (awaits CollapseDoubledLineBreaks)", _
+    RoadCase "two examples, doubled: CR CR rows, CR CR CR CR between", _
              Fixture(CR & CR) & CR & CR & Fixture(CR & CR), 2
-    RoadCase "two examples, LF CR rows, LF CR LF CR between  (awaits CollapseDoubledLineBreaks)", _
+    RoadCase "two examples, LF CR rows, LF CR LF CR between", _
              Fixture(LF & CR) & LF & CR & Fixture(LF & CR), 2
     ' The guard: text that is not FLEx keeps its blank line even when every run is even.
     plain = "a" & Chr$(9) & "b" & LF & LF & "c" & Chr$(9) & "d"
     Eq "not FLEx: a blank line survives NormalizeClipboardText", CountLF(NormalizeClipboardText(plain)), 2
+    ' The shared guard covers vertical tabs too: in text that is not FLEx a Chr$(11) is Word's
+    ' soft break (CleanTextLine makes it a space), so it is left alone.
+    Eq "not FLEx: a vertical tab is left alone", CountVT(NormalizeClipboardText("a" & Chr$(9) & "b" & VT & "c" & Chr$(9) & "d")), 1
     ' Applied twice, the boundary normaliser must change nothing the second time.
     once = NormalizeClipboardText(Fixture(CR & CR) & CR & CR & Fixture(CR & CR))
     Eq "NormalizeClipboardText is idempotent", NormalizeClipboardText(once), once
@@ -185,6 +188,10 @@ End Function
 
 Private Function CountLF(ByVal s As String) As Long
     CountLF = Len(s) - Len(Replace(s, Chr$(10), ""))
+End Function
+
+Private Function CountVT(ByVal s As String) As Long
+    CountVT = Len(s) - Len(Replace(s, Chr$(11), ""))
 End Function
 
 Private Sub Ok(ByVal label As String, ByVal cond As Boolean, Optional ByVal detail As String = "")

@@ -15,8 +15,8 @@ Option Explicit
 ' shows two breaks arriving as two CRs, so the doubling depends on the source
 ' or the path and must be measured, not assumed.  ReadClipboardText therefore
 ' returns the text RAW, and everything that decides what a break means is in
-' NormalizeClipboardText (the shared normaliser; modClipboardBreaks until it
-' lands), called once, here, at the boundary.
+' NormalizeClipboardText (shared, in modIgtModel), called once, here, at the
+' boundary.
 '
 ' Pure ASCII; numbers instead of named constants (the Mac type library lacks
 ' some): Presentations.Add(0) is a presentation with no window, Slides.Add(1,

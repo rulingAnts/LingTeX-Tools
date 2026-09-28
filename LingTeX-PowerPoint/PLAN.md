@@ -2,7 +2,7 @@
 
 LingTeX-Word's Interlinear tab, for PowerPoint. The idea: paste from FLEx and get an aligned interlinear example that wraps inside its own frame and re-wraps when the frame changes.
 
-Status (2026-09-28): probing is complete (six rounds, below) and step 2 has started. `src/` now holds the clipboard reader, a stub of the shared clipboard normaliser, and the test suite; none of it has run yet -- the dev rig is blocked by a macOS permission (see step 2). Next: unblock the rig, run the suite with both line-break settings, then Insert.
+Status (2026-09-28, later): probing is complete (six rounds, below) and step 2 has started. `src/` holds the clipboard reader and the test suite; the shared clipboard normaliser it calls has LANDED (`claude/lingtex-word-crlf` 790d140, merged to `main`), so the stub is gone. None of it has run in PowerPoint yet -- the dev rig waits on a macOS permission that needs the app relaunched. Next: run the suite with both line-break settings and probe round 7, then Insert.
 
 ## Why it differs from Word
 
@@ -70,25 +70,27 @@ Two fixes from that run:
 What exists, in `src/`, all imported by the rig and none of it yet run in PowerPoint:
 
 - **`modPptClipboard`** -- `ReadClipboardText` reads the clipboard the one way that works here (paste into a text box in a windowless scratch presentation, probe rounds 2 and 3) and returns the text RAW; `ReadClipboardForParser` is that plus one call to `NormalizeClipboardText`; `BreakCounts` and `EscapeBreaks` for reports.
-- **`modClipboardBreaks`** -- a STUB of the shared clipboard normaliser, with the agreed names (below). `VerticalTabsToLineBreaks` is real (one line); `CollapseDoubledLineBreaks` returns its input on purpose. `run-in-powerpoint.sh` leaves the stub out as soon as `build/shared/modFlexParse.bas` defines `NormalizeClipboardText`; then delete the file.
-- **`modPptTests`** -- `PptTestsRun`, run with `run-in-powerpoint.sh --tests`, writes `Tests.<os>.txt`. Section 1: the shared modules answer. Section 2: Insert's road on the made-up sample (`LingTeX-Word/samples/checklist-sample.txt`, embedded as `Fixture(sep)`, generated from the file); the expected numbers -- one block, tiers Morphemes and Gloss, 15 word-aligned columns, 22 morpheme-aligned, one free line -- come from `reference.js`. Section 3: the fixture joined by every break sequence a paste can produce: LF, CR LF, CR, CR CR, LF CR (Mac VBA's `vbCrLf`), a vertical tab, and two examples with a blank line between in each form. Section 4: the live clipboard -- what the rig put there, its counts and run profile, then parsed. **The cases marked "awaits CollapseDoubledLineBreaks" fail until the shared collapse lands; they are its acceptance test.**
+- **`modPptTests`** -- `PptTestsRun`, run with `run-in-powerpoint.sh --tests`, writes `Tests.<os>.txt`. Section 1: the shared modules answer. Section 2: Insert's road on the made-up sample (`LingTeX-Word/samples/checklist-sample.txt`, embedded as `Fixture(sep)`, generated from the file); the expected numbers -- one block, tiers Morphemes and Gloss, 15 word-aligned columns, 22 morpheme-aligned, one free line -- come from `reference.js`. Section 3: the fixture joined by every break sequence a paste can produce: LF, CR LF, CR, CR CR, LF CR (Mac VBA's `vbCrLf`), a vertical tab, and two examples with a blank line between in each form. Section 4: the live clipboard -- what the rig put there, its counts and run profile, then parsed. **These cases are the shared normaliser's acceptance test**; in JavaScript (the line-break session mirrored the algorithm into `reference.js` and the cases into `parity-test.js`) all of them pass; in VBA they are unexecuted until the rig runs.
 
-**The clipboard normaliser is shared, and it is the line-break session's** (`claude/lingtex-word-crlf`), agreed 2026-09-28. It goes into `modFlexParse` as new functions, not into `NormalizeLineBreaks`, because that one is a lossless map of conventions to LF, runs twice per parse, and halving is not idempotent (all-4 halves to all-2, which halves again, and a blank line between two examples is gone). The names are final:
+**The clipboard normaliser is shared, and landed 2026-09-28** (`claude/lingtex-word-crlf` 790d140, the line-break session's). Not a change to `NormalizeLineBreaks`: that one is a lossless map of conventions to LF, runs twice per parse, and halving is not idempotent (all-4 halves to all-2, which halves again, and a blank line between two examples is gone). Where it lives:
 
 ```
-NormalizeClipboardText(s)      the one call a reader makes: VT -> LF, NormalizeLineBreaks, then the collapse
-VerticalTabsToLineBreaks(s)    Chr$(11) -> Chr$(10): a Shift+Return is a ROW separator in a FLEx copy (in a Word
-                               document it is a soft break, which is why modIgtModel.CleanTextLine makes it a
-                               space -- same character, opposite meaning, decided by the source, settled here)
-CollapseDoubledLineBreaks(s)   let m be the shortest run of breaks; collapse only if m is even and every run is a
-                               multiple of m, then divide every run by m; otherwise leave the text alone -- an
-                               over-split example is visible and recoverable, a silently merged one is neither.
-                               Guarded by LooksLikeFlex: in FLEx output the tier rows of one block are adjacent,
-                               one break apart, so an all-even payload can only be a doubled one.
-LineBreakRunProfile(s)         diagnostics, e.g. "2x5,4x1"
+modIgtModel   NormalizeClipboardText(s)     the one call a reader makes. For FLEx text (LooksLikeFlex): vertical
+                                            tabs to LF, NormalizeLineBreaks, then the collapse. For anything else:
+                                            NormalizeLineBreaks and nothing more -- in a Word document a Chr$(11) is
+                                            a soft break and CleanTextLine makes it a space, so it is left alone.
+modFlexParse  VerticalTabsToLineBreaks(s)   Chr$(11) -> Chr$(10): a Shift+Return is a ROW separator in a FLEx copy
+              DoublingFactor(s)             m: the shortest run of break CHARACTERS, if even and every run is a
+                                            multiple of it; else 1
+              CollapseDoubledLineBreaks(s)  divide every run by m; when the test says no, leave the text alone --
+                                            an over-split example is visible and recoverable, a silently merged
+                                            one is neither
+              LineBreakRunProfile(s)        diagnostics, e.g. "2x5,4x1"
 ```
 
-Applied ONCE, at the clipboard boundary. Word's `ClipboardText` should call `NormalizeClipboardText` too; a FLEx copy made with Shift+Return probably arrives as one line in Word today (untested: the Word rig is blocked on the same paste it has waited on since 2026-09-16).
+Runs are counted in break characters, BEFORE CR LF is paired into one break. PowerPoint's "two examples, LF CR" vector forced that: two adjacent LF CR breaks spell LF CR LF CR, the pairing rule merges the inner pair, the blank line measures three breaks not four, the odd run disproves doubling, nothing collapses, and the two examples come back as four blocks. Counting characters, a run of two means one break whether it is a real CR LF or a doubled single break, and every vector passes. (It is in `modIgtModel`, not `modFlexParse`, because it guards on `LooksLikeFlex`, and `modIgtModel` is what depends on `modFlexParse`.)
+
+Applied ONCE, at the clipboard boundary. Expected in the Word rig when it runs: `RunAllTests` 140 (a hand count by the line-break session, not a measurement). Word's `ClipboardText` should call `NormalizeClipboardText` too; a FLEx copy made with Shift+Return probably arrives as one line in Word today (untested: the Word rig is blocked on the same paste it has waited on since 2026-09-16).
 
 **Does a CR LF paste double?** Rounds 2 and 3 said yes (CR CR); the `Probe.mac.txt` in the repo shows two breaks arriving as two CRs, and does not record which setting produced them. Section 4 of the tests reports the counts and run profile that arrive; run it with `LINGTEX_CLIP_EOL=lf` and without, and record both here.
 

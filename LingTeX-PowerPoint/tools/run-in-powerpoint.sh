@@ -61,9 +61,9 @@ startup_probe="$HOME/Library/Group Containers/UBF8T346G9.Office/User Content.loc
 # What is imported, in order, relative to LingTeX-PowerPoint/. The five modules
 # shared with LingTeX-Word come from build/shared, which tools/stage-shared.sh
 # fills from one git revision of LingTeX-Word (see its header); src/ holds
-# PowerPoint's own. modClipboardBreaks is a STUB of the shared clipboard
-# normaliser and is left out automatically once build/shared's modFlexParse
-# defines NormalizeClipboardText (below).
+# PowerPoint's own. The clipboard normaliser PowerPoint calls
+# (NormalizeClipboardText, in modIgtModel since 2026-09-28) must be in the
+# staged revision: the check below refuses to run without it.
 MODULES="
 tools/modLingTeXDevCore.bas
 build/shared/modFlexParse.bas
@@ -71,7 +71,6 @@ build/shared/modIgtModel.bas
 build/shared/clsIgtWarning.cls
 build/shared/modLeipzig.bas
 build/shared/modWrap.bas
-src/modClipboardBreaks.bas
 src/modPptClipboard.bas
 src/modPptTests.bas
 tools/probe/modProbe.bas
@@ -125,15 +124,13 @@ stage_modules() {
         basename "$m" >> "$stage/modules.txt"
     done
 }
-# The shared modules, fresh from LingTeX-Word; then drop the stub if the real
-# normaliser has arrived (two Public procedures of one name would not compile).
+# The shared modules, fresh from LingTeX-Word; PowerPoint's own modules call the
+# shared clipboard normaliser, so a revision without it cannot be imported.
 if [ "$stage_shared" = 1 ]; then
     sh "$here/stage-shared.sh" || exit 2
 fi
-if grep -q 'Function NormalizeClipboardText' "$root/build/shared/modFlexParse.bas" 2>/dev/null; then
-    MODULES=$(printf '%s\n' $MODULES | grep -v '^src/modClipboardBreaks.bas$')
-    echo "== build/shared's modFlexParse defines NormalizeClipboardText: the stub modClipboardBreaks is left out"
-fi
+grep -q 'Function NormalizeClipboardText' "$root/build/shared/modIgtModel.bas" "$root/build/shared/modFlexParse.bas" 2>/dev/null || {
+    echo "run-in-powerpoint: build/shared has no NormalizeClipboardText; stage from claude/lingtex-word-crlf 790d140 or later (tools/stage-shared.sh [REV])" >&2; exit 2; }
 for m in $MODULES; do
     [ -f "$root/$m" ] || { echo "run-in-powerpoint: missing module $m" >&2; exit 2; }
 done
