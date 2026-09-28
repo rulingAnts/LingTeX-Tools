@@ -428,6 +428,43 @@ Private Sub EnsureNumberListStyle(doc As Document)
         .TextPosition = 0
         .TabPosition = 0
     End With
+    ' Level 2: the sub-number of an example that is one of several from one
+    ' copy, "a.", "b.", ..., restarting after every example number.
+    FormatSubLevel st.ListTemplate, 2
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' A sub-number level: "a.", "b.", ... at the cell's left edge, like level 1.
+Private Sub FormatSubLevel(tpl As Object, ByVal lvl As Long)
+    On Error Resume Next
+    With tpl.ListLevels(lvl)
+        .NumberFormat = "%" & CStr(lvl) & "."
+        .NumberStyle = wdListNumberStyleLowercaseLetter
+        .TrailingCharacter = wdTrailingNone
+        .NumberPosition = 0
+        .TextPosition = 0
+        .TabPosition = 0
+    End With
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' The list level a sub-number goes on, formatted "a." if it is not yet: a
+' document whose list style predates sub-numbering has Word's default there,
+' and a document numbering its examples at a deeper level needs the one below.
+Public Sub EnsureSubNumberLevel(doc As Document, ByVal lvl As Long)
+    Dim tpl As Object
+    Dim fmt As String, sty As Long
+    If lvl < 1 Or lvl > 9 Then Exit Sub
+    On Error Resume Next
+    Set tpl = doc.Styles(STYLE_NUMBER).ListTemplate
+    If tpl Is Nothing Then Exit Sub
+    fmt = tpl.ListLevels(lvl).NumberFormat
+    sty = tpl.ListLevels(lvl).NumberStyle
+    If fmt <> "%" & CStr(lvl) & "." Or sty <> wdListNumberStyleLowercaseLetter Then
+        FormatSubLevel tpl, lvl
+    End If
     Err.Clear
     On Error GoTo 0
 End Sub

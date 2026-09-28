@@ -69,7 +69,12 @@ Public gRenderError As String
 ' Draw an example at a range, replacing whatever the range covers.
 ' Returns the table created, or Nothing if there was nothing to draw.
 '-----------------------------------------------------------------------------
-Public Function RenderExample(ex As IgtExample, target As Range) As Table
+' subIdx > 0: the example is one of several from one copy, the subIdx-th.
+' The group gets one number and each example its letter, "a.", "b.", ... in a
+' cell of its own after the number cell, which is blank on all but the first
+' (Seth, 2026-09-29; the shape of a LaTeX xlist).
+Public Function RenderExample(ex As IgtExample, target As Range, _
+        Optional ByVal subIdx As Long = 0) As Table
     Dim doc As Document
     Dim colW() As Double
     Dim lineStarts() As Long
@@ -77,6 +82,7 @@ Public Function RenderExample(ex As IgtExample, target As Range) As Table
     Dim nLines As Long, maxCols As Long
     Dim why As String
     Dim indent As Double, numW As Double, level As Long
+    Dim subW As Double
 
     Set doc = target.Document
     ' A fresh example is numbered if the document says so: a number column as
@@ -94,16 +100,17 @@ Public Function RenderExample(ex As IgtExample, target As Range) As Table
     If SettingNumberExamples(doc) Then
         EnsureStyles doc
         numW = SettingNumberHang(doc)
+        If subIdx > 0 Then subW = SubNumberWidth(doc)
     End If
     If Not PlanExample(ex, target, doc, interTiers, nInter, colW, _
-                       lineStarts, nLines, maxCols, why, indent + numW) Then
+                       lineStarts, nLines, maxCols, why, indent + numW + subW) Then
         gRenderError = why
         Exit Function
     End If
 
     Set RenderExample = DrawExample(ex, target, doc, interTiers, nInter, _
                                     colW, lineStarts, nLines, maxCols, _
-                                    indent, numW, level, "")
+                                    indent, numW, level, "", subW, subIdx, "")
 End Function
 
 ' The left indent of the paragraph an example is being inserted into; 0 inside
@@ -271,13 +278,15 @@ Private Function DrawExample(ex As IgtExample, target As Range, doc As Document,
         colW() As Double, lineStarts() As Long, _
         ByVal nLines As Long, ByVal maxCols As Long, _
         ByVal indent As Double, ByVal numW As Double, ByVal level As Long, _
-        ByVal numText As String) As Table
+        ByVal numText As String, ByVal subW As Double, ByVal subIdx As Long, _
+        ByVal subText As String) As Table
 
     Dim tbl As Table
     Dim anchor As Range
     Dim nNum As Long
 
     If numW > 0 Then nNum = 1
+    If subW > 0 Then nNum = nNum + 1
 
     Set anchor = target.Duplicate
     StartPendingUndo                       ' the first change to the document
@@ -288,9 +297,15 @@ Private Function DrawExample(ex As IgtExample, target As Range, doc As Document,
     StyleTable tbl, doc
 
     gRenderError = ""
-    FillTable tbl, ex, interTiers, nInter, lineStarts, colW, doc, indent, numW
-    If nNum = 1 Then NumberFirstCell tbl, doc, level, numText
-    ' After the number cell, whose paragraph is re-formatted by NumberFirstCell:
+    FillTable tbl, ex, interTiers, nInter, lineStarts, colW, doc, indent, numW, subW
+    ' The number cell is numbered unless the example is a later one of a
+    ' group, whose number cell is blank; the sub-number cell one level down.
+    If nNum >= 1 Then NumberCellAt tbl, doc, 1, nNum, level, (subIdx <= 1), numText
+    If nNum = 2 Then
+        EnsureSubNumberLevel doc, level + 1
+        NumberCellAt tbl, doc, 2, nNum, level + 1, True, subText
+    End If
+    ' After the number cells, whose paragraphs are re-formatted by NumberCellAt:
     ' the number must sit as far down as the vernacular beside it.
     ApplyExampleSpacing tbl, doc, (ex.FreeCount > 0)
 
@@ -298,7 +313,7 @@ Private Function DrawExample(ex As IgtExample, target As Range, doc As Document,
     ' Written BEFORE the row keeps, so SetRowKeeps can see the first translation
     ' paragraph and keep the last row of the table with it. Done the other way
     ' round, a page break can fall between an example and its translation.
-    WriteFreeLines ex, tbl, doc, indent + numW
+    WriteFreeLines ex, tbl, doc, indent + numW + subW
     SetRowKeeps tbl, (ex.FreeCount > 0)
 
     ' Not proofed, cell by cell as well as by style, so an example in a
@@ -357,17 +372,20 @@ Private Sub ApplyTranslationSpacing(after As Range, doc As Document)
 End Sub
 
 '-----------------------------------------------------------------------------
-' Number the example: the first row's first cell gets the LingTeX Example
-' paragraph, numbered by the list style it is linked to (or by the template
-' applied directly when the link could not be made), at the list level asked
-' for. Whatever numbering leaked into the cell from the paragraph the table
-' was added in goes first. The paragraph's own indents are zeroed, because a
-' list level's indents (a text position of 36pt in a 36pt cell) would push
-' the number onto a second line. Text a user had typed after the number
-' (numText, read back before a re-wrap) is written back.
+' Number the example: the first row's number cell (col 1; the sub-number
+' cell, col 2) gets the LingTeX Example paragraph, numbered by the list style
+' it is linked to (or by the template applied directly when the link could
+' not be made), at the list level asked for -- or left unnumbered, for the
+' blank number cell of a group's later example. Whatever numbering leaked
+' into the cell from the paragraph the table was added in goes first. The
+' paragraph's own indents are zeroed, because a list level's indents (a text
+' position of 36pt in a 36pt cell) would push the number onto a second line.
+' Text a user had typed after the number (read back before a re-wrap) is
+' written back. nNum says where the first content cell is.
 '-----------------------------------------------------------------------------
-Private Sub NumberFirstCell(tbl As Table, doc As Document, ByVal level As Long, _
-        ByVal numText As String)
+Private Sub NumberCellAt(tbl As Table, doc As Document, ByVal col As Long, _
+        ByVal nNum As Long, ByVal level As Long, ByVal numbered As Boolean, _
+        ByVal text As String)
     Dim rng As Range
     Dim para As Paragraph
     Dim rowAfter As Double
@@ -379,10 +397,10 @@ Private Sub NumberFirstCell(tbl As Table, doc As Document, ByVal level As Long, 
     ' so every paragraph of the row agrees. (Word draws the row as tall as its
     ' tallest cell either way; this is about the row reading as one thing.
     ' Found by the spacing doc-test, Mac, 2026-09-14.)
-    rowAfter = tbl.Cell(1, 2).Range.ParagraphFormat.SpaceAfter
+    rowAfter = tbl.Cell(1, nNum + 1).Range.ParagraphFormat.SpaceAfter
     If Err.Number <> 0 Or rowAfter < 0 Or rowAfter = wdUndefined Then rowAfter = 0
     Err.Clear
-    Set rng = tbl.Cell(1, 1).Range
+    Set rng = tbl.Cell(1, col).Range
     rng.End = rng.End - 1
     rng.ListFormat.RemoveNumbers
     rng.Style = doc.Styles(STYLE_EXAMPLE)
@@ -391,7 +409,15 @@ Private Sub NumberFirstCell(tbl As Table, doc As Document, ByVal level As Long, 
     On Error GoTo 0
     If para Is Nothing Then Exit Sub
 
-    ApplyNumberToParagraph para, doc, level
+    If numbered Then
+        ApplyNumberToParagraph para, doc, level
+    Else
+        ' The style's link numbered it; a blank number cell wants none.
+        On Error Resume Next
+        para.Range.ListFormat.RemoveNumbers
+        Err.Clear
+        On Error GoTo 0
+    End If
 
     On Error Resume Next
     With para.Format
@@ -405,7 +431,7 @@ Private Sub NumberFirstCell(tbl As Table, doc As Document, ByVal level As Long, 
         ' one row taller than the vernacular row below it (Seth, 2026-09-14).
         .LineSpacingRule = wdLineSpaceSingle
     End With
-    If numText <> "" Then rng.Text = numText
+    If text <> "" Then rng.Text = text
     Err.Clear
     On Error GoTo 0
 End Sub
@@ -463,6 +489,39 @@ Public Function LegacyNumberLineOf(tbl As Table) As Paragraph
     If para.Style = STYLE_EXAMPLE Then Set LegacyNumberLineOf = para
     Err.Clear
     On Error GoTo 0
+End Function
+
+' The sub-number cell's paragraph of an example that is one of several from
+' one copy, or Nothing.
+Public Function SubNumberParagraphOf(tbl As Table) As Paragraph
+    On Error Resume Next
+    If NumberColumns(tbl) < 2 Then Exit Function
+    Set SubNumberParagraphOf = tbl.Cell(1, 2).Range.Paragraphs(1)
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+' The sub-number an example shows, e.g. "b."; empty when it has none.
+Public Function SubNumberString(tbl As Table) As String
+    Dim para As Paragraph
+    On Error Resume Next
+    Set para = SubNumberParagraphOf(tbl)
+    If para Is Nothing Then Exit Function
+    If para.Range.ListFormat.ListType <> wdListNoNumbering Then
+        SubNumberString = para.Range.ListFormat.ListString
+    End If
+    Err.Clear
+    On Error GoTo 0
+End Function
+
+' How wide the sub-number cell is: six tenths of the number hang, and never
+' too narrow for "a." beside the cell padding. Not a setting yet.
+Public Function SubNumberWidth(doc As Document) As Double
+    Dim w As Double, floor As Double
+    w = SettingNumberHang(doc) * 0.6
+    floor = 18 + SettingCellPadding(doc, "Left") + SettingCellPadding(doc, "Right")
+    If w < floor Then w = floor
+    SubNumberWidth = w
 End Function
 
 ' The number an example shows, e.g. "(3)"; empty when it is not numbered.
@@ -610,6 +669,7 @@ Public Function RedrawExampleAt(tbl As Table, ex As IgtExample, _
     Dim indent As Double, numW As Double, level As Long
     Dim numText As String
     Dim numPara As Paragraph, legacy As Paragraph
+    Dim subPara As Paragraph, subW As Double, subIdx As Long, subText As String
 
     gRenderError = ""
     If tbl Is Nothing Then Exit Function
@@ -629,6 +689,18 @@ Public Function RedrawExampleAt(tbl As Table, ex As IgtExample, _
         numW = SettingNumberHang(doc)
         level = ListLevelOf(numPara, level)
         numText = Trim$(ParaText(numPara))
+        ' One of several from one copy: a sub-number cell beside the number
+        ' cell, which is blank on all but the group's first example.
+        Set subPara = SubNumberParagraphOf(tbl)
+        If Not subPara Is Nothing Then
+            subW = SubNumberWidth(doc)
+            subText = Trim$(ParaText(subPara))
+            subIdx = 1
+            On Error Resume Next
+            If numPara.Range.ListFormat.ListType = wdListNoNumbering Then subIdx = 2
+            Err.Clear
+            On Error GoTo 0
+        End If
     Else
         ' The earlier design, a number line above the table: the number moves
         ' into the table, the line goes, and the example's indent is where the
@@ -648,7 +720,7 @@ Public Function RedrawExampleAt(tbl As Table, ex As IgtExample, _
     End If
 
     If Not PlanExample(ex, RangeAfterTable(tbl), doc, interTiers, nInter, colW, _
-                       lineStarts, nLines, maxCols, why, indent + numW) Then
+                       lineStarts, nLines, maxCols, why, indent + numW + subW) Then
         gRenderError = why
         Exit Function                      ' table untouched
     End If
@@ -671,7 +743,7 @@ Public Function RedrawExampleAt(tbl As Table, ex As IgtExample, _
     On Error GoTo DrawFailed
     Set RedrawExampleAt = DrawExample(ex, anchor, doc, interTiers, nInter, _
                                       colW, lineStarts, nLines, maxCols, _
-                                      indent, numW, level, numText)
+                                      indent, numW, level, numText, subW, subIdx, subText)
     Exit Function
 
 DrawFailed:
@@ -755,7 +827,7 @@ End Sub
 '-----------------------------------------------------------------------------
 Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
         ByVal nInter As Long, lineStarts() As Long, colW() As Double, doc As Document, _
-        ByVal indent As Double, ByVal numW As Double)
+        ByVal indent As Double, ByVal numW As Double, ByVal subW As Double)
 
     Dim g As Long, i As Long, c As Long, r As Long
     Dim lineFirst As Long, lineLast As Long, lineCols As Long
@@ -775,6 +847,7 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
     contIndent = SettingContIndent(doc)
     padL = SettingCellPadding(doc, "Left")
     If numW > 0 Then nNum = 1
+    If subW > 0 Then nNum = nNum + 1
 
     For g = 0 To nLines - 1
         lineFirst = lineStarts(g)
@@ -815,7 +888,7 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
             ' further in with the table's left edge kept straight. It takes the
             ' tier's paragraph style so it adds no height to the row; the first
             ' row's is restyled and numbered afterwards (NumberFirstCell).
-            If nNum = 1 Then
+            If nNum >= 1 Then
                 numCellW = numW
                 If g > 0 Then numCellW = numW + contIndent
                 On Error Resume Next
@@ -825,6 +898,24 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
                 tbl.Cell(r, 1).SetWidth ColumnWidth:=numCellW, RulerStyle:=wdAdjustNone
                 If Err.Number <> 0 Then
                     gRenderError = "could not set the width of the number cell in row " & _
+                                   CStr(r) & " (" & CStr(Err.Number) & ": " & _
+                                   Err.Description & ")"
+                    Err.Clear
+                End If
+                On Error GoTo 0
+            End If
+
+            ' The sub-number cell, when the example is one of a group: as
+            ' wide as SubNumberWidth on every wrap line; styled like the number
+            ' cell, and the first row's numbered afterwards.
+            If nNum = 2 Then
+                On Error Resume Next
+                Set cellRng = tbl.Cell(r, 2).Range
+                cellRng.End = cellRng.End - 1
+                ApplyParaStyle cellRng, doc, role
+                tbl.Cell(r, 2).SetWidth ColumnWidth:=subW, RulerStyle:=wdAdjustNone
+                If Err.Number <> 0 Then
+                    gRenderError = "could not set the width of the sub-number cell in row " & _
                                    CStr(r) & " (" & CStr(Err.Number) & ": " & _
                                    Err.Description & ")"
                     Err.Clear
@@ -870,7 +961,7 @@ Private Sub FillTable(tbl As Table, ex As IgtExample, interTiers() As Long, _
             ' do the same: their edge sits in the margin so the text aligns.
             ' ExampleIndent adds the padding back when it reads this.
             On Error Resume Next
-            If g = 0 Or nNum = 1 Then
+            If g = 0 Or nNum >= 1 Then
                 tbl.Rows(r).LeftIndent = indent - padL
             Else
                 tbl.Rows(r).LeftIndent = indent + contIndent - padL

@@ -390,7 +390,13 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
     Application.ScreenUpdating = False
     Set nextTarget = target
     For i = 0 To n - 1
-        Set tbl = RenderExample(models(i), nextTarget)
+        ' Several from one copy: one number for the group, a letter each
+        ' (Seth, 2026-09-29; the shape of a LaTeX xlist).
+        If n > 1 Then
+            Set tbl = RenderExample(models(i), nextTarget, i + 1)
+        Else
+            Set tbl = RenderExample(models(i), nextTarget)
+        End If
         If tbl Is Nothing Then Exit For
         drawn = drawn + 1
         ' The record must still be the one opened by the first draw.

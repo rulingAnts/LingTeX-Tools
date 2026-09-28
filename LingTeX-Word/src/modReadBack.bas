@@ -78,10 +78,18 @@ Public Function HasNumberColumn(tbl As Table) As Boolean
 End Function
 
 ' How many cells at the start of every row are not content: 1 with a number
-' column, else 0. Computed once per read and passed down, because each call is
-' a trip through the object model.
+' column, 2 when a sub-number cell follows it (one example of several from
+' one copy: "a.", "b.", ... in the same style), else 0. Computed once per read
+' and passed down, because each call is a trip through the object model.
 Public Function NumberColumns(tbl As Table) As Long
-    If HasNumberColumn(tbl) Then NumberColumns = 1
+    Dim nm As String
+    If Not HasNumberColumn(tbl) Then Exit Function
+    NumberColumns = 1
+    On Error Resume Next
+    nm = tbl.Cell(1, 2).Range.Paragraphs(1).Style
+    Err.Clear
+    On Error GoTo 0
+    If nm = STYLE_EXAMPLE Then NumberColumns = 2
 End Function
 
 '-----------------------------------------------------------------------------

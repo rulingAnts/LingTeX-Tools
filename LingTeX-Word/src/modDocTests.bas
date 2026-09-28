@@ -1337,6 +1337,28 @@ Private Sub TestInsertSeveralExamples()
         Ok "  no warning was reported", (gLastMessage = "")
         If gLastMessage <> "" Then Emit "         said: " & gLastMessage
         Ok "  the undo record stayed open across both examples", (Not gUndoRecordBroke)
+
+        '-- one number for the group, a letter for each (Seth, 2026-09-29) --
+        Eq "  the group is numbered once: the first table shows (1)", ExampleNumberString(doc.Tables(1)), "(1)"
+        Ok "  and has a sub-number cell", (NumberColumns(doc.Tables(1)) = 2)
+        Eq "  reading a.", SubNumberString(doc.Tables(1)), "a."
+        Eq "  the second table's number cell is blank", ExampleNumberString(doc.Tables(2)), ""
+        Eq "  and its sub-number reads b.", SubNumberString(doc.Tables(2)), "b."
+        Ok "  the sub-number cell is inside the example", _
+            (Not FindExampleAt(doc.Tables(2).Cell(1, 2).Range) Is Nothing)
+        Ok "  the translation is indented past both number cells", _
+            (Abs(ParagraphAfterTable(doc.Tables(1)).Format.LeftIndent - _
+                 (SettingNumberHang(doc) + SubNumberWidth(doc))) <= 0.5)
+        Emit "         translation at " & CStr(ParagraphAfterTable(doc.Tables(1)).Format.LeftIndent) & _
+             "pt, hang " & CStr(SettingNumberHang(doc)) & "pt + sub " & CStr(SubNumberWidth(doc)) & "pt"
+        RewrapDocument doc, False
+        Ok "  re-wrap keeps two tables", (doc.Tables.Count = 2)
+        If doc.Tables.Count = 2 Then
+            Eq "  re-wrap keeps (1) on the first", ExampleNumberString(doc.Tables(1)), "(1)"
+            Eq "    and a. beside it", SubNumberString(doc.Tables(1)), "a."
+            Eq "    the second's number cell still blank", ExampleNumberString(doc.Tables(2)), ""
+            Eq "    and b. beside it", SubNumberString(doc.Tables(2)), "b."
+        End If
     Else
         Emit "         said: " & gLastMessage
     End If

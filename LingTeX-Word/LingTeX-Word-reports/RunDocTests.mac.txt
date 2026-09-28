@@ -274,6 +274,19 @@ Open documents at start: 1
   PASS     its translation is under it
   PASS     no warning was reported
   PASS     the undo record stayed open across both examples
+  PASS     the group is numbered once: the first table shows (1)
+  PASS     and has a sub-number cell
+  PASS     reading a.
+  PASS     the second table's number cell is blank
+  PASS     and its sub-number reads b.
+  PASS     the sub-number cell is inside the example
+  PASS     the translation is indented past both number cells
+         translation at 57.6pt, hang 36pt + sub 21.6pt
+  PASS     re-wrap keeps two tables
+  PASS     re-wrap keeps (1) on the first
+  PASS       and a. beside it
+  PASS       the second's number cell still blank
+  PASS       and b. beside it
   PASS   LingTeXInsertInterlinear (several) leaves gBusy clear
   PASS   LingTeXInsertInterlinear (several) leaves ScreenUpdating on
   PASS   LingTeXInsertInterlinear (several) leaks no document
@@ -585,5 +598,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 511 passed
+ALL PASS -- 523 passed
 

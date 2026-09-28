@@ -852,6 +852,7 @@ WD_CONSTANTS = {
     "wdLineStyleNone",
     "wdListNoNumbering",
     "wdListNumberStyleArabic",
+    "wdListNumberStyleLowercaseLetter",   # Microsoft Word.tlb (Mac): wdListNumberStyleLowercaseLetterP, 2026-09-29
     "wdPasteText",
     "wdSelectionIP",
     "wdStyleDefaultParagraphFont",
