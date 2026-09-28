@@ -37,7 +37,9 @@ skip. It also fails a class or form that went in double-spaced, and a template
 built with the old `modImport` (2026-09-15). The step after it fails a
 template whose own document body holds any text, or that carries document
 variables, comments, notes, headers, footers or AutoText: the release
-template is code and ribbon and nothing else.
+template is code and ribbon and nothing else. It names any variables it
+finds; `LingTeX_DevRoot` means `SetDevRoot` was run against the engine
+instead of the dev template — remove it from the engine and save again.
 
 ## 2. Publish
 
