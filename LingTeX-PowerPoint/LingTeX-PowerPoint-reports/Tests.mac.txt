@@ -1,4 +1,4 @@
-PptTestsRun  2026-09-28 20:34:08
+PptTestsRun  2026-09-28 20:40:25
 
 == 1. The shared modules
   PASS  NormalizeLineBreaks maps CR LF to LF
@@ -36,6 +36,9 @@ PptTestsRun  2026-09-28 20:34:08
   PASS  two examples, blank line, CR LF
   PASS  two examples, doubled: CR CR rows, CR CR CR CR between
   PASS  two examples, LF CR rows, LF CR LF CR between
+  PASS  one example, CR CR rows, trailing CR (what the paste reports)
+  PASS  two examples, doubled, trailing CR
+  PASS  LineBreakRunProfile of that
   PASS  not FLEx: a blank line survives NormalizeClipboardText
   PASS  not FLEx: a vertical tab is left alone
   PASS  NormalizeClipboardText is idempotent
@@ -43,11 +46,11 @@ PptTestsRun  2026-09-28 20:34:08
 
 == 4. The clipboard (what run-in-powerpoint.sh put there)
   PASS  ReadClipboardText returned text
-  arrived: 305 characters; tabs 67, CR 5, LF 0, VT 0; runs 1x1,2x2
-  Morphemes\tzel\tvimo\t\t\trixu\t\t\t=xo\txu\t=zevi\tOzivela\tze\t_\tzel\tvimo\t\t\trixu\t\t\t=xo\tVo\tvu\t=ve\tlevo\t\t\t=zi\tzo\tz\tzuvo\t=ve\t=zi\r\r\tLex. Gl
-  normalised: tabs 67, CR 0, LF 5, VT 0; runs 1x1,2x2
+  arrived: 302 characters; tabs 67, CR 2, LF 0, VT 0; runs 1x2
+  Morphemes\tzel\tvimo\t\t\trixu\t\t\t=xo\txu\t=zevi\tOzivela\tze\t_\tzel\tvimo\t\t\trixu\t\t\t=xo\tVo\tvu\t=ve\tlevo\t\t\t=zi\tzo\tz\tzuvo\t=ve\t=zi\r\tLex. Glos
+  normalised: tabs 67, CR 0, LF 2, VT 0; runs 1x2
   PASS    LooksLikeFlex
-  FAIL  the clipboard parses as one example  blocks: 2, want 1  (runs 1x1,2x2 -> 1x1,2x2)
+  PASS  the clipboard parses as one example
   PASS    15 word-aligned columns
 
 == 5. Measuring (a scratch presentation with no window)
@@ -114,4 +117,4 @@ PptTestsRun  2026-09-28 20:34:08
   PASS    and fewer paragraphs than at 250  (17 -> 7)
   PASS    re-wrap again: nothing written
 
-FAILURES -- 93 passed, 1 failed
+ALL PASS -- 97 passed

@@ -1,0 +1,10 @@
+Insert undo probe (round 8)  2026-09-28 20:49:23
+  Presentation66, slide 1 blank; shapes before: 0
+  after LingTeXInsertInterlinear: shapes 1 (1 added)
+  the new shape is tagged as ours: True
+  its paragraphs: 5
+  the VBA editor was visible: False
+  next: the rig reads the Edit menu, presses Cmd+Z once, then ProbeInsertUndoAfter counts again
+
+== undo check (run-in-powerpoint.sh --undo-check)
+PowerPoint's menu bar: Edit offered 'Undo Last'; clicked it; now it offers 'Can't Undo'

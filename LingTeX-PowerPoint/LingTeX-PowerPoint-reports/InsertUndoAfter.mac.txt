@@ -1,0 +1,4 @@
+Insert undo probe (round 8), after one Cmd+Z  2026-09-28 21:04:49
+  Presentation70: slides 0
+  VERDICT: the one Undo removed the slide the macro added, and everything on it
+  -- the whole macro run was one undo entry

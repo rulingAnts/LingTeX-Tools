@@ -1,0 +1,7 @@
+Many-writes undo probe (round 8)  2026-09-28 21:04:44
+  Presentation70: slides before 0
+  in one macro run: Slides.Add, then 3 x AddShape, each given a text -- 7 writes
+  now: slides 1, shapes on slide 1: 3
+
+== undo check (run-in-powerpoint.sh --undo-check)
+PowerPoint's menu bar: Edit offered 'Undo Typing'; pressed it; now it offers 'Can't Undo'

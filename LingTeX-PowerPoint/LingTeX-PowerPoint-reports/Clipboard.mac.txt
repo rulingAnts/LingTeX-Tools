@@ -1,0 +1,23 @@
+Clipboard probe (round 7)  2026-09-28 20:40:51
+
+== A. Rich TEXT on the clipboard, saved and restored around the one paste
+  ok   setup: the target holds an OLD example (many undo entries: setup, not the test)
+  ok   the user's clipboard: a snippet with italics, small capitals and tab stops
+  ok   1 save: TextRange2.Paste into a scratch box
+     saved box holds the snippet whole: YES
+  ok   2+3 compose, Copy, ONE TextRange2.Paste into the target (THE undo entry)
+     target holds the example whole: YES
+  ok   4 restore: Copy from the saved box
+     clipboard after restore is the user's snippet whole: YES
+
+== B. A SHAPE on the clipboard (not text)
+  ok   a rectangle copied to the clipboard
+     AppleScript: clipboard info has  flavour(s)  ERR  : 438: Object doesn't support this property or method
+
+  ERR  a text-box save of it: TextRange2.Paste: -2147024809: The specified value is out of range.
+     box text now: ''
+  ok   Shapes.Paste of it
+     shapes 2 -> 3 (a shape came back: True)
+  ERR  AppleScript: set the clipboard to (the clipboard): 438: Object doesn't support this property or method
+  ok   Shapes.Paste after that round trip
+     shapes 3 -> 4 (the shape survived AppleScript: True)

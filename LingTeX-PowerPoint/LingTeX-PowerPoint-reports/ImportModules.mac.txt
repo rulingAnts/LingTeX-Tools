@@ -1,10 +1,10 @@
-LingTeXDevImport  2026-09-28 20:34:06
+LingTeXDevImport  2026-09-28 21:04:42
   from  /Users/Seth/Library/Containers/com.microsoft.Powerpoint/Data/Documents/LingTeX-PowerPoint-src
   into  /Users/Seth/Documents/LingTeX-PowerPoint-Dev.pptm
   AddFromString takes LF as one line break here
   here vbCrLf is [10+13], vbNewLine is [10], vbLf is [10]
   skipped  modLingTeXDevCore.bas (the importer never replaces itself)
-  ok       modFlexParse.bas  modFlexParse, 1040 lines
+  ok       modFlexParse.bas  modFlexParse, 1053 lines
   ok       modIgtModel.bas  modIgtModel, 1089 lines
   ok       clsIgtWarning.cls  clsIgtWarning, 36 lines, class
   ok       modLeipzig.bas  modLeipzig, 349 lines
@@ -15,18 +15,19 @@ LingTeXDevImport  2026-09-28 20:34:06
   ok       modPptCompose.bas  modPptCompose, 191 lines
   ok       modPptInsert.bas  modPptInsert, 208 lines
   ok       modPptRewrap.bas  modPptRewrap, 251 lines
-  ok       modPptTests.bas  modPptTests, 486 lines
+  ok       modPptTests.bas  modPptTests, 494 lines
   ok       modProbe.bas  modProbe, 784 lines
   ok       modProbeEvents.bas  modProbeEvents, 313 lines
   ok       clsProbeEvents.cls  clsProbeEvents, 73 lines, class
   ok       modProbePaste.bas  modProbePaste, 279 lines
   ok       modProbeSave.bas  modProbeSave, 306 lines
   ok       modProbeClipboard.bas  modProbeClipboard, 304 lines
+  ok       modProbeUndo.bas  modProbeUndo, 151 lines
 
 components now:
   modLingTeXDev  (443 lines, type 1)
   modLingTeXDevCore  (433 lines, type 1)
-  modFlexParse  (1040 lines, type 1)
+  modFlexParse  (1053 lines, type 1)
   modIgtModel  (1089 lines, type 1)
   clsIgtWarning  (36 lines, type 2)
   modLeipzig  (349 lines, type 1)
@@ -37,12 +38,13 @@ components now:
   modPptCompose  (191 lines, type 1)
   modPptInsert  (208 lines, type 1)
   modPptRewrap  (251 lines, type 1)
-  modPptTests  (486 lines, type 1)
+  modPptTests  (494 lines, type 1)
   modProbe  (784 lines, type 1)
   modProbeEvents  (313 lines, type 1)
   clsProbeEvents  (73 lines, type 2)
   modProbePaste  (279 lines, type 1)
   modProbeSave  (306 lines, type 1)
   modProbeClipboard  (304 lines, type 1)
+  modProbeUndo  (151 lines, type 1)
 
-ALL IMPORTED -- 19 module(s)
+ALL IMPORTED -- 20 module(s)

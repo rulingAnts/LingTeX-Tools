@@ -19,6 +19,8 @@
 #                          press Cmd+Z once in PowerPoint, read it again, and
 #                          append both to the last report (the undo count, with
 #                          nobody at the keyboard; needs Accessibility)
+#           --after-undo NAME
+#                          run NAME after that one Cmd+Z (the count afterwards)
 #           --commit       commit the reports afterwards (default: do not)
 #           --remove-startup-probe
 #                          delete the test add-in MakeStartupProbeAddIn put in
@@ -89,13 +91,16 @@ tools/probe/clsProbeEvents.cls
 tools/probe/modProbePaste.bas
 tools/probe/modProbeSave.bas
 tools/probe/modProbeClipboard.bas
+tools/probe/modProbeUndo.bas
 "
 
-import=1; commit=0; pres=""; macros=""; want=""; stage_shared=1; undo_check=0
+import=1; commit=0; pres=""; macros=""; want=""; stage_shared=1; undo_check=0; after_undo=""
 for a in "$@"; do
     if [ "$want" = macro ]; then macros="$macros $a"; want=""; continue; fi
+    if [ "$want" = after ]; then after_undo=$a; want=""; continue; fi
     case "$a" in
         --macro)      want=macro ;;
+        --after-undo) want=after ;;
         --tests)      macros="$macros PptTestsRun" ;;
         --no-import)  import=0 ;;
         --no-stage)   stage_shared=0 ;;
@@ -318,21 +323,34 @@ done
 # The frontmost presentation is the probe's (it has a window); the label is
 # what the user would read, "Undo Paste" after round 5's one paste.
 if [ "$undo_check" = 1 ]; then
+    # ("before" and "after" are AppleScript reserved words: not variable names.)
     u=$(osascript 2>&1 <<'AS'
 tell application "Microsoft PowerPoint" to activate
 delay 1
 tell application "System Events" to tell process "Microsoft PowerPoint"
-    set before to name of menu item 1 of menu "Edit" of menu bar 1
-    keystroke "z" using command down
+    set menuOwner to "the editor's menu bar"
+    if (name of every menu of menu bar 1) contains "Slide Show" then set menuOwner to "PowerPoint's menu bar"
+    -- Never OPEN a menu here: an open menu blocks every Apple event to
+    -- PowerPoint until a human closes it (2026-09-28). Pressing the item
+    -- through accessibility runs it without opening; the name read this way
+    -- can be stale, so the count the --after-undo macro takes is the evidence.
+    set lbl1 to name of menu item 1 of menu "Edit" of menu bar 1
+    click menu item 1 of menu "Edit" of menu bar 1
     delay 1
-    set after to name of menu item 1 of menu "Edit" of menu bar 1
-    return "Edit menu offered: '" & before & "'; after one Cmd+Z it offers: '" & after & "'"
+    set lbl2 to name of menu item 1 of menu "Edit" of menu bar 1
+    return menuOwner & ": Edit offered '" & lbl1 & "'; pressed it; now it offers '" & lbl2 & "'"
 end tell
 AS
-)
+) || u="the undo check's AppleScript failed: $u"
     echo "== undo check: $u"
     last=$(ls -t "$boxreports"/*.mac.txt 2>/dev/null | grep -v Ping | head -1)
     [ -n "$last" ] && printf '\n== undo check (run-in-powerpoint.sh --undo-check)\n%s\n' "$u" >> "$last"
+    if [ -n "$after_undo" ]; then
+        echo "   running $after_undo (after the one Cmd+Z) ..."
+        if ! run_macro "$after_undo" "$qualify$after_undo"; then
+            echo "   $after_undo did not return cleanly (see above)."
+        fi
+    fi
 fi
 
 #-- Reports ------------------------------------------------------------------
