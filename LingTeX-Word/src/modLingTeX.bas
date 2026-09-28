@@ -105,6 +105,7 @@ Public gQuiet As Boolean            ' suppress dialogs (tests set this)
 Public gQuietAnswer As Boolean      ' what Confirm returns while quiet
 Public gQuietText As String         ' what Ask returns while quiet
 Public gLastMessage As String       ' the last thing reported, dialog or not
+Public gUndoRecordBroke As Boolean  ' a custom undo record closed early inside a command (tests assert False)
 
 Public Sub Report(ByVal msg As String, ByVal kind As Long)
     gLastMessage = msg
@@ -371,17 +372,33 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
     Dim tbl As Table, p As Paragraph
     Dim nextTarget As Range
     Dim warnings As Collection, allText As String
+    Dim widths() As Double, haveRecord As Boolean
 
     On Error GoTo Fail
+    gUndoRecordBroke = False
     gBusy = True
+    ' Measure every example BEFORE the undo record opens (see BeginUndo): a
+    ' write to the hidden measuring document closes a custom record, and the
+    ' second example's measuring did exactly that, so every later drawing step
+    ' listed on its own in the undo menu (Seth's screenshot, 2026-09-29).
+    ' With the cache warm, the draws below never touch that document.
+    For i = 0 To n - 1
+        FixCellSpaces models(i), SettingSpaceReplacement(doc)
+        MeasureExample models(i), doc, widths
+    Next i
     BeginUndo label
     Application.ScreenUpdating = False
     Set nextTarget = target
     For i = 0 To n - 1
-        FixCellSpaces models(i), SettingSpaceReplacement(doc)
         Set tbl = RenderExample(models(i), nextTarget)
         If tbl Is Nothing Then Exit For
         drawn = drawn + 1
+        ' The record must still be the one opened by the first draw.
+        If i = 0 Then
+            haveRecord = RecordIsOpen()
+        ElseIf haveRecord And Not RecordIsOpen() Then
+            gUndoRecordBroke = True
+        End If
         Set warnings = CheckExample(models(i))
         If Not warnings Is Nothing Then
             If warnings.Count > 0 Then
@@ -1528,6 +1545,16 @@ Public Sub StartPendingUndo()
     On Error GoTo 0
     mPendingUndoLabel = ""
 End Sub
+
+' Is a custom record recording right now?  False as well on a build with no
+' UndoRecord at all, so callers compare with what the first change gave them.
+Private Function RecordIsOpen() As Boolean
+    Dim ur As Object
+    On Error Resume Next
+    Set ur = Application.UndoRecord
+    If Not ur Is Nothing Then RecordIsOpen = ur.IsRecordingCustomRecord
+    Err.Clear
+End Function
 
 Public Sub EndUndo()
     Dim ur As Object

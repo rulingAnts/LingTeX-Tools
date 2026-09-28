@@ -1336,6 +1336,7 @@ Private Sub TestInsertSeveralExamples()
             (InStr(ParagraphAfterTable(doc.Tables(2)).Range.Text, "yams") > 0)
         Ok "  no warning was reported", (gLastMessage = "")
         If gLastMessage <> "" Then Emit "         said: " & gLastMessage
+        Ok "  the undo record stayed open across both examples", (Not gUndoRecordBroke)
     Else
         Emit "         said: " & gLastMessage
     End If

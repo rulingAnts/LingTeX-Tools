@@ -273,6 +273,7 @@ Open documents at start: 1
   PASS     its last gloss
   PASS     its translation is under it
   PASS     no warning was reported
+  PASS     the undo record stayed open across both examples
   PASS   LingTeXInsertInterlinear (several) leaves gBusy clear
   PASS   LingTeXInsertInterlinear (several) leaves ScreenUpdating on
   PASS   LingTeXInsertInterlinear (several) leaks no document
@@ -584,5 +585,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 510 passed
+ALL PASS -- 511 passed
 
