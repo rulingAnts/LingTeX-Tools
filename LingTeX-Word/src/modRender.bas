@@ -1076,49 +1076,6 @@ Public Sub ApplyGramGlossRuns(rng As Range, ByVal sourceText As String, _
     Next i
 End Sub
 
-'-----------------------------------------------------------------------------
-' Split a gloss cell into segments, keeping the delimiters as segments of their
-' own so they can be reassembled unchanged.
-'
-' Splits on the morpheme boundaries AND on Leipzig rule 4's "." and ":" and on
-' ";", because "follow.CMP" is one morpheme whose gloss has a lexical part and a
-' grammatical part, and only the grammatical part takes small caps.
-'
-' Port of the segmentation inside docs\core.js wrapGlosses.
-' Returns the number of segments; parts is filled by reference.
-'-----------------------------------------------------------------------------
-Public Function SplitGlossSegments(ByVal text As String, _
-        ByRef parts() As String) As Long
-
-    Dim i As Long, n As Long, ch As String, cur As String
-
-    ReDim parts(0 To Len(text) * 2 + 1)
-    n = 0
-    cur = ""
-
-    For i = 1 To Len(text)
-        ch = Mid$(text, i, 1)
-        If IsBoundary(ch) Or ch = "." Or ch = ":" Or ch = ";" Then
-            If cur <> "" Then
-                parts(n) = cur
-                n = n + 1
-                cur = ""
-            End If
-            parts(n) = ch
-            n = n + 1
-        Else
-            cur = cur & ch
-        End If
-    Next i
-    If cur <> "" Then
-        parts(n) = cur
-        n = n + 1
-    End If
-
-    SplitGlossSegments = n
-End Function
-
-
 '=============================================================================
 ' -- FREE TRANSLATIONS ------------------------------------------------------
 '=============================================================================
