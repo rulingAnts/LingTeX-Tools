@@ -240,6 +240,35 @@ cp "$root/src/modWrap.bas" "$root/src/zzTestOnly.bas"
 expect_fail "a source missing from the manifest" "not in the manifest"
 rm -f "$root/src/zzTestOnly.bas"
 
+#-- text typed into the template's own body -----------------------------------
+# The release template is code and ribbon only; prose in its body would ship in
+# every document made from it, and no scrub of src/ would see it.
+rm -rf "$work/mut"; mkdir -p "$work/mut"
+unzip -q "$dotm" -d "$work/mut"
+sed 's|<w:p/>|<w:p><w:r><w:t>text that must not ship</w:t></w:r></w:p>|' \
+    "$work/mut/word/document.xml" > "$work/mut/word/document.xml.new"
+mv "$work/mut/word/document.xml.new" "$work/mut/word/document.xml"
+rm -f "$dotm"
+( cd "$work/mut" && zip -q -X "$dotm" "[Content_Types].xml" )
+( cd "$work/mut" && find . -type f ! -name '[Content_Types].xml' -print \
+    | sed 's|^\./||' | sort | zip -q -X -@ "$dotm" )
+expect_fail "text in the template's body" "document body holds"
+cp "$work/keep.dotm" "$dotm"
+
+#-- a document variable in the template ---------------------------------------
+# What a dev template saved under the release name would carry.
+rm -rf "$work/mut"; mkdir -p "$work/mut"
+unzip -q "$dotm" -d "$work/mut"
+printf '%s\n' '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' \
+    '<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docVars><w:docVar w:name="LingTeX_DevRoot" w:val="/somewhere"/></w:docVars></w:settings>' \
+    > "$work/mut/word/settings.xml"
+rm -f "$dotm"
+( cd "$work/mut" && zip -q -X "$dotm" "[Content_Types].xml" )
+( cd "$work/mut" && find . -type f ! -name '[Content_Types].xml' -print \
+    | sed 's|^\./||' | sort | zip -q -X -@ "$dotm" )
+expect_fail "a document variable in the template" "document variable(s)"
+cp "$work/keep.dotm" "$dotm"
+
 #-- and clean again -----------------------------------------------------------
 if sh "$here/check-dotm.sh" "$dotm" >/dev/null 2>&1; then
     pass "check-dotm passes again once everything is restored"
