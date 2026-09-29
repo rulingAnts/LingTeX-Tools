@@ -305,6 +305,11 @@ Open documents at start: 1
   PASS   LingTeXInsertInterlinear (fresh) leaves ScreenUpdating on
   PASS   LingTeXInsertInterlinear (fresh) leaks no document
   PASS   LingTeXInsertInterlinear (fresh) leaves no undo record open
+  PASS     (simulated Undo: no LingTeX table style left)
+  PASS   after an Undo took the styles away, the next insert makes them again
+  PASS     and draws two tables
+  PASS     numbered
+  PASS     its first line in its tier style
   PASS   one example into a fresh document draws one table
   PASS     in one record, open to the end
   PASS     with nothing written before it opened
@@ -629,5 +634,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 545 passed
+ALL PASS -- 550 passed
 

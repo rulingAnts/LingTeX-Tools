@@ -355,6 +355,8 @@ fi
 if [ -n "$summary" ]; then
     mkdir -p "$root/build"; : > "$root/build/engine-ok"
     echo "== engine marked loadable: it will load at the next Word start"
+    echo "   To try a change BY HAND, quit and restart Word first: ribbon clicks in a"
+    echo "   running Word may keep using the code it loaded at its start (2026-09-29)."
 else
     echo "== NO REPORT, so the engine is NOT marked loadable: it will not load at the"
     echo "   next Word start until a run gets as far as the suites. Fix the import or"

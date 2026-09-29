@@ -147,13 +147,20 @@ Public Sub EnsureStyles(doc As Document, Optional ByVal force As Boolean = False
     Dim createdAny As Boolean
 
     If Not force Then
+        ' Both fast paths are VERIFIED against the document, never trusted:
+        ' undoing the insert that made the styles takes them out again (they
+        ' are inside its one undo record), and the next insert, remembering
+        ' the document as styled, drew with no styles at all -- upright
+        ' forms, no small capitals, no numbers (Seth, 2026-09-29).
         If Not mStyledDoc Is Nothing Then
-            If mStyledDoc Is doc Then Exit Sub
+            If mStyledDoc Is doc Then
+                If StylesStillThere(doc) Then Exit Sub
+            End If
         End If
-        ' The mark plus ONE probe, not eleven. The mark alone would be wrong for a
-        ' document whose styles were deleted by hand after it was set.
+        ' The mark plus a few probes, not eleven. The mark alone would be wrong
+        ' for a document whose styles were deleted by hand, or undone.
         If StylesAlreadyMade(doc) Then
-            If StyleExistsOfType(doc, STYLE_TABLE, wdStyleTypeTable) Then
+            If StylesStillThere(doc) Then
                 Set mStyledDoc = doc
                 Exit Sub
             End If
@@ -544,6 +551,14 @@ Private Sub EnsureTableStyle(doc As Document)
     Err.Clear
     On Error GoTo 0
 End Sub
+
+' Are the LingTeX styles really in this document now? The table style, the
+' number-cell style and one tier style: an Undo removes them all together.
+Private Function StylesStillThere(doc As Document) As Boolean
+    If Not StyleExistsOfType(doc, STYLE_TABLE, wdStyleTypeTable) Then Exit Function
+    If Not StyleExists(doc, STYLE_EXAMPLE) Then Exit Function
+    StylesStillThere = StyleExists(doc, ParaStyleName(ROLE_VERNACULAR))
+End Function
 
 Private Function StylesAlreadyMade(doc As Document) As Boolean
     Dim v As String

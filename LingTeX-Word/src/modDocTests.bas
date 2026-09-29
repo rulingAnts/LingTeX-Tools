@@ -1345,6 +1345,26 @@ Private Sub TestInsertIntoFreshDocument()
     Ok "  and NOTHING was written to the document before it opened (styles inside it)", (Not gUndoWroteEarly)
     Emit "         " & gUndoDiag
     CheckStateIsClean "LingTeXInsertInterlinear (fresh)", docsBefore
+
+    ' Undo of that insert takes its styles out again, since they are inside
+    ' its record; the add-in still remembers the document as styled. The next
+    ' insert drew with no styles at all (Seth, 2026-09-29). Simulated here:
+    ' the tables, the styles and the add-in's variables go, as an Undo takes them.
+    RemoveLingTeXStylesAndContent doc
+    Ok "  (simulated Undo: no LingTeX table style left)", Not StyleExistsOfType(doc, STYLE_TABLE, wdStyleTypeTable)
+    doc.Content.Text = TwoFlexExamples()
+    doc.Content.Select
+    ReleaseScratch
+    RunCommandByName "LingTeXInsertInterlinear"
+    Ok "after an Undo took the styles away, the next insert makes them again", _
+        StyleExistsOfType(doc, STYLE_TABLE, wdStyleTypeTable)
+    Ok "  and draws two tables", (doc.Tables.Count = 2)
+    If doc.Tables.Count >= 1 Then
+        Ok "  numbered", HasNumberColumn(doc.Tables(1))
+        Eq "  its first line in its tier style", _
+            CStr(doc.Tables(1).Cell(1, NumberColumns(doc.Tables(1)) + 1).Range.Paragraphs(1).Style), _
+            ParaStyleName(ROLE_MORPHEMES)
+    End If
     CloseNoSave doc
 
     ' One example alone takes the other road (DrawParsedExample).
@@ -1470,6 +1490,22 @@ Private Function ParaFmt(p As Paragraph) As String
               Format$(p.LineSpacing, "0.0") & "/" & CStr(p.LineSpacingRule) & "/" & p.Style & "]"
     Err.Clear
 End Function
+
+' What an Undo of a first insert takes away: its tables and text, the LingTeX
+' styles (the list style and the table style with them), the add-in's
+' document variables.
+Private Sub RemoveLingTeXStylesAndContent(doc As Document)
+    Dim i As Long
+    On Error Resume Next
+    doc.Content.Delete
+    For i = doc.Styles.Count To 1 Step -1
+        If Left$(doc.Styles(i).NameLocal, 7) = "LingTeX" Then doc.Styles(i).Delete
+    Next i
+    For i = doc.Variables.Count To 1 Step -1
+        If Left$(doc.Variables(i).Name, 7) = "LingTeX" Then doc.Variables(i).Delete
+    Next i
+    Err.Clear
+End Sub
 
 Private Sub TestInsertSeveralExamples()
     Dim doc As Document
