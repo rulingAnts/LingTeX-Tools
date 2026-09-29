@@ -398,6 +398,12 @@ lost.
 
 ## Known issues
 
+**Cramped line spacing after an insert (Windows).** On Word for Windows an
+example sometimes comes out with its rows too close together right after
+it is inserted. **Re-wrap All** (or **Re-wrap This**) draws it with the right
+spacing. Tracked at
+[github.com/rulingAnts/LingTeX-Tools/issues/15](https://github.com/rulingAnts/LingTeX-Tools/issues/15).
+
 **By Word and By Morpheme do not switch an example already on the page.**
 They set how *new* examples are aligned in the document; an example keeps the
 alignment it was inserted with. To change one, use **Split Column** and
