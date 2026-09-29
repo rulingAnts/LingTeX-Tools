@@ -1,11 +1,11 @@
-LingTeXDevImport  2026-09-29 08:40:50
+LingTeXDevImport  2026-09-29 09:45:18
   from  /Users/Seth/Library/Containers/com.microsoft.Powerpoint/Data/Documents/LingTeX-PowerPoint-src
   into  /Users/Seth/Documents/LingTeX-PowerPoint-Dev.pptm
   AddFromString takes LF as one line break here
   here vbCrLf is [10+13], vbNewLine is [10], vbLf is [10]
   skipped  modLingTeXDevCore.bas (the importer never replaces itself)
   ok       modFlexParse.bas  modFlexParse, 1315 lines
-  ok       modIgtModel.bas  modIgtModel, 1194 lines
+  ok       modIgtModel.bas  modIgtModel, 1259 lines
   ok       clsIgtWarning.cls  clsIgtWarning, 36 lines, class
   ok       modLeipzig.bas  modLeipzig, 390 lines
   ok       modWrap.bas  modWrap, 201 lines
@@ -28,7 +28,7 @@ components now:
   modLingTeXDev  (443 lines, type 1)
   modLingTeXDevCore  (433 lines, type 1)
   modFlexParse  (1315 lines, type 1)
-  modIgtModel  (1194 lines, type 1)
+  modIgtModel  (1259 lines, type 1)
   clsIgtWarning  (36 lines, type 2)
   modLeipzig  (390 lines, type 1)
   modWrap  (201 lines, type 1)
