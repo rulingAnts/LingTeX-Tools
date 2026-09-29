@@ -393,7 +393,12 @@ ver=$(ver_of < "$src/modLingTeX.bas")
 if [ -z "$ver" ]; then
     fail "no LINGTEX_VERSION found in src/modLingTeX.bas"
 else
-    this=${GITHUB_REF_NAME:-$(git -C "$root" tag --points-at HEAD --list 'word-v*' 2>/dev/null | head -1)}
+    # The release being made: CI's ref only when it IS a release tag (on a
+    # branch push GITHUB_REF_NAME is the branch, which is no release: the
+    # beta.9 branch run failed on exactly that), else a word-v* tag on HEAD.
+    this=""
+    case "${GITHUB_REF_NAME:-}" in word-v*) this=$GITHUB_REF_NAME ;; esac
+    [ -z "$this" ] && this=$(git -C "$root" tag --points-at HEAD --list 'word-v*' 2>/dev/null | head -1)
     if [ -n "$this" ] && [ "$this" != "word-v$ver" ]; then
         fail "LINGTEX_VERSION is $ver but the release is $this -- set it to ${this#word-v} and rebuild the template"
     elif [ -n "$this" ]; then
