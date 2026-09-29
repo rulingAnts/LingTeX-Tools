@@ -58,6 +58,9 @@ Public Sub PptTestsRun()
     SectionCompose
     SectionInsert
     SectionRewrap
+    SectionSettings
+    SectionCommands
+    SectionRenumber
     Note ""
     If mFail = 0 Then
         Note "ALL PASS -- " & mPass & " passed"
@@ -404,6 +407,206 @@ Tidy:
     Exit Sub
 Fail:
     Fail "read-back / re-wrap", Err.Number & ": " & Err.Description
+    Resume Tidy
+End Sub
+
+'-----------------------------------------------------------------------------
+' 9. Settings in Presentation.Tags
+'-----------------------------------------------------------------------------
+Private Sub SectionSettings()
+    Dim app As Object, host As Object
+    Note ""
+    Note "== 9. Settings (Presentation.Tags)"
+    On Error GoTo Fail
+    Set app = Application
+    Set host = app.Presentations.Add(0)
+    Eq "default font", SettingFont(host), "Times New Roman"
+    Eq "default size", SettingSize(host), 24
+    Eq "default gap", SettingGap(host), 6
+    Eq "default number hang", SettingNumberHang(host), 36
+    Eq "default between", SettingBetween(host), 12
+    Ok "default: examples numbered", SettingNumberExamples(host)
+    Ok "default: grammatical glosses lowercased", SettingLowercaseGram(host)
+    Ok "default: no initial capital", Not SettingInitialCap(host)
+    Ok "default: re-wrap on resize", SettingRewrapOnResize(host)
+    Eq "default granularity: by word", SettingGranularity(host), igtWordAligned
+    Eq "default space replacement", SettingSpaceReplacement(host), "."
+    SetSettingFont host, "Charis SIL"
+    SetSettingSize host, 18.5
+    SetSettingGap host, 4
+    SetSettingNumberHang host, 40
+    SetSettingBetween host, 8
+    SetSettingNumberExamples host, False
+    SetSettingLowercaseGram host, False
+    SetSettingInitialCap host, True
+    SetSettingRewrapOnResize host, False
+    SetSettingGranularity host, igtMorphemeAligned
+    SetSettingSpaceReplacement host, "_"
+    Eq "font written and read", SettingFont(host), "Charis SIL"
+    Eq "size written and read (a decimal, locale-proof)", SettingSize(host), 18.5
+    Eq "gap written and read", SettingGap(host), 4
+    Eq "hang written and read", SettingNumberHang(host), 40
+    Eq "between written and read", SettingBetween(host), 8
+    Ok "numbering off", Not SettingNumberExamples(host)
+    Ok "lowercasing off", Not SettingLowercaseGram(host)
+    Ok "initial capital on", SettingInitialCap(host)
+    Ok "re-wrap on resize off", Not SettingRewrapOnResize(host)
+    Eq "granularity by morpheme", SettingGranularity(host), igtMorphemeAligned
+    Eq "space replacement _", SettingSpaceReplacement(host), "_"
+    SetSettingSpaceReplacement host, "x"
+    Eq "a space replacement that is neither falls back to .", SettingSpaceReplacement(host), "."
+    Ok "the tags are on the presentation", host.Tags.Item("LINGTEX_SET_Font") = "Charis SIL"
+    host.Saved = -1
+    host.Close
+    Exit Sub
+Fail:
+    Fail "settings", Err.Number & ": " & Err.Description
+    On Error Resume Next
+    If Not host Is Nothing Then host.Saved = -1: host.Close
+End Sub
+
+'-----------------------------------------------------------------------------
+' 10. Commands on a box: the cursor's column, split, merge, realign, check
+'-----------------------------------------------------------------------------
+Private Sub SectionCommands()
+    Dim app As Object, host As Object, sld As Object, shp As Object
+    Dim ex As IgtExample, back As IgtExample, num As String, gran As Long
+    Dim tr As Object, txt As String, p1 As Long, p2 As Long, pos As Long, nParas As Long
+    Dim c As Long, splitAt As Long, cell As String, i As Long, shortTiers As String, okAll As Boolean
+    Dim tsv0 As String, warnings As Collection, nCols As Long
+    Note ""
+    Note "== 10. Commands (on a box of a scratch presentation)"
+    On Error GoTo Fail
+    Set app = Application
+    Set host = app.Presentations.Add(0)
+    Set sld = host.Slides.Add(1, 12)
+    If InsertExamples(Fixture(Chr$(10)), sld, 40, 40, 400) <> 1 Then
+        Fail "commands: the fixture did not insert", ""
+        GoTo Tidy
+    End If
+    Set shp = sld.Shapes(sld.Shapes.Count)
+    ex = ModelFromText(Fixture(Chr$(10)), igtWordAligned)
+    tsv0 = ModelToTsv(ex)
+    Ok "the box records the size it was composed at", SizeIsOurs(shp)
+    Eq "its sub-letter tag is empty (a single example)", shp.Tags.Item(TAG_SUB), ""
+
+    '-- the cursor's column, from a character position -----------------------
+    Set tr = shp.TextFrame2.TextRange
+    txt = tr.Paragraphs(1).Text
+    p1 = InStr(1, txt, Chr$(9))                  ' after the number
+    p2 = InStr(p1 + 1, txt, Chr$(9))             ' after the first cell
+    pos = tr.Paragraphs(1).Start + p2             ' the first character of the second cell
+    Eq "a character in the first line's second cell is column 1", ColumnAtChar(shp, pos), 1
+    Eq "a character in the first cell is column 0", ColumnAtChar(shp, tr.Paragraphs(1).Start + p1), 0
+    Eq "a character on the number is -1", ColumnAtChar(shp, tr.Paragraphs(1).Start), -1
+    pos = tr.Paragraphs(2).Start
+    Eq "the first character of the gloss paragraph is column 0", ColumnAtChar(shp, pos), 0
+    nParas = tr.Paragraphs.Count
+    Eq "a character on the free translation is -1", ColumnAtChar(shp, tr.Paragraphs(nParas).Start), -1
+    If nParas > 3 Then
+        ' The second wrap line: its first cell is the first column not on line 1.
+        c = CountTabsIn(tr.Paragraphs(1).Text)      ' cells on line 1, the number's tab included
+        Eq "the first cell of the second wrap line follows line 1's cells", ColumnAtChar(shp, tr.Paragraphs(3).Start), c
+    End If
+
+    '-- split at the first column with a boundary, then merge back -----------
+    splitAt = -1
+    For c = 0 To ex.ColCount - 1
+        cell = ex.Cells(0, c)
+        For i = 2 To Len(cell)
+            If IsBoundary(Mid$(cell, i, 1)) Then splitAt = c: Exit For
+        Next i
+        If splitAt >= 0 Then Exit For
+    Next c
+    Ok "the fixture has a column with a morpheme break to split", splitAt >= 0, "column " & splitAt
+    If splitAt >= 0 Then
+        okAll = SplitColumnInBox(shp, splitAt, shortTiers)
+        Ok "SplitColumnInBox splits on every tier", okAll, shortTiers
+        Ok "  the box reads back", ReadBackExample(shp, back, num, gran)
+        Eq "  with one more column", back.ColCount, ex.ColCount + 1
+        Ok "  the size tag follows the composition", SizeIsOurs(shp)
+        Eq "MergeColumnsInBox merges it back (1)", MergeColumnsInBox(shp, splitAt, splitAt + 1), 1
+        Ok "  and the box reads back", ReadBackExample(shp, back, num, gran)
+        Eq "  as the model it started from", StripOwnMarks(ModelToTsv(back)), StripOwnMarks(tsv0)
+        Eq "merging past the last column merges nothing (0)", MergeColumnsInBox(shp, ex.ColCount - 1, ex.ColCount), 0
+    End If
+
+    '-- by morpheme and back by word -----------------------------------------
+    nCols = back.ColCount
+    Ok "RealignExample by morpheme composes", RealignExample(shp, igtMorphemeAligned)
+    Ok "  the box reads back", ReadBackExample(shp, back, num, gran)
+    Ok "  with more columns", back.ColCount > nCols, nCols & " -> " & back.ColCount
+    Eq "  its granularity tag says morpheme", shp.Tags.Item(TAG_GRAN), CStr(igtMorphemeAligned)
+    Ok "RealignExample by word composes", RealignExample(shp, igtWordAligned)
+    Ok "  the box reads back", ReadBackExample(shp, back, num, gran)
+    Eq "  with the columns it had", back.ColCount, nCols
+    Eq "  as the model it started from", StripOwnMarks(ModelToTsv(back)), StripOwnMarks(tsv0)
+
+    '-- check glossing on the model --------------------------------------------
+    Set warnings = CheckExample(back)
+    Ok "CheckExample answers on the read-back model", Not warnings Is Nothing, warnings.Count & " warning(s)"
+    Ok "WarningsText fits a message box", Len(WarningsText(warnings)) <= 1000
+Tidy:
+    On Error Resume Next
+    host.Saved = -1
+    host.Close
+    ReleaseScratch
+    Exit Sub
+Fail:
+    Fail "commands", Err.Number & ": " & Err.Description
+    Resume Tidy
+End Sub
+
+Private Function CountTabsIn(ByVal s As String) As Long
+    CountTabsIn = Len(s) - Len(Replace(s, Chr$(9), ""))
+End Function
+
+'-----------------------------------------------------------------------------
+' 11. Renumbering, and the next free number
+'-----------------------------------------------------------------------------
+Private Sub SectionRenumber()
+    Dim app As Object, host As Object, sld As Object, boxes() As Object, n As Long
+    Note ""
+    Note "== 11. Renumber"
+    On Error GoTo Fail
+    Set app = Application
+    Set host = app.Presentations.Add(0)
+    Set sld = host.Slides.Add(1, 12)
+    Eq "an empty presentation's next number is 1", NextExampleNumber(host), 1
+    If InsertExamples(Fixture(Chr$(10)), sld, 40, 40, 400, 5) <> 1 Then
+        Fail "renumber: the fixture did not insert", ""
+        GoTo Tidy
+    End If
+    Eq "after (5) the next number is 6", NextExampleNumber(host), 6
+    If InsertExamples(Fixture(Chr$(10)) & Chr$(10) & Fixture(Chr$(10)), sld, 40, 300, 400, 9) <> 2 Then
+        Fail "renumber: the pair did not insert", ""
+        GoTo Tidy
+    End If
+    n = ExampleBoxesInOrder(sld, boxes)
+    Eq "three example boxes, top to bottom", n, 3
+    Eq "  the top one is (5)", boxes(0).Tags.Item(TAG_NUMBER), "(5)"
+    Eq "  then (9a)", boxes(1).Tags.Item(TAG_NUMBER), "(9a)"
+    Eq "  with sub-letter a", SubLetterOf(boxes(1)), "a"
+    Eq "  then (9b)", boxes(2).Tags.Item(TAG_NUMBER), "(9b)"
+    Eq "the next number is 10", NextExampleNumber(host), 10
+    Eq "NumberValueOf reads the digits", NumberValueOf("(12b)"), 12
+    Eq "RenumberPresentation numbers three", RenumberPresentation(host), 3
+    n = ExampleBoxesInOrder(sld, boxes)
+    Eq "  the top one is now (1)", boxes(0).Tags.Item(TAG_NUMBER), "(1)"
+    Eq "  the pair is (2a)", boxes(1).Tags.Item(TAG_NUMBER), "(2a)"
+    Eq "  and (2b)", boxes(2).Tags.Item(TAG_NUMBER), "(2b)"
+    Ok "  the text shows the new number", Left$(boxes(0).TextFrame2.TextRange.Text, 4) = "(1)" & Chr$(9)
+    Ok "  and the pair's", Left$(boxes(2).TextFrame2.TextRange.Text, 5) = "(2b)" & Chr$(9)
+    Eq "  the next number is 3", NextExampleNumber(host), 3
+    Eq "renumbering again changes nothing and counts three", RenumberPresentation(host), 3
+Tidy:
+    On Error Resume Next
+    host.Saved = -1
+    host.Close
+    ReleaseScratch
+    Exit Sub
+Fail:
+    Fail "renumber", Err.Number & ": " & Err.Description
     Resume Tidy
 End Sub
 

@@ -40,13 +40,8 @@ Public Const TAG_TSV As String = "LINGTEX_TSV"
 Public Const TAG_NUMBER As String = "LINGTEX_NUMBER"
 Public Const TAG_GRAN As String = "LINGTEX_GRAN"
 
-' Defaults until settings live in Presentation.Tags: Word's numbers where they
-' carry over (gap 6, hang 36), a slide-sized font.
-Private Const DEF_FONT As String = "Times New Roman"
-Private Const DEF_SIZE As Double = 24
-Private Const DEF_GAP As Double = 6
-Private Const DEF_NUMBER_HANG As Double = 36
-Private Const DEF_BETWEEN As Double = 12   ' between two examples from one copy
+' Fonts, gaps, the hang and the space between examples come from the
+' presentation's settings (modPptSettings).
 
 '-----------------------------------------------------------------------------
 ' The command: the clipboard, onto the current slide, below the top margin.
@@ -70,7 +65,10 @@ Public Sub LingTeXInsertInterlinear()
     w = app.ActivePresentation.PageSetup.SlideWidth * 0.8
     x0 = app.ActivePresentation.PageSetup.SlideWidth * 0.1
     y0 = app.ActivePresentation.PageSetup.SlideHeight * 0.2
-    n = InsertExamples(text, sld, x0, y0, w)
+    gPptBusy = True
+    n = InsertExamples(text, sld, x0, y0, w, NextExampleNumber(app.ActivePresentation), _
+                       SettingGranularity(app.ActivePresentation))
+    gPptBusy = False
     If n = 0 Then MsgBox "The clipboard's text is not an interlinear example LingTeX can read.", 48, "LingTeX"
 End Sub
 
@@ -83,18 +81,24 @@ Public Function InsertExamples(ByVal text As String, ByVal sld As Object, _
         Optional ByVal firstNumber As Long = 1, _
         Optional ByVal gran As IgtGranularity = igtWordAligned) As Long
     Dim models() As IgtExample, n As Long, i As Long, y As Double, shp As Object, num As String
+    Dim pres As Object, numbered As Boolean, sub_ As String
     models = ModelsFromText(text, gran, n)
     If n = 0 Then Exit Function
+    Set pres = sld.Parent
+    numbered = SettingNumberExamples(pres)
     y = y0
     For i = 0 To n - 1
-        If n = 1 Then
-            num = "(" & firstNumber & ")"
+        sub_ = ""
+        If n > 1 Then sub_ = Chr$(97 + i)
+        If Not numbered Then
+            num = ""
         Else
-            num = "(" & firstNumber & Chr$(97 + i) & ")"
+            num = "(" & firstNumber & sub_ & ")"
         End If
         Set shp = InsertOne(models(LBound(models) + i), sld, x0, y, boxWidth, num, gran)
         If shp Is Nothing Then Exit For
-        y = y + shp.Height + DEF_BETWEEN
+        shp.Tags.Add TAG_SUB, sub_
+        y = y + shp.Height + SettingBetween(pres)
         InsertExamples = InsertExamples + 1
     Next i
     ReleaseScratch
@@ -107,29 +111,15 @@ End Function
 Public Function InsertOne(ex As IgtExample, ByVal sld As Object, ByVal x0 As Double, _
         ByVal y0 As Double, ByVal boxWidth As Double, ByVal numberText As String, _
         ByVal gran As IgtGranularity) As Object
-    Dim box As Object
+    Dim box As Object, pres As Object
     Dim fonts() As PptTierFont, widths() As Double, cw() As Double, nb() As Boolean, lines() As Long
-    Dim lay As PptLayout, t As Long, numW As Double, tf As PptTierFont
+    Dim lay As PptLayout
     If ex.TierCount = 0 Or ex.ColCount = 0 Then Exit Function
 
-    ' Fonts and layout.
-    tf.Name = DEF_FONT: tf.Size = DEF_SIZE: tf.Italic = False
-    ReDim fonts(0 To ex.TierCount - 1)
-    For t = 0 To ex.TierCount - 1
-        fonts(t) = tf
-        fonts(t).Italic = (ex.Tiers(t) = ROLE_VERNACULAR Or ex.Tiers(t) = ROLE_MORPHEMES)
-    Next t
-    lay.Gap = DEF_GAP
-    lay.LowercaseGram = True
-    lay.InitialCap = False
-    lay.FreeFont = tf
-    If Len(numberText) > 0 Then
-        numW = MeasureText(numberText, ROLE_FREE, tf) + DEF_GAP
-        If numW > DEF_NUMBER_HANG Then lay.NumberHang = numW Else lay.NumberHang = DEF_NUMBER_HANG
-    Else
-        lay.NumberHang = 0
-    End If
-    lay.ContIndent = lay.NumberHang
+    ' Fonts and layout, from the presentation's settings.
+    Set pres = sld.Parent
+    fonts = TierFontsFor(pres, ex)
+    lay = LayoutFor(pres, numberText)
 
     ' Measure and plan.
     MeasureExample ex, fonts, widths
@@ -147,6 +137,7 @@ Public Function InsertOne(ex As IgtExample, ByVal sld As Object, ByVal x0 As Dou
     box.Tags.Add TAG_TSV, ModelToTsv(ex)
     box.Tags.Add TAG_NUMBER, numberText
     box.Tags.Add TAG_GRAN, CStr(gran)
+    RecordSize box
     Set InsertOne = box
     Exit Function
 Fail:

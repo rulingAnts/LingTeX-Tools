@@ -1,4 +1,4 @@
-LingTeXDevImport  2026-09-29 09:45:18
+LingTeXDevImport  2026-09-29 09:56:03
   from  /Users/Seth/Library/Containers/com.microsoft.Powerpoint/Data/Documents/LingTeX-PowerPoint-src
   into  /Users/Seth/Documents/LingTeX-PowerPoint-Dev.pptm
   AddFromString takes LF as one line break here
@@ -13,9 +13,12 @@ LingTeXDevImport  2026-09-29 09:45:18
   ok       modPptFormat.bas  modPptFormat, 120 lines
   ok       modPptMeasure.bas  modPptMeasure, 134 lines
   ok       modPptCompose.bas  modPptCompose, 191 lines
-  ok       modPptInsert.bas  modPptInsert, 162 lines
-  ok       modPptRewrap.bas  modPptRewrap, 250 lines
-  ok       modPptTests.bas  modPptTests, 497 lines
+  ok       modPptInsert.bas  modPptInsert, 153 lines
+  ok       modPptRewrap.bas  modPptRewrap, 240 lines
+  ok       modPptSettings.bas  modPptSettings, 230 lines
+  ok       modPptCommands.bas  modPptCommands, 513 lines
+  ok       clsPptEvents.cls  clsPptEvents, 44 lines, class
+  ok       modPptTests.bas  modPptTests, 700 lines
   ok       modProbe.bas  modProbe, 784 lines
   ok       modProbeEvents.bas  modProbeEvents, 313 lines
   ok       clsProbeEvents.cls  clsProbeEvents, 73 lines, class
@@ -36,9 +39,12 @@ components now:
   modPptFormat  (120 lines, type 1)
   modPptMeasure  (134 lines, type 1)
   modPptCompose  (191 lines, type 1)
-  modPptInsert  (162 lines, type 1)
-  modPptRewrap  (250 lines, type 1)
-  modPptTests  (497 lines, type 1)
+  modPptInsert  (153 lines, type 1)
+  modPptRewrap  (240 lines, type 1)
+  modPptSettings  (230 lines, type 1)
+  modPptCommands  (513 lines, type 1)
+  clsPptEvents  (44 lines, type 2)
+  modPptTests  (700 lines, type 1)
   modProbe  (784 lines, type 1)
   modProbeEvents  (313 lines, type 1)
   clsProbeEvents  (73 lines, type 2)
@@ -47,4 +53,4 @@ components now:
   modProbeClipboard  (304 lines, type 1)
   modProbeUndo  (214 lines, type 1)
 
-ALL IMPORTED -- 20 module(s)
+ALL IMPORTED -- 23 module(s)

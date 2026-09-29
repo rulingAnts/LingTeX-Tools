@@ -1,4 +1,4 @@
-PptTestsRun  2026-09-29 09:45:22
+PptTestsRun  2026-09-29 09:56:08
 
 == 1. The shared modules
   PASS  NormalizeLineBreaks maps CR LF to LF
@@ -117,4 +117,78 @@ PptTestsRun  2026-09-29 09:45:22
   PASS    and fewer paragraphs than at 250  (17 -> 7)
   PASS    re-wrap again: nothing written
 
-ALL PASS -- 97 passed
+== 9. Settings (Presentation.Tags)
+  PASS  default font
+  PASS  default size
+  PASS  default gap
+  PASS  default number hang
+  PASS  default between
+  PASS  default: examples numbered
+  PASS  default: grammatical glosses lowercased
+  PASS  default: no initial capital
+  PASS  default: re-wrap on resize
+  PASS  default granularity: by word
+  PASS  default space replacement
+  PASS  font written and read
+  PASS  size written and read (a decimal, locale-proof)
+  PASS  gap written and read
+  PASS  hang written and read
+  PASS  between written and read
+  PASS  numbering off
+  PASS  lowercasing off
+  PASS  initial capital on
+  PASS  re-wrap on resize off
+  PASS  granularity by morpheme
+  PASS  space replacement _
+  PASS  a space replacement that is neither falls back to .
+  PASS  the tags are on the presentation
+
+== 10. Commands (on a box of a scratch presentation)
+  PASS  the box records the size it was composed at
+  PASS  its sub-letter tag is empty (a single example)
+  PASS  a character in the first line's second cell is column 1
+  PASS  a character in the first cell is column 0
+  PASS  a character on the number is -1
+  PASS  the first character of the gloss paragraph is column 0
+  PASS  a character on the free translation is -1
+  PASS  the first cell of the second wrap line follows line 1's cells
+  PASS  the fixture has a column with a morpheme break to split  (column 2)
+  PASS  SplitColumnInBox splits on every tier
+  PASS    the box reads back
+  PASS    with one more column
+  PASS    the size tag follows the composition
+  PASS  MergeColumnsInBox merges it back (1)
+  PASS    and the box reads back
+  PASS    as the model it started from
+  PASS  merging past the last column merges nothing (0)
+  PASS  RealignExample by morpheme composes
+  PASS    the box reads back
+  PASS    with more columns  (15 -> 22)
+  PASS    its granularity tag says morpheme
+  PASS  RealignExample by word composes
+  PASS    the box reads back
+  PASS    with the columns it had
+  PASS    as the model it started from
+  PASS  CheckExample answers on the read-back model  (0 warning(s))
+  PASS  WarningsText fits a message box
+
+== 11. Renumber
+  PASS  an empty presentation's next number is 1
+  PASS  after (5) the next number is 6
+  PASS  three example boxes, top to bottom
+  PASS    the top one is (5)
+  PASS    then (9a)
+  PASS    with sub-letter a
+  PASS    then (9b)
+  PASS  the next number is 10
+  PASS  NumberValueOf reads the digits
+  PASS  RenumberPresentation numbers three
+  PASS    the top one is now (1)
+  PASS    the pair is (2a)
+  PASS    and (2b)
+  PASS    the text shows the new number
+  PASS    and the pair's
+  PASS    the next number is 3
+  PASS  renumbering again changes nothing and counts three
+
+ALL PASS -- 165 passed

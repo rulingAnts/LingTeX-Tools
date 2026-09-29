@@ -31,7 +31,7 @@ import pathlib
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent
 
-STAGED = ("build/shared/*.bas", "build/shared/*.cls", "src/*.bas",
+STAGED = ("build/shared/*.bas", "build/shared/*.cls", "src/*.bas", "src/*.cls",
           "tools/*.bas", "tools/probe/*.bas")
 
 KEYWORDS = set("""

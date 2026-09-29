@@ -30,10 +30,8 @@ Option Explicit
 ' Pure ASCII apart from the quotes from modFlexParse.
 '=============================================================================
 
-Private Const DEF_FONT As String = "Times New Roman"
-Private Const DEF_SIZE As Double = 24
-Private Const DEF_GAP As Double = 6
-Private Const DEF_NUMBER_HANG As Double = 36
+' Fonts, the gap and the hang come from the presentation's settings
+' (modPptSettings), as Insert's do.
 
 '-----------------------------------------------------------------------------
 ' The command: every selected LingTeX example re-wrapped to its box's width.
@@ -71,7 +69,7 @@ End Sub
 '-----------------------------------------------------------------------------
 Public Function RewrapExample(ByVal shp As Object) As Long
     Dim app As Object, ex As IgtExample, numberText As String, gran As Long
-    Dim fonts() As PptTierFont, tf As PptTierFont, t As Long, lay As PptLayout, numW As Double
+    Dim fonts() As PptTierFont, lay As PptLayout, pres As Object
     Dim widths() As Double, cw() As Double, nb() As Boolean, lines() As Long
     Dim scratch As Object, sbox As Object, w As Double
     Set app = Application
@@ -81,18 +79,9 @@ Public Function RewrapExample(ByVal shp As Object) As Long
     End If
     w = shp.Width - shp.TextFrame2.MarginLeft - shp.TextFrame2.MarginRight
 
-    tf.Name = DEF_FONT: tf.Size = DEF_SIZE: tf.Italic = False
-    ReDim fonts(0 To ex.TierCount - 1)
-    For t = 0 To ex.TierCount - 1
-        fonts(t) = tf
-        fonts(t).Italic = (ex.Tiers(t) = ROLE_VERNACULAR Or ex.Tiers(t) = ROLE_MORPHEMES)
-    Next t
-    lay.Gap = DEF_GAP: lay.LowercaseGram = True: lay.InitialCap = False: lay.FreeFont = tf
-    If Len(numberText) > 0 Then
-        numW = MeasureText(numberText, ROLE_FREE, tf) + DEF_GAP
-        If numW > DEF_NUMBER_HANG Then lay.NumberHang = numW Else lay.NumberHang = DEF_NUMBER_HANG
-    End If
-    lay.ContIndent = lay.NumberHang
+    Set pres = PresentationOf(shp)
+    fonts = TierFontsFor(pres, ex)
+    lay = LayoutFor(pres, numberText)
 
     MeasureExample ex, fonts, widths
     cw = ColumnWidths(ex, widths, lay.Gap)
@@ -115,6 +104,7 @@ Public Function RewrapExample(ByVal shp As Object) As Long
     Set scratch = Nothing
     ComposeExample shp, ex, fonts, cw, lines, numberText, lay
     shp.Tags.Add TAG_TSV, ModelToTsv(ex)
+    RecordSize shp
     RewrapExample = 1
     Exit Function
 Fail:
