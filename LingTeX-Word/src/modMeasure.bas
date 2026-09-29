@@ -352,6 +352,14 @@ Public Function MeasureTexts(texts() As String, tf As TierFont, _
     Next i
 
     If nMiss > 0 Then
+        ' A write to the measuring document while a custom undo record is
+        ' recording ends the record: every command measures before its record
+        ' opens, so this note says when one did not (Windows beta.8, 2026-09-29).
+        If CustomUndoRecordOpen() Then
+            If InStr(gUndoDiag, "measured inside") = 0 Then
+                gUndoDiag = gUndoDiag & "; " & CStr(nMiss) & " text(s) measured inside the record, which ends it"
+            End If
+        End If
         ReDim Preserve missText(0 To nMiss - 1)
         fresh = MeasureByPosition(missText, tf, role, srcDoc)
         For i = 0 To nMiss - 1
@@ -598,6 +606,12 @@ Private Function EnsureScratch() As Document
     Set mScratch = Nothing
     Err.Clear
     On Error GoTo 0
+
+    ' A write to this document while a custom undo record is recording ends
+    ' the record (Word's UndoRecord documentation; seen on Windows beta.8):
+    ' every command measures before its record opens, so this is the note
+    ' that says when one did not.
+    If CustomUndoRecordOpen() Then gUndoDiag = gUndoDiag & "; the measuring document was CREATED inside the record"
 
     On Error Resume Next
     Set doc = Documents.Add(Visible:=False)

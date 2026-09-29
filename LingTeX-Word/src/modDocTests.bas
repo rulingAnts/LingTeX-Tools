@@ -92,6 +92,7 @@ Public Sub RunDocTests()
     RunSection "rows"
     RunSection "fromtext"
     RunSection "several"
+    RunSection "fresh"
     RunSection "msgbox"
     RunSection "measure"
     RunSection "agreement"
@@ -138,6 +139,7 @@ Private Sub RunSection(ByVal which As String)
         Case "rows":         TestRowGeometry
         Case "fromtext":     TestTextToInterlinear
         Case "several":      TestInsertSeveralExamples
+        Case "fresh":        TestInsertIntoFreshDocument
         Case "msgbox":       TestClipForMsgBox
         Case "measure":      TestMeasure
         Case "agreement":    TestRenderMeasureAgreement
@@ -1309,6 +1311,40 @@ Private Sub TestClipForMsgBox()
     Ok "  at a line break", (InStr(out, "column" & vbCr & "... ") > 0)
     Ok "  saying how many lines went", (out Like "*more line(s).")
     If Not (out Like "*more line(s).") Then Emit "         tail: " & Right$(out, 60)
+End Sub
+
+'-----------------------------------------------------------------------------
+' A first insert into a FRESH document: the styles are created inside the
+' command, which clears the measuring cache; the record must still be one
+' and open to the end (the several-examples test prepares the styles first,
+' so it never saw this road; Word for Windows did, 2026-09-29).
+'-----------------------------------------------------------------------------
+Private Sub TestInsertIntoFreshDocument()
+    Dim doc As Document, docsBefore As Long
+    Dim savedQuiet As Boolean, savedText As String
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "fresh: could create a blank document", False
+        Exit Sub
+    End If
+    ClearCache
+    savedQuiet = gQuiet
+    savedText = gQuietText
+    gQuiet = True
+    doc.Content.Text = TwoFlexExamples()
+    doc.Content.Select
+    ReleaseScratch
+    docsBefore = Documents.Count
+    gLastMessage = ""
+    RunCommandByName "LingTeXInsertInterlinear"
+    Ok "a first insert into a fresh document draws two tables", (doc.Tables.Count = 2)
+    Ok "  its styles were made on the way", StyleExistsOfType(doc, STYLE_TABLE, wdStyleTypeTable)
+    Ok "  and the undo record opened and lasted the whole command", (Not gUndoRecordBroke)
+    Emit "         " & gUndoDiag
+    CheckStateIsClean "LingTeXInsertInterlinear (fresh)", docsBefore
+    gQuiet = savedQuiet
+    gQuietText = savedText
+    CloseNoSave doc
 End Sub
 
 Private Sub TestInsertSeveralExamples()

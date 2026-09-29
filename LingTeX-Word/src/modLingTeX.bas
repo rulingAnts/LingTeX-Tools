@@ -80,7 +80,11 @@ Private Const INDENT_STEP As Double = 36
 ' The first run: what the add-in does for itself the first time Word loads
 ' it from STARTUP, recorded in the Normal template so it happens once. Bump
 ' to run it again on every machine at the next start.
-Private Const SETUP_VERSION As String = "6"      ' 6: the clipboard normaliser (CR CR and LF CR copies, Shift+Return rows); 5: beta.7, the 2026-09-28 rebuild from the scrubbed sources by the fixed importer; 4: beta.6, a real template with no reference to Normal
+' The release this template is: shown by the first-run message and by
+' LingTeXAbout, and checked by check-dotm.sh against the word-v* tag of the
+' commit it is built from (RELEASING.md: bump it before the template build).
+Public Const LINGTEX_VERSION As String = "0.1.0-beta.9"
+Private Const SETUP_VERSION As String = "7"      ' 7: beta.9, the undo record kept whole in a fresh document, the version in the first-run message; 6: the clipboard normaliser (CR CR and LF CR copies, Shift+Return rows); 5: beta.7, the 2026-09-28 rebuild from the scrubbed sources by the fixed importer; 4: beta.6, a real template with no reference to Normal
 Private Const SETUP_VAR As String = "LingTeX_Setup"
 
 '-----------------------------------------------------------------------------
@@ -108,7 +112,8 @@ Public gQuiet As Boolean            ' suppress dialogs (tests set this)
 Public gQuietAnswer As Boolean      ' what Confirm returns while quiet
 Public gQuietText As String         ' what Ask returns while quiet
 Public gLastMessage As String       ' the last thing reported, dialog or not
-Public gUndoRecordBroke As Boolean  ' a custom undo record closed early inside a command (tests assert False)
+Public gUndoRecordBroke As Boolean  ' a custom undo record closed early inside a command, or never opened (tests assert False)
+Public gUndoDiag As String          ' what the last command's undo record did (LingTeXUndoDiagnostics shows it)
 
 Public Sub Report(ByVal msg As String, ByVal kind As Long)
     gLastMessage = msg
@@ -233,7 +238,7 @@ Public Sub LingTeXFirstRun()
     Err.Clear
     On Error GoTo 0
 
-    Report "LingTeX-Word is installed." & vbCr & vbCr & _
+    Report "LingTeX-Word " & LINGTEX_VERSION & " is installed." & vbCr & vbCr & _
            "The Interlinear tab is on the ribbon of every document: insert an " & _
            "interlinear example from FLEx or from text, re-wrap, split and " & _
            "merge columns, check the glossing. Examples are numbered; the " & _
@@ -404,6 +409,13 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
     On Error GoTo Fail
     gUndoRecordBroke = False
     gBusy = True
+    ' The styles FIRST: creating them clears the measuring cache, and in a
+    ' document that had never held an example that happened inside
+    ' RenderExample, after the measuring below, so the second example was
+    ' measured again inside the open record, which ended it: every write of
+    ' the draw listed on its own (Word for Windows beta.8, 2026-09-29; the
+    ' fresh-document doc test reproduces it).
+    EnsureStyles doc
     ' Measure every example BEFORE the undo record opens (see BeginUndo): a
     ' write to the hidden measuring document closes a custom record, and the
     ' second example's measuring did exactly that, so every later drawing step
@@ -426,9 +438,13 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
         End If
         If tbl Is Nothing Then Exit For
         drawn = drawn + 1
-        ' The record must still be the one opened by the first draw.
+        ' The record must be open after the first draw, and still the one it
+        ' opened after every later one.  A record that never opened counts
+        ' too (Windows, 2026-09-29): a command with no record lists every
+        ' write on its own.
         If i = 0 Then
             haveRecord = RecordIsOpen()
+            If Not haveRecord Then gUndoRecordBroke = True
         ElseIf haveRecord And Not RecordIsOpen() Then
             gUndoRecordBroke = True
         End If
@@ -1081,6 +1097,7 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
     ' Measure everything BEFORE the undo record opens (see BeginUndo): with the
     ' cache warm, the re-wraps below touch the scratch document only for text
     ' the cache has never seen, so the record stays in one piece.
+    EnsureStyles doc                       ' before measuring: see DrawParsedExamples
     For i = 1 To tables.Count
         WarmMeasureCache tables(i)
     Next i
@@ -1580,16 +1597,63 @@ End Sub
 ' Open the record BeginUndo named, if it has not been opened yet. Called by the
 ' renderer immediately before its first change to the document.
 Public Sub StartPendingUndo()
-    Dim ur As Object
+    Dim ur As Object, wasOpen As Boolean, isOpen As Boolean
     If mPendingUndoLabel = "" Then Exit Sub
+    ' Every step is written down: on Word for Windows beta.8 listed every write
+    ' on its own (Seth's screenshot, 2026-09-29), so the record either never
+    ' opened or closed at once, and this is how to tell which from a report.
+    gUndoDiag = "StartPendingUndo " & Chr$(34) & mPendingUndoLabel & Chr$(34) & ": "
     On Error Resume Next
     Set ur = Application.UndoRecord
-    If Not ur Is Nothing Then
-        If Not ur.IsRecordingCustomRecord Then ur.StartCustomRecord mPendingUndoLabel
+    If ur Is Nothing Then
+        gUndoDiag = gUndoDiag & "Application.UndoRecord is Nothing (" & CStr(Err.Number) & ": " & Err.Description & ")"
+    Else
+        wasOpen = ur.IsRecordingCustomRecord
+        If Err.Number <> 0 Then gUndoDiag = gUndoDiag & "IsRecordingCustomRecord failed (" & CStr(Err.Number) & "); "
+        Err.Clear
+        If wasOpen Then
+            gUndoDiag = gUndoDiag & "a custom record was already open, so none was started"
+        Else
+            ur.StartCustomRecord mPendingUndoLabel
+            If Err.Number <> 0 Then
+                gUndoDiag = gUndoDiag & "StartCustomRecord failed (" & CStr(Err.Number) & ": " & Err.Description & ")"
+            Else
+                Err.Clear
+                isOpen = ur.IsRecordingCustomRecord
+                gUndoDiag = gUndoDiag & IIf(isOpen, "opened", "StartCustomRecord returned but no record is recording")
+            End If
+        End If
     End If
     Err.Clear
     On Error GoTo 0
     mPendingUndoLabel = ""
+End Sub
+
+' Is a custom undo record recording right now?  modMeasure asks before it
+' writes to the hidden measuring document, which would end the record.
+Public Function CustomUndoRecordOpen() As Boolean
+    Dim ur As Object
+    On Error Resume Next
+    Set ur = Application.UndoRecord
+    If Not ur Is Nothing Then CustomUndoRecordOpen = ur.IsRecordingCustomRecord
+    Err.Clear
+End Function
+
+' Which release this is: for a bug report, and to check an upgrade took.
+Public Sub LingTeXAbout()
+    Report "LingTeX-Word " & LINGTEX_VERSION & vbCr & vbCr & _
+           "Setup version " & SETUP_VERSION & "; the engine is " & _
+           ThisDocument.FullName, vbInformation
+End Sub
+
+' What the last command's undo record did, for a bug report: run it from the
+' macro list right after an Insert whose undo list shows many steps.
+Public Sub LingTeXUndoDiagnostics()
+    Dim s As String
+    s = gUndoDiag
+    If s = "" Then s = "No command has opened an undo record since Word started."
+    If gUndoRecordBroke Then s = s & vbCr & vbCr & "The record did not last the whole command."
+    Report s, vbInformation
 End Sub
 
 ' Is a custom record recording right now?  False as well on a build with no

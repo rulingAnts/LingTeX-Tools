@@ -295,6 +295,16 @@ Open documents at start: 1
   PASS       and the gloss likewise
   PASS     Merge Columns writes the owner back
 
+-- fresh -----------------------------------------------------
+  PASS   a first insert into a fresh document draws two tables
+  PASS     its styles were made on the way
+  PASS     and the undo record opened and lasted the whole command
+         StartPendingUndo "Insert interlinear": opened
+  PASS   LingTeXInsertInterlinear (fresh) leaves gBusy clear
+  PASS   LingTeXInsertInterlinear (fresh) leaves ScreenUpdating on
+  PASS   LingTeXInsertInterlinear (fresh) leaks no document
+  PASS   LingTeXInsertInterlinear (fresh) leaves no undo record open
+
 -- msgbox ----------------------------------------------------
   PASS   a short message is untouched
   PASS   a long message is cut inside the message-box limit
@@ -604,5 +614,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 527 passed
+ALL PASS -- 534 passed
 

@@ -8,6 +8,12 @@ inside a `.dotm` is a binary only Word writes, and no GitHub runner has Word.
 
 With the dev rig loaded and the runner green (`sh tools/run-in-word.sh`):
 
+0. **Set the version.** `LINGTEX_VERSION` in `src/modLingTeX.bas` is the release
+   being made (`0.1.0-beta.9` for the tag `word-v0.1.0-beta.9`); the first-run
+   message and `LingTeXAbout` show it, and `check-dotm.sh` fails a tag that does
+   not match it, or a version that did not move since the previous tag. Bump
+   `SETUP_VERSION` too (below). Both are compiled in, so both come before the
+   template build.
 1. **Take the development shortcuts out of the engine**, or they ship inside
    the template and override the same keys on every user's machine: macro list
    → `LingTeXRemoveShortcuts`. (Users get their own set on first run, which
@@ -43,7 +49,12 @@ instead of the dev template — remove it from the engine and save again.
 
 ## 2. Publish
 
-Push a tag from the commit that holds the template:
+Push a tag from the commit that holds the template. The tag must be
+`word-v<LINGTEX_VERSION>` of that commit: the local `.git/hooks/pre-push`
+refuses a `word-v*` tag whose commit's `src/modLingTeX.bas` says another
+version (recreate that check when recreating the hook on a new clone; it
+sits beside the main-push and workflow guards), and `check-dotm.sh` in the
+release workflow fails the same mismatch before anything is published.
 
 ```bash
 git tag word-v0.1.0-beta.1 && git push origin word-v0.1.0-beta.1

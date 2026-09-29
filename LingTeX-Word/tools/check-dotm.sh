@@ -383,6 +383,32 @@ else
     fi
 fi
 
+#-- LINGTEX_VERSION: the release the template says it is ------------------------
+# Shown by the first-run message and LingTeXAbout (Seth, 2026-09-29). It must
+# name the release being made: when a word-v* tag is on HEAD, or CI runs for
+# one, the tag is word-v<LINGTEX_VERSION>; and it must have moved since the
+# previous tag, or an upgrade would announce the old version.
+ver_of() { tr -d '\r' | sed -n 's/.*LINGTEX_VERSION As String = "\([^"]*\)".*/\1/p' | head -1; }
+ver=$(ver_of < "$src/modLingTeX.bas")
+if [ -z "$ver" ]; then
+    fail "no LINGTEX_VERSION found in src/modLingTeX.bas"
+else
+    this=${GITHUB_REF_NAME:-$(git -C "$root" tag --points-at HEAD --list 'word-v*' 2>/dev/null | head -1)}
+    if [ -n "$this" ] && [ "$this" != "word-v$ver" ]; then
+        fail "LINGTEX_VERSION is $ver but the release is $this -- set it to ${this#word-v} and rebuild the template"
+    elif [ -n "$this" ]; then
+        pass "LINGTEX_VERSION $ver matches the release $this"
+    else
+        pass "LINGTEX_VERSION is $ver (no release tag on HEAD to compare)"
+    fi
+    if [ -n "$prev" ]; then
+        wasver=$(git -C "$root" show "$prev:./src/modLingTeX.bas" 2>/dev/null | ver_of)
+        if [ -n "$wasver" ] && [ "$wasver" = "$ver" ]; then
+            fail "LINGTEX_VERSION is still $ver, as in $prev: bump it before the template build"
+        fi
+    fi
+fi
+
 echo ""
 if [ "$fails" -eq 0 ]; then
     echo "ALL PASS"
