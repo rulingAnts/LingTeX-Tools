@@ -552,12 +552,25 @@ Private Sub EnsureTableStyle(doc As Document)
     On Error GoTo 0
 End Sub
 
-' Are the LingTeX styles really in this document now? The table style, the
-' number-cell style and one tier style: an Undo removes them all together.
+' Are ALL the LingTeX styles really in this document now? Every one
+' EnsureStyles makes: a document made by beta.2 to beta.7 has the older
+' styles and the mark but not the boundary styles, and probing only a few
+' let it pass, so they were never made (review of beta.10). A name taken by
+' a style of the wrong kind still counts as there: EnsureStyles cannot fix
+' it and must not try again on every call.
 Private Function StylesStillThere(doc As Document) As Boolean
+    Dim roles As Variant, i As Long
     If Not StyleExistsOfType(doc, STYLE_TABLE, wdStyleTypeTable) Then Exit Function
     If Not StyleExists(doc, STYLE_EXAMPLE) Then Exit Function
-    StylesStillThere = StyleExists(doc, ParaStyleName(ROLE_VERNACULAR))
+    If Not StyleExists(doc, STYLE_NUMBER) Then Exit Function
+    If Not StyleExists(doc, STYLE_GRAM) Then Exit Function
+    If Not StyleExists(doc, STYLE_LEFT_BD) Then Exit Function
+    If Not StyleExists(doc, STYLE_SHARED_BD) Then Exit Function
+    roles = Array(ROLE_VERNACULAR, ROLE_MORPHEMES, ROLE_GLOSS, ROLE_WORDGLOSS, ROLE_CATEGORY, ROLE_FREE)
+    For i = LBound(roles) To UBound(roles)
+        If Not StyleExists(doc, ParaStyleName(CStr(roles(i)))) Then Exit Function
+    Next i
+    StylesStillThere = True
 End Function
 
 Private Function StylesAlreadyMade(doc As Document) As Boolean
@@ -570,6 +583,7 @@ Private Function StylesAlreadyMade(doc As Document) As Boolean
 End Function
 
 Private Sub MarkStylesMade(doc As Document)
+    If StylesAlreadyMade(doc) Then Exit Sub      ' written only when it changes
     On Error Resume Next
     doc.Variables(STYLES_MADE_VAR).Value = STYLES_VERSION
     If Err.Number <> 0 Then

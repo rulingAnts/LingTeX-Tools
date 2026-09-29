@@ -216,6 +216,14 @@ Public Sub SelectionMoved(ByVal Sel As Selection)
             ' its layout would change (a margin moved), so that clicking
             ' through examples adds no Undo entries (Seth, 2026-09-29).
             edited = (leaving.Range.Text <> mLastTableText)
+            ' A LingTeX command that redrew this example while the cursor
+            ' was in it (Split, Merge, Fix, Re-wrap This, Indent) is not an
+            ' edit: the text is what that command drew. Taken for one, the
+            ' leave redrew it again and added an invisible Undo entry on top
+            ' of the command's own (review of beta.10).
+            If edited And leaving.Range.Start = gLastDrawnStart Then
+                If leaving.Range.Text = gLastDrawnText Then edited = False
+            End If
             Set done = RewrapTable(leaving, , Not edited)
             EndUndo
             On Error Resume Next

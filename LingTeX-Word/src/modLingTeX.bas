@@ -83,8 +83,8 @@ Private Const INDENT_STEP As Double = 36
 ' The release this template is: shown by the first-run message and by
 ' LingTeXAbout, and checked by check-dotm.sh against the word-v* tag of the
 ' commit it is built from (RELEASING.md: bump it before the template build).
-Public Const LINGTEX_VERSION As String = "0.1.0-beta.9"
-Private Const SETUP_VERSION As String = "7"      ' 7: beta.9, the undo record kept whole in a fresh document, the version in the first-run message; 6: the clipboard normaliser (CR CR and LF CR copies, Shift+Return rows); 5: beta.7, the 2026-09-28 rebuild from the scrubbed sources by the fixed importer; 4: beta.6, a real template with no reference to Normal
+Public Const LINGTEX_VERSION As String = "0.1.0-beta.10"
+Private Const SETUP_VERSION As String = "8"      ' 8: beta.10, one Undo entry per insert, styles inside it; 7: beta.9, the undo record kept whole in a fresh document, the version in the first-run message; 6: the clipboard normaliser (CR CR and LF CR copies, Shift+Return rows); 5: beta.7, the 2026-09-28 rebuild from the scrubbed sources by the fixed importer; 4: beta.6, a real template with no reference to Normal
 Private Const SETUP_VAR As String = "LingTeX_Setup"
 
 '-----------------------------------------------------------------------------
@@ -423,6 +423,14 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
     For i = 0 To n - 1
         FixCellSpaces models(i), SettingSpaceReplacement(doc)
         MeasureExample models(i), doc, widths
+        ' A failed measurement stops here, before anything is written.
+        If gMeasureFailed Then
+            gBusy = False
+            ReleaseScratch
+            Report "The examples could not be drawn: the text could not be measured (" & _
+                   gMeasureError & ").", vbExclamation
+            Exit Sub
+        End If
     Next i
     BeginUndo label
     ' ONE Undo entry per user action (Seth, 2026-09-29): the record opens NOW,
@@ -499,8 +507,10 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
     ' measuring document and the record stays whole; last table first, so a
     ' redraw never moves one still to come.
     If Not gNoInsertRewrap Then
+        ' From the models just drawn, not a read-back of the page: the same
+        ' text that was measured, so nothing is measured inside the record.
         For k = drawn - 1 To 0 Step -1
-            RewrapTable drawnTbls(k)
+            RedrawExampleAt drawnTbls(k), models(k)
         Next k
         If haveRecord And Not RecordIsOpen() Then gUndoRecordBroke = True
     End If
@@ -555,6 +565,12 @@ Private Sub DrawParsedExample(ByRef ex As IgtExample, target As Range, doc As Do
     ' Measured before the record opens, then the record, then the styles
     ' inside it: see DrawParsedExamples.
     MeasureExample ex, doc, widths
+    If gMeasureFailed Then
+        ReleaseScratch
+        Report "The example could not be drawn: the text could not be measured (" & _
+               gMeasureError & ").", vbExclamation
+        Exit Sub
+    End If
 
     gBusy = True
     BeginUndo label
@@ -567,7 +583,7 @@ Private Sub DrawParsedExample(ByRef ex As IgtExample, target As Range, doc As Do
     Set tbl = RenderExample(ex, target)
     ' The closing re-wrap, inside the same record: see DrawParsedExamples.
     If Not tbl Is Nothing Then
-        If Not gNoInsertRewrap Then Set tbl = RewrapTable(tbl)
+        If Not gNoInsertRewrap Then Set tbl = RedrawExampleAt(tbl, ex)
     End If
     If Not RecordIsOpen() Then gUndoRecordBroke = True
 
@@ -1139,7 +1155,8 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean, _
     ' Measure everything BEFORE the undo record opens (see BeginUndo): with the
     ' cache warm, the re-wraps below touch the scratch document only for text
     ' the cache has never seen, so the record stays in one piece.
-    EnsureStyles doc                       ' before measuring: see DrawParsedExamples
+    ' No EnsureStyles here: each redraw makes any missing style inside the
+    ' record (RedrawExampleAt), and a re-wrap that skips makes none.
     For i = 1 To tables.Count
         WarmMeasureCache tables(i)
     Next i
@@ -1859,11 +1876,13 @@ Public Sub LingTeXToggleGramGlossInitialCap()
     v = Not SettingGramGlossInitialCap(doc)
     SetSettingGramGlossInitialCap doc, v
     RefreshRibbon
+    ' Applied at once: an automatic re-wrap only redraws what would change
+    ' its layout, and First Capital may not move a column (review).
+    RewrapDocument doc, False
     Report "Grammatical glosses in small capitals now " & _
            IIf(v, "begin with a full-size capital (Erg, 3Sg)", _
                   "are uniform small capitals throughout (erg, 3sg), as the " & _
-                  "Leipzig Glossing Rules print them") & "." & vbCr & vbCr & _
-           "Re-wrap the examples to apply it.", vbInformation
+                  "Leipzig Glossing Rules print them") & ", in every example.", vbInformation
 End Sub
 
 ' The LingTeX paragraph styles follow the document's Normal style -- size
@@ -2506,6 +2525,7 @@ Public Sub RbnToggle(control As Variant, pressed As Boolean)
             SetSettingRewrapOnSelectionChange doc, pressed
         Case "LingTeXInitialCapToggle"
             SetSettingGramGlossInitialCap doc, pressed
+            RewrapDocument doc, False          ' applied at once (see LingTeXToggleGramGlossInitialCap)
         Case "LingTeXNumbersToggle"
             SetSettingNumberExamples doc, pressed
     End Select

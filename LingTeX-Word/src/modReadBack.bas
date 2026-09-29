@@ -208,24 +208,34 @@ End Function
 ' Falls back to the whole table, i.e. a single unwrapped line.
 '-----------------------------------------------------------------------------
 Private Function DetectGroupSize(roles() As String, ByVal nRows As Long) As Long
-    Dim i As Long, first As String
+    Dim p As Long, i As Long, repeats As Boolean
 
-    first = roles(1)
-    If first = "" Then
+    If roles(1) = "" Then
         DetectGroupSize = nRows
         Exit Function
     End If
 
-    For i = 2 To nRows
-        If roles(i) = first Then
-            ' Only believe it if it divides the table evenly; otherwise two tiers
-            ' genuinely share a role and this is not a group boundary.
-            If nRows Mod (i - 1) = 0 Then
-                DetectGroupSize = i - 1
+    ' The rows of one wrap line repeat, in order, through the whole table: the
+    ' group is the SHORTEST run of rows whose roles repeat exactly to the end.
+    ' The first role coming round again is not enough: a line copied in two
+    ' writing systems puts two rows of one role first (Word, Word; Morphemes,
+    ' Morphemes), which read as wrap lines of one row each and scrambled the
+    ' example on its next re-wrap (review of beta.10, 2026-09-29).
+    For p = 1 To nRows
+        If nRows Mod p = 0 Then
+            repeats = True
+            For i = p + 1 To nRows
+                If roles(i) <> roles(((i - 1) Mod p) + 1) Then
+                    repeats = False
+                    Exit For
+                End If
+            Next i
+            If repeats Then
+                DetectGroupSize = p
                 Exit Function
             End If
         End If
-    Next i
+    Next p
 
     DetectGroupSize = nRows
 End Function

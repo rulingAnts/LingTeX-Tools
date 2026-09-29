@@ -18,6 +18,10 @@ Public Const INFO_Y_PAGE As Long = 6
 ' Why the last render or re-wrap gave up, for callers that report to the user.
 ' Empty after a successful one.
 Public gRenderError As String
+' The example the last drawing left on the page: where it starts and its text.
+' The leave re-wrap tells a LingTeX command's redraw from a user's edit by it.
+Public gLastDrawnStart As Long
+Public gLastDrawnText As String
 
 '=============================================================================
 ' modRender  --  LingTeX-Word
@@ -97,8 +101,15 @@ Public Function RenderExample(ex As IgtExample, target As Range, _
     End If
     level = SettingNumberLevel(doc)
     numW = 0
+    ' The styles, whether numbered or not (PlanExample no longer makes them:
+    ' a re-wrap makes them inside its undo record). An insert has opened its
+    ' record already, so they are made inside it.
+    EnsureStyles doc
+    If gStyleError <> "" Then
+        gRenderError = gStyleError
+        Exit Function
+    End If
     If SettingNumberExamples(doc) Then
-        EnsureStyles doc
         numW = SettingNumberHang(doc)
         If subIdx > 0 Then subW = SubNumberWidth(doc)
     End If
@@ -154,14 +165,11 @@ Private Function PlanExample(ex As IgtExample, target As Range, doc As Document,
         Exit Function
     End If
 
-    EnsureStyles doc
-    If gStyleError <> "" Then
-        ' A style name collided with a style of the wrong kind. Drawing now would
-        ' produce rows with no role on them, which read back as one giant wrap
-        ' line -- a confusing result from a nameable cause.
-        why = gStyleError
-        Exit Function
-    End If
+    ' No EnsureStyles here: planning writes nothing to the document. A missing
+    ' style is measured with the font it will be made with (ResolveTierFont),
+    ' and the caller makes the styles inside its undo record -- a re-wrap made
+    ' them here, before its record opened, and a save or a click that then
+    ' redrew nothing still left Style entries in the Undo list (review).
 
     nInter = InterlinearTierList(ex, interTiers)
     If nInter = 0 Then
@@ -267,6 +275,9 @@ Public Sub WarmMeasureCache(tbl As Table)
     On Error Resume Next
     ex = ReadExampleFromTable(tbl)
     If ex.TierCount > 0 And ex.ColCount > 0 Then
+        ' The text the re-wrap will draw: spaces already replaced, or the
+        ' re-wrap measures the fixed text inside its record (review).
+        FixCellSpaces ex, SettingSpaceReplacement(tbl.Range.Document)
         MeasureExample ex, tbl.Range.Document, widths
     End If
     Err.Clear
@@ -325,6 +336,11 @@ Private Function DrawExample(ex As IgtExample, target As Range, doc As Document,
     ' formatting can leak it into the first one when the table is added there.
     StripStrayNumber tbl, 1 + nNum
 
+    On Error Resume Next
+    gLastDrawnStart = tbl.Range.Start
+    gLastDrawnText = tbl.Range.Text
+    Err.Clear
+    On Error GoTo 0
     Set DrawExample = tbl
 End Function
 
@@ -744,6 +760,13 @@ Public Function RedrawExampleAt(tbl As Table, ex As IgtExample, _
     startPos = tbl.Range.Start
     If Not legacy Is Nothing Then startPos = legacy.Range.Start
     StartPendingUndo                       ' the first change to the document
+    ' Any style missing is made now, inside the record; a name collision
+    ' stops here, with the table untouched.
+    EnsureStyles doc
+    If gStyleError <> "" Then
+        gRenderError = gStyleError
+        Exit Function
+    End If
     DeleteTableAndFreeLines tbl
     If Not legacy Is Nothing Then
         On Error Resume Next
@@ -790,6 +813,7 @@ Private Function TableMatchesPlan(tbl As Table, doc As Document, ByVal nInter As
     Dim padL As Double, contIndent As Double, lineGap As Double, tierGap As Double
     Dim w As Double, want As Double
     Dim fmt As ParagraphFormat
+    Dim p As Paragraph
 
     On Error GoTo Differs
     If numW > 0 Then nNum = 1
@@ -846,6 +870,14 @@ Private Function TableMatchesPlan(tbl As Table, doc As Document, ByVal nInter As
             If Abs(fmt.SpaceAfter - want) > TOL Then Exit Function
         Next i
     Next g
+    ' The translation follows the example: an example moved by its edge on
+    ' the ruler leaves its translation behind until a redraw (review).
+    If hasFree Then
+        Set p = ParagraphAfterTable(tbl)
+        If Not p Is Nothing Then
+            If Abs(p.LeftIndent - (indent + numW + subW)) > TOL Then Exit Function
+        End If
+    End If
     TableMatchesPlan = True
 Differs:
 End Function

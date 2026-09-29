@@ -315,6 +315,19 @@ Open documents at start: 1
   PASS     with nothing written before it opened
          StartPendingUndo "Insert interlinear": opened
 
+-- reviewfixes -----------------------------------------------
+  PASS   two rows of one role: drawn on more than one wrap line
+         15 rows for 5 tiers
+  PASS     reads back with every tier
+  PASS     and every cell as drawn
+  PASS     and a re-wrap keeps every cell
+  PASS   older document: the boundary styles are gone
+  PASS     the insert makes them again
+  PASS     inside its record, open to the end
+         StartPendingUndo "Insert interlinear": opened
+  PASS   the measure cache tells ERG from erg
+         ERG 20.1000003814697, erg 15.8999996185303
+
 -- roundtripundo ---------------------------------------------
   PASS   round trip: the Undo list starts empty
   PASS   the insert draws two tables
@@ -648,9 +661,11 @@ Open documents at start: 1
   PASS   leaving an example with re-wrap on leave redraws it
   PASS   and the cursor is still on the paragraph after the translation
          rows 2 before, 6 after; cursor 1 from the end both times
+  PASS   leaving after a command: the split took
+  PASS     and leaving the example afterwards writes nothing (no extra Undo entry)
   PASS   Detach does not raise
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 565 passed
+ALL PASS -- 575 passed
 

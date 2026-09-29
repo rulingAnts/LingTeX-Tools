@@ -93,6 +93,7 @@ Public Sub RunDocTests()
     RunSection "fromtext"
     RunSection "several"
     RunSection "fresh"
+    RunSection "reviewfixes"
     RunSection "roundtripundo"
     RunSection "insertspacing"
     RunSection "msgbox"
@@ -142,6 +143,7 @@ Private Sub RunSection(ByVal which As String)
         Case "fromtext":     TestTextToInterlinear
         Case "several":      TestInsertSeveralExamples
         Case "fresh":        TestInsertIntoFreshDocument
+        Case "reviewfixes":  TestReviewFixes
         Case "roundtripundo": TestUndoRoundTrip
         Case "insertspacing": TestInsertSpacingMatchesRewrap
         Case "msgbox":       TestClipForMsgBox
@@ -1599,6 +1601,126 @@ Private Function UndoDepth(doc As Document) As Long
     If n > 0 Then doc.Redo n
     Err.Clear
     UndoDepth = n
+End Function
+
+'-----------------------------------------------------------------------------
+' From the review of beta.10 (2026-09-29): an example whose first two rows
+' share a role reads back whole, across several wrap lines, and survives a
+' re-wrap; a document missing some LingTeX styles (made by an older version)
+' gets them inside the insert's record; the measure cache tells case apart.
+'-----------------------------------------------------------------------------
+Private Sub TestReviewFixes()
+    Dim doc As Document, model As IgtExample, back As IgtExample, tbl As Table
+    Dim savedQuiet As Boolean, savedText As String
+    Dim tf As TierFont, a() As String, w1() As Double, w2() As Double
+
+    savedQuiet = gQuiet
+    savedText = gQuietText
+    gQuiet = True
+
+    '-- two Word rows first, wrapped onto several lines --------------------
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "review: could create a blank document", False
+        GoTo Tidy
+    End If
+    EnsureStyles doc, True
+    SetPageGeometry doc, 260, 792, 72
+    model = ModelFromText(TwoWordLinesExample(), igtWordAligned)
+    Set tbl = RenderExample(model, doc.Content)
+    If tbl Is Nothing Then
+        Ok "two rows of one role: the example drew", False
+        Emit "         " & gRenderError
+        GoTo Next1
+    End If
+    back = ReadExampleFromTable(tbl)
+    Ok "two rows of one role: drawn on more than one wrap line", _
+        (tbl.Rows.Count > InterlinearCount(model))
+    Emit "         " & CStr(tbl.Rows.Count) & " rows for " & CStr(InterlinearCount(model)) & " tiers"
+    Eq "  reads back with every tier", InterlinearCount(back), InterlinearCount(model)
+    Eq "  and every cell as drawn", RowsOnly(back), RowsOnly(model)
+    Set tbl = RewrapTable(tbl)
+    If Not tbl Is Nothing Then
+        back = ReadExampleFromTable(tbl)
+        Eq "  and a re-wrap keeps every cell", RowsOnly(back), RowsOnly(model)
+    End If
+Next1:
+    CloseNoSave doc
+
+    '-- an older document: some styles missing, the mark present --------------
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then GoTo Tidy
+    EnsureStyles doc, True
+    On Error Resume Next
+    doc.Styles(STYLE_LEFT_BD).Delete
+    doc.Styles(STYLE_SHARED_BD).Delete
+    Err.Clear
+    On Error GoTo 0
+    Ok "older document: the boundary styles are gone", Not StyleExists(doc, STYLE_LEFT_BD)
+    ClearCache
+    doc.Content.Text = TwoFlexExamples()
+    doc.Content.Select
+    ReleaseScratch
+    RunCommandByName "LingTeXInsertInterlinear"
+    Ok "  the insert makes them again", StyleExists(doc, STYLE_LEFT_BD) And StyleExists(doc, STYLE_SHARED_BD)
+    Ok "  inside its record, open to the end", (Not gUndoRecordBroke) And (Not gUndoWroteEarly)
+    Emit "         " & gUndoDiag
+    CloseNoSave doc
+
+    '-- the measure cache: case is part of the key -----------------------------
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then GoTo Tidy
+    ClearCache
+    tf = ResolveTierFont(doc, ROLE_VERNACULAR)
+    ReDim a(0 To 0)
+    a(0) = "ERG"
+    w1 = MeasureTexts(a, tf, ROLE_VERNACULAR, doc)
+    a(0) = "erg"
+    w2 = MeasureTexts(a, tf, ROLE_VERNACULAR, doc)
+    Ok "the measure cache tells ERG from erg", (w1(0) > w2(0))
+    Emit "         ERG " & CStr(w1(0)) & ", erg " & CStr(w2(0))
+    CloseNoSave doc
+    ReleaseScratch
+
+Tidy:
+    gQuiet = savedQuiet
+    gQuietText = savedText
+End Sub
+
+' The Word line and the Morphemes line in two writing systems each (made-up,
+' PROMPT.md example 8): its first two rows share a role.
+Private Function TwoWordLinesExample() As String
+    Dim t As String
+    t = vbTab
+    TwoWordLinesExample = _
+        "1.1" & t & "Word xyz" & t & t & t & "so" & t & t & t & vbCr & _
+        t & "Word xyz-ort" & t & "vuve" & t & t & "zo" & t & "zuvoa" & t & t & vbCr & _
+        t & "Morphemes xyz" & t & "wu=" & t & "=we" & t & "so" & t & "suwo" & t & t & "-a" & vbCr & _
+        t & "Morphemes xyz-ort" & t & "vu=" & t & "=ve" & t & "zo" & t & "zuvo" & t & t & "-a" & vbCr & _
+        t & "Lex. Gloss" & t & "fox" & t & "ERG" & t & "dream" & t & t & "follow" & t & "lnk" & vbCr & _
+        "Free The fox dreamt of following"
+End Function
+
+Private Function InterlinearCount(ex As IgtExample) As Long
+    Dim i As Long
+    For i = 0 To ex.TierCount - 1
+        If IsInterlinearTier(ex.Tiers(i)) Then InterlinearCount = InterlinearCount + 1
+    Next i
+End Function
+
+' The interlinear rows as text, one per line, ownership marks left out.
+Private Function RowsOnly(ex As IgtExample) As String
+    Dim i As Long, c As Long, s As String, row As String
+    For i = 0 To ex.TierCount - 1
+        If IsInterlinearTier(ex.Tiers(i)) Then
+            row = ex.Tiers(i) & ":"
+            For c = 0 To ex.ColCount - 1
+                row = row & "|" & StripOwnMarks(ex.Cells(i, c))
+            Next c
+            s = s & row & " / "
+        End If
+    Next i
+    RowsOnly = s
 End Function
 
 Private Sub TestInsertSeveralExamples()
@@ -3409,6 +3531,7 @@ Private Sub TestEvents()
     gBusy = False
 
     CheckLeavingKeepsCursor ev, doc
+    CheckLeavingAfterCommandWritesNothing ev, doc
 
     ev.Detach
     Ok "Detach does not raise", True
@@ -3425,6 +3548,41 @@ End Sub
 ' after the translation, to keep writing, put the cursor in the first cell of
 ' the example. The re-wrap deletes and redraws the table at the very position
 ' that paragraph had been pulled back to. The handler must put the cursor back.
+' A LingTeX command that redraws the example under the cursor (here Split
+' Column) is not an edit: leaving the example afterwards must write nothing,
+' or an invisible re-wrap sits on top of the command in the Undo list
+' (review of beta.10).
+Private Sub CheckLeavingAfterCommandWritesNothing(ev As clsAppEvents, doc As Document)
+    Dim ex As IgtExample, tbl As Table, tailPos As Long, n0 As Long
+    gBusy = False
+    doc.Content.Delete
+    SetPageGeometry doc, 612, 792, 72
+    ex = ThreeTierExample()
+    Set tbl = RenderExample(ex, doc.Content)
+    If tbl Is Nothing Then
+        Ok "leaving after a command: an example drew", False
+        Exit Sub
+    End If
+    SetSettingRewrapOnSelectionChange doc, True
+    On Error Resume Next
+    tbl.Cell(1, NumberColumns(tbl) + 1).Range.Select
+    ev.SelectionMoved Selection
+    n0 = TableColumnCount(doc.Tables(1))
+    RunCommandByName "LingTeXSplitColumn"
+    Err.Clear
+    On Error GoTo 0
+    Ok "leaving after a command: the split took", (TableColumnCount(doc.Tables(1)) = n0 + 1)
+    doc.Saved = True
+    tailPos = doc.Content.End - 1
+    On Error Resume Next
+    doc.Range(tailPos, tailPos).Select
+    ev.SelectionMoved Selection
+    Err.Clear
+    On Error GoTo 0
+    Ok "  and leaving the example afterwards writes nothing (no extra Undo entry)", doc.Saved
+    SetSettingRewrapOnSelectionChange doc, False
+End Sub
+
 Private Sub CheckLeavingKeepsCursor(ev As clsAppEvents, doc As Document)
     Dim ex As IgtExample
     Dim tbl As Table

@@ -265,8 +265,29 @@ End Function
 '-----------------------------------------------------------------------------
 Private Function MeasureKey(tf As TierFont, ByVal role As String, _
         ByVal text As String, srcDoc As Document) As String
+    ' First Capital changes what a gloss shows (Erg vs ERG), so it is in the
+    ' key; and a Collection key ignores case, so the case of the text is added
+    ' as a signature: "Dog" and "dog" are different widths (review).
     MeasureKey = FontKey(tf) & "|" & role & "|" & _
-                 IIf(SettingLowercaseGramGloss(srcDoc), "lc", "asis") & "|" & text
+                 IIf(SettingLowercaseGramGloss(srcDoc), "lc", "asis") & _
+                 IIf(SettingGramGlossInitialCap(srcDoc), "ic", "") & "|" & text & _
+                 "|" & CaseSignature(text)
+End Function
+
+' "" when the text has no capital; else one digit per character, 1 for a
+' capital: two texts that differ only in case get different signatures.
+Private Function CaseSignature(ByVal s As String) As String
+    Dim i As Long, ch As String, out As String, anyCap As Boolean
+    For i = 1 To Len(s)
+        ch = Mid$(s, i, 1)
+        If ch <> LCase$(ch) Then
+            out = out & "1"
+            anyCap = True
+        Else
+            out = out & "0"
+        End If
+    Next i
+    If anyCap Then CaseSignature = out
 End Function
 
 
@@ -374,7 +395,9 @@ Public Function MeasureTexts(texts() As String, tf As TierFont, _
         fresh = MeasureByPosition(missText, tf, role, srcDoc)
         For i = 0 To nMiss - 1
             out(missIdx(i)) = fresh(i)
-            CacheStore MeasureKey(tf, role, missText(i), srcDoc), fresh(i)
+            ' A failed measurement is never cached: a later look-up would
+            ' take its zero for a width and never see the failure (review).
+            If Not gMeasureFailed Then CacheStore MeasureKey(tf, role, missText(i), srcDoc), fresh(i)
         Next i
     End If
 
