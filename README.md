@@ -10,6 +10,7 @@ Linguistic fieldwork macro tools for LaTeX — available in four formats:
 | **Safari extension** | planned | Not yet available — Safari CI build currently failing |
 | **Desktop app (Tauri)** | `tauri/` | Menu-bar / system-tray; OS-wide keyboard shortcuts type converted text at the cursor |
 | **Word add-in** | `LingTeX-Word/` | **LingTeX-Word** — a separate sub-project with its own downloads. Pastes FLEx interlinear into Word as borderless, auto-wrapping tables rather than LaTeX |
+| **PowerPoint add-in** | `LingTeX-PowerPoint/` | **LingTeX-PowerPoint** — in development. Draws FLEx interlinear into a text box on a slide, aligned with tab stops and re-wrapped when the box is resized; shares LingTeX-Word's parser and checks |
 
 ## What it does
 
