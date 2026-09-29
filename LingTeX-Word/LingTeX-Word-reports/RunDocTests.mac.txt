@@ -1,7 +1,7 @@
 
 LingTeX-Word document tests
 ===========================
-Open documents at start: 3
+Open documents at start: 1
 
 -- styles ----------------------------------------------------
   PASS   EnsureStyles leaves Err.Number at 0
@@ -299,11 +299,16 @@ Open documents at start: 3
   PASS   a first insert into a fresh document draws two tables
   PASS     its styles were made on the way
   PASS     and the undo record opened and lasted the whole command
+  PASS     and NOTHING was written to the document before it opened (styles inside it)
          StartPendingUndo "Insert interlinear": opened
   PASS   LingTeXInsertInterlinear (fresh) leaves gBusy clear
   PASS   LingTeXInsertInterlinear (fresh) leaves ScreenUpdating on
   PASS   LingTeXInsertInterlinear (fresh) leaks no document
   PASS   LingTeXInsertInterlinear (fresh) leaves no undo record open
+  PASS   one example into a fresh document draws one table
+  PASS     in one record, open to the end
+  PASS     with nothing written before it opened
+         StartPendingUndo "Insert interlinear": opened
 
 -- insertspacing ---------------------------------------------
   PASS   the insert draws two tables
@@ -408,7 +413,7 @@ Open documents at start: 3
 
 -- scratch ---------------------------------------------------
   PASS   two measuring batches create at most one document
-         4 open before, 5 after
+         2 open before, 3 after
   PASS   ReleaseScratch puts the document count back
   PASS   ReleaseScratch twice does not raise
   PASS   measuring works again after a release
@@ -624,5 +629,5 @@ Open documents at start: 3
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 541 passed
+ALL PASS -- 545 passed
 

@@ -183,10 +183,11 @@ Public Sub EnsureStyles(doc As Document, Optional ByVal force As Boolean = False
 
     createdAny = mCreatedStyle
 
-    ' A newly created or changed style invalidates every width measured under the
-    ' old appearance. ClearCache's own comment has always said to call it here;
-    ' until now nothing did, anywhere in the project.
-    If createdAny Then ClearCache
+    ' A newly created style invalidates nothing: before it existed, measuring
+    ' already used the font it is created with (modMeasure.ResolveTierFont),
+    ' and the cache key holds the whole font. Clearing here made a first
+    ' insert measure again inside its undo record, which ended the record
+    ' (issue #13). Reset Styles and the style dialog still clear the cache.
 
     ' Only remember success. A wrong-kind name collision means some style is
     ' missing, so the next call has to look again and report again rather than

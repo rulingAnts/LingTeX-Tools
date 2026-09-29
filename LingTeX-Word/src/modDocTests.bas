@@ -1342,11 +1342,27 @@ Private Sub TestInsertIntoFreshDocument()
     Ok "a first insert into a fresh document draws two tables", (doc.Tables.Count = 2)
     Ok "  its styles were made on the way", StyleExistsOfType(doc, STYLE_TABLE, wdStyleTypeTable)
     Ok "  and the undo record opened and lasted the whole command", (Not gUndoRecordBroke)
+    Ok "  and NOTHING was written to the document before it opened (styles inside it)", (Not gUndoWroteEarly)
     Emit "         " & gUndoDiag
     CheckStateIsClean "LingTeXInsertInterlinear (fresh)", docsBefore
+    CloseNoSave doc
+
+    ' One example alone takes the other road (DrawParsedExample).
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then GoTo Tidy
+    ClearCache
+    doc.Content.Text = Split(TwoFlexExamples(), "1.2")(0)
+    doc.Content.Select
+    ReleaseScratch
+    RunCommandByName "LingTeXInsertInterlinear"
+    Ok "one example into a fresh document draws one table", (doc.Tables.Count = 1)
+    Ok "  in one record, open to the end", (Not gUndoRecordBroke)
+    Ok "  with nothing written before it opened", (Not gUndoWroteEarly)
+    Emit "         " & gUndoDiag
+Tidy:
     gQuiet = savedQuiet
     gQuietText = savedText
-    CloseNoSave doc
+    If Not doc Is Nothing Then CloseNoSave doc
 End Sub
 
 '-----------------------------------------------------------------------------

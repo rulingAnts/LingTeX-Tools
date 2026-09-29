@@ -115,6 +115,7 @@ Public gLastMessage As String       ' the last thing reported, dialog or not
 Public gUndoRecordBroke As Boolean  ' a custom undo record closed early inside a command, or never opened (tests assert False)
 Public gUndoDiag As String          ' what the last command's undo record did (LingTeXUndoDiagnostics shows it)
 Public gNoInsertRewrap As Boolean   ' tests only: an insert without its closing re-wrap, to see what that re-wrap corrects
+Public gUndoWroteEarly As Boolean   ' the document changed before the command's undo record opened (tests assert False)
 
 Public Sub Report(ByVal msg As String, ByVal kind As Long)
     gLastMessage = msg
@@ -406,18 +407,14 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
     Dim warnings As Collection, allText As String
     Dim block As String, heldBack As Long
     Dim drawnTbls() As Table
+    Dim stateAtStart As String
     Dim widths() As Double, haveRecord As Boolean
 
     On Error GoTo Fail
     gUndoRecordBroke = False
+    gUndoWroteEarly = False
     gBusy = True
-    ' The styles FIRST: creating them clears the measuring cache, and in a
-    ' document that had never held an example that happened inside
-    ' RenderExample, after the measuring below, so the second example was
-    ' measured again inside the open record, which ended it: every write of
-    ' the draw listed on its own (Word for Windows beta.8, 2026-09-29; the
-    ' fresh-document doc test reproduces it).
-    EnsureStyles doc
+    stateAtStart = DocState(doc)
     ' Measure every example BEFORE the undo record opens (see BeginUndo): a
     ' write to the hidden measuring document closes a custom record, and the
     ' second example's measuring did exactly that, so every later drawing step
@@ -428,6 +425,17 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
         MeasureExample models(i), doc, widths
     Next i
     BeginUndo label
+    ' ONE Undo entry per user action (Seth, 2026-09-29): the record opens NOW,
+    ' before anything is written to the document, and the styles a first
+    ' insert creates go inside it. Created before it, they listed as dozens of
+    ' Style / ParagraphFormat / ListLevel entries under "Insert interlinear"
+    ' (Seth's screenshots, Mac and Windows; issue #13). The widths above were
+    ' measured with the fonts the styles are created with, so nothing below
+    ' measures again inside the record.
+    gUndoWroteEarly = (DocState(doc) <> stateAtStart)
+    StartPendingUndo
+    If gUndoWroteEarly Then gUndoDiag = gUndoDiag & "; the document changed before the record opened"
+    EnsureStyles doc
     Application.ScreenUpdating = False
     Set nextTarget = target
     ReDim drawnTbls(0 To n - 1)
@@ -535,14 +543,25 @@ Private Sub DrawParsedExample(ByRef ex As IgtExample, target As Range, doc As Do
     Dim errNum As Long, errDesc As String
     Dim tbl As Table
     Dim warnings As Collection
+    Dim widths() As Double, stateAtStart As String
 
     On Error GoTo Fail
+    gUndoRecordBroke = False
+    gUndoWroteEarly = False
+    stateAtStart = DocState(doc)
     ' Repair what has only one right answer before drawing, so the example does
     ' not arrive already violating its own invariants.
     FixCellSpaces ex, SettingSpaceReplacement(doc)
+    ' Measured before the record opens, then the record, then the styles
+    ' inside it: see DrawParsedExamples.
+    MeasureExample ex, doc, widths
 
     gBusy = True
     BeginUndo label
+    gUndoWroteEarly = (DocState(doc) <> stateAtStart)
+    StartPendingUndo
+    If gUndoWroteEarly Then gUndoDiag = gUndoDiag & "; the document changed before the record opened"
+    EnsureStyles doc
     Application.ScreenUpdating = False
 
     Set tbl = RenderExample(ex, target)
@@ -550,6 +569,7 @@ Private Sub DrawParsedExample(ByRef ex As IgtExample, target As Range, doc As Do
     If Not tbl Is Nothing Then
         If Not gNoInsertRewrap Then Set tbl = RewrapTable(tbl)
     End If
+    If Not RecordIsOpen() Then gUndoRecordBroke = True
 
     Application.ScreenUpdating = True
     EndUndo
@@ -817,15 +837,15 @@ Public Sub LingTeXConvertTableToIgt()
         Exit Sub
     End If
 
-    ' Styles and measurements BEFORE the undo record opens (see BeginUndo):
-    ' creating a style and measuring both write outside the record's document.
-    ' Then the record, then the delete -- which used to come first and sat in
-    ' the undo list as two or three steps of its own.
-    EnsureStyles doc
+    ' Measurements BEFORE the undo record opens (see BeginUndo): measuring
+    ' writes outside the record's document. Then the record, then the styles
+    ' and the delete inside it, one Undo entry (see DrawParsedExamples).
     MeasureExample ex, doc, warmed
 
     gBusy = True
     BeginUndo "Convert table to interlinear"
+    StartPendingUndo
+    EnsureStyles doc
     Application.ScreenUpdating = False
 
     Dim anchor As Range
@@ -1650,6 +1670,17 @@ Public Sub StartPendingUndo()
     On Error GoTo 0
     mPendingUndoLabel = ""
 End Sub
+
+' A fingerprint of what a command could write before its undo record opens:
+' styles, lists, variables, text, tables. Equal at command start and at the
+' moment the record opens means nothing escaped the record.
+Public Function DocState(doc As Document) As String
+    On Error Resume Next
+    DocState = CStr(doc.Styles.Count) & "|" & CStr(doc.ListTemplates.Count) & "|" & _
+               CStr(doc.Variables.Count) & "|" & CStr(doc.Content.End) & "|" & _
+               CStr(doc.Tables.Count)
+    Err.Clear
+End Function
 
 ' Is a custom undo record recording right now?  modMeasure asks before it
 ' writes to the hidden measuring document, which would end the record.

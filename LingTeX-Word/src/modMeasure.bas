@@ -221,6 +221,16 @@ Public Function ResolveTierFont(doc As Document, ByVal role As String) As TierFo
         tf.Bold = (st.Font.Bold <> False)
         tf.Italic = (st.Font.Italic <> False)
         tf.SmallCaps = (st.Font.SmallCaps <> False)
+    Else
+        ' Not there yet: the font EnsureStyles will create it with -- the body
+        ' font and size, italic on the object-language lines. A first insert
+        ' measures BEFORE its undo record opens and creates the styles INSIDE
+        ' it, so the widths it measured must be the widths the created styles
+        ' give; they are, so creating the styles invalidates nothing and the
+        ' draw measures nothing inside the record (issue #13, 2026-09-29).
+        tf.Name = BodyFontName(doc)
+        tf.Size = BodyFontSize(doc)
+        tf.Italic = (role = ROLE_VERNACULAR Or role = ROLE_MORPHEMES)
     End If
 
     If tf.Name = "" Or Left$(tf.Name, 1) = "+" Then
