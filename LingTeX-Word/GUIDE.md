@@ -415,6 +415,10 @@ tracked at
 
 ## When something goes wrong
 
+**Which version is installed.** Run `LingTeXAbout` from the macro list (Tools >
+Macro > Macros on Mac, Alt+F8 on Windows): it names the release and the setup
+version. The message shown once after installing names the release too.
+
 **"LingTeX-Word is busy with another operation."** A command was interrupted
 and left a flag set. Run `LingTeXStart` from the macro list, or restart Word.
 
