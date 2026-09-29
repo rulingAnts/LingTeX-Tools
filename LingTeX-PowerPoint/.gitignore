@@ -3,3 +3,5 @@ build/
 # Dev presentations and built add-ins are made by PowerPoint, not kept here.
 *.pptm
 *.ppam
+# The built add-in: compiled VBA, untracked until a drift guard proves it is the sources (PLAN.md).
+LingTeX-PowerPoint.ppam

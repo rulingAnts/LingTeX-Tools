@@ -259,6 +259,42 @@ Public Function RealignExample(ByVal shp As Object, ByVal gran As IgtGranularity
 End Function
 
 '-----------------------------------------------------------------------------
+' Re-wrap All: every example in the presentation, to its box's width.
+'-----------------------------------------------------------------------------
+Public Sub LingTeXRewrapAll()
+    Dim n As Long, changed As Long, bad As Long
+    n = RewrapPresentation(Application.ActivePresentation, changed, bad)
+    ReleaseScratch
+    If bad > 0 Then
+        MsgBox CStr(changed) & " of " & CStr(n) & " example(s) re-wrapped; " & CStr(bad) & _
+               " could not be read back (a tab typed or deleted?).", 48, TITLE
+    Else
+        MsgBox CStr(changed) & " of " & CStr(n) & " example(s) re-wrapped.", 64, TITLE
+    End If
+End Sub
+
+' Returns how many examples there are; changed and bad count the outcomes.
+Public Function RewrapPresentation(ByVal pres As Object, ByRef changed As Long, ByRef bad As Long) As Long
+    Dim sld As Object, shp As Object
+    changed = 0: bad = 0
+    gPptBusy = True
+    On Error Resume Next
+    For Each sld In pres.Slides
+        For Each shp In sld.Shapes
+            If IsLingTeXExample(shp) Then
+                RewrapPresentation = RewrapPresentation + 1
+                Select Case RewrapExample(shp)
+                    Case 1: changed = changed + 1
+                    Case -1: bad = bad + 1
+                End Select
+            End If
+        Next shp
+    Next sld
+    Err.Clear
+    gPptBusy = False
+End Function
+
+'-----------------------------------------------------------------------------
 ' Renumber: every example in the presentation, slide by slide, top to
 ' bottom.  A group from one copy keeps its letters: the first ("a", or no
 ' letter) takes the next number, the rest share it.

@@ -1,0 +1,19 @@
+SaveAsAddInSource  2026-09-29 10:02:21
+  ok       modFlexParse.bas  modFlexParse, 1315 lines
+  ok       modIgtModel.bas  modIgtModel, 1259 lines
+  ok       clsIgtWarning.cls  clsIgtWarning, 36 lines, class
+  ok       modLeipzig.bas  modLeipzig, 390 lines
+  ok       modWrap.bas  modWrap, 201 lines
+  ok       modPptClipboard.bas  modPptClipboard, 75 lines
+  ok       modPptFormat.bas  modPptFormat, 120 lines
+  ok       modPptMeasure.bas  modPptMeasure, 134 lines
+  ok       modPptCompose.bas  modPptCompose, 191 lines
+  ok       modPptInsert.bas  modPptInsert, 153 lines
+  ok       modPptRewrap.bas  modPptRewrap, 240 lines
+  ok       modPptSettings.bas  modPptSettings, 230 lines
+  ok       modPptCommands.bas  modPptCommands, 549 lines
+  ok       clsPptEvents.cls  clsPptEvents, 44 lines, class
+  ok       modPptRibbon.bas  modPptRibbon, 110 lines
+  components: 15
+  saved  /Users/Seth/Library/Containers/com.microsoft.Powerpoint/Data/Documents/LingTeX-PowerPoint-engine.pptm
+Next: sh LingTeX-PowerPoint/tools/build-ppam.sh

@@ -103,6 +103,38 @@ Done:
 End Sub
 
 '-----------------------------------------------------------------------------
+' Import every file named in listPath (names relative to the list's folder)
+' into pres -- the engine presentation the add-in is built from
+' (modPptBuild.SaveAsAddInSource).  Returns how many failed; what happened is
+' appended to log.  Uses the same ImportOne as the dev import, so a class
+' goes in the one way that works here.
+'-----------------------------------------------------------------------------
+Public Function DevImportList(ByVal pres As Object, ByVal listPath As String, ByRef log As String) As Long
+    Dim vbp As Object, files As Collection, f As Variant, folder As String, saved As String
+    saved = mLog
+    mLog = ""
+    Set mHost = pres
+    Set vbp = pres.VBProject
+    folder = Left$(listPath, InStrRev(listPath, PathSep()) - 1)
+    mSep = AddFromStringSeparator(vbp)
+    If mSep = "" Then
+        Note "PROBLEM: AddFromString counted no separator as one line break"
+        DevImportList = 1
+    Else
+        Set files = ReadList(listPath)
+        If files.Count = 0 Then
+            Note "PROBLEM: nothing to import: " & listPath & " is missing or empty"
+            DevImportList = 1
+        End If
+        For Each f In files
+            If Not ImportOne(vbp, folder & PathSep() & CStr(f)) Then DevImportList = DevImportList + 1
+        Next
+    End If
+    log = log & mLog
+    mLog = saved
+End Function
+
+'-----------------------------------------------------------------------------
 ' One file in.  A standard module goes through Import, which names it from its
 ' Attribute VB_Name line.  A class is NEVER imported (Import can misread the
 ' class preamble and make a standard module full of syntax errors): it is

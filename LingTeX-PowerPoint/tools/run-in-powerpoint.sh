@@ -87,7 +87,9 @@ src/modPptRewrap.bas
 src/modPptSettings.bas
 src/modPptCommands.bas
 src/clsPptEvents.cls
+src/modPptRibbon.bas
 src/modPptTests.bas
+tools/modPptBuild.bas
 tools/probe/modProbe.bas
 tools/probe/modProbeEvents.bas
 tools/probe/clsProbeEvents.cls
@@ -96,6 +98,10 @@ tools/probe/modProbeSave.bas
 tools/probe/modProbeClipboard.bas
 tools/probe/modProbeUndo.bas
 "
+
+# The add-in's modules: the shared layer and src/, without the tests, the
+# probes and the dev rig.  Staged as release.txt beside modules.txt.
+RELEASE_MODULES=$(printf '%s\n' $MODULES | grep -v '^tools/' | grep -v 'modPptTests')
 
 import=1; commit=0; pres=""; macros=""; want=""; stage_shared=1; undo_check=0; after_undo=""
 for a in "$@"; do
@@ -141,6 +147,9 @@ stage_modules() {
         cp "$root/$m" "$stage/"
         basename "$m" >> "$stage/modules.txt"
     done
+    # The release list: what the add-in is built from (modPptBuild.SaveAsAddInSource).
+    : > "$stage/release.txt"
+    for m in $RELEASE_MODULES; do basename "$m" >> "$stage/release.txt"; done
 }
 # The shared modules, fresh from LingTeX-Word; PowerPoint's own modules call the
 # shared clipboard normaliser, so a revision without it cannot be imported.
@@ -354,6 +363,14 @@ AS
             echo "   $after_undo did not return cleanly (see above)."
         fi
     fi
+fi
+
+#-- The engine presentation, when SaveAsAddInSource wrote one ----------------
+if [ -f "$box/LingTeX-PowerPoint-engine.pptm" ]; then
+    mkdir -p "$root/build"
+    mv "$box/LingTeX-PowerPoint-engine.pptm" "$root/build/LingTeX-PowerPoint-engine.pptm"
+    echo "== engine presentation collected: build/LingTeX-PowerPoint-engine.pptm"
+    echo "   next: sh LingTeX-PowerPoint/tools/build-ppam.sh"
 fi
 
 #-- Reports ------------------------------------------------------------------

@@ -126,7 +126,15 @@ On the shared modules from `main` c34fe49 (LingTeX-Word beta.8): a copied baseli
 
 Untested by the rig, by design: the wrappers that read the live selection (`SelectedExampleBox`, `ColumnAtSelection`), since the scratch presentation has no window. To exercise by hand from the macro list, then from the ribbon.
 
-**Next, in order:** the ribbon (customUI in the `.pptm`, so the dev presentation shows the tab too), the `.ppam` build (content type of an engine `.pptm`), `Auto_Open` calling `LingTeXStart`, the Mac installer (Startup folder), the guide; then issues #8-#10 in the shared layer, and Word-side parity items (the Lex. Gram. Info. role).
+## Step 5, begun: the ribbon and the add-in build (2026-09-29)
+
+- **`src/customUI14.xml`** -- the Interlinear tab: Insert; Re-wrap This, Re-wrap All, Renumber; Split Column, Merge Columns, By Word, By Morpheme; the toggles Numbers, First Capital, Re-wrap on Resize; Check Glossing. LingTeX-Word's icons, reused. Left out on purpose, with the reason in the file's comment: Convert Table, Text to Interlinear, Indent/Outdent, Re-wrap on Save/Leave, the Settings dialog, Reset Styles, the shortcuts.
+- **`src/modPptRibbon`** -- the `Rbn*` callbacks (controls As Variant), `RbnGetPressed`/`RbnToggle` on the active presentation's settings, `Auto_Open` -> `LingTeXStart` (the events), `Auto_Close` -> `LingTeXStop`.
+- **`tools/modPptBuild.SaveAsAddInSource`** (dev rig) -- a new presentation with no window gets exactly the release modules (the rig stages `release.txt`: `$MODULES` less `tools/` and the tests; `modLingTeXDevCore.DevImportList` imports them the one way that works here) and is saved as `LingTeX-PowerPoint-engine.pptm` (format 16) in PowerPoint's Documents folder; the runner moves it to `build/`.
+- **`tools/build-ppam.sh`** -- from that engine: the main part's content type becomes the add-in's, the ribbon and icons are injected (as build-dotm.sh does), packed with `[Content_Types].xml` first -> `LingTeX-PowerPoint/LingTeX-PowerPoint.ppam`. `--ribbon-into file.pptm` writes a copy of any presentation with the ribbon in it, to look at the tab without installing.
+- **Install (Mac):** copy the `.ppam` into the Startup folder (`modLingTeXDev.StartupFolder`), quit and start PowerPoint; `Auto_Open` hooks the events. To confirm by hand: the tab shows, Insert draws from a FLEx copy, a resized box re-wraps, one Cmd+Z takes a command back.
+
+**Next, in order:** the by-hand confirmation of the add-in from the Startup folder (ribbon, events, undo from the ribbon); a drift guard like check-dotm.sh (the module text in `ppt/vbaProject.bin` against `src/` and the staged shared modules); the Mac install script and the guide; a Windows smoke test (add-ins register in the registry there); then issues #8-#10 in the shared layer, and Word-side parity items (the Lex. Gram. Info. role).
 
 ## Probe 1 results (Mac, PowerPoint 16.112.4, 2026-09-15)
 

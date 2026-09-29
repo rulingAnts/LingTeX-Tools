@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  LingTeX-PowerPoint ribbon.
+
+  Injected into LingTeX-PowerPoint.ppam by ../tools/build-ppam.sh, as
+  LingTeX-Word's is into its template: PowerPoint saves the VBA project but
+  has no way to put a custom ribbon in a file.  Tracked as a source file so the
+  ribbon is reviewable; the build fails a button whose icon is missing.
+
+  Every onAction points at a Rbn* procedure in modPptRibbon.bas, typed As
+  Variant rather than As IRibbonControl so the project needs no reference to
+  the Office object library.  The icons are LingTeX-Word's (../../LingTeX-Word/
+  src/icons); image="igtInsert" names a relationship of THIS part, written by
+  the build beside the PNGs.
+
+  What is not here, and why: Convert Table and Text to Interlinear (a slide
+  has no table of ours to convert; Insert reads the clipboard), Indent and
+  Outdent (a box is moved by hand), Re-wrap on Save and on Leave (a resized
+  box re-wraps itself; the toggle for that is Re-wrap on Resize), the
+  Settings dialog and Reset Styles (settings are on this tab's toggles until
+  a dialog exists; there are no styles), the shortcuts (PowerPoint's VBA
+  cannot bind keys).
+-->
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui" onLoad="RbnOnLoad">
+  <ribbon>
+    <tabs>
+      <tab id="LingTeXTab" label="Interlinear">
+
+        <group id="LingTeXInterlinearGroup" label="Interlinear">
+          <button id="LingTeXInsert"
+                  label="Insert Interlinear"
+                  size="large"
+                  image="igtInsert"
+                  onAction="RbnInsert"
+                  screentip="Insert an interlinear example from the clipboard"
+                  supertip="Copy an interlinear selection in FLEx and click here. Every example in the copy is drawn in a text box on the current slide, one under another, lined up with tab stops and wrapped to the box's width. Widen or narrow the box and it re-wraps."/>
+        </group>
+
+        <group id="LingTeXLayoutGroup" label="Layout">
+          <box id="LingTeXRewrapBox" boxStyle="vertical">
+            <button id="LingTeXRewrapCurrent"
+                    label="Re-wrap This"
+                    image="igtRewrapThis"
+                    onAction="RbnRewrapCurrent"
+                    screentip="Re-wrap the selected examples to their boxes' width"
+                    supertip="Reads the text back (what you typed counts), measures, plans and draws again. A re-wrap that changes nothing writes nothing."/>
+            <button id="LingTeXRewrapAll"
+                    label="Re-wrap All"
+                    image="igtRewrapAll"
+                    onAction="RbnRewrapAll"
+                    screentip="Re-wrap every example in the presentation"/>
+          </box>
+          <button id="LingTeXRenumber"
+                  label="Renumber"
+                  image="igtNumbers"
+                  onAction="RbnRenumber"
+                  screentip="Number every example in order: slide by slide, top to bottom"
+                  supertip="Numbers here are text, so they do not renumber themselves. A group from one copy keeps its letters: (2a), (2b)."/>
+        </group>
+
+        <group id="LingTeXAlignGroup" label="Alignment">
+          <button id="LingTeXSplit"
+                  label="Split Column"
+                  image="igtSplit"
+                  onAction="RbnSplitColumn"
+                  screentip="Split the column at the cursor"
+                  supertip="Click into a cell first. Pulls an affix, clitic or reduplicant out into a column of its own, carrying the morpheme break character onto the new column on every tier."/>
+          <button id="LingTeXMerge"
+                  label="Merge Columns"
+                  image="igtMerge"
+                  onAction="RbnMergeColumns"
+                  screentip="Merge columns back together"
+                  supertip="Select across cells to merge exactly those; with the cursor in one cell, that column is merged with the one after it."/>
+          <toggleButton id="LingTeXAlignWord"
+                  label="By Word"
+                  image="igtByWord"
+                  getPressed="RbnGetPressed"
+                  onAction="RbnToggle"
+                  screentip="One column per word: the selected examples now, new examples from here on"
+                  supertip="Enclitics stay in their host's column."/>
+          <toggleButton id="LingTeXAlignMorpheme"
+                  label="By Morpheme"
+                  image="igtByMorpheme"
+                  getPressed="RbnGetPressed"
+                  onAction="RbnToggle"
+                  screentip="One column per morpheme: the selected examples now, new examples from here on"
+                  supertip="Enclitic columns never start a wrap line."/>
+        </group>
+
+        <group id="LingTeXSettingsGroup" label="Settings">
+          <toggleButton id="LingTeXNumbersToggle"
+                  label="Numbers"
+                  image="igtNumbers"
+                  getPressed="RbnGetPressed"
+                  onAction="RbnToggle"
+                  screentip="Number new examples (1), (2)..."
+                  supertip="Stored in this presentation. Renumber puts every example in order."/>
+          <toggleButton id="LingTeXInitialCapToggle"
+                  label="First Capital"
+                  image="igtInitialCap"
+                  getPressed="RbnGetPressed"
+                  onAction="RbnToggle"
+                  screentip="Grammatical glosses as Erg / 3Sg; off, uniform small capitals"/>
+          <toggleButton id="LingTeXRewrapOnResizeToggle"
+                  label="Re-wrap on Resize"
+                  image="igtRewrapOnLeave"
+                  getPressed="RbnGetPressed"
+                  onAction="RbnToggle"
+                  screentip="Re-wrap an example when its box is resized"
+                  supertip="On by default. Fires when the handle is let go."/>
+        </group>
+
+        <group id="LingTeXCheckGroup" label="Check">
+          <button id="LingTeXCheck"
+                  label="Check Glossing"
+                  size="large"
+                  image="igtCheck"
+                  onAction="RbnCheck"
+                  screentip="Check the selected example against the glossing conventions"
+                  supertip="Reports columns whose cells disagree about a morpheme break character, spaces inside cells, form and gloss showing a different number of breaks, and unmatched infix brackets. Offers to fix the ones with a single right answer."/>
+        </group>
+
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>
