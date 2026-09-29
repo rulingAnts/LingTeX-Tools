@@ -398,6 +398,14 @@ lost.
 
 ## Known issues
 
+**Many Undo steps after the first insert into a new document.** The first
+Insert Interlinear in a document also creates the LingTeX styles, and those
+steps appear in the Undo list below "Insert interlinear". Undo only the top
+entry: it takes the examples back. Undoing further deletes the styles, and a
+redo then brings back examples without numbers. Later inserts into that
+document are one step. Tracked at
+[github.com/rulingAnts/LingTeX-Tools/issues/13](https://github.com/rulingAnts/LingTeX-Tools/issues/13).
+
 **Cramped line spacing after an insert (Windows).** On Word for Windows an
 example sometimes comes out with its rows too close together right after
 it is inserted. **Re-wrap All** (or **Re-wrap This**) draws it with the right
