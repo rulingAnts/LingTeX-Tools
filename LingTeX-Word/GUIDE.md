@@ -398,6 +398,13 @@ lost.
 
 ## Known issues
 
+**Indent and Outdent move one table at a time.** A copy of several examples
+is drawn as one numbered group, each example its own table. Indent and
+Outdent step the table the cursor is in, so on a group each sub-example has
+to be indented or outdented on its own; indenting the first, the one with
+the group number, moves only that one. Tracked at
+[github.com/rulingAnts/LingTeX-Tools/issues/12](https://github.com/rulingAnts/LingTeX-Tools/issues/12).
+
 **Undo after editing an ordinary table takes two presses (Mac).** After you
 delete a cell in a table that is not an interlinear example, the first
 Cmd+Z makes the whole table seem to vanish and disturbs the layout around
