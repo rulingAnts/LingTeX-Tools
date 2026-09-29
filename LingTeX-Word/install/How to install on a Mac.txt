@@ -1,0 +1,44 @@
+HOW TO INSTALL LINGTEX-WORD ON A MAC
+
+macOS no longer opens installers downloaded from the internet unless they are
+signed by a paid Apple developer account, which LingTeX-Word is not. So on a
+Mac, LingTeX-Word is installed with one command in Terminal. What the command
+runs is install.sh, in this folder; open it in TextEdit to read every step.
+Nothing else on your Mac is changed, and no password is needed.
+
+1. Quit Word.
+
+2. Open Terminal in this folder:
+   - Open Terminal (Applications > Utilities > Terminal, or press Command-Space
+     and type Terminal).
+   - Type this, then press Return:
+
+         cd /Volumes/LingTeX-Word
+
+     (If Finder shows this disk as "LingTeX-Word 1", an older copy is still
+     mounted: eject every LingTeX-Word disk in Finder and open this one again.)
+
+3. Type this, then press Return:
+
+         sh install.sh
+
+   If macOS asks whether Terminal may access data from other apps, click Allow:
+   that is the copy into Word's folder. If Word is still open, the script waits
+   for you to quit it, or quits it for you if you type q.
+
+4. Start Word. If it asks whether to enable macros in LingTeX-Word.dotm, choose
+   Enable Macros. A message then says LingTeX-Word is installed, and the
+   Interlinear tab is on the ribbon of every document.
+
+SHORTCUT for steps 2 and 3: in Terminal type  sh  and a space, drag install.sh
+from this window onto the Terminal window, and press Return.
+
+UPGRADING: the same steps with the new disk image; it replaces the old copy.
+
+TO REMOVE LINGTEX-WORD: the same steps, but in step 3 type
+
+         sh install.sh --uninstall
+
+(two ordinary hyphens). From the next start of Word, the Interlinear tab is gone.
+
+The user guide, LingTeX-Word-Guide.pdf, is in this folder too.

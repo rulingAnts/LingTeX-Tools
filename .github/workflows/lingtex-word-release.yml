@@ -115,10 +115,13 @@ jobs:
           retention-days: 1
 
   dmg:
-    # The Mac download: a disk image holding the template, the two Script
-    # Editor documents that install and remove it (compiled from the
-    # .applescript sources), and the guide. A script document rather than an
-    # installer app, because Gatekeeper blocks an unsigned downloaded program.
+    # The Mac download: a disk image holding the template, install.sh (which
+    # installs it, or removes it with --uninstall), "How to install on a Mac.txt"
+    # and the guide. A shell script run in Terminal, because Gatekeeper on
+    # macOS 27 blocks an unsigned downloaded program AND the Script Editor
+    # documents that shipped until beta.10 (Seth, 2026-09-29); Terminal does
+    # not check a script it is told to run. The script copies the template off
+    # the read-only image and clears the quarantine on its copy.
     needs: package
     runs-on: macos-latest
     env:
@@ -140,19 +143,21 @@ jobs:
           mkdir -p "$stage"
           cp out/LingTeX-Word.dotm "$stage/"
           cp "out/LingTeX-Word-Guide-$TAG.pdf" "$stage/LingTeX-Word-Guide.pdf"
-          # The scripts ship COMPILED, as .scpt documents. A plain-text script is
-          # recompiled by Script Editor when Run is pressed, and on a read-only
-          # disk image that edit makes it ask to Unlock or Duplicate (Seth's test,
-          # 2026-09-14). A .scpt is a single-file document, not an app: it opens
-          # in Script Editor showing its source and comments. Never osacompile -x
-          # (run-only), which would strip the source the user is meant to read.
-          for k in Install Uninstall; do
-            src="LingTeX-Word/install/$k LingTeX-Word.applescript"
-            dst="$stage/$k LingTeX-Word.scpt"
-            osacompile -o "$dst" "$src"
-            [ -f "$dst" ] || { echo "::error::$dst is not a single-file document"; exit 1; }
-            osadecompile "$dst" | grep -q "WHAT IT DOES" || { echo "::error::$dst does not carry its source"; exit 1; }
-          done
+          # The installer: install.sh, executable, and the instructions beside it.
+          sh -n LingTeX-Word/install/install.sh || { echo "::error::install.sh does not parse"; exit 1; }
+          cp LingTeX-Word/install/install.sh "$stage/install.sh"
+          chmod 755 "$stage/install.sh"
+          cp "LingTeX-Word/install/How to install on a Mac.txt" "$stage/How to install on a Mac.txt"
+          # It must install the template on this image, and nothing else: a
+          # dry run into a scratch Office folder, the quarantine cleared.
+          gc="$RUNNER_TEMP/gc"
+          mkdir -p "$gc"
+          LINGTEX_OFFICE_GC="$gc" LINGTEX_IGNORE_WORD=1 sh "$stage/install.sh"
+          cmp -s "$stage/LingTeX-Word.dotm" "$gc/User Content.localized/Startup.localized/Word/LingTeX-Word.dotm" ||
+            { echo "::error::install.sh did not install the template from the image"; exit 1; }
+          LINGTEX_OFFICE_GC="$gc" LINGTEX_IGNORE_WORD=1 sh "$stage/install.sh" --uninstall
+          [ ! -e "$gc/User Content.localized/Startup.localized/Word/LingTeX-Word.dotm" ] ||
+            { echo "::error::install.sh --uninstall did not remove it"; exit 1; }
           # HFS+ so older macOS mounts it too. hdiutil on hosted runners now and
           # then fails with "Resource busy"; a retry clears it.
           for attempt in 1 2 3; do
@@ -233,13 +238,15 @@ jobs:
               and registers an uninstaller under Settings → Apps. (The
               `-windows.zip` holds the same template with `install.bat`, for
               anyone who prefers to see what the installer does.)
-            - **Mac:** open `-macos.dmg` and double-click **Install LingTeX-Word**.
-              It opens in Script Editor with what it does written at the top; click
-              the **Run** button (the triangle) and follow the messages. If macOS
-              asks whether Script Editor may access data from other apps, click
-              **Allow**: that is the copy into Word's folder. It copies the template
-              into Word's Startup folder, replacing an earlier version, and clears
-              the download quarantine. When Word asks whether to enable macros in
+            - **Mac:** open `-macos.dmg`; **How to install on a Mac.txt** inside it
+              says what follows. macOS no longer opens unsigned installers, so it is
+              one command in Terminal: open Terminal, type `cd /Volumes/LingTeX-Word`
+              and Return, then `sh install.sh` and Return (or type `sh `, drag
+              `install.sh` onto the Terminal window, and press Return). If macOS asks
+              whether Terminal may access data from other apps, click **Allow**: that
+              is the copy into Word's folder. It copies the template into Word's
+              Startup folder, replacing an earlier version, and clears the download
+              quarantine. When Word asks whether to enable macros in
               `LingTeX-Word.dotm`, choose **Enable Macros**.
             - **The user guide** is `LingTeX-Word-Guide-…pdf`, and is inside the
               Windows zip and the Mac disk image.
@@ -253,5 +260,5 @@ jobs:
             **Upgrading** is the same: run the new installer and it replaces the
             old file. If your keyboard shortcuts stop working after an upgrade,
             click **Install Shortcuts** on the Interlinear tab once. To remove the
-            add-in: Settings → Apps on Windows, or **Uninstall LingTeX-Word** from
+            add-in: Settings → Apps on Windows, or `sh install.sh --uninstall` from
             the disk image on the Mac.
