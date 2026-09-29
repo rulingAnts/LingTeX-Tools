@@ -51,6 +51,14 @@ Public Const STYLE_PREFIX As String = "LingTeX "
 
 '-- Character style for grammatical gloss runs.
 Public Const STYLE_GRAM As String = "LingTeX Gram Gloss"
+'-- Character styles, with no formatting of their own, on a boundary glyph
+'   whose owner is the morpheme to its LEFT (a prefix or proclitic), or BOTH
+'   its neighbours.  The renderer puts them on; read-back turns them back into
+'   the model's ownership mark (modFlexParse OwnMark).  A style rather than an
+'   invisible character in the text, so Find matches the plain spelling and
+'   nothing invisible is stored on the page (Seth, 2026-09-28).
+Public Const STYLE_LEFT_BD As String = "LingTeX Left Boundary"
+Public Const STYLE_SHARED_BD As String = "LingTeX Shared Boundary"
 ' The list style whose level 1 numbers examples "(1)", "(2)"... Applied to the
 ' first cell's paragraph, so the number is Word's own: it renumbers when an
 ' example is deleted or moved, cross-references can point at it, and linking
@@ -108,6 +116,7 @@ Public Function RoleFromParaStyle(ByVal styleName As String) As String
     If Len(styleName) <= Len(STYLE_PREFIX) Then Exit Function
     If Left$(styleName, Len(STYLE_PREFIX)) <> STYLE_PREFIX Then Exit Function
     If styleName = STYLE_GRAM Then Exit Function          ' a character style
+    If styleName = STYLE_LEFT_BD Or styleName = STYLE_SHARED_BD Then Exit Function
     RoleFromParaStyle = Mid$(styleName, Len(STYLE_PREFIX) + 1)
 End Function
 
@@ -166,6 +175,8 @@ Public Sub EnsureStyles(doc As Document, Optional ByVal force As Boolean = False
     EnsureParaStyle doc, ROLE_FREE, bodyFont, bodySize, False, FREE_SPACE_AFTER
 
     EnsureGramStyle doc, bodyFont
+
+    EnsureOwnershipStyles doc
     EnsureTableStyle doc
     EnsureNumberListStyle doc
     EnsureExampleParaStyle doc
@@ -321,6 +332,28 @@ End Sub
 ' modReadBack can restore "ERG" losslessly -- the lowercasing is reversible, not
 ' destructive.
 '-----------------------------------------------------------------------------
+' The two ownership styles carry no formatting at all: they are labels.
+Private Sub EnsureOwnershipStyles(doc As Document)
+    EnsureBareCharStyle doc, STYLE_LEFT_BD
+    EnsureBareCharStyle doc, STYLE_SHARED_BD
+End Sub
+
+Private Sub EnsureBareCharStyle(doc As Document, ByVal styleName As String)
+    Dim st As Style
+    If StyleExistsOfType(doc, styleName, wdStyleTypeCharacter) Then Exit Sub
+    If StyleExists(doc, styleName) Then
+        gStyleError = "A style called """ & styleName & """ already exists but is " & _
+                      "not a character style, so a boundary's owner cannot be " & _
+                      "recorded. Rename or delete it and try again."
+        Exit Sub
+    End If
+    On Error Resume Next
+    Set st = doc.Styles.Add(Name:=styleName, Type:=wdStyleTypeCharacter)
+    If Not st Is Nothing Then mCreatedStyle = True
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
 Private Sub EnsureGramStyle(doc As Document, ByVal fontName As String)
     Dim st As Style
     If StyleExistsOfType(doc, STYLE_GRAM, wdStyleTypeCharacter) Then Exit Sub
@@ -395,6 +428,43 @@ Private Sub EnsureNumberListStyle(doc As Document)
         .TextPosition = 0
         .TabPosition = 0
     End With
+    ' Level 2: the sub-number of an example that is one of several from one
+    ' copy, "a.", "b.", ..., restarting after every example number.
+    FormatSubLevel st.ListTemplate, 2
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' A sub-number level: "a.", "b.", ... at the cell's left edge, like level 1.
+Private Sub FormatSubLevel(tpl As Object, ByVal lvl As Long)
+    On Error Resume Next
+    With tpl.ListLevels(lvl)
+        .NumberFormat = "%" & CStr(lvl) & "."
+        .NumberStyle = wdListNumberStyleLowercaseLetter
+        .TrailingCharacter = wdTrailingNone
+        .NumberPosition = 0
+        .TextPosition = 0
+        .TabPosition = 0
+    End With
+    Err.Clear
+    On Error GoTo 0
+End Sub
+
+' The list level a sub-number goes on, formatted "a." if it is not yet: a
+' document whose list style predates sub-numbering has Word's default there,
+' and a document numbering its examples at a deeper level needs the one below.
+Public Sub EnsureSubNumberLevel(doc As Document, ByVal lvl As Long)
+    Dim tpl As Object
+    Dim fmt As String, sty As Long
+    If lvl < 1 Or lvl > 9 Then Exit Sub
+    On Error Resume Next
+    Set tpl = doc.Styles(STYLE_NUMBER).ListTemplate
+    If tpl Is Nothing Then Exit Sub
+    fmt = tpl.ListLevels(lvl).NumberFormat
+    sty = tpl.ListLevels(lvl).NumberStyle
+    If fmt <> "%" & CStr(lvl) & "." Or sty <> wdListNumberStyleLowercaseLetter Then
+        FormatSubLevel tpl, lvl
+    End If
     Err.Clear
     On Error GoTo 0
 End Sub

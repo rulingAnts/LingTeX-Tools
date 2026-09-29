@@ -18,6 +18,7 @@ Reads word/vbaProject.bin with olefile and the MS-OVBA decompression below.
     python3 check-vba-refs.py path/to/LingTeX-Word.dotm      exit 0 ok, 1 not
 """
 import io
+import os
 import struct
 import sys
 import zipfile
@@ -25,7 +26,6 @@ import zipfile
 try:
     import olefile
 except ImportError:
-    import os
     if os.environ.get("LINGTEX_REQUIRE_OLEFILE"):
         print("  FAIL  olefile is not installed, and this run requires the VBA reference check")
         sys.exit(1)
@@ -103,7 +103,18 @@ def references(dotm):
 def main():
     if len(sys.argv) != 2:
         sys.exit("usage: check-vba-refs.py path/to/file.dotm")
-    refs = references(sys.argv[1])
+    try:
+        refs = references(sys.argv[1])
+    except Exception as e:
+        # No readable VBA project in the package: a missing vbaProject.bin, or one
+        # that is not an OLE file. A real template must fail here, cleanly rather
+        # than with a traceback. test-dotm-scripts.sh's synthetic package carries
+        # a stand-in vbaProject.bin by design and says so with LINGTEX_VBA_STANDIN.
+        if os.environ.get("LINGTEX_VBA_STANDIN") == "1":
+            print("  SKIP  word/vbaProject.bin is a test stand-in (LINGTEX_VBA_STANDIN); VBA references not checked")
+            sys.exit(0)
+        print(f"  FAIL  word/vbaProject.bin holds no readable VBA project ({type(e).__name__}: {e})")
+        sys.exit(1)
     projects = [r for r in refs if r[0] == "project"]
     if projects:
         for _, name, path in projects:

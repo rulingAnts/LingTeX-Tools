@@ -11,9 +11,18 @@
 #     so the shipped template contains code that is nowhere in the repository;
 #   * someone edits src/customUI14.xml, or redraws an icon in src/icons/, and
 #     does not re-run build-dotm.sh, so the reviewable ribbon is not the ribbon
-#     that ships.
+#     that ships;
+#   * the import itself changes the code -- the classes went in double-spaced
+#     for a week (2026-09-15) -- or the template holds text that is in no source
+#     file at all (2026-09-16: language data a text scrub of src/ could not
+#     reach, because module text sits compressed inside an OLE file inside the
+#     zip, where nothing greps it).
 #
-# Neither shows up in a diff. Both show up here.
+# None shows up in a diff. All show up here. Step 4d reads the compiled module
+# text out of word/vbaProject.bin and compares it with src/ line for line, so
+# the template is clean BY CONSTRUCTION rather than by a word list; step 4e then
+# checks that the rest of the package -- body, document variables, notes,
+# AutoText -- carries no text at all, so nothing but code and ribbon ships.
 #
 # Usage:  sh LingTeX-Word/tools/check-dotm.sh [path/to/file.dotm]
 # Exit:   0 all checks pass, 1 otherwise.
@@ -196,6 +205,81 @@ if command -v python3 >/dev/null 2>&1; then
     if python3 "$here/check-vba-refs.py" "$dotm"; then :; else fails=$((fails + 1)); fi
 else
     echo "  SKIP  python3 is not available; VBA references not checked"
+fi
+
+#-- 4d. every VBA module in the template IS its committed source ---------------
+# The manifest (step 6) proves src/ has not changed since build-dotm.sh ran. It
+# does not prove the compiled modules equal src/: a fix typed into the VBA editor
+# and never exported passes it, and so did the classes the importer installed
+# double-spaced (2026-09-15) and the template that carried language data no scrub
+# of src/ could reach (2026-09-16). tools/check-dotm-sources.py reads the module
+# text out of word/vbaProject.bin and compares it with src/ line for line, case-
+# insensitively (the one rewrite Word makes on import), and also fails on a module
+# with no source or a source with no module. No word list -- a list of the
+# sensitive words in a public repository would itself be the leak. Same needs as
+# 4c: python3 and olefile; the release workflow requires both.
+if command -v python3 >/dev/null 2>&1; then
+    if python3 "$here/check-dotm-sources.py" "$dotm" "$src"; then :; else fails=$((fails + 1)); fi
+else
+    echo "  SKIP  python3 is not available; VBA modules not compared with src/"
+fi
+
+#-- 4e. nothing but code and ribbon: no text in the body, no document variables -
+# 4d proves the modules are their sources; this proves the REST of the package
+# carries no text at all. A template's own document body, its document variables
+# (LingTeX keeps its settings there in USER documents, and the dev template keeps
+# its clone path there), AutoText (word/glossary), comments, headers, footers and
+# notes can all hold prose, and a text scrub of src/ reaches none of them. The
+# release template is code and ribbon and nothing else, so any of these is a
+# failure to look at, not a warning. It also tells a release template from a dev
+# template saved under the wrong name. No Python needed: the parts are XML.
+body="$work/word/document.xml"
+if [ -f "$body" ]; then
+    chars=$(sed -e 's/<[^>]*>//g' "$body" | tr -d ' \t\r\n' | wc -c | tr -d ' ')
+    if [ "$chars" -eq 0 ]; then
+        pass "the template's document body holds no text"
+    else
+        fail "the template's document body holds $chars characters of text -- a release template is code and ribbon only; re-save it from an empty document"
+    fi
+else
+    fail "word/document.xml is missing -- the package is invalid"
+fi
+nvars=0
+varnames=""
+if [ -f "$work/word/settings.xml" ]; then
+    nvars=$(grep -o '<w:docVar ' "$work/word/settings.xml" | wc -l | tr -d ' ')
+    # Names are safe to print and identify the cause; values are not printed.
+    varnames=$(grep -o '<w:docVar w:name="[^"]*"' "$work/word/settings.xml" | sed 's/.*w:name="//; s/"$//' | sort -u)
+fi
+if [ "$nvars" -eq 0 ]; then
+    pass "the template carries no document variables"
+else
+    fail "the template carries $nvars document variable(s): $(printf '%s' "$varnames" | tr '\n' ' ')"
+    if printf '%s\n' "$varnames" | grep -qx 'LingTeX_DevRoot'; then
+        # The likeliest way this ever fires: SetDevRoot run against the ENGINE
+        # (LingTeX.dotm) instead of the dev template, so the clone path rode
+        # into the rebuilt release. Re-saving from an empty document would not
+        # help; the variable has to come out of the engine.
+        echo "        LingTeX_DevRoot is the DEV template's clone path: SetDevRoot was run against"
+        echo "        the engine (LingTeX.dotm) instead of LingTeX-Dev.dotm. Remove the variable"
+        echo "        from the engine, or rebuild from an engine that never had one, then save"
+        echo "        the template again."
+    else
+        echo "        Settings live in documents, never in the release template: remove the"
+        echo "        variable(s) from the engine and save the template again."
+    fi
+fi
+extra=""
+for p in word/comments.xml word/footnotes.xml word/endnotes.xml word/glossary/document.xml; do
+    [ -f "$work/$p" ] && extra="$extra $p"
+done
+for p in "$work"/word/header*.xml "$work"/word/footer*.xml; do
+    [ -f "$p" ] && extra="$extra word/$(basename "$p")"
+done
+if [ -z "$extra" ]; then
+    pass "no comments, notes, headers, footers or AutoText parts in the template"
+else
+    fail "parts that can hold prose are in the template:$extra -- re-save it from an empty document"
 fi
 
 #-- 5. the ribbon is well-formed, and every onAction resolves ----------------

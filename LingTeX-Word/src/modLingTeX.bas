@@ -80,7 +80,7 @@ Private Const INDENT_STEP As Double = 36
 ' The first run: what the add-in does for itself the first time Word loads
 ' it from STARTUP, recorded in the Normal template so it happens once. Bump
 ' to run it again on every machine at the next start.
-Private Const SETUP_VERSION As String = "4"      ' 4: beta.6, a real template with no reference to Normal
+Private Const SETUP_VERSION As String = "6"      ' 6: the clipboard normaliser (CR CR and LF CR copies, Shift+Return rows); 5: beta.7, the 2026-09-28 rebuild from the scrubbed sources by the fixed importer; 4: beta.6, a real template with no reference to Normal
 Private Const SETUP_VAR As String = "LingTeX_Setup"
 
 '-----------------------------------------------------------------------------
@@ -100,17 +100,44 @@ Private Const SETUP_VAR As String = "LingTeX_Setup"
 ' the title is a constant rather than a literal at each one: a bulk edit over this
 ' file can no longer silently take it off them.
 Private Const DIALOG_TITLE As String = "LingTeX-Word"
+' What one Insert's warning report may hold before it says "... and N more"
+' (a message box shows 1024 characters; Word for Mac draws the rest as garbage).
+Private Const REPORT_BUDGET As Long = 900
 
 Public gQuiet As Boolean            ' suppress dialogs (tests set this)
 Public gQuietAnswer As Boolean      ' what Confirm returns while quiet
 Public gQuietText As String         ' what Ask returns while quiet
 Public gLastMessage As String       ' the last thing reported, dialog or not
+Public gUndoRecordBroke As Boolean  ' a custom undo record closed early inside a command (tests assert False)
 
 Public Sub Report(ByVal msg As String, ByVal kind As Long)
     gLastMessage = msg
     If gQuiet Then Exit Sub
-    MsgBox msg, kind, DIALOG_TITLE
+    MsgBox ClipForMsgBox(msg), kind, DIALOG_TITLE
 End Sub
+
+' MsgBox shows at most 1024 characters, and Word for Mac draws whatever runs
+' past that as garbage (Seth's screenshot of a six-example report,
+' 2026-09-29). A long message is cut at a line break inside the limit and
+' says how many lines went.
+Public Function ClipForMsgBox(ByVal s As String) As String
+    Const LIMIT As Long = 1000
+    Const KEEP As Long = 880
+    Dim cut As Long, dropped As Long, p As Long
+    If Len(s) <= LIMIT Then
+        ClipForMsgBox = s
+        Exit Function
+    End If
+    cut = InStrRev(s, vbCr, KEEP)
+    If cut < KEEP \ 2 Then cut = KEEP
+    dropped = 1
+    p = InStr(cut + 1, s, vbCr)
+    Do While p > 0
+        dropped = dropped + 1
+        p = InStr(p + 1, s, vbCr)
+    Loop
+    ClipForMsgBox = Left$(s, cut - 1) & vbCr & "... " & CStr(dropped) & " more line(s)."
+End Function
 
 ' A yes/no question.  Same contract: while quiet it answers gQuietAnswer rather
 ' than asking, so a test can exercise both the accept and the decline path.
@@ -279,7 +306,7 @@ End Sub
 Public Sub LingTeXInsertInterlinear()
     Dim doc As Document
     Dim raw As String
-    Dim ex As IgtExample
+    Dim models() As IgtExample, n As Long
     Dim target As Range
     Dim fromClipboard As Boolean
     Dim lines() As String
@@ -315,8 +342,15 @@ Public Sub LingTeXInsertInterlinear()
         raw = target.Text
     End If
 
-    ex = ModelFromText(raw, SettingGranularity(doc))
-    If ex.TierCount = 0 Or ex.ColCount = 0 Then
+    ' NormalizeClipboardText, not raw: the clipboard and a selection both come
+    ' from outside the model, and a selection keeps Chr$(11) where a row was
+    ' broken with Shift+Return. The fallbacks below read the original raw on
+    ' purpose -- plain prose is not FLEx text, and its line breaks mean what
+    ' CleanTextLine says they mean.
+    ' Every example in the text: a FLEx Print View copy of several lines
+    ' carries several, one after another (Seth, 2026-09-16: all are inserted).
+    models = ModelsFromText(NormalizeClipboardText(raw), SettingGranularity(doc), n)
+    If n = 0 Then
         ' Not FLEx text and not tab-separated rows. Selected lines of plain
         ' text -- words on one line, glosses on the next -- take the Text to
         ' Interlinear road, with its one question (Seth, 2026-09-14).
@@ -337,11 +371,124 @@ Public Sub LingTeXInsertInterlinear()
         Exit Sub
     End If
 
-    DrawParsedExample ex, target, doc, "Insert interlinear"
+    If n = 1 Then
+        DrawParsedExample models(0), target, doc, "Insert interlinear"
+    Else
+        DrawParsedExamples models, n, target, doc, "Insert interlinear"
+    End If
     Exit Sub
 
 Fail:
     Report "Error " & CStr(Err.Number) & ": " & Err.Description, vbCritical
+End Sub
+
+'-----------------------------------------------------------------------------
+' Several examples from one copy, one under another, inside ONE undo record.
+' The first replaces the target as DrawParsedExample does; each next one is
+' drawn in a fresh paragraph after the previous example's last translation
+' line -- which also keeps two tables apart, since Word would merge tables
+' that touch.  Each gets the next number; one number for the group with
+' sub-numbers (a), (b) is the agreed shape and is still to come.  Warnings
+' are collected and reported once, by example.
+'-----------------------------------------------------------------------------
+Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target As Range, _
+        doc As Document, ByVal label As String)
+    Dim errNum As Long, errDesc As String
+    Dim i As Long, k As Long, drawn As Long
+    Dim tbl As Table, p As Paragraph
+    Dim nextTarget As Range
+    Dim warnings As Collection, allText As String
+    Dim block As String, heldBack As Long
+    Dim widths() As Double, haveRecord As Boolean
+
+    On Error GoTo Fail
+    gUndoRecordBroke = False
+    gBusy = True
+    ' Measure every example BEFORE the undo record opens (see BeginUndo): a
+    ' write to the hidden measuring document closes a custom record, and the
+    ' second example's measuring did exactly that, so every later drawing step
+    ' listed on its own in the undo menu (Seth's screenshot, 2026-09-29).
+    ' With the cache warm, the draws below never touch that document.
+    For i = 0 To n - 1
+        FixCellSpaces models(i), SettingSpaceReplacement(doc)
+        MeasureExample models(i), doc, widths
+    Next i
+    BeginUndo label
+    Application.ScreenUpdating = False
+    Set nextTarget = target
+    For i = 0 To n - 1
+        ' Several from one copy: one number for the group, a letter each
+        ' (Seth, 2026-09-29; the shape of a LaTeX xlist).
+        If n > 1 Then
+            Set tbl = RenderExample(models(i), nextTarget, i + 1)
+        Else
+            Set tbl = RenderExample(models(i), nextTarget)
+        End If
+        If tbl Is Nothing Then Exit For
+        drawn = drawn + 1
+        ' The record must still be the one opened by the first draw.
+        If i = 0 Then
+            haveRecord = RecordIsOpen()
+        ElseIf haveRecord And Not RecordIsOpen() Then
+            gUndoRecordBroke = True
+        End If
+        Set warnings = CheckExample(models(i))
+        If Not warnings Is Nothing Then
+            If warnings.Count > 0 Then
+                ' Whole examples up to what a message box can show, then a
+                ' count: past 1024 characters Word for Mac draws garbage
+                ' (Seth's six-example report, 2026-09-29). Check Glossing on
+                ' one example gives its full list.
+                block = "Example " & CStr(i + 1) & ":" & vbCr & WarningText(warnings)
+                If allText <> "" And Len(allText) + Len(block) + 2 > REPORT_BUDGET Then
+                    heldBack = heldBack + 1
+                Else
+                    If allText <> "" Then allText = allText & vbCr & vbCr
+                    allText = allText & block
+                End If
+            End If
+        End If
+        If i < n - 1 Then
+            ' The paragraph after the table is the first translation line, or
+            ' Word's own paragraph when there is none; the last translation
+            ' line is FreeCount - 1 paragraphs on.  A new paragraph after it
+            ' is where the next example goes.
+            Set p = doc.Range(tbl.Range.End, tbl.Range.End).Paragraphs(1)
+            For k = 2 To models(i).FreeCount
+                If p.Next Is Nothing Then Exit For
+                Set p = p.Next
+            Next k
+            p.Range.InsertParagraphAfter
+            Set nextTarget = p.Next.Range
+            nextTarget.Collapse 1                 ' wdCollapseStart
+        End If
+    Next i
+    Application.ScreenUpdating = True
+    EndUndo
+    gBusy = False
+    ReleaseScratch
+
+    If drawn < n Then
+        Report CStr(drawn) & " of " & CStr(n) & " examples were drawn; the next could not be." & _
+               IIf(gRenderError = "", "", vbCr & vbCr & gRenderError), vbExclamation
+    ElseIf gRenderError <> "" Then
+        Report "The examples were drawn, but not exactly as planned:" & vbCr & vbCr & _
+               gRenderError & vbCr & vbCr & "Re-wrapping them may fix the layout.", vbExclamation
+    End If
+    If heldBack > 0 Then
+        allText = allText & vbCr & vbCr & "... and " & CStr(heldBack) & _
+                  " more example(s) with warnings: click in one and run Check Glossing to see them."
+    End If
+    If allText <> "" Then Report allText, vbExclamation
+    Exit Sub
+
+Fail:
+    errNum = Err.Number: errDesc = Err.Description
+    Application.ScreenUpdating = True
+    EndUndo
+    gBusy = False
+    ReleaseScratch
+    Report "Error " & errNum & ": " & errDesc, vbCritical
 End Sub
 
 '-----------------------------------------------------------------------------
@@ -1444,6 +1591,16 @@ Public Sub StartPendingUndo()
     On Error GoTo 0
     mPendingUndoLabel = ""
 End Sub
+
+' Is a custom record recording right now?  False as well on a build with no
+' UndoRecord at all, so callers compare with what the first change gave them.
+Private Function RecordIsOpen() As Boolean
+    Dim ur As Object
+    On Error Resume Next
+    Set ur = Application.UndoRecord
+    If Not ur Is Nothing Then RecordIsOpen = ur.IsRecordingCustomRecord
+    Err.Clear
+End Function
 
 Public Sub EndUndo()
     Dim ur As Object

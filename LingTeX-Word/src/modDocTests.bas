@@ -91,6 +91,8 @@ Public Sub RunDocTests()
     RunSection "spacefix"
     RunSection "rows"
     RunSection "fromtext"
+    RunSection "several"
+    RunSection "msgbox"
     RunSection "measure"
     RunSection "agreement"
     RunSection "rendering"
@@ -135,6 +137,8 @@ Private Sub RunSection(ByVal which As String)
         Case "spacefix":     TestSpaceFix
         Case "rows":         TestRowGeometry
         Case "fromtext":     TestTextToInterlinear
+        Case "several":      TestInsertSeveralExamples
+        Case "msgbox":       TestClipForMsgBox
         Case "measure":      TestMeasure
         Case "agreement":    TestRenderMeasureAgreement
         Case "rendering":    TestRendering
@@ -1260,6 +1264,163 @@ Private Sub TestTextToInterlinear()
         Eq "  the first word is in the table, not erased", back.Cells(0, 0), "Uwzob"
         Ok "  and the whole translation is under it", _
             (InStr(ParagraphAfterTable(doc.Tables(1)).Range.Text, "sesuatu") > 0)
+    End If
+
+    gQuiet = savedQuiet
+    gQuietText = savedText
+    CloseNoSave doc
+End Sub
+
+'=============================================================================
+' -- INSERT: SEVERAL EXAMPLES FROM ONE COPY ---------------------------------
+'=============================================================================
+' A FLEx Print View copy of consecutive lines: each example with its number
+' cell, no blank line between them, a gloss spread to the end of a row, and
+' FLEx's end-of-segment sign closing the second (all seen live 2026-09-28,
+' made up here).  Every example is inserted (Seth, 2026-09-16), one under
+' another, and one Undo takes them all back.
+
+Private Function TwoFlexExamples() As String
+    Dim t As String, lrm As String
+    t = vbTab
+    lrm = ChrW(&H200E)
+    TwoFlexExamples = _
+        "1.1" & t & "Morphemes" & t & "vu" & t & "=ve" & t & "ze=" & t & "zuvo" & t & t & vbCr & _
+        t & "Lex. Gloss" & t & "fox" & t & "ERG" & t & "DAT" & t & t & "follow" & t & ".CMP" & vbCr & _
+        lrm & "Free " & lrm & lrm & "The fox's dream was followed." & vbCr & _
+        "1.2" & t & "Morphemes" & t & "zel" & t & "vimo" & t & "=xo" & t & ChrW(&HA7) & vbCr & _
+        t & "Lex. Gloss" & t & "yam" & t & "pick" & t & "SEQ" & t & vbCr & _
+        lrm & "Free " & lrm & lrm & "She picked yams and then"
+End Function
+
+'-----------------------------------------------------------------------------
+' A report longer than a message box can show (1024 characters) is cut at a
+' line break and says how many lines went; Word for Mac drew the overflow as
+' garbage (Seth's six-example report, 2026-09-29).
+'-----------------------------------------------------------------------------
+Private Sub TestClipForMsgBox()
+    Dim s As String, i As Long, out As String
+    Eq "a short message is untouched", ClipForMsgBox("hello" & vbCr & "there"), "hello" & vbCr & "there"
+    For i = 1 To 40
+        s = s & "- warning line number " & CStr(i) & " about a column" & vbCr
+    Next i
+    out = ClipForMsgBox(s)
+    Ok "a long message is cut inside the message-box limit", (Len(out) <= 1000)
+    Ok "  at a line break", (InStr(out, "column" & vbCr & "... ") > 0)
+    Ok "  saying how many lines went", (out Like "*more line(s).")
+    If Not (out Like "*more line(s).") Then Emit "         tail: " & Right$(out, 60)
+End Sub
+
+Private Sub TestInsertSeveralExamples()
+    Dim doc As Document
+    Dim back As IgtExample
+    Dim tbl As Table
+    Dim docsBefore As Long
+    Dim savedQuiet As Boolean, savedText As String
+
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "several: could create a blank document", False
+        Exit Sub
+    End If
+    EnsureStyles doc, True
+    ClearCache
+    savedQuiet = gQuiet
+    savedText = gQuietText
+    gQuiet = True
+    SetSettingGranularity doc, igtWordAligned
+
+    doc.Content.Text = TwoFlexExamples()
+    doc.Content.Select
+    ReleaseScratch
+    docsBefore = Documents.Count
+    gLastMessage = ""
+    RunCommandByName "LingTeXInsertInterlinear"
+    Ok "two examples from one copy draw two tables", (doc.Tables.Count = 2)
+    If doc.Tables.Count = 2 Then
+        back = ReadExampleFromTable(doc.Tables(1))
+        Ok "  the first: two columns by word, the proclitic joined to its host", (back.ColCount = 2)
+        Eq "  its first cell", back.Cells(0, 0), "vu=ve"
+        Eq "  its last gloss, spread to the row's end in the copy, behind the proclitic's", _
+            StripOwnMarks(back.Cells(1, 1)), "DAT=follow.CMP"
+        Ok "  the page holds no ownership mark: the owner is a character style", _
+            (InStr(doc.Tables(1).Range.Text, OwnMark()) = 0)
+        Ok "  and read-back restores the mark from the style", _
+            (back.Cells(0, 1) = "ze=" & OwnMark() & "zuvo")
+        Ok "  its translation is under it", _
+            (InStr(ParagraphAfterTable(doc.Tables(1)).Range.Text, "fox") > 0)
+        back = ReadExampleFromTable(doc.Tables(2))
+        Ok "  the second: two columns, the section sign gone", (back.ColCount = 2)
+        Eq "  its last gloss", back.Cells(1, 1), "pick=SEQ"
+        Ok "  its translation is under it", _
+            (InStr(ParagraphAfterTable(doc.Tables(2)).Range.Text, "yams") > 0)
+        Ok "  no warning was reported", (gLastMessage = "")
+        If gLastMessage <> "" Then Emit "         said: " & gLastMessage
+        Ok "  the undo record stayed open across both examples", (Not gUndoRecordBroke)
+
+        '-- one number for the group, a letter for each (Seth, 2026-09-29) --
+        Eq "  the group is numbered once: the first table shows (1)", ExampleNumberString(doc.Tables(1)), "(1)"
+        Ok "  and has a sub-number cell", (NumberColumns(doc.Tables(1)) = 2)
+        Eq "  reading a.", SubNumberString(doc.Tables(1)), "a."
+        Eq "  the second table's number cell is blank", ExampleNumberString(doc.Tables(2)), ""
+        Eq "  and its sub-number reads b.", SubNumberString(doc.Tables(2)), "b."
+        Ok "  the sub-number cell is inside the example", _
+            (Not FindExampleAt(doc.Tables(2).Cell(1, 2).Range) Is Nothing)
+        Ok "  the translation is indented past both number cells", _
+            (Abs(ParagraphAfterTable(doc.Tables(1)).Format.LeftIndent - _
+                 (SettingNumberHang(doc) + SubNumberWidth(doc))) <= 0.5)
+        Emit "         translation at " & CStr(ParagraphAfterTable(doc.Tables(1)).Format.LeftIndent) & _
+             "pt, hang " & CStr(SettingNumberHang(doc)) & "pt + sub " & CStr(SubNumberWidth(doc)) & "pt"
+        RewrapDocument doc, False
+        Ok "  re-wrap keeps two tables", (doc.Tables.Count = 2)
+        If doc.Tables.Count = 2 Then
+            Eq "  re-wrap keeps (1) on the first", ExampleNumberString(doc.Tables(1)), "(1)"
+            Eq "    and a. beside it", SubNumberString(doc.Tables(1)), "a."
+            Eq "    the second's number cell still blank", ExampleNumberString(doc.Tables(2)), ""
+            Eq "    and b. beside it", SubNumberString(doc.Tables(2)), "b."
+        End If
+    Else
+        Emit "         said: " & gLastMessage
+    End If
+    ' The two are drawn inside one BeginUndo/EndUndo, the call every command
+    ' uses; "leaves no undo record open" above covers it.  Document.Undo on the
+    ' hidden test document does nothing at all (measured 2026-09-28), so the
+    ' one-press check is not made here.
+    CheckStateIsClean "LingTeXInsertInterlinear (several)", docsBefore
+
+    ' Split Column hands the boundary to its owner, and Merge Columns writes
+    ' the owner back: the proclitic cell round-trips through the page.
+    If doc.Tables.Count = 2 Then
+        On Error Resume Next
+        doc.Tables(1).Cell(1, 2 + NumberColumns(doc.Tables(1))).Range.Select
+        Err.Clear
+        On Error GoTo 0
+        gLastMessage = ""
+        RunCommandByName "LingTeXSplitColumn"
+        Set tbl = FindExampleAt(Selection.Range)
+        If tbl Is Nothing Then
+            Ok "  Split Column on the proclitic cell: the example survived", False
+            Emit "         said: " & gLastMessage
+        Else
+            back = ReadExampleFromTable(tbl)
+            Eq "  Split Column gives the proclitic its boundary: ze= then zuvo", _
+                back.Cells(0, 1) & "|" & back.Cells(0, 2), "ze=|zuvo"
+            Eq "    and the gloss likewise", back.Cells(1, 1) & "|" & back.Cells(1, 2), "DAT=|follow.CMP"
+            On Error Resume Next
+            tbl.Cell(1, 2 + NumberColumns(tbl)).Range.Select
+            Err.Clear
+            On Error GoTo 0
+            gLastMessage = ""
+            RunCommandByName "LingTeXMergeColumns"
+            Set tbl = FindExampleAt(Selection.Range)
+            If tbl Is Nothing Then
+                Ok "  Merge Columns: the example survived", False
+                Emit "         said: " & gLastMessage
+            Else
+                back = ReadExampleFromTable(tbl)
+                Ok "  Merge Columns writes the owner back", (back.Cells(0, 1) = "ze=" & OwnMark() & "zuvo")
+            End If
+        End If
     End If
 
     gQuiet = savedQuiet

@@ -28,6 +28,19 @@ Any later change to `src/` means doing this again before the next release:
 `check-dotm.sh` fails (in CI too) when the committed template and `src/`
 disagree.
 
+**`check-dotm.sh` also reads every compiled module out of the template and
+compares it with `src/` line for line** (`tools/check-dotm-sources.py`), so the
+template is proven to be the committed sources by construction — no word list.
+It needs `python3` and `olefile`; run `pip install olefile` once locally, or the
+step says SKIP and proves nothing. The release workflow requires it and cannot
+skip. It also fails a class or form that went in double-spaced, and a template
+built with the old `modImport` (2026-09-15). The step after it fails a
+template whose own document body holds any text, or that carries document
+variables, comments, notes, headers, footers or AutoText: the release
+template is code and ribbon and nothing else. It names any variables it
+finds; `LingTeX_DevRoot` means `SetDevRoot` was run against the engine
+instead of the dev template — remove it from the engine and save again.
+
 ## 2. Publish
 
 Push a tag from the commit that holds the template:
@@ -57,7 +70,7 @@ Not the dev rig: the files a user would download.
 
 **Windows** (the VM): download the `.exe`, close Word, run it (SmartScreen:
 More info → Run anyway), start Word. Expect the installed message with the shortcuts,
-the Interlinear tab, and then, from Alt+F8: `RunAllTests` (116) and `RunDocTests`
+the Interlinear tab, and then, from Alt+F8: `RunAllTests` (140) and `RunDocTests`
 (all green; it writes `RunDocTests.win.txt` beside the template in STARTUP,
 which the Immediate window may cut short). Then the by-hand basics: insert
 the sample, re-wrap after narrowing the margins, split and merge, check,

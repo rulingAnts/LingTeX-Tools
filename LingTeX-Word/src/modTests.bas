@@ -70,6 +70,8 @@ Public Sub RunAllTests()
     ' which section died and the run CONTINUES to the next one.
     RunSection "golden"
     RunSection "projections"
+    RunSection "ownership"
+    RunSection "freelines"
     RunSection "routing"
     RunSection "linebreaks"
     RunSection "columns"
@@ -105,6 +107,8 @@ Private Sub RunSection(ByVal which As String)
     Select Case which
         Case "golden":      TestGoldenVectors
         Case "projections": TestProjections
+        Case "ownership":   TestOwnership
+        Case "freelines":   TestFreeLines
         Case "routing":     TestRouting
         Case "linebreaks":  TestLineBreaks
         Case "columns":     TestColumnEditing
@@ -315,7 +319,7 @@ Private Function Vector1Raw() As String
         T & "Lex. Gloss" & T & "1SG" & T & "dream" & T & "DEM" & T & "***" & T & "fox" & _
             T & "ERG" & T & T & "follow" & T & ".CMP" & T & "REL" & T & "FOC" & _
             T & "1SG" & T & "dream" & vbLf & _
-        "Free Eng Concerning what I'm dreaming about."
+        "Free Concerning what I'm dreaming about."
 End Function
 
 Private Function Vector1Forms() As String
@@ -343,7 +347,7 @@ Private Function Vector2Raw() As String
             T & "SEQ" & T & "P.N." & T & "fox" & T & "ERG" & T & T & "follow" & _
             T & ".CMP" & T & "REL" & T & "FOC" & T & "1SG" & T & "dream" & T & "ABL" & _
             T & "REL" & vbLf & _
-        "Free Eng (When) she picked her yams."
+        "Free (When) she picked her yams."
 End Function
 
 Private Function Vector2Forms() As String
@@ -359,12 +363,160 @@ Private Function Vector2Glosses() As String
         T & "dream=ABL=REL"
 End Function
 
+' PROMPT.md example 3, input.  A gloss spread over the cells after its
+' morpheme's at the END of the row: the morpheme row ends in empty cells, which
+' the parser must keep as columns (seen live 2026-09-28).
+Private Function Vector3Raw() As String
+    Vector3Raw = _
+        "Morphemes" & T & "vu" & T & "=ve" & T & "zo" & T & "zuvo" & T & T & vbLf & _
+        T & "Lex. Gloss" & T & "fox" & T & "ERG" & T & "dream" & T & T & "follow" & T & ".CMP" & vbLf & _
+        "Free The fox's dream was followed."
+End Function
+
+Private Function Vector3Forms() As String
+    Vector3Forms = "vu=ve" & T & "zo" & T & "zuvo"
+End Function
+
+Private Function Vector3Glosses() As String
+    Vector3Glosses = "fox=ERG" & T & "dream" & T & "follow.CMP"
+End Function
+
+' PROMPT.md example 4, input.  The same spread after a CLITIC: its own gloss
+' cell empty, the pieces under empty morpheme cells ending the row; they join
+' behind its boundary character (seen live 2026-09-28).
+Private Function Vector4Raw() As String
+    Vector4Raw = _
+        "Morphemes" & T & "vu" & T & "=ve" & T & "zo" & T & "=zi" & T & T & vbLf & _
+        T & "Lex. Gloss" & T & "fox" & T & "ERG" & T & "dream" & T & T & "follow" & T & ".CMP" & vbLf & _
+        "Free The fox dreamt of following."
+End Function
+
+Private Function Vector4Forms() As String
+    Vector4Forms = "vu=ve" & T & "zo=zi"
+End Function
+
+Private Function Vector4Glosses() As String
+    Vector4Glosses = "fox=ERG" & T & "dream=follow.CMP"
+End Function
+
+' PROMPT.md example 5, input.  A proclitic before an enclitic, a proclitic
+' before a stem whose gloss is spread, then a suffix and an enclitic: a
+' TRAILING boundary joins the morpheme after it, and a seam that carries the
+' boundary on both sides writes it once.
+Private Function Vector5Raw() As String
+    Vector5Raw = _
+        "Morphemes" & T & "xu=" & T & "=ve" & T & "zo" & T & "ze=" & T & "zuvo" & T & T & T & "-a" & T & "=zi" & vbLf & _
+        T & "Lex. Gloss" & T & "3SG" & T & "ERG" & T & "dream" & T & "DAT" & T & T & "follow" & T & ".CMP" & T & "lnk" & T & "REL" & vbLf & _
+        "Free She dreamt of following him."
+End Function
+
+Private Function Vector5Forms() As String
+    Vector5Forms = "xu=ve" & T & "zo" & T & "ze=zuvo-a=zi"
+End Function
+
+Private Function Vector5Glosses() As String
+    Vector5Glosses = "3SG=ERG" & T & "dream" & T & "DAT=follow.CMP-lnk=REL"
+End Function
+
+' PROMPT.md example 6, input.  A copied baseline ("Word"): its words are the
+' columns.  Rows 0 and 1 are the baseline and the Morphemes row.
+Private Function Vector6Raw() As String
+    Vector6Raw = _
+        "1.1" & T & "Word" & T & "vu" & T & "ve" & T & "zo" & T & "zuvoa" & T & T & T & T & "te" & T & ChrW(&HA7) & vbLf & _
+        T & "Morphemes" & T & "vu" & T & "=ve" & T & "zo" & T & "zuvo" & T & T & T & "-a" & T & "=te" & T & vbLf & _
+        T & "Lex. Gloss" & T & "fox" & T & "ERG" & T & "dream" & T & T & "follow" & T & ".CMP" & T & "lnk" & T & "SEQ" & T & vbLf & _
+        "Free The fox dreamt of following and then"
+End Function
+
+Private Function Vector6Forms() As String
+    Vector6Forms = "vu" & T & "ve" & T & "zo" & T & "zuvoa" & T & "te"
+End Function
+
+Private Function Vector6Glosses() As String
+    Vector6Glosses = "vu" & T & "=ve" & T & "zo" & T & "zuvo-a" & T & "=te"
+End Function
+
+' PROMPT.md example 7, input.  Everything a copy may hold: two writing systems
+' on the Morphemes line, two analysis languages on the gloss line, Lex. Gram.
+' Info., Word Gloss in two languages, Word Cat., two free translations without
+' marks (the further-language line starts with a space).
+Private Function Vector7Raw() As String
+    Vector7Raw = _
+        "1.1" & T & "Word" & T & "vu" & T & "ve" & T & "zo" & T & "zuvoa" & T & T & T & T & "te" & T & ChrW(&HA7) & vbLf & _
+        T & "Morphemes xyz" & T & "wu" & T & "=we" & T & "so" & T & "suwo" & T & T & T & "-a" & T & "=tee" & T & vbLf & _
+        T & "Morphemes xyz-ort" & T & "vu" & T & "=ve" & T & "zo" & T & "zuvo" & T & T & T & "-a" & T & "=te" & T & vbLf & _
+        T & "Lex. Gloss Eng" & T & "fox" & T & "ERG" & T & "dream" & T & T & "follow" & T & ".CMP" & T & "lnk" & T & "SEQ" & T & vbLf & _
+        T & "Lex. Gloss Ind" & T & T & T & "mimpi" & T & T & T & ".CMP" & T & T & T & vbLf & _
+        T & "Lex. Gram. Info. Eng" & T & "n" & T & "adp" & T & "n" & T & "v" & T & T & T & "v:(lnk)" & T & "cosub" & T & vbLf & _
+        T & "Word Gloss Eng" & T & "fox" & T & "by" & T & "dream" & T & "followed" & T & T & T & T & "then" & T & vbLf & _
+        T & "Word Gloss Ind" & T & "rubah" & T & "oleh" & T & "mimpi" & T & "diikuti" & T & T & T & T & "lalu" & T & vbLf & _
+        T & "Word Cat. Eng" & T & "n" & T & "adp" & T & "n" & T & "v" & T & T & T & T & "cosub" & T & vbLf & _
+        "Free Eng The fox dreamt of following and then" & vbLf & _
+        " Ind rubah mimpi ikut lalu"
+End Function
+
+Private Function Vector7Forms() As String
+    Vector7Forms = "vu" & T & "ve" & T & "zo" & T & "zuvoa" & T & "te"
+End Function
+
+Private Function Vector7Glosses() As String
+    Vector7Glosses = "wu" & T & "=we" & T & "so" & T & "suwo-a" & T & "=tee"
+End Function
+
+' PROMPT.md example 8, input.  The baseline in two writing systems, the first
+' with a form for only some words; a proclitic and its host as one baseline
+' word; a second Morphemes row.  Rows 0 and 1 are the two Word rows.
+Private Function Vector8Raw() As String
+    Vector8Raw = _
+        "1.1" & T & "Word xyz" & T & T & T & "so" & T & T & T & vbLf & _
+        T & "Word xyz-ort" & T & "vuve" & T & T & "zo" & T & "zuvoa" & T & T & vbLf & _
+        T & "Morphemes xyz" & T & "wu=" & T & "=we" & T & "so" & T & "suwo" & T & T & "-a" & vbLf & _
+        T & "Morphemes xyz-ort" & T & "vu=" & T & "=ve" & T & "zo" & T & "zuvo" & T & T & "-a" & vbLf & _
+        T & "Lex. Gloss" & T & "fox" & T & "ERG" & T & "dream" & T & T & "follow" & T & "lnk" & vbLf & _
+        "Free The fox dreamt of following"
+End Function
+
+Private Function Vector8Forms() As String
+    Vector8Forms = T & "so" & T
+End Function
+
+Private Function Vector8Glosses() As String
+    Vector8Glosses = "vuve" & T & "zo" & T & "zuvoa"
+End Function
+
+' A vector with a leading example number, as Print View copies it, and FLEx's
+' end-of-segment sign as a last cell of the first row with an empty gloss cell
+' under it: both must fall away.  Pure ASCII source, so ChrW(&HA7).
+Private Function WithSectionSign(ByVal raw As String) As String
+    Dim p1 As Long, p2 As Long
+    p1 = InStr(raw, vbLf)
+    p2 = InStr(p1 + 1, raw, vbLf)
+    WithSectionSign = "1.1" & T & Left$(raw, p1 - 1) & T & ChrW(&HA7) & _
+                      Mid$(raw, p1, p2 - p1) & T & Mid$(raw, p2)
+End Function
+
 Private Sub TestGoldenVectors()
     Section "Golden vectors (PROMPT.md)"
     CheckVector "example 1", Vector1Raw(), Vector1Forms(), Vector1Glosses(), _
                 "Concerning what I'm dreaming about."
     CheckVector "example 2", Vector2Raw(), Vector2Forms(), Vector2Glosses(), _
                 "(When) she picked her yams."
+    CheckVector "example 3 (a gloss spread to the row's end)", Vector3Raw(), Vector3Forms(), Vector3Glosses(), _
+                "The fox's dream was followed."
+    CheckVector "example 4 (a clitic's gloss spread to the row's end)", Vector4Raw(), Vector4Forms(), Vector4Glosses(), _
+                "The fox dreamt of following."
+    CheckVector "example 5 (proclitics: a trailing boundary joins the host)", Vector5Raw(), Vector5Forms(), Vector5Glosses(), _
+                "She dreamt of following him."
+    CheckVector "example 6 (a copied baseline gives the columns)", Vector6Raw(), Vector6Forms(), Vector6Glosses(), _
+                "The fox dreamt of following and then"
+    CheckVector "example 7 (every line type, a code on every line)", Vector7Raw(), Vector7Forms(), Vector7Glosses(), _
+                "The fox dreamt of following and then"
+    CheckVector "example 8 (a baseline in two writing systems, one sparse)", Vector8Raw(), Vector8Forms(), Vector8Glosses(), _
+                "The fox dreamt of following"
+    ' A cell that is exactly "section sign" is dropped, and the column it
+    ' leaves empty on every tier with it (Seth, 2026-09-15; seen live 2026-09-28).
+    CheckVector "example 2 with a number and a trailing section sign", WithSectionSign(Vector2Raw()), _
+                Vector2Forms(), Vector2Glosses(), "(When) she picked her yams."
 End Sub
 
 Private Sub CheckVector(ByVal name As String, ByVal raw As String, _
@@ -378,18 +530,142 @@ Private Sub CheckVector(ByVal name As String, ByVal raw As String, _
 
     Eq name & ": word-aligned forms", RowText(ex, 0), wantForms
     Eq name & ": word-aligned glosses", RowText(ex, 1), wantGlosses
-    Ok name & ": free translation captured", (ex.FreeCount = 1)
-    If ex.FreeCount = 1 Then Eq name & ": free translation text", ex.FreeLines(0), wantFree
+    Ok name & ": free translation captured", (ex.FreeCount >= 1)
+    If ex.FreeCount >= 1 Then Eq name & ": first free translation text", ex.FreeLines(0), wantFree
 End Sub
 
+' A tier's cells, tab-joined, as an export shows them: ownership marks out.
 Private Function RowText(ex As IgtExample, ByVal t As Long) As String
+    RowText = StripOwnMarks(RawRow(ex, t))
+End Function
+
+' A tier's cells exactly as the model holds them, marks and all.
+Private Function RawRow(ex As IgtExample, ByVal t As Long) As String
     Dim c As Long, s As String
     For c = 0 To ex.ColCount - 1
         If c > 0 Then s = s & vbTab
         s = s & ex.Cells(t, c)
     Next c
-    RowText = s
+    RawRow = s
 End Function
+
+'=============================================================================
+' -- OWNERSHIP OF A BOUNDARY ACROSS BY WORD AND BY MORPHEME ------------------
+'=============================================================================
+' A fold writes the mark, a split consumes it, so the toggle is lossless both
+' ways; without a mark the right-hand morpheme keeps the boundary (PROMPT.md
+' rule 9).
+
+'=============================================================================
+' -- FREE LINES, A BASELINE, EVERY LINE TYPE --------------------------------
+'=============================================================================
+' FLEx's direction marks say where a free translation's text starts; without
+' them the next line decides (PROMPT.md rule 10).  A copied baseline gives the
+' columns and takes no part in the checks (rule 12); every line type keeps
+' its row, in FLEx's order (rule 11).
+
+Private Sub TestFreeLines()
+    Dim two As String, M As String
+    Dim ex As IgtExample
+    Dim word As IgtExample, morph As IgtExample, warnings As Collection
+    M = ChrW(&H200E)
+    two = "Morphemes" & T & "vu" & T & "=ve" & vbLf & T & "Lex. Gloss" & T & "fox" & T & "ERG" & vbLf
+    ex = ModelFromText(two & M & "Free " & M & M & "came back.", igtWordAligned)
+    Eq "with marks, no code: the text is whole", FreeText(ex), "came back."
+    ex = ModelFromText(two & M & "Free " & M & "Eng" & M & " " & M & M & "came back." & vbLf & _
+                       M & " " & M & "Ind" & M & " " & M & M & "dia kembali.", igtWordAligned)
+    Eq "with marks and a code, two languages", FreeText(ex), "came back.|dia kembali."
+    ex = ModelFromText(two & "Free came back.", igtWordAligned)
+    Eq "without marks, no further line: the first word stays", FreeText(ex), "came back."
+    ex = ModelFromText(two & "Free Eng came back." & vbLf & " Ind dia kembali.", igtWordAligned)
+    Eq "without marks, a further line follows: the code goes", FreeText(ex), "came back.|dia kembali."
+    ex = ModelFromText(two & "Free came back." & vbLf & "Lit. come back again.", igtWordAligned)
+    Eq "Lit. is a line of its own", FreeText(ex), "came back.|come back again."
+
+    word = ModelFromText(Vector7Raw(), igtWordAligned)
+    Ok "example 7 keeps nine rows", (word.TierCount = 9)
+    If word.TierCount = 9 Then
+        Eq "  in FLEx's order", word.Tiers(0) & "," & word.Tiers(1) & "," & word.Tiers(2) & "," & word.Tiers(3) & "," & _
+           word.Tiers(4) & "," & word.Tiers(5) & "," & word.Tiers(6) & "," & word.Tiers(7) & "," & word.Tiers(8), _
+           ROLE_VERNACULAR & "," & ROLE_MORPHEMES & "," & ROLE_MORPHEMES & "," & ROLE_GLOSS & "," & ROLE_GLOSS & "," & _
+           ROLE_CATEGORY & "," & ROLE_WORDGLOSS & "," & ROLE_WORDGLOSS & "," & ROLE_CATEGORY
+        Eq "  the first gloss row on the baseline's columns", RowText(word, 3), "fox" & T & "=ERG" & T & "dream" & T & "follow.CMP-lnk" & T & "=SEQ"
+        Eq "  the second gloss row, sparse, on the same segments", RowText(word, 4), T & T & "mimpi" & T & ".CMP" & T
+        Eq "  Lex. Gram. Info. per segment, with the boundaries", RowText(word, 5), "n" & T & "=adp" & T & "n" & T & "v-v:(lnk)" & T & "=cosub"
+        Eq "  Word Gloss per baseline word", RowText(word, 7), "rubah" & T & "oleh" & T & "mimpi" & T & "diikuti" & T & "lalu"
+        Eq "  Word Cat. per baseline word", RowText(word, 8), "n" & T & "adp" & T & "n" & T & "v" & T & "cosub"
+    End If
+    Eq "  both free lines", FreeText(word), "The fox dreamt of following and then|rubah mimpi ikut lalu"
+    morph = ModelFromText(Vector7Raw(), igtMorphemeAligned)
+    Eq "  by morpheme, the second form row splits with the first", RowText(morph, 2), "vu" & T & "=ve" & T & "zo" & T & "zuvo" & T & "-a" & T & "=te"
+    Eq "  the baseline sits in each word's first column", RowText(morph, 0), "vu" & T & "ve" & T & "zo" & T & "zuvoa" & T & T & "te"
+    Set warnings = CheckExample(word)
+    Ok "  no warning at all: the baseline takes no part in the checks", (warnings.Count = 0)
+    If warnings.Count > 0 Then Emit "         first: " & warnings(1).Describe
+
+    ' Example 8: a column starts a word where ANY Word row has a cell, and
+    ' the second Morphemes row writes a shared seam once, as the first does.
+    word = ModelFromText(Vector8Raw(), igtWordAligned)
+    Ok "example 8 has three columns: the sparse Word row did not merge words", (word.ColCount = 3)
+    Eq "  the first Morphemes row", RowText(word, 2), "wu=we" & T & "so" & T & "suwo-a"
+    Eq "  the second Morphemes row, its shared seam written once", RowText(word, 3), "vu=ve" & T & "zo" & T & "zuvo-a"
+    Eq "  the gloss row", RowText(word, 4), "fox=ERG" & T & "dream" & T & "follow-lnk"
+    Ok "  the second Morphemes row carries the ownership marks too", _
+        (InStr(RawRow(word, 3), OwnMark()) > 0)
+    Set warnings = CheckExample(word)
+    Ok "  and no warning", (warnings.Count = 0)
+    If warnings.Count > 0 Then Emit "         first: " & warnings(1).Describe
+End Sub
+
+Private Function FreeText(ex As IgtExample) As String
+    Dim i As Long, s As String
+    For i = 0 To ex.FreeCount - 1
+        If i > 0 Then s = s & "|"
+        s = s & ex.FreeLines(i)
+    Next i
+    FreeText = s
+End Function
+
+Private Sub TestOwnership()
+    Dim word As IgtExample, morph As IgtExample, back As IgtExample, legacy As IgtExample
+    Dim encl As IgtExample
+    Dim flags() As Boolean, c As Long, t As Long
+
+    word = ModelFromText(Vector5Raw(), igtWordAligned)
+    morph = ModelFromText(Vector5Raw(), igtMorphemeAligned)
+    encl = ModelFromText(Vector2Raw(), igtWordAligned)
+    Ok "a proclitic's boundary is marked in the word-aligned cell", _
+       (InStr(word.Cells(0, 2), OwnMark()) > 0)
+    Ok "  and in its gloss", (InStr(word.Cells(1, 2), OwnMark()) > 0)
+    Ok "an enclitic's is not", (InStr(encl.Cells(0, 2), OwnMark()) = 0)
+    Ok "one both sides own carries the mark on both sides", _
+       (InStr(word.Cells(0, 0), OwnMark() & "=" & OwnMark()) > 0)
+
+    back = word
+    ProjectToMorphemes back
+    Eq "re-splitting the word-aligned cells reproduces the morpheme-aligned forms", _
+       RawRow(back, 0), RawRow(morph, 0)
+    Eq "  and glosses", RawRow(back, 1), RawRow(morph, 1)
+    Ok "  and consumes every mark", (InStr(RawRow(back, 0) & RawRow(back, 1), OwnMark()) = 0)
+
+    flags = NoBreakFlags(back)
+    For c = back.ColCount - 1 To 1 Step -1
+        If flags(c) Then MergeColumns back, c - 1, c
+    Next c
+    Eq "merging back reproduces the word-aligned cells, marks and all", _
+       RawRow(back, 0) & "|" & RawRow(back, 1), RawRow(word, 0) & "|" & RawRow(word, 1)
+
+    legacy = word
+    For t = 0 To legacy.TierCount - 1
+        For c = 0 To legacy.ColCount - 1
+            legacy.Cells(t, c) = StripOwnMarks(legacy.Cells(t, c))
+        Next c
+    Next t
+    ProjectToMorphemes legacy
+    Eq "without a mark the right-hand morpheme keeps the boundary, as it always did", _
+       legacy.Cells(0, 3) & "|" & legacy.Cells(0, 4), "ze|=zuvo"
+    Eq "an export shows no mark", RowText(word, 0), Vector5Forms()
+End Sub
 
 
 '=============================================================================
@@ -400,6 +676,12 @@ Private Sub TestProjections()
     Section "Projections (word-aligned vs morpheme-aligned)"
     CheckProjection "example 1", Vector1Raw()
     CheckProjection "example 2", Vector2Raw()
+    CheckProjection "example 3", Vector3Raw()
+    CheckProjection "example 4", Vector4Raw()
+    CheckProjection "example 5 (proclitics)", Vector5Raw()
+    CheckProjection "example 6 (a baseline)", Vector6Raw()
+    CheckProjection "example 7 (every line type)", Vector7Raw()
+    CheckProjection "example 8 (two Word rows, two Morphemes rows)", Vector8Raw()
 End Sub
 
 Private Sub CheckProjection(ByVal name As String, ByVal raw As String)
@@ -428,7 +710,9 @@ Private Sub CheckProjection(ByVal name As String, ByVal raw As String)
 
     ' Merging every continuation column back into its head must reproduce the
     ' word-aligned projection: the two are views of one segment list, not two
-    ' separate parsers.
+    ' separate parsers.  Not with a baseline: there the columns are its words,
+    ' and a clitic's column, though never a wrap-line start, is a word of its own.
+    If TierIndex(morph, ROLE_VERNACULAR) >= 0 Then Exit Sub
     flags = NoBreakFlags(morph)
     For c = morph.ColCount - 1 To 1 Step -1
         If flags(c) Then MergeColumns morph, c - 1, c
@@ -492,6 +776,8 @@ End Sub
 Private Sub TestLineBreaks()
     Dim lf As String
     Dim mixed As String
+    Dim doubled As String
+    Dim tsv As String
 
     Section "Line breaks (CR LF and CR input parse as LF input does)"
     Emit "  note  " & LineBreakConstantsLine()
@@ -513,6 +799,77 @@ Private Sub TestLineBreaks()
     lf = Vector1Raw() & vbLf & vbLf & Vector2Raw()
     CheckLineBreakVariants "two FLEx examples", lf, 6, 2
     CheckTwoExamplesCrLf lf
+
+    ' -- Text arriving from outside the model ---------------------------------
+    ' NormalizeClipboardText, the one call the clipboard and selection readers
+    ' make. CR CR is what PowerPoint's TextRange2.Paste leaves of a Windows
+    ' CR LF on the Mac; LF CR is what vbCrLf IS there, so text built with it
+    ' looks the same; a vertical tab is what Shift+Return leaves in a Word
+    ' selection. All of them must give the blocks the LF form gives.
+    ' Mirrors "Clipboard and selection normalising" in tools/parity-test.js and
+    ' SectionLineBreaks in LingTeX-PowerPoint's modPptTests.
+    lf = Vector1Raw()
+    CheckClipboardVariant "one example, LF", lf, 1
+    CheckClipboardVariant "one example, CR LF", Replace(lf, Chr$(10), Chr$(13) & Chr$(10)), 1
+    CheckClipboardVariant "one example, CR", Replace(lf, Chr$(10), Chr$(13)), 1
+    CheckClipboardVariant "one example, doubled CR CR", Replace(lf, Chr$(10), Chr$(13) & Chr$(13)), 1
+    CheckClipboardVariant "one example, LF CR", Replace(lf, Chr$(10), Chr$(10) & Chr$(13)), 1
+    CheckClipboardVariant "one example, rows split by a vertical tab", _
+                          Replace(lf, Chr$(10), Chr$(11)), 1
+
+    lf = Vector1Raw() & vbLf & vbLf & Vector2Raw()
+    doubled = Replace(lf, Chr$(10), Chr$(13) & Chr$(13))
+    CheckClipboardVariant "two examples, LF", lf, 2
+    CheckClipboardVariant "two examples, CR LF", Replace(lf, Chr$(10), Chr$(13) & Chr$(10)), 2
+    CheckClipboardVariant "two examples, doubled CR CR", doubled, 2
+    CheckClipboardVariant "two examples, LF CR", Replace(lf, Chr$(10), Chr$(10) & Chr$(13)), 2
+
+    ' What PowerPoint's paste reports for a CR LF copy that ends in a break: the
+    ' internal breaks doubled, the trailing one single (the box's last paragraph
+    ' has no terminator). A run at either end of the payload is a terminator,
+    ' not structure, so it must not veto the collapse (2026-09-28).
+    CheckClipboardVariant "one example, doubled CR CR, trailing CR", _
+                          Replace(Vector1Raw(), Chr$(10), Chr$(13) & Chr$(13)) & Chr$(13), 1
+    CheckClipboardVariant "two examples, doubled CR CR, trailing CR", doubled & Chr$(13), 2
+
+    ' Five runs of two break characters, one run of four: the blank line between
+    ' the examples. Counted in characters, so a CR LF payload reads as 2x too.
+    Eq "the run profile of the doubled two-example text", _
+       LineBreakRunProfile(doubled), "2x4,4x1"
+    Eq "normalising twice is normalising once", _
+       ShowBreaks(NormalizeClipboardText(NormalizeClipboardText(doubled))), _
+       ShowBreaks(NormalizeClipboardText(doubled))
+
+    ' Not FLEx, so neither repair applies: halving is justified by a fact about
+    ' FLEx output -- that the tier rows of one block are separated by a single
+    ' break -- and a hand-built table keeps its blank line.
+    tsv = "one" & T & "two" & vbLf & vbLf & "three" & T & "four"
+    Eq "a blank line in plain TSV survives", _
+       ShowBreaks(NormalizeClipboardText(tsv)), ShowBreaks(tsv)
+    Eq "a doubled-looking plain TSV is left alone", _
+       ShowBreaks(NormalizeClipboardText("one" & T & "two" & Chr$(13) & Chr$(13) & Chr$(13) & "three" & T & "four")), _
+       "one<TAB>two<LF><LF><LF>three<TAB>four"
+End Sub
+
+' One payload, in one break convention, through NormalizeClipboardText: the
+' blocks the parser then finds, and that each carries its tiers and its free
+' line rather than having been cut up or run together.
+Private Sub CheckClipboardVariant(ByVal name As String, ByVal raw As String, _
+        ByVal wantBlocks As Long)
+    Dim blocks() As FlexBlock
+    Dim i As Long
+    Dim shaped As Boolean
+
+    blocks = ParseFlexBlocks(NormalizeClipboardText(raw))
+    Eq name & ": blocks", CStr(UBound(blocks) + 1), CStr(wantBlocks)
+    If UBound(blocks) + 1 <> wantBlocks Then Exit Sub
+
+    shaped = True
+    For i = 0 To UBound(blocks)
+        If blocks(i).TierCount <> 2 Then shaped = False
+        If blocks(i).FreeCount <> 1 Then shaped = False
+    Next i
+    Ok name & ": every block has its two tiers and its free line", shaped
 End Sub
 
 ' The same text with LF, CR LF and CR line breaks must give the same examples:

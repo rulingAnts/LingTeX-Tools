@@ -181,6 +181,34 @@ NextLine:
     Next i
 End Function
 
+'-----------------------------------------------------------------------------
+' Text arriving from OUTSIDE the model -- off the clipboard, or out of a
+' selection in a document -- made ready for the parser.  One call, made once,
+' at the boundary; the parser itself keeps using NormalizeLineBreaks.
+'
+' For FLEx-shaped text: vertical tabs become line breaks, every break
+' convention becomes LF, and a uniformly doubled paste is halved
+' (CollapseDoubledLineBreaks in modFlexParse carries the reasoning).
+'
+' For anything else -- plain TSV, prose -- only the break conventions are
+' normalised, which loses nothing.  Neither of the other two repairs is
+' justified there: both rest on a fact about FLEx output, that the tier rows of
+' one block are separated by a single break, and ModelFromTsv ignores blank
+' lines anyway.  So a blank line in a hand-built table survives, and a manual
+' line break in prose stays the same line as CleanTextLine reads it.
+'
+' Not inside NormalizeLineBreaks, which is a lossless mapping of conventions
+' and runs several times per parse: a repair must not be applied twice, and
+' must not touch text that never had the fault.
+'-----------------------------------------------------------------------------
+Public Function NormalizeClipboardText(ByVal s As String) As String
+    If Not LooksLikeFlex(s) Then
+        NormalizeClipboardText = NormalizeLineBreaks(s)
+        Exit Function
+    End If
+    NormalizeClipboardText = CollapseDoubledLineBreaks(VerticalTabsToLineBreaks(s))
+End Function
+
 ' First example in raw text, routed by inspection to the FLEx or plain-TSV path.
 Public Function ModelFromText(ByVal raw As String, _
         ByVal granularity As IgtGranularity) As IgtExample
@@ -268,7 +296,7 @@ Public Function ModelFromBlock(b As FlexBlock, _
     Dim t As Long, i As Long, s As Long, c As Long
     Dim morphIdx As Long, glossIdx As Long, wgIdx As Long, catIdx As Long, wordIdx As Long
     Dim formIdx As Long, dataStart As Long
-    Dim formArr() As String, glossArr() As String
+    Dim formArr() As String, glossArr() As String, starts() As String
     Dim words() As IgtWord, nWords As Long
     Dim forms() As String, glosses() As String
     Dim spanStart() As Long, spanEnd() As Long
@@ -312,7 +340,14 @@ Public Function ModelFromBlock(b As FlexBlock, _
         If IsAllDigits(formArr(dataStart)) Then dataStart = dataStart + 1
     End If
 
-    words = GroupSegmentsFromColumns(formArr, glossArr, dataStart, nWords)
+    ' With a copied baseline its words are the columns (PROMPT.md rule 12);
+    ' without one the boundary characters group the morphemes.
+    If wordIdx >= 0 And morphIdx >= 0 Then
+        starts = BaselineStarts(b)
+        words = GroupByBaseline(formArr, glossArr, starts, dataStart, nWords)
+    Else
+        words = GroupSegmentsFromColumns(formArr, glossArr, dataStart, nWords)
+    End If
     HandleStandalonePunctuation words, nWords
     If nWords = 0 Then Exit Function
 
@@ -328,8 +363,8 @@ Public Function ModelFromBlock(b As FlexBlock, _
             For s = 0 To words(i).SegCount - 1
                 ' The boundary character leads BOTH cells, which is exactly
                 ' invariant 1 satisfied by construction.
-                forms(nCols) = words(i).Segments(s).Bd & words(i).Segments(s).Form
-                glosses(nCols) = words(i).Segments(s).Bd & words(i).Segments(s).Gloss
+                forms(nCols) = words(i).Segments(s).Bd & words(i).Segments(s).Form & words(i).Segments(s).Tb
+                glosses(nCols) = words(i).Segments(s).Bd & words(i).Segments(s).Gloss & words(i).Segments(s).Tb
                 If s = 0 Then
                     ' Only a word's first column carries its word-level tiers.
                     spanStart(nCols) = words(i).StartCol
@@ -349,45 +384,62 @@ Public Function ModelFromBlock(b As FlexBlock, _
         End If
     Next i
 
-    '-- Assemble the tier rows ----------------------------------------------
-    ReDim tierRoles(0 To 5)
-    ReDim tierCols(0 To 5)
+    '-- Assemble the tier rows, in FLEx's order --------------------------------
+    ' The first Morphemes row (or the Word row when there is none) gave the
+    ' segments and so the columns; every other row is laid out on them: a
+    ' Word row and the word-level rows (Word Gloss, Word Cat.) per word span,
+    ' a further Morphemes or Lex. Gloss row and Lex. Gram. Info. per segment.
+    ' A row's writing-system code is not kept; the rows keep FLEx's order.
+    ReDim tierRoles(0 To 5 + b.TierCount)
+    ReDim tierCols(0 To 5 + b.TierCount)
     nTiers = 0
 
-    ' A surface-word tier, when FLEx supplied one alongside the morpheme tier.
-    If morphIdx >= 0 And wordIdx >= 0 Then
-        tierRoles(nTiers) = ROLE_VERNACULAR
-        tierCols(nTiers) = PerWordTier(b.ColArrays(wordIdx), spanStart, spanEnd, nCols)
-        nTiers = nTiers + 1
-    End If
-
-    ' The form tier keeps the role FLEx gave it, so the paragraph style in the
-    ' rendered table says whether the row is surface words or a breakdown.
-    If morphIdx >= 0 Then
-        tierRoles(nTiers) = ROLE_MORPHEMES
-    Else
-        tierRoles(nTiers) = ROLE_VERNACULAR
-    End If
-    tierCols(nTiers) = forms
-    nTiers = nTiers + 1
-
-    If glossIdx >= 0 Then
-        tierRoles(nTiers) = ROLE_GLOSS
-        tierCols(nTiers) = glosses
-        nTiers = nTiers + 1
-    End If
-
-    If wgIdx >= 0 Then
-        tierRoles(nTiers) = ROLE_WORDGLOSS
-        tierCols(nTiers) = PerWordTier(b.ColArrays(wgIdx), spanStart, spanEnd, nCols)
-        nTiers = nTiers + 1
-    End If
-
-    If catIdx >= 0 Then
-        tierRoles(nTiers) = ROLE_CATEGORY
-        tierCols(nTiers) = PerWordTier(b.ColArrays(catIdx), spanStart, spanEnd, nCols)
-        nTiers = nTiers + 1
-    End If
+    For t = 0 To b.TierCount - 1
+        If t = formIdx Then
+            ' The form tier keeps the role FLEx gave it, so the paragraph style
+            ' in the rendered table says whether the row is words or a breakdown.
+            If morphIdx >= 0 Then
+                tierRoles(nTiers) = ROLE_MORPHEMES
+            Else
+                tierRoles(nTiers) = ROLE_VERNACULAR
+            End If
+            tierCols(nTiers) = forms
+            nTiers = nTiers + 1
+        ElseIf t = glossIdx Then
+            tierRoles(nTiers) = ROLE_GLOSS
+            tierCols(nTiers) = glosses
+            nTiers = nTiers + 1
+        Else
+            Select Case b.LineTypes(t)
+                Case TIER_WORD
+                    tierRoles(nTiers) = ROLE_VERNACULAR
+                    tierCols(nTiers) = PerWordTier(b.ColArrays(t), spanStart, spanEnd, nCols)
+                    nTiers = nTiers + 1
+                Case TIER_MORPHEMES, TIER_LEXENTRIES
+                    tierRoles(nTiers) = ROLE_MORPHEMES
+                    tierCols(nTiers) = PerSegmentTier(b.ColArrays(t), words, nWords, granularity, False, nCols)
+                    nTiers = nTiers + 1
+                Case TIER_LEXGLOSS
+                    tierRoles(nTiers) = ROLE_GLOSS
+                    tierCols(nTiers) = PerSegmentTier(b.ColArrays(t), words, nWords, granularity, True, nCols)
+                    nTiers = nTiers + 1
+                Case TIER_LEXGRAM
+                    ' Its own style, based on Word Cat.'s, is agreed and still
+                    ' to come; until then it takes Word Cat.'s.
+                    tierRoles(nTiers) = ROLE_CATEGORY
+                    tierCols(nTiers) = PerSegmentTier(b.ColArrays(t), words, nWords, granularity, True, nCols)
+                    nTiers = nTiers + 1
+                Case TIER_WORDGLOSS
+                    tierRoles(nTiers) = ROLE_WORDGLOSS
+                    tierCols(nTiers) = PerWordTier(b.ColArrays(t), spanStart, spanEnd, nCols)
+                    nTiers = nTiers + 1
+                Case TIER_WORDCAT
+                    tierRoles(nTiers) = ROLE_CATEGORY
+                    tierCols(nTiers) = PerWordTier(b.ColArrays(t), spanStart, spanEnd, nCols)
+                    nTiers = nTiers + 1
+            End Select
+        End If
+    Next t
 
     ex = NewExample(nTiers, nCols)
     For t = 0 To nTiers - 1
@@ -406,6 +458,117 @@ Public Function ModelFromBlock(b As FlexBlock, _
 
     DropEmptyTiers ex
     ModelFromBlock = ex
+End Function
+
+'-----------------------------------------------------------------------------
+' Where the baseline's words start when the Word line was copied in several
+' writing systems: one of them may lack a form for a word (seen live
+' 2026-09-29, a Word row with a form for only some words, whose gaps merged
+' words together), so a column starts a word where ANY Word row has a cell.
+' The merged row holds "x" there and "" elsewhere; GroupByBaseline reads it.
+'-----------------------------------------------------------------------------
+Private Function BaselineStarts(b As FlexBlock) As String()
+    Dim t As Long, k As Long, hi As Long
+    Dim row() As String, merged() As String
+    hi = 0
+    For t = 0 To b.TierCount - 1
+        If b.LineTypes(t) = TIER_WORD Then
+            row = b.ColArrays(t)
+            If UBound(row) > hi Then hi = UBound(row)
+        End If
+    Next t
+    ReDim merged(0 To hi)
+    For t = 0 To b.TierCount - 1
+        If b.LineTypes(t) = TIER_WORD Then
+            row = b.ColArrays(t)
+            For k = LBound(row) To UBound(row)
+                If k >= 0 Then
+                    If Trim$(row(k)) <> "" Then merged(k) = "x"
+                End If
+            Next k
+        End If
+    Next t
+    BaselineStarts = merged
+End Function
+
+'-----------------------------------------------------------------------------
+' A further form row's piece for a segment, less the boundary characters the
+' segment owns: they are written back at the seams the way the first row
+' writes them, once where two segments share one and with the ownership
+' marks, rather than twice ("ka==be", seen live 2026-09-29). agreed is False
+' when the piece still begins or ends with a boundary character afterwards:
+' the row disagrees with the first about the segmentation, and is written
+' as it is.
+'-----------------------------------------------------------------------------
+Private Function FormBody(ByVal piece As String, seg As IgtSegment, ByRef agreed As Boolean) As String
+    Dim s As String
+    s = piece
+    If seg.Bd <> "" Then
+        If Left$(s, 1) = seg.Bd Then s = Mid$(s, 2)
+    End If
+    If seg.Tb <> "" And Len(s) > 0 Then
+        If Right$(s, 1) = seg.Tb Then s = Left$(s, Len(s) - 1)
+    End If
+    agreed = True
+    If Len(s) > 0 Then
+        If IsBoundary(Left$(s, 1)) Or IsBoundary(Right$(s, 1)) Then agreed = False
+    End If
+    FormBody = s
+End Function
+
+'-----------------------------------------------------------------------------
+' A further writing system of the form or gloss line, projected on the same
+' segments as the first: each segment takes the row's cells over the columns
+' the segment came from (its own and the ones its gloss spread over).  A gloss
+' row takes the segments' boundary characters where it has a piece, as
+' JoinGloss gives the first gloss; a form row's own boundary characters are
+' rewritten at the seams the same way (FormBody), so a shared one is written
+' once and carries the ownership marks.
+'-----------------------------------------------------------------------------
+Private Function PerSegmentTier(srcV As Variant, words() As IgtWord, ByVal nWords As Long, _
+        ByVal granularity As IgtGranularity, ByVal isGloss As Boolean, ByVal nCols As Long) As String()
+    Dim src() As String, out() As String
+    Dim i As Long, s As Long, k As Long, n As Long, piece As String, acc As String
+    Dim body As String, agreed As Boolean
+
+    src = srcV
+    ReDim out(0 To IIf(nCols > 0, nCols - 1, 0))
+    n = 0
+    For i = 0 To nWords - 1
+        acc = ""
+        For s = 0 To words(i).SegCount - 1
+            piece = ""
+            For k = words(i).Segments(s).ColStart To words(i).Segments(s).ColEnd
+                If k >= LBound(src) Then
+                    If k <= UBound(src) Then piece = piece & Trim$(src(k))
+                End If
+            Next k
+            If granularity = igtMorphemeAligned Then
+                If isGloss And piece <> "" Then
+                    out(n) = words(i).Segments(s).Bd & piece & words(i).Segments(s).Tb
+                Else
+                    out(n) = piece
+                End If
+                n = n + 1
+            ElseIf piece <> "" Then
+                If isGloss Then
+                    acc = acc & SeamBd(words(i), s) & piece & TrailPart(words(i), s)
+                Else
+                    body = FormBody(piece, words(i).Segments(s), agreed)
+                    If agreed Then
+                        acc = acc & SeamBd(words(i), s) & body & TrailPart(words(i), s)
+                    Else
+                        acc = acc & piece
+                    End If
+                End If
+            End If
+        Next s
+        If granularity <> igtMorphemeAligned Then
+            out(n) = acc
+            n = n + 1
+        End If
+    Next i
+    PerSegmentTier = out
 End Function
 
 Private Function CountProjected(words() As IgtWord, ByVal nWords As Long, _
@@ -643,7 +806,21 @@ Public Function MergeColumns(ByRef ex As IgtExample, _
         acc = ""
         For c = firstIdx To lastIdx
             If acc <> "" And ex.Cells(t, c) <> "" And sep <> "" Then acc = acc & sep
-            acc = acc & ex.Cells(t, c)
+            ' The seam keeps who owns the boundary (PROMPT.md rules 8 and 9):
+            ' a boundary present on both sides is written once with the
+            ' ownership mark on both sides of it; one the left cell ends with
+            ' gets the mark after it; one the right cell starts with is bare.
+            If sep = "" And acc <> "" And ex.Cells(t, c) <> "" Then
+                If TrailChar(acc) <> "" And TrailChar(acc) = LeadChar(ex.Cells(t, c)) Then
+                    acc = Left$(acc, Len(acc) - 1) & OwnMark() & TrailChar(acc) & OwnMark() & Mid$(ex.Cells(t, c), 2)
+                ElseIf TrailChar(acc) <> "" Then
+                    acc = acc & OwnMark() & ex.Cells(t, c)
+                Else
+                    acc = acc & ex.Cells(t, c)
+                End If
+            Else
+                acc = acc & ex.Cells(t, c)
+            End If
         Next c
         ex.Cells(t, firstIdx) = acc
         ' Shift the tail left over the columns just consumed.
@@ -682,6 +859,7 @@ Public Function SplitColumn(ByRef ex As IgtExample, ByVal colIdx As Long, _
     Dim t As Long, c As Long, i As Long
     Dim leftPart() As String, rightPart() As String
     Dim cell As String, seen As Long, at As Long
+    Dim markBefore As Boolean, markAfter As Boolean
 
     ' Each early exit names its own reason. The caller reports
     ' "No morpheme break was found in: " & outShortTiers, so an empty string here
@@ -700,10 +878,17 @@ Public Function SplitColumn(ByRef ex As IgtExample, ByVal colIdx As Long, _
     ReDim leftPart(0 To ex.TierCount - 1)
     ReDim rightPart(0 To ex.TierCount - 1)
 
+    ' Who owns the boundary being split on: the ownership marks, written by
+    ' every fold (PROMPT.md rule 9).  A cell with no mark at the boundary gives
+    ' it to the right-hand morpheme, as it always did -- predictable, and right
+    ' for every suffix and enclitic.
+
     For t = 0 To ex.TierCount - 1
         cell = ex.Cells(t, colIdx)
-        If Not IsInterlinearTier(ex.Tiers(t)) Then
-            ' A free-translation row has no column structure to split.
+        If Not IsInterlinearTier(ex.Tiers(t)) Or IsWordLevelTier(ex, t) Then
+            ' A free-translation row has no column structure to split; a row
+            ' laid out per word (the baseline, Word Gloss, Word Cat.) glosses
+            ' the words as written and stays whole on the left.
             leftPart(t) = cell
             rightPart(t) = ""
         Else
@@ -726,8 +911,21 @@ Public Function SplitColumn(ByRef ex As IgtExample, ByVal colIdx As Long, _
                     outShortTiers = outShortTiers & ex.Tiers(t)
                 End If
             Else
-                leftPart(t) = Left$(cell, at - 1)
-                rightPart(t) = Mid$(cell, at)
+                markBefore = (at > 1 And Mid$(cell, at - 1, 1) = OwnMark())
+                markAfter = (Mid$(cell, at + 1, 1) = OwnMark())
+                If markBefore And markAfter Then
+                    ' Both own it: "xu=" and "=ve".  The marks are consumed.
+                    leftPart(t) = Left$(cell, at - 2) & Mid$(cell, at, 1)
+                    rightPart(t) = Mid$(cell, at, 1) & Mid$(cell, at + 2)
+                ElseIf markAfter Then
+                    ' The left owns it: a prefix or proclitic and its host.
+                    leftPart(t) = Left$(cell, at)
+                    rightPart(t) = Mid$(cell, at + 2)
+                Else
+                    ' The right owns it: a suffix, enclitic or reduplicant.
+                    leftPart(t) = Left$(cell, at - 1)
+                    rightPart(t) = Mid$(cell, at)
+                End If
             End If
         End If
     Next t
@@ -1043,7 +1241,7 @@ Public Function ColumnSplitsEverywhere(ex As IgtExample, ByVal colIdx As Long) A
 
     If colIdx < 0 Or colIdx >= ex.ColCount Then Exit Function
     For t = 0 To ex.TierCount - 1
-        If IsInterlinearTier(ex.Tiers(t)) Then
+        If IsInterlinearTier(ex.Tiers(t)) And Not IsWordLevelTier(ex, t) Then
             cell = ex.Cells(t, colIdx)
             If cell <> "" Then
                 anyCell = True

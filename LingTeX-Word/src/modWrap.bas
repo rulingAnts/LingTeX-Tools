@@ -49,6 +49,13 @@ Public Function NoBreakFlags(ex As IgtExample) As Boolean()
         flag = False
         For t = 0 To ex.TierCount - 1
             If Not IsInterlinearTier(ex.Tiers(t)) Then GoTo NextTier
+            ' The column after a prefix or proclitic is that word's host.
+            If c > 0 Then
+                If TrailChar(ex.Cells(t, c - 1)) <> "" Then
+                    flag = True
+                    Exit For
+                End If
+            End If
             cell = ex.Cells(t, c)
             If cell = "" Then GoTo NextTier
             If LeadChar(cell) <> "" Then

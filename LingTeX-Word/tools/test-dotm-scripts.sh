@@ -19,6 +19,16 @@ fails=0
 pass() { echo "  PASS  $1"; }
 fail() { echo "  FAIL  $1"; fails=$((fails + 1)); }
 
+# The synthetic package's vbaProject.bin is a stand-in, not an OLE file, because
+# only Word can write a real one. Tell the two Python checks in check-dotm.sh
+# (4c, the VBA references; 4d, the modules against src/) so they SKIP it: with
+# olefile installed they would otherwise reject every package this script
+# builds, which is not what is under test here. That is exactly what happened
+# on machines with olefile before this line existed -- CI stayed green only
+# because its lint job never installs olefile. A real template must never be
+# checked with this set.
+export LINGTEX_VBA_STANDIN=1
+
 work=$(mktemp -d 2>/dev/null || mktemp -d -t lingtextest)
 
 # Two of the negative cases deliberately mutate the repository -- a stale manifest
@@ -229,6 +239,41 @@ cp "$work/manifest.cur" "$root/src/MANIFEST.sha256"
 cp "$root/src/modWrap.bas" "$root/src/zzTestOnly.bas"
 expect_fail "a source missing from the manifest" "not in the manifest"
 rm -f "$root/src/zzTestOnly.bas"
+
+#-- text typed into the template's own body -----------------------------------
+# The release template is code and ribbon only; prose in its body would ship in
+# every document made from it, and no scrub of src/ would see it.
+rm -rf "$work/mut"; mkdir -p "$work/mut"
+unzip -q "$dotm" -d "$work/mut"
+sed 's|<w:p/>|<w:p><w:r><w:t>text that must not ship</w:t></w:r></w:p>|' \
+    "$work/mut/word/document.xml" > "$work/mut/word/document.xml.new"
+mv "$work/mut/word/document.xml.new" "$work/mut/word/document.xml"
+rm -f "$dotm"
+( cd "$work/mut" && zip -q -X "$dotm" "[Content_Types].xml" )
+( cd "$work/mut" && find . -type f ! -name '[Content_Types].xml' -print \
+    | sed 's|^\./||' | sort | zip -q -X -@ "$dotm" )
+expect_fail "text in the template's body" "document body holds"
+cp "$work/keep.dotm" "$dotm"
+
+#-- a document variable in the template ---------------------------------------
+# What a dev template saved under the release name would carry.
+rm -rf "$work/mut"; mkdir -p "$work/mut"
+unzip -q "$dotm" -d "$work/mut"
+printf '%s\n' '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' \
+    '<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docVars><w:docVar w:name="LingTeX_DevRoot" w:val="/somewhere"/></w:docVars></w:settings>' \
+    > "$work/mut/word/settings.xml"
+rm -f "$dotm"
+( cd "$work/mut" && zip -q -X "$dotm" "[Content_Types].xml" )
+( cd "$work/mut" && find . -type f ! -name '[Content_Types].xml' -print \
+    | sed 's|^\./||' | sort | zip -q -X -@ "$dotm" )
+expect_fail "a document variable in the template" "document variable(s)"
+# ...and names it, with the remedy for the likeliest cause rather than a generic one.
+if grep -q "LingTeX_DevRoot" "$work/neg" && grep -q "SetDevRoot was run against" "$work/neg"; then
+    pass "check-dotm names the variable and says SetDevRoot hit the engine"
+else
+    fail "check-dotm caught the variable but did not name it or give the SetDevRoot remedy"
+fi
+cp "$work/keep.dotm" "$dotm"
 
 #-- and clean again -----------------------------------------------------------
 if sh "$here/check-dotm.sh" "$dotm" >/dev/null 2>&1; then

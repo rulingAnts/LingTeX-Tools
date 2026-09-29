@@ -81,7 +81,7 @@ function loadVectors() {
             raw: inp.body.join('\n').replace(/→/g, '\t'),
             // Only the interlinear rows are compared; the free-translation row
             // is abbreviated with an ellipsis in the spec for example 2.
-            expected: (expects[n] ? expects[n].body : []).slice(0, 2),
+            expected: (expects[n] ? expects[n].body : []).filter(function (l) { return l.indexOf('\t') !== -1; }),
         };
     });
 }
@@ -91,7 +91,25 @@ function loadVectors() {
 var vectors = loadVectors();
 
 section('Golden vectors (derived from PROMPT.md)');
-ok('found 2 input vectors in PROMPT.md', vectors.length === 2, 'found ' + vectors.length);
+ok('found 8 input vectors in PROMPT.md', vectors.length === 8, 'found ' + vectors.length);
+
+// FLEx's end-of-segment sign "\u00A7" ends a line in some copies (its .flextext
+// importer adds it; seen live 2026-09-28). A cell that is exactly "\u00A7" is
+// dropped, with the column it leaves empty on every tier -- here the gloss
+// row's trailing tab -- and a leading example number reads as Print View
+// copies it.
+(function () {
+    var v2 = vectors[1];
+    var ls = v2.raw.split('\n');
+    var raw = '1.1\t' + ls[0] + '\t\u00A7\n' + ls[1] + '\t\n' + ls.slice(2).join('\n');
+    var models = R.buildModels(raw, R.WORD_ALIGNED);
+    ok('example 2 with a number and a trailing section sign parses to one block', models.length === 1, 'got ' + models.length);
+    if (models.length === 1) {
+        var rows = R.modelToTsv(models[0]).split('\n');
+        eq('  its form row is example 2\'s', rows[0], v2.expected[0]);
+        eq('  its gloss row is example 2\'s', rows[1], v2.expected[1]);
+    }
+})();
 
 vectors.forEach(function (v) {
     var models = R.buildModels(v.raw, R.WORD_ALIGNED);
@@ -100,15 +118,19 @@ vectors.forEach(function (v) {
 
     var rows = R.modelToTsv(models[0]).split('\n');
 
-    // (a) against the expected output written in the spec
-    eq(v.name + ': form row matches PROMPT.md',  rows[0], v.expected[0]);
-    eq(v.name + ': gloss row matches PROMPT.md', rows[1], v.expected[1]);
+    // (a) against the expected output written in the spec: every row of it
+    v.expected.forEach(function (e, r) {
+        eq(v.name + ': row ' + r + ' matches PROMPT.md', rows[r], e);
+    });
 
-    // (b) against the live reference implementation in docs/core.js
+    // (b) against the live reference implementation in docs/core.js, which
+    // renders the segmented form row and the first gloss row only
+    var fi = models[0].tiers.indexOf(R.ROLE_MORPHEMES); if (fi < 0) fi = 0;
+    var gi = models[0].tiers.indexOf(R.ROLE_GLOSS);
     var coreRows = core.renderFLExTSVAuto(core.parseFLExBlocks(v.raw),
                                           { glossCase: 'none' }).split('\n');
-    eq(v.name + ': form row matches docs/core.js',  rows[0], coreRows[0]);
-    eq(v.name + ': gloss row matches docs/core.js', rows[1], coreRows[1]);
+    eq(v.name + ': form row matches docs/core.js',  rows[fi], coreRows[0]);
+    if (gi >= 0) eq(v.name + ': gloss row matches docs/core.js', rows[gi], coreRows[1]);
 });
 
 // ── 2. projections ────────────────────────────────────────────────────────────
@@ -132,6 +154,9 @@ vectors.forEach(function (v) {
 
     // Merging every column of a word back down must reproduce word-alignment:
     // the two projections are views of one segment list, not separate parsers.
+    // Not with a baseline: there the columns are the baseline's words, and a
+    // clitic's column, though never a wrap-line start, is a word of its own.
+    if (morph.tiers.indexOf(R.ROLE_VERNACULAR) >= 0) return;
     var flags = R.noBreakFlags(morph);
     var rebuilt = JSON.parse(JSON.stringify(morph));
     for (var c = R.colCount(rebuilt) - 1; c > 0; c--) {
@@ -142,6 +167,73 @@ vectors.forEach(function (v) {
     eq(v.name + ': merging continuations reproduces word-aligned glosses',
         rebuilt.cells[1].join('\t'), word.cells[1].join('\t'));
 });
+
+// ── 2 free lines, further writing systems, a baseline ────────────────────────
+
+section('Free lines, codes, further writing systems, a baseline');
+
+(function () {
+    var M = '\u200E';
+    var two = 'Morphemes\tvu\t=ve\n\tLex. Gloss\tfox\tERG\n';
+    function free(raw) { return R.buildModels(raw, R.WORD_ALIGNED)[0].freeLines; }
+    eq('with marks, no code: the text is whole', free(two + M + 'Free ' + M + M + 'came back.').join('|'), 'came back.');
+    eq('with marks and a code', free(two + M + 'Free ' + M + 'Eng' + M + ' ' + M + M + 'came back.\n' + M + ' ' + M + 'Ind' + M + ' ' + M + M + 'dia kembali.').join('|'), 'came back.|dia kembali.');
+    eq('without marks, no further line: the first word stays', free(two + 'Free came back.').join('|'), 'came back.');
+    eq('without marks, a further line follows: the code goes', free(two + 'Free Eng came back.\n Ind dia kembali.').join('|'), 'came back.|dia kembali.');
+    eq('Lit. is a line of its own', free(two + 'Free came back.\nLit. come back again.').join('|'), 'came back.|come back again.');
+
+    var v7 = vectors[6];
+    var m7 = R.buildModels(v7.raw, R.WORD_ALIGNED)[0];
+    eq('example 7 keeps nine rows in FLEx\'s order', m7.tiers.join(','),
+        [R.ROLE_VERNACULAR, R.ROLE_MORPHEMES, R.ROLE_MORPHEMES, R.ROLE_GLOSS, R.ROLE_GLOSS, R.ROLE_CATEGORY, R.ROLE_WORDGLOSS, R.ROLE_WORDGLOSS, R.ROLE_CATEGORY].join(','));
+    eq('  both free lines', m7.freeLines.join(' / '), 'The fox dreamt of following and then / rubah mimpi ikut lalu');
+    var m7m = R.buildModels(v7.raw, R.MORPHEME_ALIGNED)[0];
+    eq('  by morpheme, the second form row splits with the first', m7m.cells[2].join('\t'), 'vu\t=ve\tzo\tzuvo\t-a\t=te');
+    eq('  the baseline sits in each word\'s first column', m7m.cells[0].join('\t'), 'vu\tve\tzo\tzuvoa\t\tte');
+    eq('  Lex. Gram. Info. per segment, with the boundaries', m7m.cells[5].join('\t'), 'n\t=adp\tn\tv\t-v:(lnk)\t=cosub');
+    ok('  no warning at all: the baseline takes no part in the checks', R.checkExample(m7).length === 0,
+        JSON.stringify(R.checkExample(m7).map(function (w) { return w.code + ' col ' + w.col; })));
+
+    var v8 = vectors[7];
+    var m8 = R.buildModels(v8.raw, R.WORD_ALIGNED)[0];
+    ok('example 8 has three columns: a sparse Word row merges no words', m8.cells[0].length === 3, 'got ' + m8.cells[0].length);
+    ok('  the second Morphemes row carries the ownership marks too', m8.cells[3].join('').indexOf(R.OWN_MARK) >= 0);
+    ok('  and no warning', R.checkExample(m8).length === 0,
+        JSON.stringify(R.checkExample(m8).map(function (w) { return w.code + ' col ' + w.col; })));
+})();
+
+// ── 2a. ownership of a boundary across By Word and By Morpheme ───────────────
+
+section('Ownership of a boundary across By Word and By Morpheme');
+
+(function () {
+    var v5 = vectors[4];
+    var word  = R.buildModels(v5.raw, R.WORD_ALIGNED)[0];
+    var morph = R.buildModels(v5.raw, R.MORPHEME_ALIGNED)[0];
+    var encl  = R.buildModels(vectors[1].raw, R.WORD_ALIGNED)[0];
+    ok('a proclitic\'s boundary is marked in the word-aligned cell', word.cells[0][2].indexOf(R.OWN_MARK) !== -1);
+    ok('  and in its gloss', word.cells[1][2].indexOf(R.OWN_MARK) !== -1);
+    ok('an enclitic\'s is not', encl.cells[0][2].indexOf(R.OWN_MARK) === -1);
+    ok('one both sides own carries the mark on both sides', word.cells[0][0].indexOf(R.OWN_MARK + '=' + R.OWN_MARK) !== -1);
+
+    var back = JSON.parse(JSON.stringify(word));
+    R.projectToMorphemes(back);
+    eq('re-splitting the word-aligned cells reproduces the morpheme-aligned forms', back.cells[0].join('\t'), morph.cells[0].join('\t'));
+    eq('  and glosses', back.cells[1].join('\t'), morph.cells[1].join('\t'));
+    ok('  and consumes every mark', (back.cells[0].join('') + back.cells[1].join('')).indexOf(R.OWN_MARK) === -1);
+
+    var flags = R.noBreakFlags(back);
+    for (var c = R.colCount(back) - 1; c > 0; c--) if (flags[c]) R.mergeColumns(back, c - 1, c);
+    eq('merging back reproduces the word-aligned cells, marks and all',
+        back.cells[0].join('\t') + '|' + back.cells[1].join('\t'),
+        word.cells[0].join('\t') + '|' + word.cells[1].join('\t'));
+
+    var legacy = JSON.parse(JSON.stringify(word));
+    legacy.cells = legacy.cells.map(function (row) { return row.map(R.stripOwnMarks); });
+    R.projectToMorphemes(legacy);
+    eq('without a mark the right-hand morpheme keeps the boundary, as it always did', legacy.cells[0][3] + '|' + legacy.cells[0][4], 'ze|=zuvo');
+    eq('an export shows no mark', R.modelToTsv(word).split('\n')[0], v5.expected[0]);
+})();
 
 // ── 2b. FLEx vs plain TSV routing ────────────────────────────────────────────
 
@@ -201,6 +293,74 @@ section('Line breaks (CR LF and CR input parse as LF input does)');
     sameExamples('FLEx block', vectors[0].raw, 1);
     sameExamples('TSV example', 'zomu-xa\tvu\ngo-DIST\tfox\nHe went far away.\n', 1);
     sameExamples('two FLEx examples', vectors[0].raw + '\n\n' + vectors[1].raw, 2);
+})();
+
+// ── 2d. text arriving from outside the model ─────────────────────────────────
+
+section('Clipboard and selection normalising');
+
+(function () {
+    // LingTeX-PowerPoint's acceptance vectors (modPptTests.bas SectionLineBreaks),
+    // run here because VBA cannot run in CI and PowerPoint's rig is blocked on a
+    // container grant. The fixture is the one its rig uses.
+    var fixture = fs.readFileSync(path.join(__dirname, '..', 'samples', 'checklist-sample.txt'), 'utf8');
+    var lf = normalize(fixture);                       // as LF, trailing break kept
+    function normalize(s) { return String(s).replace(/\r\n/g, '\n').replace(/\r/g, '\n'); }
+    function withBreaks(text, seq) { return text.replace(/\n/g, seq); }
+
+    function blocks(raw) {
+        return core.parseFLExBlocks(R.normalizeClipboardText(raw));
+    }
+    function check(name, raw, wantBlocks) {
+        var bs = blocks(raw);
+        if (!ok(name + ': blocks', bs.length === wantBlocks, 'got ' + bs.length)) return;
+        ok(name + ': every block has its tiers and its free line',
+            bs.every(function (b) { return b.lineTypes.length >= 2 && b.freeLines.length === 1; }),
+            JSON.stringify(bs.map(function (b) { return [b.lineTypes.length, b.freeLines.length]; })));
+    }
+
+    // One example, every convention. CR CR is what TextRange2.Paste produces on
+    // the Mac; LF CR is what vbCrLf IS there.
+    check('one example, LF', lf, 1);
+    check('one example, CR LF', withBreaks(lf, '\r\n'), 1);
+    check('one example, CR', withBreaks(lf, '\r'), 1);
+    check('one example, doubled CR CR', withBreaks(lf, '\r\r'), 1);
+    check('one example, LF CR', withBreaks(lf, '\n\r'), 1);
+    check('one example, rows split by a vertical tab', withBreaks(lf, '\u000B'), 1);
+
+    // Two examples with one blank line between them: two blocks, never one.
+    var two = lf + '\n' + lf;
+    check('two examples, LF', two, 2);
+    check('two examples, CR LF', withBreaks(two, '\r\n'), 2);
+    check('two examples, doubled CR CR', withBreaks(two, '\r\r'), 2);
+    check('two examples, LF CR', withBreaks(two, '\n\r'), 2);
+
+    // What PowerPoint's paste reports for a CR LF copy that ends in a break: the
+    // internal breaks doubled, the trailing one single, because the box's last
+    // paragraph has no terminator (measured 2026-09-28, its section 4). A run at
+    // either end of the payload is a terminator, not structure, and must not
+    // veto the collapse.
+    var pasted = withBreaks(lf, '\r\r').replace(/\r\r$/, '\r');
+    check('one example, doubled CR CR, trailing CR', pasted, 1);
+    check('two examples, doubled CR CR, trailing CR', withBreaks(lf, '\r\r') + '\r\r' + pasted, 2);
+    eq('run profile of that two-example text',
+        R.lineBreakRunProfile(withBreaks(lf, '\r\r') + '\r\r' + pasted), '1x1,2x4,4x1');
+
+    // The number PowerPoint's rig asserts, on the same fixture.
+    eq('run profile of the doubled two-example text',
+        R.lineBreakRunProfile(withBreaks(two, '\r\r')), '2x5,4x1');
+
+    // Applied twice is applied once: after a collapse the shortest run is 1.
+    eq('normalising twice equals normalising once',
+        R.normalizeClipboardText(R.normalizeClipboardText(withBreaks(two, '\r\r'))),
+        R.normalizeClipboardText(withBreaks(two, '\r\r')));
+
+    // Not FLEx: the blank line is left alone. Halving is justified by a fact
+    // about FLEx output, so it may not be applied to a hand-built table.
+    var tsv = 'one\ttwo\n\nthree\tfour';
+    eq('a blank line in plain TSV survives', R.normalizeClipboardText(tsv), tsv);
+    eq('a doubled-looking TSV is not collapsed either',
+        R.normalizeClipboardText('one\ttwo\r\r\rthree\tfour'), 'one\ttwo\n\n\nthree\tfour');
 })();
 
 // ── 3. column editing ─────────────────────────────────────────────────────────

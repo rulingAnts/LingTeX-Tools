@@ -155,13 +155,22 @@ at its next re-wrap, which with the defaults is the next save.
 
 In FieldWorks Language Explorer, select the interlinear text you want, copy
 it, click in your Word document where the example should go, and click
-**Insert Interlinear**. The tiers FLEx copies (word, morphemes, lexical
-gloss, word gloss, word category, free translation) are recognised by their
-labels, in either spelling. By default the example is aligned by word, with
-enclitics kept in their host's column; **By Morpheme** gives one column per
-morpheme instead.
+**Insert Interlinear**. The lines FLEx copies (Word, Morphemes, Lex. Gloss,
+Lex. Gram. Info., Word Gloss, Word Cat., Free, Lit.) are recognised by their
+labels, in either spelling, and every line copied keeps its row, in FLEx's
+order, so a line shown in two writing systems or two analysis languages
+gives two rows. Which lines are copied is decided in FLEx, under Tools >
+Configure > Interlinear, before you copy. By default the example is aligned
+by word, with enclitics kept in their host's column; **By Morpheme** gives
+one column per morpheme instead.
 
-If FLEx copied several examples at once, the first is inserted.
+When the copy includes FLEx's Word line, its words are the columns: a clitic
+FLEx writes as a word of its own stays one. Without it, the boundary
+characters decide, as above. That line is the words as written, so it keeps
+its spaces and takes no part in Check Glossing.
+
+If FLEx copied several examples at once, every one is inserted, under one
+number with a letter each (see Numbering).
 
 ### From a table
 
@@ -244,6 +253,15 @@ can point at it; the list style decides its format.
 an example keeps its number through every re-wrap. The width of the number
 column is a setting (36 pt by default).
 
+**Several examples from one copy** share one number: the first carries
+`(3)` and `a.`, the next only `b.`, `c.`..., each letter in a second number
+cell, six tenths as wide as the first, so the group reads as one example
+with sub-examples, the way a LaTeX xlist does. The letters are level 2 of
+the same list style, so they restart after every number and renumber when a
+sub-example goes. Delete the first of a group and the number moves to the
+next example, not to the group: give that one the number by hand if you
+need to.
+
 **Per chapter.** Modify the list style *LingTeX Example Number* in Word's
 own style dialog (Format > Style on Mac, the Styles pane on Windows; set its
 list to *All styles* to see it): link its level 1 to Heading 1 with no number
@@ -309,7 +327,7 @@ and every example in the document follows on its next re-wrap.
 | LingTeX Morphemes | The morpheme line, when FLEx supplies one; italic by default |
 | LingTeX Gloss | The morpheme glosses |
 | LingTeX Word Gloss | The word glosses |
-| LingTeX Category | The word categories |
+| LingTeX Category | The word categories, and Lex. Gram. Info. until it has a style of its own |
 | LingTeX Free | The free translation |
 | LingTeX Gram Gloss | A character style: the grammatical abbreviations, in small capitals |
 | LingTeX Example | The number cell |
@@ -396,6 +414,39 @@ and left a flag set. Run `LingTeXStart` from the macro list, or restart Word.
 **"That text could not be read as interlinear data."** Insert Interlinear
 expects FLEx text, tab-separated rows, or lines of plain text. Select the
 lines and try Text to Interlinear, which asks about the translation lines.
+
+**Prefixes and proclitics.** A boundary mark belongs to the affix or clitic,
+never to the word it attaches to: in `be=dai` the `=` is the proclitic's. When
+two morphemes are folded into one By Word cell, the add-in records whose the
+boundary is as a character style on that one character, *LingTeX Left
+Boundary* or *LingTeX Shared Boundary*, with no formatting of its own. So
+Split Column gives the boundary back to its owner, the cell's text stays
+plain and Find matches it as typed. Retyping a cell drops the style; a
+boundary with no record is treated as the right-hand morpheme's, as a suffix
+or enclitic is.
+
+**Several examples in one copy.** Select several lines in FLEx's Print View
+and copy: Insert Interlinear draws every example, one under another, as one
+numbered group with a letter each (see Numbering). FLEx's end-of-segment
+sign, `§`, is dropped, and a gloss FLEx spreads over the cells after its
+morpheme's, at the end of a row too, is read whole.
+
+**A free translation lost its first word.** FLEx marks where the text of a
+Free or Lit. line starts with invisible direction marks, and the add-in reads
+them; when they are absent (a writing system with Graphite on) it reads the
+next line instead, so a line that starts with a space, a further language,
+tells it the line before carried a language code. A word is never taken for
+a code by its shape.
+
+**One copy became two examples, or came out as one long line.** The line
+breaks of a copy are read before the text is parsed: a copy from FLEx on
+Windows arrives with CR LF endings, some routes between applications double
+every break, and rows ended with Shift+Return arrive as vertical tabs. All
+of these are read as the plain lines they were, so one example stays one
+example and two examples separated by a blank line stay two. Plain
+tab-separated text that is not FLEx output is left exactly as typed, blank
+lines included. If a copy still misreads, paste it into a plain-text editor
+and send what you see there with the report.
 
 **A style of the wrong kind.** If the document already has a style called,
 say, *LingTeX Gloss* that is not a paragraph style, the add-in says so and

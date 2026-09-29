@@ -69,6 +69,12 @@ function vbaString(expr, where) {
             if (w === 'T' || w === 'vbTab') out += '\t';
             else if (w === 'vbLf') out += '\n';
             else if (w === 'vbCr') out += '\r';
+            else if (w === 'ChrW') {
+                var hex = expr.substring(i).match(/^\(\s*&H([0-9A-Fa-f]+)\s*\)/);
+                if (!hex) throw new Error('ChrW without a hex code in ' + where);
+                out += String.fromCharCode(parseInt(hex[1], 16));
+                i += hex[0].length;
+            }
             else throw new Error('unknown token "' + w + '" in ' + where);
         } else i++;                      // & and whitespace
     }
@@ -124,7 +130,7 @@ function eq(label, actual, expected) {
 var free = expectedFree();
 var prompts = promptVectors();
 
-[1, 2].forEach(function (n) {
+[1, 2, 3, 4, 5, 6, 7, 8].forEach(function (n) {
     console.log('modTests.bas golden vector ' + n);
     var raw = vbaFunc('Vector' + n + 'Raw');
     var models = R.buildModels(raw, R.WORD_ALIGNED);
@@ -138,9 +144,9 @@ var prompts = promptVectors();
     eq('gloss row', rows[1], vbaFunc('Vector' + n + 'Glosses'));
 
     var lines = models[0].freeLines || [];
-    if (lines.length !== 1) {
+    if (lines.length < 1) {
         bad++;
-        console.log('  FAIL  free translation: ' + lines.length + ' lines, CheckVector expects 1');
+        console.log('  FAIL  free translation: none, CheckVector expects one at least');
     } else if (free[String(n)] === undefined) {
         bad++;
         console.log('  FAIL  no CheckVector call found for vector ' + n);

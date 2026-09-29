@@ -47,6 +47,7 @@ Public Const TIER_LEXENTRIES As String = "LexEntries"
 Public Const TIER_LEXGLOSS  As String = "LexGloss"
 Public Const TIER_WORDGLOSS As String = "WordGloss"
 Public Const TIER_WORDCAT   As String = "WordCat"
+Public Const TIER_LEXGRAM   As String = "LexGramInfo"   ' Lex. Gram. Info., per morpheme
 
 '-- One morpheme inside a word -----------------------------------------------
 ' Bd     the boundary character introducing this segment ("" for the first)
@@ -55,9 +56,12 @@ Public Const TIER_WORDCAT   As String = "WordCat"
 '        in: FLEx spreads "follow" and ".CMP" over two columns but both belong
 '        to the single morpheme "levo".
 Public Type IgtSegment
-    Bd    As String
+    Bd    As String     ' leading boundary: a suffix, enclitic or reduplicant
     Form  As String
+    Tb    As String     ' trailing boundary: a prefix or proclitic, host to follow
     Gloss As String
+    ColStart As Long    ' the morpheme's own source column ...
+    ColEnd   As Long    ' ... and the last of the empty columns its gloss spread over
 End Type
 
 '-- One word: a run of segments, and the source columns it came from ---------
@@ -71,7 +75,8 @@ End Type
 '-- One parsed interlinear block --------------------------------------------
 ' ColArrays(i) is a String() holding tier i's cells, cell 0 being the label.
 Public Type FlexBlock
-    LineTypes()  As String
+    LineTypes()  As String      ' the base label: Morphemes, LexGloss, Word ...
+    LineTags()   As String      ' the writing-system code after it, if any: "Eng"
     ColArrays()  As Variant
     TierCount    As Long
     FreeLines()  As String
@@ -146,6 +151,199 @@ Public Function NormalizeLineBreaks(ByVal s As String) As String
     NormalizeLineBreaks = Replace(Replace(s, LINE_CRLF, LINE_LF), LINE_CR, LINE_LF)
 End Function
 
+' Chr$(11), the manual line break Shift+Return leaves, as a line break.
+' In a Word DOCUMENT that character means "the same line", which is why
+' CleanTextLine turns it into a space -- right for prose, wrong for a FLEx tier
+' row.  The same byte, opposite meanings, decided by where the text came from:
+' hence this conversion belongs at the boundary and not in the parser.
+Public Function VerticalTabsToLineBreaks(ByVal s As String) As String
+    VerticalTabsToLineBreaks = Replace(s, Chr$(11), LINE_LF)
+End Function
+
+'-----------------------------------------------------------------------------
+' A UNIFORMLY DOUBLED PASTE, HALVED.
+'
+' PowerPoint for Mac's TextRange2.Paste turns each CR LF into CR CR, so a
+' Windows FLEx copy arrives with every line break doubled; text built with
+' vbCrLf on the Mac is LF CR and looks the same.  Doubled, the blank line that
+' ParseFlexBlocks reads as the end of an example appears after EVERY tier row,
+' and one example becomes one block per row.
+'
+' Runs are measured in BREAK CHARACTERS, before CR LF is paired into one break.
+' It has to be that way round: two adjacent LF CR breaks spell LF CR LF CR,
+' whose inner CR LF the pairing rule merges, so a blank line between two
+' examples measured three breaks instead of four and that one odd run disproved
+' the doubling for the entire payload (found by the parity vectors, 2026-09-28).
+' Counting characters makes a run of two mean ONE break whether it is a real
+' CR LF or a doubled single break, which is exactly the equivalence wanted here.
+'
+' The test is over the WHOLE payload, never one run at a time, because a single
+' run is ambiguous: in an LF-sourced payload a genuine blank line between two
+' examples also arrives as two breaks, and halving it merges the two examples.
+' What distinguishes them is the rest of the text -- a FLEx payload has tier
+' rows separated by ONE break, so one odd run disproves uniform doubling.
+'
+' When the payload does not pass the test, nothing is collapsed.  That way
+' round on purpose: an over-split example is visible on the page and can be put
+' right by hand, while a silently merged one is neither visible nor
+' recoverable.  (The asymmetry, and the whole-payload form, are the importer
+' session's, 2026-09-28.)
+'
+' Its one blind spot is a payload whose EVERY gap is a blank line, which cannot
+' be FLEx output once any block has two tier rows, since those are adjacent --
+' which is why NormalizeClipboardText applies this only to FLEx-shaped text.
+'-----------------------------------------------------------------------------
+
+' The factor every run of line breaks is a multiple of, when that factor is at
+' least 2 and every run is an exact multiple of the shortest one; else 0.
+' A run at the very start or end of the payload is a terminator, not
+' structure, and is left out of the test: PowerPoint reports a pasted trailing
+' CR LF as ONE CR after the doubled internal breaks, because the box's last
+' paragraph has no terminator (measured 2026-09-28, section 4 of the
+' PowerPoint tests). The collapse still divides such a run, to nothing.
+Public Function DoublingFactor(ByVal s As String) As Long
+    Dim runs() As Long, n As Long
+    Dim i As Long, m As Long, first As Long, last As Long
+    Dim t As String
+
+    runs = BreakRunLengths(s, n)
+    If n = 0 Then Exit Function
+
+    t = VerticalTabsToLineBreaks(s)
+    first = 0
+    last = n - 1
+    If IsBreakChar(Left$(t, 1)) Then first = 1
+    If IsBreakChar(Right$(t, 1)) Then last = last - 1
+    If last < first Then Exit Function
+
+    m = runs(first)
+    For i = first + 1 To last
+        If runs(i) < m Then m = runs(i)
+    Next i
+    If m < 2 Then Exit Function
+
+    For i = first To last
+        If runs(i) Mod m <> 0 Then Exit Function
+    Next i
+    DoublingFactor = m
+End Function
+
+' Every line break as LF, with each run of break characters divided by the
+' doubling factor when there is one.  Idempotent: a collapse leaves runs of one
+' character, so the factor is 0 and a second pass changes nothing.  With no
+' factor the conventions are normalised the ordinary way, CR LF included.
+Public Function CollapseDoubledLineBreaks(ByVal s As String) As String
+    Dim t As String, out As String, ch As String
+    Dim f As Long, i As Long, run As Long
+
+    t = VerticalTabsToLineBreaks(s)
+    f = DoublingFactor(t)
+    If f < 2 Then
+        CollapseDoubledLineBreaks = NormalizeLineBreaks(t)
+        Exit Function
+    End If
+
+    For i = 1 To Len(t)
+        ch = Mid$(t, i, 1)
+        If IsBreakChar(ch) Then
+            run = run + 1
+        Else
+            If run > 0 Then out = out & String$(run \ f, LINE_LF)
+            run = 0
+            out = out & ch
+        End If
+    Next i
+    If run > 0 Then out = out & String$(run \ f, LINE_LF)
+    CollapseDoubledLineBreaks = out
+End Function
+
+' CR or LF.  A vertical tab is converted to LF before any of this.
+Private Function IsBreakChar(ByVal ch As String) As Boolean
+    IsBreakChar = (ch = LINE_LF Or ch = LINE_CR)
+End Function
+
+' The runs of BREAK CHARACTERS in a text, as their lengths: CR and LF each count
+' one, and a vertical tab is converted first.  Not pairs -- see the note above
+' CollapseDoubledLineBreaks for why pairing first broke the LF CR payload.
+' n is how many runs there are.
+Private Function BreakRunLengths(ByVal s As String, ByRef n As Long) As Long()
+    Dim out() As Long
+    Dim t As String
+    Dim i As Long, run As Long
+
+    t = VerticalTabsToLineBreaks(s)
+    ReDim out(0 To Len(t))                   ' at most one run per character
+    n = 0
+    For i = 1 To Len(t)
+        If IsBreakChar(Mid$(t, i, 1)) Then
+            run = run + 1
+        ElseIf run > 0 Then
+            out(n) = run
+            n = n + 1
+            run = 0
+        End If
+    Next i
+    If run > 0 Then
+        out(n) = run
+        n = n + 1
+    End If
+    BreakRunLengths = out
+End Function
+
+' The run lengths as "<length>x<count>", shortest first: "2x5,4x1" is five runs
+' of two break CHARACTERS and one run of four -- so a Windows payload, whose
+' every break is CR LF, reads as 2x... and not 1x...  Diagnostics: the probe
+' reports print it, and a failed assertion reads better beside it.
+Public Function LineBreakRunProfile(ByVal s As String) As String
+    Dim runs() As Long, n As Long
+    Dim lengths() As Long, counts() As Long, nLen As Long
+    Dim i As Long, j As Long, k As Long, tmp As Long
+    Dim seen As Boolean
+    Dim out As String
+
+    runs = BreakRunLengths(s, n)
+    If n = 0 Then Exit Function
+
+    ReDim lengths(0 To n - 1)
+    ReDim counts(0 To n - 1)
+    For i = 0 To n - 1
+        seen = False
+        For j = 0 To nLen - 1
+            If lengths(j) = runs(i) Then
+                counts(j) = counts(j) + 1
+                seen = True
+                Exit For
+            End If
+        Next j
+        If Not seen Then
+            lengths(nLen) = runs(i)
+            counts(nLen) = 1
+            nLen = nLen + 1
+        End If
+    Next i
+
+    For i = 0 To nLen - 2
+        k = i
+        For j = i + 1 To nLen - 1
+            If lengths(j) < lengths(k) Then k = j
+        Next j
+        If k <> i Then
+            tmp = lengths(i)
+            lengths(i) = lengths(k)
+            lengths(k) = tmp
+            tmp = counts(i)
+            counts(i) = counts(k)
+            counts(k) = tmp
+        End If
+    Next i
+
+    For i = 0 To nLen - 1
+        If i > 0 Then out = out & ","
+        out = out & CStr(lengths(i)) & "x" & CStr(counts(i))
+    Next i
+    LineBreakRunProfile = out
+End Function
+
 
 '=============================================================================
 ' -- LOW-LEVEL HELPERS ------------------------------------------------------
@@ -159,16 +357,41 @@ Public Function IsBoundary(ch As String) As Boolean
     IsBoundary = (InStr(MORPH_DIVS, ch) > 0)
 End Function
 
-' The boundary character a cell starts with, or "".
-Public Function LeadChar(s As String) As String
-    If Len(s) = 0 Then Exit Function
-    If IsBoundary(Left$(s, 1)) Then LeadChar = Left$(s, 1)
+'-----------------------------------------------------------------------------
+' THE OWNERSHIP MARK.  A boundary character belongs to the affix or clitic,
+' never to its host, and FLEx keeps that by the side of the cell it sits on.
+' Folding two cells into one word-aligned cell loses it: "be=dai" no longer
+' says whose "=" it is, and a later split can only guess.  So the fold writes
+' U+2060 WORD JOINER right after a boundary the LEFT morpheme owns (a prefix
+' or proclitic), and on both sides of one that both own (a proclitic meeting
+' an enclitic); a split reads it and consumes it.  Zero width, no line break
+' inside the word, invisible in any font.  The cost, documented in the guide:
+' Find in Word will not match the plain spelling of such a word, and a copy
+' carries the mark until an export strips it.  Cells the user retyped have no
+' mark, and the gloss then decides (modIgtModel SplitOwnsLeft).
+'-----------------------------------------------------------------------------
+Public Function OwnMark() As String
+    OwnMark = ChrW(&H2060)
 End Function
 
-' The boundary character a cell ends with, or "".
+Public Function StripOwnMarks(ByVal s As String) As String
+    StripOwnMarks = Replace(s, ChrW(&H2060), "")
+End Function
+
+' The boundary character a cell starts with, or "".  Marks are looked through.
+Public Function LeadChar(s As String) As String
+    Dim u As String
+    u = StripOwnMarks(s)
+    If Len(u) = 0 Then Exit Function
+    If IsBoundary(Left$(u, 1)) Then LeadChar = Left$(u, 1)
+End Function
+
+' The boundary character a cell ends with, or "".  Marks are looked through.
 Public Function TrailChar(s As String) As String
-    If Len(s) = 0 Then Exit Function
-    If IsBoundary(Right$(s, 1)) Then TrailChar = Right$(s, 1)
+    Dim u As String
+    u = StripOwnMarks(s)
+    If Len(u) = 0 Then Exit Function
+    If IsBoundary(Right$(u, 1)) Then TrailChar = Right$(u, 1)
 End Function
 
 ' Number of segmentable boundaries in a cell.  Leipzig rule 4's "." and ":"
@@ -282,6 +505,51 @@ Public Function IsGramGloss(ByVal seg As String) As Boolean
     IsGramGloss = True
 End Function
 
+'-----------------------------------------------------------------------------
+' In modFlexParse rather than modRender because LingTeX-PowerPoint shares
+' this module and this function (2026-09-28); it touches no Word objects.
+'
+' Split a gloss cell into segments, keeping the delimiters as segments of their
+' own so they can be reassembled unchanged.
+'
+' Splits on the morpheme boundaries AND on Leipzig rule 4's "." and ":" and on
+' ";", because "follow.CMP" is one morpheme whose gloss has a lexical part and a
+' grammatical part, and only the grammatical part takes small caps.
+'
+' Port of the segmentation inside docs\core.js wrapGlosses.
+' Returns the number of segments; parts is filled by reference.
+'-----------------------------------------------------------------------------
+Public Function SplitGlossSegments(ByVal text As String, _
+        ByRef parts() As String) As Long
+
+    Dim i As Long, n As Long, ch As String, cur As String
+
+    ReDim parts(0 To Len(text) * 2 + 1)
+    n = 0
+    cur = ""
+
+    For i = 1 To Len(text)
+        ch = Mid$(text, i, 1)
+        If IsBoundary(ch) Or ch = "." Or ch = ":" Or ch = ";" Or ch = OwnMark() Then
+            If cur <> "" Then
+                parts(n) = cur
+                n = n + 1
+                cur = ""
+            End If
+            parts(n) = ch
+            n = n + 1
+        Else
+            cur = cur & ch
+        End If
+    Next i
+    If cur <> "" Then
+        parts(n) = cur
+        n = n + 1
+    End If
+
+    SplitGlossSegments = n
+End Function
+
 
 '=============================================================================
 ' -- LINE NORMALISATION -----------------------------------------------------
@@ -293,6 +561,7 @@ Public Function NormalizeLabels(ByVal s As String) As String
     s = Replace(s, "Lex. Gloss", TIER_LEXGLOSS)
     s = Replace(s, "Word Gloss", TIER_WORDGLOSS)
     s = Replace(s, "Word Cat.", TIER_WORDCAT)
+    s = Replace(s, "Lex. Gram. Info.", TIER_LEXGRAM)
     NormalizeLabels = s
 End Function
 
@@ -432,6 +701,43 @@ End Function
 ' Parse one block into tier labels and raw column arrays.
 ' Port of docs\core.js parseFLExBlock.
 '-----------------------------------------------------------------------------
+' Drop every data column that is empty on every tier: what a dropped "section
+' sign" leaves, or a stray trailing tab.  Index 0 is the tier label and stays.
+' Tiers may be ragged; a tier too short for a column counts as empty there.
+' Port of docs/core.js dropEmptyColumns.
+Private Sub DropEmptyColumns(ByRef b As FlexBlock)
+    Dim t As Long, j As Long, k As Long, maxU As Long, allEmpty As Boolean
+    Dim cols() As String
+
+    If b.TierCount = 0 Then Exit Sub
+    maxU = 0
+    For t = 0 To b.TierCount - 1
+        cols = b.ColArrays(t)
+        If UBound(cols) > maxU Then maxU = UBound(cols)
+    Next t
+    For j = maxU To 1 Step -1
+        allEmpty = True
+        For t = 0 To b.TierCount - 1
+            cols = b.ColArrays(t)
+            If j <= UBound(cols) Then
+                If cols(j) <> "" Then allEmpty = False
+            End If
+        Next t
+        If allEmpty Then
+            For t = 0 To b.TierCount - 1
+                cols = b.ColArrays(t)
+                If j <= UBound(cols) Then
+                    For k = j To UBound(cols) - 1
+                        cols(k) = cols(k + 1)
+                    Next k
+                    ReDim Preserve cols(0 To UBound(cols) - 1)
+                    b.ColArrays(t) = cols
+                End If
+            Next t
+        End If
+    Next j
+End Sub
+
 Public Function ParseFlexBlock(ByVal text As String) As FlexBlock
     Dim res As FlexBlock
     Dim lines() As String, i As Long, j As Long
@@ -444,6 +750,7 @@ Public Function ParseFlexBlock(ByVal text As String) As FlexBlock
     lines = Split(text, LINE_LF)
 
     ReDim res.LineTypes(0 To UBound(lines))
+    ReDim res.LineTags(0 To UBound(lines))
     ReDim res.ColArrays(0 To UBound(lines))
     ReDim res.FreeLines(0 To UBound(lines))
     res.TierCount = 0
@@ -452,16 +759,19 @@ Public Function ParseFlexBlock(ByVal text As String) As FlexBlock
 
     For i = 0 To UBound(lines)
         ln = lines(i)
-        ' Strip trailing blanks but keep interior tabs: an empty trailing
-        ' column is meaningful, an empty trailing run of spaces is not.
+        ' Strip trailing SPACES and keep every tab: an empty cell at the end
+        ' of a row is a column.  FLEx spreads a gloss over the cells after its
+        ' morpheme's, and for the last morpheme of a line those cells END the
+        ' morpheme row -- stripping them lost the gloss (seen live 2026-09-28;
+        ' PROMPT.md example 3).  A line of nothing but blanks and tabs is blank.
         Do While Len(ln) > 0
-            If Right$(ln, 1) = " " Or Right$(ln, 1) = vbTab Then
+            If Right$(ln, 1) = " " Then
                 ln = Left$(ln, Len(ln) - 1)
             Else
                 Exit Do
             End If
         Loop
-        If Trim$(ln) = "" Then GoTo NextLine
+        If Trim$(Replace(ln, vbTab, "")) = "" Then GoTo NextLine
 
         ' An example number on the first line becomes the block's reference.
         If res.LineNum = "" Then
@@ -475,15 +785,22 @@ Public Function ParseFlexBlock(ByVal text As String) As FlexBlock
 
         clean = Trim$(StripInvisible(ln))
 
-        ' Free translation: "Free", optionally followed by a language tag.
-        If LCase$(Left$(clean, 4)) = "free" Then
+        ' A free translation, a literal translation or a note: "Free", then
+        ' a writing-system code when the line type is shown in more than one
+        ' writing system, then the text.  FLEx marks the structure with
+        ' direction marks (U+200E), and the text always follows TWO of them;
+        ' without marks the next line decides (FreeLineText).  The first word
+        ' of the text is never taken for a code by its shape: "came back."
+        ' lost "came" that way (Seth, 2026-09-29).
+        If IsFreeLabel(clean) Then
             seenFree = True
-            AddFreeLine res, StripFreeLabel(clean)
+            AddFreeLine res, FreeLineText(ln, NextRawLine(lines, i), True)
             GoTo NextLine
         End If
-        ' After a Free line, a bare language tag introduces another one.
-        If seenFree And IsShortTag(clean) Then
-            AddFreeLine res, Trim$(Mid$(clean, InStr(clean, " ") + 1))
+        ' After one, a line that starts with a space (or a mark and a space)
+        ' is the same line type in a further writing system: code, then text.
+        If seenFree And IsFurtherLanguageLine(ln) Then
+            AddFreeLine res, FreeLineText(ln, NextRawLine(lines, i), False)
             GoTo NextLine
         End If
 
@@ -492,6 +809,8 @@ Public Function ParseFlexBlock(ByVal text As String) As FlexBlock
             cols = Split(NormalizeLabels(StripInvisible(ln)), vbTab)
             For j = 0 To UBound(cols)
                 cols(j) = Trim$(cols(j))
+                ' FLEx's end-of-segment sign is not data (Seth, 2026-09-15).
+                If cols(j) = ChrW(&HA7) Then cols(j) = ""
             Next j
             ' The Lex. Gloss row often has its label in column 1, not 0, so a
             ' leading empty column is dropped.  The bounds test has to come
@@ -506,7 +825,12 @@ Public Function ParseFlexBlock(ByVal text As String) As FlexBlock
         End If
 
         If UBound(cols) < 0 Then GoTo NextLine
-        res.LineTypes(res.TierCount) = cols(0)
+        ' The label cell may carry a writing-system code after a space --
+        ' "LexGloss Eng", "Morphemes xyz-ort" -- when that line type is shown
+        ' in several writing systems.  Base label and code are kept apart, so
+        ' the row is recognised and the model keeps every writing system.
+        SplitLabel cols(0), res.LineTypes(res.TierCount), res.LineTags(res.TierCount)
+        cols(0) = res.LineTypes(res.TierCount)
         res.ColArrays(res.TierCount) = cols
         res.TierCount = res.TierCount + 1
 
@@ -515,7 +839,9 @@ NextLine:
 
     If res.TierCount > 0 Then
         ReDim Preserve res.LineTypes(0 To res.TierCount - 1)
+        ReDim Preserve res.LineTags(0 To res.TierCount - 1)
         ReDim Preserve res.ColArrays(0 To res.TierCount - 1)
+        DropEmptyColumns res
     End If
     If res.FreeCount > 0 Then
         ReDim Preserve res.FreeLines(0 To res.FreeCount - 1)
@@ -530,27 +856,103 @@ Private Sub AddFreeLine(ByRef res As FlexBlock, ByVal s As String)
     res.FreeCount = res.FreeCount + 1
 End Sub
 
-' "Free" or "Free Eng" prefix removed.
-Private Function StripFreeLabel(ByVal s As String) As String
-    Dim rest As String, tag As String, sp As Long
-    rest = Trim$(Mid$(s, 5))                      ' past "Free"
-    sp = InStr(rest, " ")
-    If sp > 0 Then
-        tag = Left$(rest, sp - 1)
-    Else
-        tag = rest
-    End If
-    If IsAlphaTag(tag) Then
-        If sp > 0 Then
-            rest = Trim$(Mid$(rest, sp + 1))
-        Else
-            rest = ""
+' A free translation line, a literal translation or a note, by its label.
+Private Function IsFreeLabel(ByVal clean As String) As Boolean
+    Dim l As String
+    l = LCase$(clean)
+    IsFreeLabel = (Left$(l, 4) = "free" Or Left$(l, 4) = "lit." Or Left$(l, 4) = "note")
+    If IsFreeLabel Then
+        If Len(clean) > 4 Then
+            If Mid$(clean, 5, 1) <> " " Then IsFreeLabel = False
         End If
     End If
-    StripFreeLabel = rest
 End Function
 
-' A 2-to-8 letter writing-system tag such as "Eng" or "Tok".
+' A direction mark FLEx writes around labels and codes.
+Private Function IsMark(ByVal ch As String) As Boolean
+    IsMark = (ch = ChrW(&H200E) Or ch = ChrW(&H200F))
+End Function
+
+' The same line type in a further writing system: FLEx starts it with a mark
+' and a space, or with a space alone when marks are off.
+Private Function IsFurtherLanguageLine(ByVal raw As String) As Boolean
+    Dim s As String
+    s = raw
+    Do While Len(s) > 0
+        If Not IsMark(Left$(s, 1)) Then Exit Do
+        s = Mid$(s, 2)
+    Loop
+    If Len(s) = 0 Then Exit Function
+    If Left$(s, 1) <> " " Then Exit Function
+    IsFurtherLanguageLine = (Trim$(StripInvisible(s)) <> "")
+End Function
+
+' The next non-blank raw line after index i, or "".
+Private Function NextRawLine(lines() As String, ByVal i As Long) As String
+    Dim k As Long
+    For k = i + 1 To UBound(lines)
+        If Trim$(StripInvisible(lines(k))) <> "" Then
+            NextRawLine = lines(k)
+            Exit Function
+        End If
+    Next k
+End Function
+
+'-----------------------------------------------------------------------------
+' The text of a free-translation line, label and writing-system code removed.
+'
+' With FLEx's marks the structure is explicit: MARK Free SPACE MARK MARK text
+' (no code), or MARK Free SPACE MARK Eng MARK SPACE MARK MARK text; a further
+' language is MARK SPACE MARK Ind MARK SPACE MARK MARK text.  The text is what
+' follows the LAST pair of adjacent marks.  Without marks (a writing system
+' with Graphite on) the label is followed by a code only when the line type
+' is shown in more than one writing system, and then a further-language line
+' follows, starting with a space: so the next line decides.  A further-
+' language line always carries a code.
+'-----------------------------------------------------------------------------
+Private Function FreeLineText(ByVal raw As String, ByVal nextRaw As String, _
+        ByVal hasLabel As Boolean) As String
+    Dim i As Long, lastPair As Long, s As String, sp As Long
+
+    lastPair = 0
+    For i = 1 To Len(raw) - 1
+        If IsMark(Mid$(raw, i, 1)) And IsMark(Mid$(raw, i + 1, 1)) Then lastPair = i
+    Next i
+    If lastPair > 0 Then
+        FreeLineText = Trim$(StripInvisible(Mid$(raw, lastPair + 2)))
+        Exit Function
+    End If
+
+    s = Trim$(StripInvisible(raw))
+    If hasLabel Then s = Trim$(Mid$(s, 5))            ' past "Free", "Lit.", "Note"
+    If hasLabel And Not IsFurtherLanguageLine(nextRaw) Then
+        FreeLineText = s                              ' no code: one writing system
+        Exit Function
+    End If
+    sp = InStr(s, " ")
+    If sp > 0 Then
+        FreeLineText = Trim$(Mid$(s, sp + 1))         ' past the code
+    Else
+        FreeLineText = ""
+    End If
+End Function
+
+' "LexGloss Eng" -> base "LexGloss", code "Eng"; a bare label keeps no code.
+Private Sub SplitLabel(ByVal cell As String, ByRef base As String, ByRef code As String)
+    Dim known As Variant, k As Variant
+    known = Array(TIER_WORD, TIER_MORPHEMES, TIER_LEXENTRIES, TIER_LEXGLOSS, TIER_WORDGLOSS, TIER_WORDCAT, TIER_LEXGRAM)
+    base = cell
+    code = ""
+    For Each k In known
+        If cell = k Then Exit Sub
+        If Left$(cell, Len(k) + 1) = k & " " Then
+            base = k
+            code = Trim$(Mid$(cell, Len(k) + 2))
+            Exit Sub
+        End If
+    Next k
+End Sub
+
 Private Function IsAlphaTag(ByVal s As String) As Boolean
     Dim i As Long, ch As String
     If Len(s) < 2 Or Len(s) > 8 Then Exit Function
@@ -648,7 +1050,7 @@ Public Function GroupSegmentsFromColumns(morphemes() As String, _
     Dim cur As IgtWord, haveCur As Boolean
     Dim col As Long, n As Long
     Dim m As String, g As String, bd As String, form As String
-    Dim contG As String
+    Dim tb As String, pending As String, at As Long
 
     n = UBound(morphemes) + 1
     ReDim words(0 To IIf(n > 0, n, 1))
@@ -659,45 +1061,7 @@ Public Function GroupSegmentsFromColumns(morphemes() As String, _
         m = Trim$(CellAt(morphemes, col))
         g = Trim$(CellAt(lexGlosses, col))
 
-        If m <> "" Then
-            bd = LeadChar(m)
-            If bd <> "" Then
-                form = Mid$(m, 2)
-            Else
-                form = m
-            End If
-
-            If bd <> "" Then
-                ' Suffix, enclitic or reduplicant: another segment of this word.
-                If haveCur Then
-                    AddSegment cur, bd, form, g
-                    cur.EndCol = col
-                End If
-            Else
-                ' No boundary character, so this starts a new word.
-                If haveCur Then
-                    words(nWords) = cur
-                    nWords = nWords + 1
-                End If
-                cur = NewWord(form, g, col)
-                haveCur = True
-
-                If g = "" Then
-                    ' The morpheme's own gloss column is empty, so the
-                    ' following empty-morpheme columns are one-to-many gloss
-                    ' continuations belonging to THIS morpheme, not new ones.
-                    Do While col + 1 <= n - 1
-                        If Trim$(CellAt(morphemes, col + 1)) <> "" Then Exit Do
-                        col = col + 1
-                        contG = Trim$(CellAt(lexGlosses, col))
-                        If contG <> "" Then
-                            cur.Segments(0).Gloss = cur.Segments(0).Gloss & contG
-                        End If
-                        cur.EndCol = col
-                    Loop
-                End If
-            End If
-        Else
+        If m = "" Then
             ' Empty morpheme column whose predecessor's gloss was already
             ' satisfied: a zero-morpheme slot with an alignment column to itself.
             If haveCur Then
@@ -706,10 +1070,55 @@ Public Function GroupSegmentsFromColumns(morphemes() As String, _
                 haveCur = False
             End If
             If g <> "" Then
-                words(nWords) = NewWord("", g, col)
+                words(nWords) = NewWord("", "", "", g, col)
+                words(nWords).Segments(0).ColStart = col
+                words(nWords).Segments(0).ColEnd = col
                 nWords = nWords + 1
             End If
+            GoTo NextCol
         End If
+
+        ' A LEADING boundary makes a suffix, enclitic or reduplicant, which
+        ' joins the word before it; a TRAILING one makes a prefix or proclitic,
+        ' whose host is the morpheme after it (PROMPT.md example 5).
+        bd = LeadChar(m)
+        If bd <> "" Then form = Mid$(m, 2) Else form = m
+        tb = ""
+        If Len(form) > 1 Then
+            tb = TrailChar(form)
+            If tb <> "" Then form = Left$(form, Len(form) - 1)
+        End If
+
+        ' A morpheme whose own gloss column is empty has its gloss spread over
+        ' the empty-morpheme columns after it (PROMPT.md examples 1, 3, 4).
+        at = col
+        If g = "" Then
+            Do While col + 1 <= n - 1
+                If Trim$(CellAt(morphemes, col + 1)) <> "" Then Exit Do
+                col = col + 1
+                g = g & Trim$(CellAt(lexGlosses, col))
+            Loop
+        End If
+
+        pending = ""
+        If haveCur Then pending = cur.Segments(cur.SegCount - 1).Tb
+        If haveCur And (bd <> "" Or pending <> "") Then
+            AddSegment cur, bd, form, tb, g
+            cur.Segments(cur.SegCount - 1).ColStart = at
+            cur.Segments(cur.SegCount - 1).ColEnd = col
+            cur.EndCol = col
+        Else
+            If haveCur Then
+                words(nWords) = cur
+                nWords = nWords + 1
+            End If
+            cur = NewWord(bd, form, tb, g, at)
+            cur.Segments(0).ColStart = at
+            cur.Segments(0).ColEnd = col
+            cur.EndCol = col
+            haveCur = True
+        End If
+NextCol:
     Next col
 
     If haveCur Then
@@ -726,17 +1135,88 @@ Public Function GroupSegmentsFromColumns(morphemes() As String, _
     GroupSegmentsFromColumns = words
 End Function
 
+'-----------------------------------------------------------------------------
+' Words from a copied baseline (PROMPT.md rule 12): a non-empty Word cell
+' starts a span, an empty one continues it, and the morphemes of each span
+' make one word whatever their boundary characters say -- "de" is a word of
+' its own when the baseline writes it so, "kabe" one word when it does.
+' Within a span the segments are read as GroupSegmentsFromColumns reads them.
+'-----------------------------------------------------------------------------
+Public Function GroupByBaseline(morphemes() As String, lexGlosses() As String, _
+        wordV As Variant, ByVal startIdx As Long, ByRef outCount As Long) As IgtWord()
+    Dim wordArr() As String
+    Dim words() As IgtWord, nWords As Long
+    Dim n As Long, k As Long, s As Long, e As Long, j As Long, q As Long, nSub As Long
+    Dim subM() As String, subG() As String, subW() As IgtWord
+    Dim w As IgtWord
+
+    wordArr = wordV
+    n = UBound(morphemes) + 1
+    If UBound(wordArr) + 1 > n Then n = UBound(wordArr) + 1
+    ReDim words(0 To IIf(n > 0, n, 1))
+    nWords = 0
+    s = startIdx
+    Do While s <= n - 1
+        e = s
+        Do While e + 1 <= n - 1
+            If Trim$(CellAt(wordArr, e + 1)) <> "" Then Exit Do
+            e = e + 1
+        Loop
+        ReDim subM(0 To e - s)
+        ReDim subG(0 To e - s)
+        For k = s To e
+            subM(k - s) = CellAt(morphemes, k)
+            subG(k - s) = CellAt(lexGlosses, k)
+        Next k
+        subW = GroupSegmentsFromColumns(subM, subG, 0, nSub)
+        If nSub = 0 Then
+            ' Nothing under the baseline word: the column is still its own.
+            w = NewWord("", "", "", "", s)
+            w.Segments(0).ColStart = s
+            w.Segments(0).ColEnd = e
+        Else
+            w = subW(0)
+            For j = 1 To nSub - 1
+                For q = 0 To subW(j).SegCount - 1
+                    AddSegment w, subW(j).Segments(q).Bd, subW(j).Segments(q).Form, _
+                               subW(j).Segments(q).Tb, subW(j).Segments(q).Gloss
+                    w.Segments(w.SegCount - 1).ColStart = subW(j).Segments(q).ColStart
+                    w.Segments(w.SegCount - 1).ColEnd = subW(j).Segments(q).ColEnd
+                Next q
+            Next j
+            For q = 0 To w.SegCount - 1
+                w.Segments(q).ColStart = w.Segments(q).ColStart + s
+                w.Segments(q).ColEnd = w.Segments(q).ColEnd + s
+            Next q
+        End If
+        w.StartCol = s
+        w.EndCol = e
+        words(nWords) = w
+        nWords = nWords + 1
+        s = e + 1
+    Loop
+
+    outCount = nWords
+    If nWords = 0 Then
+        ReDim words(-1 To -1)
+    Else
+        ReDim Preserve words(0 To nWords - 1)
+    End If
+    GroupByBaseline = words
+End Function
+
 Private Function CellAt(arr() As String, ByVal i As Long) As String
     If i < LBound(arr) Or i > UBound(arr) Then Exit Function
     CellAt = arr(i)
 End Function
 
-Private Function NewWord(ByVal form As String, ByVal gloss As String, _
-        ByVal col As Long) As IgtWord
+Private Function NewWord(ByVal bd As String, ByVal form As String, ByVal tb As String, _
+        ByVal gloss As String, ByVal col As Long) As IgtWord
     Dim w As IgtWord
     ReDim w.Segments(0 To 7)
-    w.Segments(0).Bd = ""
+    w.Segments(0).Bd = bd
     w.Segments(0).Form = form
+    w.Segments(0).Tb = tb
     w.Segments(0).Gloss = gloss
     w.SegCount = 1
     w.StartCol = col
@@ -745,12 +1225,13 @@ Private Function NewWord(ByVal form As String, ByVal gloss As String, _
 End Function
 
 Private Sub AddSegment(ByRef w As IgtWord, ByVal bd As String, _
-        ByVal form As String, ByVal gloss As String)
+        ByVal form As String, ByVal tb As String, ByVal gloss As String)
     If w.SegCount > UBound(w.Segments) Then
         ReDim Preserve w.Segments(0 To UBound(w.Segments) * 2 + 1)
     End If
     w.Segments(w.SegCount).Bd = bd
     w.Segments(w.SegCount).Form = form
+    w.Segments(w.SegCount).Tb = tb
     w.Segments(w.SegCount).Gloss = gloss
     w.SegCount = w.SegCount + 1
 End Sub
@@ -791,10 +1272,33 @@ End Sub
 '=============================================================================
 
 ' Word-aligned form: every segment of the word joined into one cell.
+' A boundary present on both sides of a seam -- the proclitic's trailing "="
+' and the enclitic's leading one -- is written once.
+Public Function SeamBd(w As IgtWord, ByVal i As Long) As String
+    SeamBd = w.Segments(i).Bd
+    If i > 0 And SeamBd <> "" Then
+        If SeamBd = w.Segments(i - 1).Tb Then SeamBd = ""
+    End If
+End Function
+
+' What a segment writes for its trailing boundary: bare when it is the word's
+' last segment; followed by the ownership mark when it alone owns the seam;
+' the mark on both sides when the next segment owns it too.
+Public Function TrailPart(w As IgtWord, ByVal i As Long) As String
+    If w.Segments(i).Tb = "" Then Exit Function
+    If i = w.SegCount - 1 Then
+        TrailPart = w.Segments(i).Tb
+    ElseIf w.Segments(i + 1).Bd = w.Segments(i).Tb Then
+        TrailPart = OwnMark() & w.Segments(i).Tb & OwnMark()
+    Else
+        TrailPart = w.Segments(i).Tb & OwnMark()
+    End If
+End Function
+
 Public Function JoinForm(w As IgtWord) As String
     Dim i As Long, s As String
     For i = 0 To w.SegCount - 1
-        s = s & w.Segments(i).Bd & w.Segments(i).Form
+        s = s & SeamBd(w, i) & w.Segments(i).Form & TrailPart(w, i)
     Next i
     JoinForm = s
 End Function
@@ -806,11 +1310,7 @@ End Function
 Public Function JoinGloss(w As IgtWord) As String
     Dim i As Long, s As String
     For i = 0 To w.SegCount - 1
-        If i = 0 Then
-            s = s & w.Segments(i).Gloss
-        Else
-            s = s & w.Segments(i).Bd & w.Segments(i).Gloss
-        End If
+        s = s & SeamBd(w, i) & w.Segments(i).Gloss & TrailPart(w, i)
     Next i
     JoinGloss = s
 End Function
