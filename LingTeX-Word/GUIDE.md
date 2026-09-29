@@ -398,6 +398,13 @@ lost.
 
 ## Known issues
 
+**By Word and By Morpheme do not switch an example already on the page.**
+They set how *new* examples are aligned in the document; an example keeps the
+alignment it was inserted with. To change one, use **Split Column** and
+**Merge Columns** column by column, or set the alignment first and insert
+the example again. Tracked at
+[github.com/rulingAnts/LingTeX-Tools/issues/14](https://github.com/rulingAnts/LingTeX-Tools/issues/14).
+
 **Indent and Outdent move one table at a time.** A copy of several examples
 is drawn as one numbered group, each example its own table. Indent and
 Outdent step the table the cursor is in, so on a group each sub-example has
