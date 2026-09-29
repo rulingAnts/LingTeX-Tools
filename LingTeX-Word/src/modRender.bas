@@ -611,8 +611,10 @@ End Sub
 ' indentOverride: the indent commands pass the example's new indent; -1 (the
 ' default) keeps the one the table has.
 Public Function RewrapTable(tbl As Table, _
-        Optional ByVal indentOverride As Double = -1) As Table
+        Optional ByVal indentOverride As Double = -1, _
+        Optional ByVal onlyIfChanged As Boolean = False) As Table
     Dim ex As IgtExample
+    Dim fixed As Long
 
     gRenderError = ""
     If tbl Is Nothing Then Exit Function
@@ -628,13 +630,14 @@ Public Function RewrapTable(tbl As Table, _
     ' would let Word wrap the text inside the cell behind the planner's back,
     ' and the column alignment rests on that never happening (Seth,
     ' 2026-09-14). Free translations are prose and keep theirs.
-    FixCellSpaces ex, SettingSpaceReplacement(tbl.Range.Document)
+    fixed = FixCellSpaces(ex, SettingSpaceReplacement(tbl.Range.Document))
 
     ' Absorb the free-translation paragraphs that belong to this example, so they
     ' are rewritten rather than duplicated.
     AbsorbFreeParagraphs ex, tbl
 
-    Set RewrapTable = RedrawExampleAt(tbl, ex, indentOverride)
+    ' A space repaired is a change, so that re-wrap is never skipped.
+    Set RewrapTable = RedrawExampleAt(tbl, ex, indentOverride, onlyIfChanged And fixed = 0)
 End Function
 
 '-----------------------------------------------------------------------------
@@ -657,7 +660,8 @@ End Function
 ' points of budget.
 '-----------------------------------------------------------------------------
 Public Function RedrawExampleAt(tbl As Table, ex As IgtExample, _
-        Optional ByVal indentOverride As Double = -1) As Table
+        Optional ByVal indentOverride As Double = -1, _
+        Optional ByVal onlyIfChanged As Boolean = False) As Table
     Dim doc As Document
     Dim anchor As Range
     Dim startPos As Long
@@ -725,6 +729,18 @@ Public Function RedrawExampleAt(tbl As Table, ex As IgtExample, _
         Exit Function                      ' table untouched
     End If
 
+    ' An automatic re-wrap (on save, or on leaving an example that was not
+    ' edited) that would draw what is already on the page writes nothing, so
+    ' it leaves no Undo entry: one entry per user action, never one for a
+    ' re-wrap nobody asked for (Seth, 2026-09-29).
+    If onlyIfChanged And legacy Is Nothing Then
+        If TableMatchesPlan(tbl, doc, nInter, lineStarts, nLines, colW, ex.ColCount, _
+                            indent, numW, subW, (ex.FreeCount > 0)) Then
+            Set RedrawExampleAt = tbl
+            Exit Function
+        End If
+    End If
+
     startPos = tbl.Range.Start
     If Not legacy Is Nothing Then startPos = legacy.Range.Start
     StartPendingUndo                       ' the first change to the document
@@ -754,6 +770,84 @@ DrawFailed:
     doc.Range(startPos, startPos).InsertBefore ModelToTsv(ex) & vbCr
     Err.Clear
     On Error GoTo 0
+End Function
+
+
+'-----------------------------------------------------------------------------
+' Would a redraw draw exactly what is on the page? The rows, the cells of each
+' row, every cell's width, the rows' indent and the spacing FillTable and
+' ApplyExampleSpacing give each row, against the plan. Read-only. Any doubt
+' (an error, a value out by more than half a point) says "differs", so the
+' worst a wrong answer does is a re-wrap that was not needed.
+'-----------------------------------------------------------------------------
+Private Function TableMatchesPlan(tbl As Table, doc As Document, ByVal nInter As Long, _
+        lineStarts() As Long, ByVal nLines As Long, colW() As Double, _
+        ByVal colCount As Long, ByVal indent As Double, ByVal numW As Double, _
+        ByVal subW As Double, ByVal hasFree As Boolean) As Boolean
+    Const TOL As Double = 0.5
+    Dim nNum As Long, g As Long, i As Long, r As Long, c As Long
+    Dim lineFirst As Long, lineCols As Long
+    Dim padL As Double, contIndent As Double, lineGap As Double, tierGap As Double
+    Dim w As Double, want As Double
+    Dim fmt As ParagraphFormat
+
+    On Error GoTo Differs
+    If numW > 0 Then nNum = 1
+    If subW > 0 Then nNum = nNum + 1
+    If NumberColumns(tbl) <> nNum Then Exit Function
+    If tbl.Rows.Count <> nLines * nInter Then Exit Function
+    padL = SettingCellPadding(doc, "Left")
+    contIndent = SettingContIndent(doc)
+    lineGap = SettingLineGap(doc)
+    tierGap = SettingTierGap(doc)
+
+    For g = 0 To nLines - 1
+        lineFirst = lineStarts(g)
+        lineCols = WrapLineEnd(lineStarts, g, colCount) - lineFirst + 1
+        For i = 0 To nInter - 1
+            r = g * nInter + i + 1
+            If tbl.Rows(r).Cells.Count <> lineCols + nNum Then Exit Function
+            For c = 0 To lineCols - 1
+                If Abs(tbl.Cell(r, c + 1 + nNum).Width - colW(lineFirst + c)) > TOL Then Exit Function
+            Next c
+            If nNum >= 1 Then
+                w = numW
+                If g > 0 Then w = numW + contIndent
+                If Abs(tbl.Cell(r, 1).Width - w) > TOL Then Exit Function
+            End If
+            If nNum = 2 Then
+                If Abs(tbl.Cell(r, 2).Width - subW) > TOL Then Exit Function
+            End If
+            If g = 0 Or nNum >= 1 Then
+                want = indent - padL
+            Else
+                want = indent + contIndent - padL
+            End If
+            If Abs(tbl.Rows(r).LeftIndent - want) > TOL Then Exit Function
+
+            Set fmt = tbl.Cell(r, nNum + 1).Range.ParagraphFormat
+            If r = 1 Then
+                want = SettingExampleBefore(doc)
+            Else
+                want = 0
+            End If
+            If Abs(fmt.SpaceBefore - want) > TOL Then Exit Function
+            If i = nInter - 1 Then
+                If g < nLines - 1 Then
+                    want = lineGap
+                ElseIf hasFree Then
+                    want = 0
+                Else
+                    want = SettingExampleAfter(doc)
+                End If
+            Else
+                want = tierGap
+            End If
+            If Abs(fmt.SpaceAfter - want) > TOL Then Exit Function
+        Next i
+    Next g
+    TableMatchesPlan = True
+Differs:
 End Function
 
 

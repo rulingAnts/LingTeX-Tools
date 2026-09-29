@@ -133,6 +133,14 @@ mkdir -p "$reports"; rm -f "$reports"/*.mac.txt "$reports"/ImportModules.txt
 rm -f "$root/build/engine-ok"
 
 macros=""
+# Before anything reaches Word: a member Word for Mac lacks is a compile error
+# there, shown as a MODAL dialog that stops Word answering this script until a
+# person clicks OK (2026-09-29, ParagraphFormat.ContextualSpacing). The type
+# libraries in Word's bundle know every member; check-members.py reads them.
+if [ "$import" = 1 ]; then
+    python3 "$here/check-members.py" || {
+        echo "run-in-word: refusing to import -- fix the member above first" >&2; exit 2; }
+fi
 [ "$import" = 1 ] && macros="$macros ImportLingTeXModulesQuiet"
 case "$tests" in
     all)  macros="$macros RunAllTestsToFile EnsureHooks" ;;

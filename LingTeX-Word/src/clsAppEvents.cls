@@ -46,6 +46,7 @@ Attribute mApp.VB_VarHelpID = -1
 ' The table the selection was last inside, so leaving it can be detected.
 Private mLastTableStart As Long
 Private mLastDocName    As String
+Private mLastTableText  As String   ' the example's text when the cursor entered it
 
 ' Automatic re-wrapping fires on every cursor move out of an example, so a failure
 ' must be said ONCE rather than on every keystroke afterwards.
@@ -133,7 +134,9 @@ Private Sub mApp_DocumentBeforeSave(ByVal Doc As Document, SaveAsUI As Boolean, 
     If Doc Is Nothing Then Exit Sub
     If Not SettingRewrapOnSave(Doc) Then Exit Sub
     mHandlerCount = mHandlerCount + 1
-    RewrapDocument Doc, False
+    ' Only the examples whose layout would change: a save that changes
+    ' nothing adds no Undo entry (one entry per user action).
+    RewrapDocument Doc, False, True
     Err.Clear
 End Sub
 
@@ -158,6 +161,7 @@ Public Sub SelectionMoved(ByVal Sel As Selection)
     Dim done As Table
     Dim errNum As Long, errDesc As String
     Dim msg As String
+    Dim edited As Boolean
 
     On Error Resume Next
     If gBusy Then Exit Sub
@@ -208,7 +212,11 @@ Public Sub SelectionMoved(ByVal Sel As Selection)
             RememberSelection doc, leaving.Range.Start, leaving.Range.End, selMode, selPos, selLen
             On Error GoTo RewrapFailed
             BeginUndo "Re-wrap interlinear example"
-            Set done = RewrapTable(leaving)
+            ' Edited while the cursor was in it: re-wrap. Not edited: only if
+            ' its layout would change (a margin moved), so that clicking
+            ' through examples adds no Undo entries (Seth, 2026-09-29).
+            edited = (leaving.Range.Text <> mLastTableText)
+            Set done = RewrapTable(leaving, , Not edited)
             EndUndo
             On Error Resume Next
             ' While gBusy still holds, so the move does not re-enter this handler.
@@ -243,6 +251,8 @@ Public Sub SelectionMoved(ByVal Sel As Selection)
 
     mLastTableStart = nowStart
     mLastDocName = doc.Name
+    mLastTableText = ""
+    If nowStart >= 0 Then mLastTableText = tbl.Range.Text
     Err.Clear
     Exit Sub
 

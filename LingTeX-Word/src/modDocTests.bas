@@ -93,6 +93,7 @@ Public Sub RunDocTests()
     RunSection "fromtext"
     RunSection "several"
     RunSection "fresh"
+    RunSection "insertspacing"
     RunSection "msgbox"
     RunSection "measure"
     RunSection "agreement"
@@ -140,6 +141,7 @@ Private Sub RunSection(ByVal which As String)
         Case "fromtext":     TestTextToInterlinear
         Case "several":      TestInsertSeveralExamples
         Case "fresh":        TestInsertIntoFreshDocument
+        Case "insertspacing": TestInsertSpacingMatchesRewrap
         Case "msgbox":       TestClipForMsgBox
         Case "measure":      TestMeasure
         Case "agreement":    TestRenderMeasureAgreement
@@ -1346,6 +1348,112 @@ Private Sub TestInsertIntoFreshDocument()
     gQuietText = savedText
     CloseNoSave doc
 End Sub
+
+'-----------------------------------------------------------------------------
+' A first insert must be spaced exactly as a re-wrap spaces the same examples:
+' on Mac and Windows the inserted rows came out cramped and the automatic
+' re-wrap after it corrected them, which is also why a re-wrap entry sat on
+' top of every insert in the Undo list (Seth, 2026-09-29; issue #15). Every
+' row's paragraph spacing, the number cell's and the first translation
+' line's, before and after a re-wrap.
+'-----------------------------------------------------------------------------
+Private Sub TestInsertSpacingMatchesRewrap()
+    Dim doc As Document, before As String, after As String
+    Dim savedQuiet As Boolean, savedText As String
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then
+        Ok "insert spacing: could create a blank document", False
+        Exit Sub
+    End If
+    ClearCache
+    savedQuiet = gQuiet
+    savedText = gQuietText
+    gQuiet = True
+    doc.Content.Text = TwoFlexExamples()
+    doc.Content.Select
+    ReleaseScratch
+
+    ' What the closing re-wrap corrects: the same insert without it.
+    gNoInsertRewrap = True
+    RunCommandByName "LingTeXInsertInterlinear"
+    gNoInsertRewrap = False
+    before = SpacingSnapshot(doc)
+    RewrapDocument doc, False
+    after = SpacingSnapshot(doc)
+    If before <> after Then
+        Emit "         WITHOUT the closing re-wrap the insert differs from a re-wrap:"
+        Emit "         inserted:   " & Replace(before, vbLf, " || ")
+        Emit "         re-wrapped: " & Replace(after, vbLf, " || ")
+    End If
+    CloseNoSave doc
+
+    ' With it (the real command), in a fresh document again.
+    Set doc = NewBlankDoc()
+    If doc Is Nothing Then GoTo Tidy
+    ClearCache
+    doc.Content.Text = TwoFlexExamples()
+    doc.Content.Select
+    ReleaseScratch
+    RunCommandByName "LingTeXInsertInterlinear"
+    Ok "the insert draws two tables", (doc.Tables.Count = 2)
+    Ok "  in one undo record, the closing re-wrap inside it", (Not gUndoRecordBroke)
+    Emit "         " & gUndoDiag
+    before = SpacingSnapshot(doc)
+    RewrapDocument doc, False
+    after = SpacingSnapshot(doc)
+    Ok "  a first insert is spaced exactly as a re-wrap spaces it", (before = after)
+    If before <> after Then
+        Emit "         inserted:   " & Replace(before, vbLf, " || ")
+        Emit "         re-wrapped: " & Replace(after, vbLf, " || ")
+    End If
+
+    ' An automatic re-wrap that would change nothing writes nothing, so it
+    ' leaves no Undo entry; one that would change the layout redraws.
+    doc.Saved = True
+    RewrapDocument doc, False, True
+    Ok "an automatic re-wrap of unchanged examples writes nothing", doc.Saved
+    Ok "  and the tables are still there", (doc.Tables.Count = 2)
+    doc.PageSetup.RightMargin = doc.PageSetup.RightMargin + 300
+    doc.Saved = True
+    RewrapDocument doc, False, True
+    Ok "after the margin moves, it re-wraps", (Not doc.Saved)
+    Ok "  and the tables are still there", (doc.Tables.Count = 2)
+Tidy:
+    gNoInsertRewrap = False
+    gQuiet = savedQuiet
+    gQuietText = savedText
+    If Not doc Is Nothing Then CloseNoSave doc
+End Sub
+
+' Space before / after, line spacing and its rule of every row's first content
+' cell, the number cell, and the first line after each table; row heights.
+Private Function SpacingSnapshot(doc As Document) As String
+    Dim t As Long, r As Long, s As String, tbl As Table, nNum As Long, p As Paragraph
+    On Error Resume Next
+    For t = 1 To doc.Tables.Count
+        Set tbl = doc.Tables(t)
+        nNum = NumberColumns(tbl)
+        s = s & "T" & CStr(t) & ":"
+        For r = 1 To tbl.Rows.Count
+            s = s & " r" & CStr(r) & ParaFmt(tbl.Cell(r, nNum + 1).Range.Paragraphs(1)) & _
+                "h" & Format$(tbl.Rows(r).Height, "0.0") & "/" & CStr(tbl.Rows(r).HeightRule)
+        Next r
+        s = s & " n" & ParaFmt(tbl.Cell(1, 1).Range.Paragraphs(1))
+        Set p = Nothing
+        Set p = ParagraphAfterTable(tbl)
+        If Not p Is Nothing Then s = s & " f" & ParaFmt(p)
+        s = s & vbLf
+    Next t
+    Err.Clear
+    SpacingSnapshot = s
+End Function
+
+Private Function ParaFmt(p As Paragraph) As String
+    On Error Resume Next
+    ParaFmt = "[" & Format$(p.SpaceBefore, "0.0") & "/" & Format$(p.SpaceAfter, "0.0") & "/" & _
+              Format$(p.LineSpacing, "0.0") & "/" & CStr(p.LineSpacingRule) & "/" & p.Style & "]"
+    Err.Clear
+End Function
 
 Private Sub TestInsertSeveralExamples()
     Dim doc As Document

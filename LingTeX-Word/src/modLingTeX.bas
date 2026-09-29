@@ -114,6 +114,7 @@ Public gQuietText As String         ' what Ask returns while quiet
 Public gLastMessage As String       ' the last thing reported, dialog or not
 Public gUndoRecordBroke As Boolean  ' a custom undo record closed early inside a command, or never opened (tests assert False)
 Public gUndoDiag As String          ' what the last command's undo record did (LingTeXUndoDiagnostics shows it)
+Public gNoInsertRewrap As Boolean   ' tests only: an insert without its closing re-wrap, to see what that re-wrap corrects
 
 Public Sub Report(ByVal msg As String, ByVal kind As Long)
     gLastMessage = msg
@@ -404,6 +405,7 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
     Dim nextTarget As Range
     Dim warnings As Collection, allText As String
     Dim block As String, heldBack As Long
+    Dim drawnTbls() As Table
     Dim widths() As Double, haveRecord As Boolean
 
     On Error GoTo Fail
@@ -428,6 +430,7 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
     BeginUndo label
     Application.ScreenUpdating = False
     Set nextTarget = target
+    ReDim drawnTbls(0 To n - 1)
     For i = 0 To n - 1
         ' Several from one copy: one number for the group, a letter each
         ' (Seth, 2026-09-29; the shape of a LaTeX xlist).
@@ -437,6 +440,7 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
             Set tbl = RenderExample(models(i), nextTarget)
         End If
         If tbl Is Nothing Then Exit For
+        Set drawnTbls(drawn) = tbl
         drawn = drawn + 1
         ' The record must be open after the first draw, and still the one it
         ' opened after every later one.  A record that never opened counts
@@ -479,6 +483,19 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
             nextTarget.Collapse 1                 ' wdCollapseStart
         End If
     Next i
+    ' One Undo entry per user action (Seth, 2026-09-29): the insert re-wraps
+    ' what it drew, inside its own record. A first draw came out with cramped
+    ' spacing on Mac and Windows, and the automatic re-wrap that corrected it
+    ' sat on top of every insert as an Undo entry of its own (issue #15). The
+    ' widths are all in the cache by now, so nothing is written to the
+    ' measuring document and the record stays whole; last table first, so a
+    ' redraw never moves one still to come.
+    If Not gNoInsertRewrap Then
+        For k = drawn - 1 To 0 Step -1
+            RewrapTable drawnTbls(k)
+        Next k
+        If haveRecord And Not RecordIsOpen() Then gUndoRecordBroke = True
+    End If
     Application.ScreenUpdating = True
     EndUndo
     gBusy = False
@@ -529,6 +546,10 @@ Private Sub DrawParsedExample(ByRef ex As IgtExample, target As Range, doc As Do
     Application.ScreenUpdating = False
 
     Set tbl = RenderExample(ex, target)
+    ' The closing re-wrap, inside the same record: see DrawParsedExamples.
+    If Not tbl Is Nothing Then
+        If Not gNoInsertRewrap Then Set tbl = RewrapTable(tbl)
+    End If
 
     Application.ScreenUpdating = True
     EndUndo
@@ -1053,7 +1074,8 @@ End Sub
 ' re-wrap deletes and redraws a table, which shifts every position after it, so
 ' working backwards keeps the remaining references valid.
 '-----------------------------------------------------------------------------
-Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
+Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean, _
+        Optional ByVal onlyIfChanged As Boolean = False)
     Dim errNum As Long, errDesc As String
     Dim tables As Collection
     Dim i As Long, n As Long, nFailed As Long, nDegraded As Long
@@ -1123,7 +1145,7 @@ Public Sub RewrapDocument(doc As Document, ByVal showResult As Boolean)
         ' status bar says how far along it is.
         StatusLine "LingTeX: re-wrapping example " & _
                    CStr(tables.Count - i + 1) & " of " & CStr(tables.Count)
-        Set done = RewrapTable(tables(i))
+        Set done = RewrapTable(tables(i), , onlyIfChanged)
         If done Is Nothing Then
             nFailed = nFailed + 1
             If firstWhy = "" Then firstWhy = gRenderError
