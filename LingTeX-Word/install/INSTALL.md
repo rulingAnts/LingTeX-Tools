@@ -17,29 +17,37 @@ this file, is the user guide.
    Settings → Apps. (Or unzip the `-windows.zip` and double-click
    `install.bat`, which does the same copy and clears the "downloaded from
    the internet" mark that would otherwise make Word block the macros.)
-2. Start Word. A message says LingTeX-Word is installed and lists its keyboard
-   shortcuts (**Ctrl+Alt+Shift** + a letter). The Interlinear tab is on the ribbon.
+2. Start Word. A few seconds later a message names the version and lists its
+   keyboard shortcuts (**Ctrl+Alt+Shift** + a letter). The Interlinear tab is
+   on the ribbon.
 
 To remove it: Settings → Apps → LingTeX-Word → Uninstall (or `install.bat
 -Uninstall`, or delete the file from the STARTUP folder).
 
 ## Mac
 
-1. Open the `-macos.dmg`.
-2. Double-click **Install LingTeX-Word**. It opens in Script Editor with what it
-   does written at the top; click the **Run** button (the triangle) and follow
-   the messages. It copies the template into Word's Startup folder, replacing an
-   earlier version, and clears the download quarantine. If macOS asks whether
-   Script Editor may use files on the disk image or data from other apps, click
-   OK.
+macOS no longer opens installers downloaded from the internet unless they are
+signed by a paid Apple developer account, which LingTeX-Word is not, so on a
+Mac it is installed with one command in Terminal. **How to install on a
+Mac.txt** on the disk image has the same steps.
+
+1. Open the `-macos.dmg` (eject any older LingTeX-Word disk image first).
+2. Open Terminal (Applications → Utilities → Terminal), type
+   `cd /Volumes/LingTeX-Word` and Return, then `sh install.sh` and Return
+   (or type `sh` and a space, drag `install.sh` onto the Terminal window, and
+   press Return). It says which template it installs; if Word is open it
+   waits (type `q` and Return to have Word quit). It copies the template into
+   Word's Startup folder, replacing an earlier version, and clears the
+   download quarantine. If macOS asks whether Terminal may access data from
+   other apps, click Allow.
 3. Start Word. If Word asks whether to enable macros in `LingTeX-Word.dotm`,
    choose **Enable Macros** (Word → Preferences → Security can make that
-   permanent). A message then says LingTeX-Word is installed and lists its
-   keyboard shortcuts (**Cmd+Option+Shift** + a letter). The Interlinear tab is on
-   the ribbon.
+   permanent). A few seconds later a message names the version and lists its
+   keyboard shortcuts (**Cmd+Option+Shift** + a letter). The Interlinear tab
+   is on the ribbon.
 
-To remove it: run **Uninstall LingTeX-Word** from the disk image the same way,
-or delete the file from
+To remove it: the same, with `sh install.sh --uninstall` (two ordinary
+hyphens), or delete the file from
 `~/Library/Group Containers/UBF8T346G9.Office/User Content.localized/Startup.localized/Word`.
 
 ## Shortcuts
@@ -52,4 +60,9 @@ Shortcuts** runs the installation again.
 
 ## Upgrading
 
-Close Word, run the installer from the new download; it replaces the file.
+Close Word and run the installer from the new download; it replaces the file.
+(On the Mac, eject the older disk image first, then run the new one's
+`install.sh` as above.) At the next start of Word the shortcuts are bound
+again and the message appears again, naming the new version; `LingTeXAbout`
+in the macro list names the version at any time. If the shortcuts still stop
+working, click **Install Shortcuts** once.

@@ -360,7 +360,7 @@ End Function
 '-----------------------------------------------------------------------------
 ' THE OWNERSHIP MARK.  A boundary character belongs to the affix or clitic,
 ' never to its host, and FLEx keeps that by the side of the cell it sits on.
-' Folding two cells into one word-aligned cell loses it: "be=dai" no longer
+' Folding two cells into one word-aligned cell loses it: "ze=zuvo" no longer
 ' says whose "=" it is, and a later split can only guess.  So the fold writes
 ' U+2060 WORD JOINER right after a boundary the LEFT morpheme owns (a prefix
 ' or proclitic), and on both sides of one that both own (a proclitic meeting
