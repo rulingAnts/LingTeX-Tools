@@ -92,6 +92,7 @@ Public Sub RunDocTests()
     RunSection "rows"
     RunSection "fromtext"
     RunSection "several"
+    RunSection "msgbox"
     RunSection "measure"
     RunSection "agreement"
     RunSection "rendering"
@@ -137,6 +138,7 @@ Private Sub RunSection(ByVal which As String)
         Case "rows":         TestRowGeometry
         Case "fromtext":     TestTextToInterlinear
         Case "several":      TestInsertSeveralExamples
+        Case "msgbox":       TestClipForMsgBox
         Case "measure":      TestMeasure
         Case "agreement":    TestRenderMeasureAgreement
         Case "rendering":    TestRendering
@@ -1290,6 +1292,24 @@ Private Function TwoFlexExamples() As String
         t & "Lex. Gloss" & t & "yam" & t & "pick" & t & "SEQ" & t & vbCr & _
         lrm & "Free " & lrm & lrm & "She picked yams and then"
 End Function
+
+'-----------------------------------------------------------------------------
+' A report longer than a message box can show (1024 characters) is cut at a
+' line break and says how many lines went; Word for Mac drew the overflow as
+' garbage (Seth's six-example report, 2026-09-29).
+'-----------------------------------------------------------------------------
+Private Sub TestClipForMsgBox()
+    Dim s As String, i As Long, out As String
+    Eq "a short message is untouched", ClipForMsgBox("hello" & vbCr & "there"), "hello" & vbCr & "there"
+    For i = 1 To 40
+        s = s & "- warning line number " & CStr(i) & " about a column" & vbCr
+    Next i
+    out = ClipForMsgBox(s)
+    Ok "a long message is cut inside the message-box limit", (Len(out) <= 1000)
+    Ok "  at a line break", (InStr(out, "column" & vbCr & "... ") > 0)
+    Ok "  saying how many lines went", (out Like "*more line(s).")
+    If Not (out Like "*more line(s).") Then Emit "         tail: " & Right$(out, 60)
+End Sub
 
 Private Sub TestInsertSeveralExamples()
     Dim doc As Document

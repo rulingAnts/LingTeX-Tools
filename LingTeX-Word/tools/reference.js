@@ -162,6 +162,37 @@ function groupByBaseline(morphemes, lexGlosses, wordArr, startIdx) {
 }
 
 /**
+ * Where the baseline's words start when the Word line was copied in several
+ * writing systems: one may lack a form for a word, so a column starts a word
+ * where ANY Word row has a cell. The merged row holds 'x' there.
+ */
+function baselineStarts(lineTypes, colArrays) {
+    var merged = [];
+    lineTypes.forEach(function (lt, t) {
+        if (lt !== 'Word') return;
+        colArrays[t].forEach(function (cell, k) {
+            if ((cell || '').trim() !== '') merged[k] = 'x';
+        });
+    });
+    for (var k = 0; k < merged.length; k++) if (merged[k] === undefined) merged[k] = '';
+    return merged;
+}
+
+/**
+ * A further form row's piece for a segment, less the boundary characters the
+ * segment owns (written back at the seams like the first row's). agreed is
+ * false when the piece still begins or ends with a boundary character: the
+ * row disagrees with the first about the segmentation, and is written as is.
+ */
+function formBody(piece, seg) {
+    var s = piece;
+    if (seg.bd !== '' && s.charAt(0) === seg.bd) s = s.substring(1);
+    if (seg.tb !== '' && s.length > 0 && s.charAt(s.length - 1) === seg.tb) s = s.substring(0, s.length - 1);
+    var agreed = !(s.length > 0 && (isBoundary(s.charAt(0)) || isBoundary(s.charAt(s.length - 1))));
+    return { body: s, agreed: agreed };
+}
+
+/**
  * Fold a word that is bare punctuation into the preceding word's last segment.
  * `ze` followed by `:` becomes the single form `ze:` with the gloss untouched.
  * @param {Array} words  mutated in place
@@ -303,7 +334,7 @@ function modelFromBlock(block, granularity) {
     // With a copied baseline its words are the columns (PROMPT.md rule 12);
     // without one the boundary characters group the morphemes.
     var words = (wordIdx >= 0 && morphIdx >= 0)
-        ? groupByBaseline(formArr, glossArr, colArrays[wordIdx], dataStart)
+        ? groupByBaseline(formArr, glossArr, baselineStarts(lineTypes, colArrays), dataStart)
         : groupSegments(formArr, glossArr, dataStart);
     handleStandalonePunctuation(words);
 
@@ -342,11 +373,16 @@ function modelFromBlock(block, granularity) {
                 for (var k = s.colStart; k <= s.colEnd && k < src.length; k++) piece += (src[k] || '').trim();
                 if (granularity === MORPHEME_ALIGNED) {
                     out.push(isGloss && piece !== '' ? s.bd + piece + s.tb : piece);
-                } else if (isGloss && piece !== '') {
+                } else if (piece !== '') {
                     var bd = (i > 0 && s.bd !== '' && s.bd === w.segments[i - 1].tb) ? '' : s.bd;
-                    acc += bd + piece + trailPart(w.segments, i);
-                } else {
-                    acc += piece;
+                    if (isGloss) {
+                        acc += bd + piece + trailPart(w.segments, i);
+                    } else {
+                        // A form row's own boundary characters, rewritten at the
+                        // seams like the first row's: a shared one once, with marks.
+                        var fb = formBody(piece, s);
+                        acc += fb.agreed ? bd + fb.body + trailPart(w.segments, i) : piece;
+                    }
                 }
             });
             if (granularity !== MORPHEME_ALIGNED) out.push(acc);

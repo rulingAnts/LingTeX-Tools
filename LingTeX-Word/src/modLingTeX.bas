@@ -100,6 +100,9 @@ Private Const SETUP_VAR As String = "LingTeX_Setup"
 ' the title is a constant rather than a literal at each one: a bulk edit over this
 ' file can no longer silently take it off them.
 Private Const DIALOG_TITLE As String = "LingTeX-Word"
+' What one Insert's warning report may hold before it says "... and N more"
+' (a message box shows 1024 characters; Word for Mac draws the rest as garbage).
+Private Const REPORT_BUDGET As Long = 900
 
 Public gQuiet As Boolean            ' suppress dialogs (tests set this)
 Public gQuietAnswer As Boolean      ' what Confirm returns while quiet
@@ -110,8 +113,31 @@ Public gUndoRecordBroke As Boolean  ' a custom undo record closed early inside a
 Public Sub Report(ByVal msg As String, ByVal kind As Long)
     gLastMessage = msg
     If gQuiet Then Exit Sub
-    MsgBox msg, kind, DIALOG_TITLE
+    MsgBox ClipForMsgBox(msg), kind, DIALOG_TITLE
 End Sub
+
+' MsgBox shows at most 1024 characters, and Word for Mac draws whatever runs
+' past that as garbage (Seth's screenshot of a six-example report,
+' 2026-09-29). A long message is cut at a line break inside the limit and
+' says how many lines went.
+Public Function ClipForMsgBox(ByVal s As String) As String
+    Const LIMIT As Long = 1000
+    Const KEEP As Long = 880
+    Dim cut As Long, dropped As Long, p As Long
+    If Len(s) <= LIMIT Then
+        ClipForMsgBox = s
+        Exit Function
+    End If
+    cut = InStrRev(s, vbCr, KEEP)
+    If cut < KEEP \ 2 Then cut = KEEP
+    dropped = 1
+    p = InStr(cut + 1, s, vbCr)
+    Do While p > 0
+        dropped = dropped + 1
+        p = InStr(p + 1, s, vbCr)
+    Loop
+    ClipForMsgBox = Left$(s, cut - 1) & vbCr & "... " & CStr(dropped) & " more line(s)."
+End Function
 
 ' A yes/no question.  Same contract: while quiet it answers gQuietAnswer rather
 ' than asking, so a test can exercise both the accept and the decline path.
@@ -372,6 +398,7 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
     Dim tbl As Table, p As Paragraph
     Dim nextTarget As Range
     Dim warnings As Collection, allText As String
+    Dim block As String, heldBack As Long
     Dim widths() As Double, haveRecord As Boolean
 
     On Error GoTo Fail
@@ -408,8 +435,17 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
         Set warnings = CheckExample(models(i))
         If Not warnings Is Nothing Then
             If warnings.Count > 0 Then
-                If allText <> "" Then allText = allText & vbCr & vbCr
-                allText = allText & "Example " & CStr(i + 1) & ":" & vbCr & WarningText(warnings)
+                ' Whole examples up to what a message box can show, then a
+                ' count: past 1024 characters Word for Mac draws garbage
+                ' (Seth's six-example report, 2026-09-29). Check Glossing on
+                ' one example gives its full list.
+                block = "Example " & CStr(i + 1) & ":" & vbCr & WarningText(warnings)
+                If allText <> "" And Len(allText) + Len(block) + 2 > REPORT_BUDGET Then
+                    heldBack = heldBack + 1
+                Else
+                    If allText <> "" Then allText = allText & vbCr & vbCr
+                    allText = allText & block
+                End If
             End If
         End If
         If i < n - 1 Then
@@ -438,6 +474,10 @@ Private Sub DrawParsedExamples(models() As IgtExample, ByVal n As Long, target A
     ElseIf gRenderError <> "" Then
         Report "The examples were drawn, but not exactly as planned:" & vbCr & vbCr & _
                gRenderError & vbCr & vbCr & "Re-wrapping them may fix the layout.", vbExclamation
+    End If
+    If heldBack > 0 Then
+        allText = allText & vbCr & vbCr & "... and " & CStr(heldBack) & _
+                  " more example(s) with warnings: click in one and run Check Glossing to see them."
     End If
     If allText <> "" Then Report allText, vbExclamation
     Exit Sub

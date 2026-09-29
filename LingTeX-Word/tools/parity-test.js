@@ -91,7 +91,7 @@ function loadVectors() {
 var vectors = loadVectors();
 
 section('Golden vectors (derived from PROMPT.md)');
-ok('found 7 input vectors in PROMPT.md', vectors.length === 7, 'found ' + vectors.length);
+ok('found 8 input vectors in PROMPT.md', vectors.length === 8, 'found ' + vectors.length);
 
 // FLEx's end-of-segment sign "\u00A7" ends a line in some copies (its .flextext
 // importer adds it; seen live 2026-09-28). A cell that is exactly "\u00A7" is
@@ -193,6 +193,13 @@ section('Free lines, codes, further writing systems, a baseline');
     eq('  Lex. Gram. Info. per segment, with the boundaries', m7m.cells[5].join('\t'), 'n\t=adp\tn\tv\t-v:(lnk)\t=cosub');
     ok('  no warning at all: the baseline takes no part in the checks', R.checkExample(m7).length === 0,
         JSON.stringify(R.checkExample(m7).map(function (w) { return w.code + ' col ' + w.col; })));
+
+    var v8 = vectors[7];
+    var m8 = R.buildModels(v8.raw, R.WORD_ALIGNED)[0];
+    ok('example 8 has three columns: a sparse Word row merges no words', m8.cells[0].length === 3, 'got ' + m8.cells[0].length);
+    ok('  the second Morphemes row carries the ownership marks too', m8.cells[3].join('').indexOf(R.OWN_MARK) >= 0);
+    ok('  and no warning', R.checkExample(m8).length === 0,
+        JSON.stringify(R.checkExample(m8).map(function (w) { return w.code + ' col ' + w.col; })));
 })();
 
 // ── 2a. ownership of a boundary across By Word and By Morpheme ───────────────

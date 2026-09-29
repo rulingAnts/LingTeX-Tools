@@ -433,6 +433,23 @@
     }
 
     /**
+     * Where the baseline's words start when the Word line was copied in
+     * several writing systems: one may lack a form for a word, so a column
+     * starts a word where ANY Word row has a cell ('x' there, '' elsewhere).
+     */
+    function baselineStarts(lineTypes, colArrays) {
+        var merged = [];
+        for (var t = 0; t < lineTypes.length; t++) {
+            if (lineTypes[t] !== 'Word') continue;
+            for (var k = 0; k < colArrays[t].length; k++) {
+                if ((colArrays[t][k] || '').trim() !== '') merged[k] = 'x';
+            }
+        }
+        for (var j = 0; j < merged.length; j++) if (merged[j] === undefined) merged[j] = '';
+        return merged;
+    }
+
+    /**
      * Special case: standalone punctuation (single char, empty gloss) appends
      * to preceding word's form only, no gloss contribution.
      * @param {Array} words  Mutated in place
@@ -508,7 +525,7 @@
         // Run word-grouping algorithm on tab-format columns
         var wordIdx = lineTypes.indexOf('Word');
         var words = (wordIdx >= 0 && wordIdx !== morphIdx)
-            ? groupByBaseline(morphemesArr, lexGlossesArr, colArrays[wordIdx], dataStart)
+            ? groupByBaseline(morphemesArr, lexGlossesArr, baselineStarts(lineTypes, colArrays), dataStart)
             : groupWordsFromColumns(morphemesArr, lexGlossesArr, dataStart);
         handleStandalonePunctuation(words);
 
@@ -724,7 +741,7 @@
         // Run word-grouping algorithm
         var wordIdx = lineTypes.indexOf('Word');
         var words = (wordIdx >= 0 && wordIdx !== morphIdx)
-            ? groupByBaseline(morphemesArr, lexGlossesArr, colArrays[wordIdx], dataStart)
+            ? groupByBaseline(morphemesArr, lexGlossesArr, baselineStarts(lineTypes, colArrays), dataStart)
             : groupWordsFromColumns(morphemesArr, lexGlossesArr, dataStart);
         handleStandalonePunctuation(words);
 

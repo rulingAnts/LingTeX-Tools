@@ -130,7 +130,7 @@ function eq(label, actual, expected) {
 var free = expectedFree();
 var prompts = promptVectors();
 
-[1, 2, 3, 4, 5, 6, 7].forEach(function (n) {
+[1, 2, 3, 4, 5, 6, 7, 8].forEach(function (n) {
     console.log('modTests.bas golden vector ' + n);
     var raw = vbaFunc('Vector' + n + 'Raw');
     var models = R.buildModels(raw, R.WORD_ALIGNED);

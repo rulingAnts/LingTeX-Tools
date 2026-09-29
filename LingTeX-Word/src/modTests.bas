@@ -463,6 +463,27 @@ Private Function Vector7Glosses() As String
     Vector7Glosses = "wu" & T & "=we" & T & "so" & T & "suwo-a" & T & "=tee"
 End Function
 
+' PROMPT.md example 8, input.  The baseline in two writing systems, the first
+' with a form for only some words; a proclitic and its host as one baseline
+' word; a second Morphemes row.  Rows 0 and 1 are the two Word rows.
+Private Function Vector8Raw() As String
+    Vector8Raw = _
+        "1.1" & T & "Word xyz" & T & T & T & "so" & T & T & T & vbLf & _
+        T & "Word xyz-ort" & T & "vuve" & T & T & "zo" & T & "zuvoa" & T & T & vbLf & _
+        T & "Morphemes xyz" & T & "wu=" & T & "=we" & T & "so" & T & "suwo" & T & T & "-a" & vbLf & _
+        T & "Morphemes xyz-ort" & T & "vu=" & T & "=ve" & T & "zo" & T & "zuvo" & T & T & "-a" & vbLf & _
+        T & "Lex. Gloss" & T & "fox" & T & "ERG" & T & "dream" & T & T & "follow" & T & "lnk" & vbLf & _
+        "Free The fox dreamt of following"
+End Function
+
+Private Function Vector8Forms() As String
+    Vector8Forms = T & "so" & T
+End Function
+
+Private Function Vector8Glosses() As String
+    Vector8Glosses = "vuve" & T & "zo" & T & "zuvoa"
+End Function
+
 ' A vector with a leading example number, as Print View copies it, and FLEx's
 ' end-of-segment sign as a last cell of the first row with an empty gloss cell
 ' under it: both must fall away.  Pure ASCII source, so ChrW(&HA7).
@@ -490,6 +511,8 @@ Private Sub TestGoldenVectors()
                 "The fox dreamt of following and then"
     CheckVector "example 7 (every line type, a code on every line)", Vector7Raw(), Vector7Forms(), Vector7Glosses(), _
                 "The fox dreamt of following and then"
+    CheckVector "example 8 (a baseline in two writing systems, one sparse)", Vector8Raw(), Vector8Forms(), Vector8Glosses(), _
+                "The fox dreamt of following"
     ' A cell that is exactly "section sign" is dropped, and the column it
     ' leaves empty on every tier with it (Seth, 2026-09-15; seen live 2026-09-28).
     CheckVector "example 2 with a number and a trailing section sign", WithSectionSign(Vector2Raw()), _
@@ -579,6 +602,19 @@ Private Sub TestFreeLines()
     Set warnings = CheckExample(word)
     Ok "  no warning at all: the baseline takes no part in the checks", (warnings.Count = 0)
     If warnings.Count > 0 Then Emit "         first: " & warnings(1).Describe
+
+    ' Example 8: a column starts a word where ANY Word row has a cell, and
+    ' the second Morphemes row writes a shared seam once, as the first does.
+    word = ModelFromText(Vector8Raw(), igtWordAligned)
+    Ok "example 8 has three columns: the sparse Word row did not merge words", (word.ColCount = 3)
+    Eq "  the first Morphemes row", RowText(word, 2), "wu=we" & T & "so" & T & "suwo-a"
+    Eq "  the second Morphemes row, its shared seam written once", RowText(word, 3), "vu=ve" & T & "zo" & T & "zuvo-a"
+    Eq "  the gloss row", RowText(word, 4), "fox=ERG" & T & "dream" & T & "follow-lnk"
+    Ok "  the second Morphemes row carries the ownership marks too", _
+        (InStr(RawRow(word, 3), OwnMark()) > 0)
+    Set warnings = CheckExample(word)
+    Ok "  and no warning", (warnings.Count = 0)
+    If warnings.Count > 0 Then Emit "         first: " & warnings(1).Describe
 End Sub
 
 Private Function FreeText(ex As IgtExample) As String
@@ -645,6 +681,7 @@ Private Sub TestProjections()
     CheckProjection "example 5 (proclitics)", Vector5Raw()
     CheckProjection "example 6 (a baseline)", Vector6Raw()
     CheckProjection "example 7 (every line type)", Vector7Raw()
+    CheckProjection "example 8 (two Word rows, two Morphemes rows)", Vector8Raw()
 End Sub
 
 Private Sub CheckProjection(ByVal name As String, ByVal raw As String)

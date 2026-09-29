@@ -23,7 +23,7 @@ When FLEx copies interlinear text to the clipboard it produces **tab-separated c
 11. **Tier labels with a writing-system code, and every line type:** the label cell may read `Lex. Gloss Eng` or `Morphemes xyz-ort`, base label and code separated by a space. Every row is kept, in FLEx's order. The first Morphemes row gives the segments and so the columns; a further Morphemes row, a further Lex. Gloss row and `Lex. Gram. Info.` are laid out on those segments (a gloss-like row takes the segments' boundary characters where it has a piece, a form row carries its own); `Word`, `Word Gloss` and `Word Cat.` are laid out per word span; glossing the words as written, they carry no morpheme boundary and take no part in the break-character agreement, its repair, or a split's precondition (they stay whole on the left). A partly filled column is judged on the segmented form row and the first gloss row only: a further gloss row may be sparse.
 12. **A copied baseline establishes the columns:** when a `Word` line is present, its non-empty cells start the word spans and its empty cells continue them; every row is laid out on those spans. The baseline itself is not segmented: it takes no part in the break-character checks, keeps any space it has, and a split leaves it whole in the left-hand column.
 9. **Ownership of a boundary across a fold and a split:** folding two cells into one word-aligned cell writes U+2060 WORD JOINER right after a boundary the left morpheme owns (`be=⁠dai`), and on both sides of one that both own (`ka⁠=⁠be`); a split reads it, hands the boundary back to its owner, and consumes it, so By Word and By Morpheme round-trip losslessly. Exports strip the mark, and LingTeX-Word never writes it to the page: there the boundary glyph carries a character style (`LingTeX Left Boundary`, `LingTeX Shared Boundary`) and read-back restores the mark from it, so Find matches the plain spelling. A boundary with no mark stays the right-hand morpheme's.
-7. **Trailing cells and the section sign:** trailing tabs are columns and are never stripped (only trailing spaces are). A cell that is exactly `§`, FLEx's end-of-segment sign, is dropped, and a column that is empty on every tier is dropped with it.
+7. **Trailing cells and the section sign:** trailing tabs are columns and are never stripped (only trailing spaces are). A cell that is exactly `§`, FLEx's end-of-segment sign, is dropped, and a column that is empty on every tier is dropped with it. When the Word line is copied in several writing systems, one may lack a form for a word: a column starts a word where ANY Word row has a cell. A further Morphemes row writes its boundary characters at the seams as the first row does, a shared one once, with the ownership marks; where it disagrees with the first about the segmentation its cell is written as it is.
 
 ---
 
@@ -318,6 +318,32 @@ fox	by	dream	followed	then
 rubah	oleh	mimpi	diikuti	lalu
 n	adp	n	v	cosub
 The fox dreamt of following and then / rubah mimpi ikut lalu
+```
+
+## Example 8 for verification
+
+The baseline in two writing systems, the first with a form for only some
+words (a writing system may lack one); a proclitic and its host as one
+baseline word; a second Morphemes row, whose shared seam is written once.
+
+**Input:**
+```
+1.1→Word xyz→→→so→→→
+→Word xyz-ort→vuve→→zo→zuvoa→→
+→Morphemes xyz→wu=→=we→so→suwo→→-a
+→Morphemes xyz-ort→vu=→=ve→zo→zuvo→→-a
+→Lex. Gloss→fox→ERG→dream→→follow→lnk
+Free The fox dreamt of following
+```
+
+**Expected TSV output:**
+```
+	so	
+vuve	zo	zuvoa
+wu=we	so	suwo-a
+vu=ve	zo	zuvo-a
+fox=ERG	dream	follow-lnk
+The fox dreamt of following
 ```
 
 ---

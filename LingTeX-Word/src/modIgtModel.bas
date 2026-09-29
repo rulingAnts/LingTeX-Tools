@@ -296,7 +296,7 @@ Public Function ModelFromBlock(b As FlexBlock, _
     Dim t As Long, i As Long, s As Long, c As Long
     Dim morphIdx As Long, glossIdx As Long, wgIdx As Long, catIdx As Long, wordIdx As Long
     Dim formIdx As Long, dataStart As Long
-    Dim formArr() As String, glossArr() As String
+    Dim formArr() As String, glossArr() As String, starts() As String
     Dim words() As IgtWord, nWords As Long
     Dim forms() As String, glosses() As String
     Dim spanStart() As Long, spanEnd() As Long
@@ -343,7 +343,8 @@ Public Function ModelFromBlock(b As FlexBlock, _
     ' With a copied baseline its words are the columns (PROMPT.md rule 12);
     ' without one the boundary characters group the morphemes.
     If wordIdx >= 0 And morphIdx >= 0 Then
-        words = GroupByBaseline(formArr, glossArr, b.ColArrays(wordIdx), dataStart, nWords)
+        starts = BaselineStarts(b)
+        words = GroupByBaseline(formArr, glossArr, starts, dataStart, nWords)
     Else
         words = GroupSegmentsFromColumns(formArr, glossArr, dataStart, nWords)
     End If
@@ -460,16 +461,75 @@ Public Function ModelFromBlock(b As FlexBlock, _
 End Function
 
 '-----------------------------------------------------------------------------
+' Where the baseline's words start when the Word line was copied in several
+' writing systems: one of them may lack a form for a word (seen live
+' 2026-09-29, a Word row with a form for only some words, whose gaps merged
+' words together), so a column starts a word where ANY Word row has a cell.
+' The merged row holds "x" there and "" elsewhere; GroupByBaseline reads it.
+'-----------------------------------------------------------------------------
+Private Function BaselineStarts(b As FlexBlock) As String()
+    Dim t As Long, k As Long, hi As Long
+    Dim row() As String, merged() As String
+    hi = 0
+    For t = 0 To b.TierCount - 1
+        If b.LineTypes(t) = TIER_WORD Then
+            row = b.ColArrays(t)
+            If UBound(row) > hi Then hi = UBound(row)
+        End If
+    Next t
+    ReDim merged(0 To hi)
+    For t = 0 To b.TierCount - 1
+        If b.LineTypes(t) = TIER_WORD Then
+            row = b.ColArrays(t)
+            For k = LBound(row) To UBound(row)
+                If k >= 0 Then
+                    If Trim$(row(k)) <> "" Then merged(k) = "x"
+                End If
+            Next k
+        End If
+    Next t
+    BaselineStarts = merged
+End Function
+
+'-----------------------------------------------------------------------------
+' A further form row's piece for a segment, less the boundary characters the
+' segment owns: they are written back at the seams the way the first row
+' writes them, once where two segments share one and with the ownership
+' marks, rather than twice ("ka==be", seen live 2026-09-29). agreed is False
+' when the piece still begins or ends with a boundary character afterwards:
+' the row disagrees with the first about the segmentation, and is written
+' as it is.
+'-----------------------------------------------------------------------------
+Private Function FormBody(ByVal piece As String, seg As IgtSegment, ByRef agreed As Boolean) As String
+    Dim s As String
+    s = piece
+    If seg.Bd <> "" Then
+        If Left$(s, 1) = seg.Bd Then s = Mid$(s, 2)
+    End If
+    If seg.Tb <> "" And Len(s) > 0 Then
+        If Right$(s, 1) = seg.Tb Then s = Left$(s, Len(s) - 1)
+    End If
+    agreed = True
+    If Len(s) > 0 Then
+        If IsBoundary(Left$(s, 1)) Or IsBoundary(Right$(s, 1)) Then agreed = False
+    End If
+    FormBody = s
+End Function
+
+'-----------------------------------------------------------------------------
 ' A further writing system of the form or gloss line, projected on the same
 ' segments as the first: each segment takes the row's cells over the columns
 ' the segment came from (its own and the ones its gloss spread over).  A gloss
 ' row takes the segments' boundary characters where it has a piece, as
-' JoinGloss gives the first gloss; a form row carries its own and takes none.
+' JoinGloss gives the first gloss; a form row's own boundary characters are
+' rewritten at the seams the same way (FormBody), so a shared one is written
+' once and carries the ownership marks.
 '-----------------------------------------------------------------------------
 Private Function PerSegmentTier(srcV As Variant, words() As IgtWord, ByVal nWords As Long, _
         ByVal granularity As IgtGranularity, ByVal isGloss As Boolean, ByVal nCols As Long) As String()
     Dim src() As String, out() As String
     Dim i As Long, s As Long, k As Long, n As Long, piece As String, acc As String
+    Dim body As String, agreed As Boolean
 
     src = srcV
     ReDim out(0 To IIf(nCols > 0, nCols - 1, 0))
@@ -490,11 +550,16 @@ Private Function PerSegmentTier(srcV As Variant, words() As IgtWord, ByVal nWord
                     out(n) = piece
                 End If
                 n = n + 1
-            Else
-                If isGloss And piece <> "" Then
+            ElseIf piece <> "" Then
+                If isGloss Then
                     acc = acc & SeamBd(words(i), s) & piece & TrailPart(words(i), s)
                 Else
-                    acc = acc & piece
+                    body = FormBody(piece, words(i).Segments(s), agreed)
+                    If agreed Then
+                        acc = acc & SeamBd(words(i), s) & body & TrailPart(words(i), s)
+                    Else
+                        acc = acc & piece
+                    End If
                 End If
             End If
         Next s

@@ -38,6 +38,11 @@ Golden vectors (PROMPT.md)
   PASS  example 7 (every line type, a code on every line): word-aligned glosses
   PASS  example 7 (every line type, a code on every line): free translation captured
   PASS  example 7 (every line type, a code on every line): first free translation text
+  PASS  example 8 (a baseline in two writing systems, one sparse): parsed
+  PASS  example 8 (a baseline in two writing systems, one sparse): word-aligned forms
+  PASS  example 8 (a baseline in two writing systems, one sparse): word-aligned glosses
+  PASS  example 8 (a baseline in two writing systems, one sparse): free translation captured
+  PASS  example 8 (a baseline in two writing systems, one sparse): first free translation text
   PASS  example 2 with a number and a trailing section sign: parsed
   PASS  example 2 with a number and a trailing section sign: word-aligned forms
   PASS  example 2 with a number and a trailing section sign: word-aligned glosses
@@ -69,6 +74,8 @@ Projections (word-aligned vs morpheme-aligned)
   PASS  example 6 (a baseline): morpheme-aligned satisfies break-char agreement
   PASS  example 7 (every line type): morpheme-aligned has at least as many columns
   PASS  example 7 (every line type): morpheme-aligned satisfies break-char agreement
+  PASS  example 8 (two Word rows, two Morphemes rows): morpheme-aligned has at least as many columns
+  PASS  example 8 (two Word rows, two Morphemes rows): morpheme-aligned satisfies break-char agreement
   PASS  a proclitic's boundary is marked in the word-aligned cell
   PASS    and in its gloss
   PASS  an enclitic's is not
@@ -95,6 +102,12 @@ Projections (word-aligned vs morpheme-aligned)
   PASS    by morpheme, the second form row splits with the first
   PASS    the baseline sits in each word's first column
   PASS    no warning at all: the baseline takes no part in the checks
+  PASS  example 8 has three columns: the sparse Word row did not merge words
+  PASS    the first Morphemes row
+  PASS    the second Morphemes row, its shared seam written once
+  PASS    the gloss row
+  PASS    the second Morphemes row carries the ownership marks too
+  PASS    and no warning
 
 Input routing
   PASS  recognises FLEx text by its tier labels
@@ -235,5 +248,5 @@ Wrap planner
   PASS  NoBreakFlags never flags the first column
   PASS  NoBreakFlags flags the enclitic columns of example 2
 
-ALL PASS -- 216 passed
+ALL PASS -- 229 passed
 

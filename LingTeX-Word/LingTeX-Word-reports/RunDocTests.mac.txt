@@ -295,6 +295,12 @@ Open documents at start: 1
   PASS       and the gloss likewise
   PASS     Merge Columns writes the owner back
 
+-- msgbox ----------------------------------------------------
+  PASS   a short message is untouched
+  PASS   a long message is cut inside the message-box limit
+  PASS     at a line break
+  PASS     saying how many lines went
+
 -- measure ---------------------------------------------------
   PASS   widths are strictly increasing for i < iii < WWW
          i=2.75  iii=8.30000019073486  WWW=27.7000007629395
@@ -598,5 +604,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 523 passed
+ALL PASS -- 527 passed
 
