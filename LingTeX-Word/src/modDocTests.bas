@@ -93,6 +93,7 @@ Public Sub RunDocTests()
     RunSection "fromtext"
     RunSection "several"
     RunSection "fresh"
+    RunSection "roundtripundo"
     RunSection "insertspacing"
     RunSection "msgbox"
     RunSection "measure"
@@ -141,6 +142,7 @@ Private Sub RunSection(ByVal which As String)
         Case "fromtext":     TestTextToInterlinear
         Case "several":      TestInsertSeveralExamples
         Case "fresh":        TestInsertIntoFreshDocument
+        Case "roundtripundo": TestUndoRoundTrip
         Case "insertspacing": TestInsertSpacingMatchesRewrap
         Case "msgbox":       TestClipForMsgBox
         Case "measure":      TestMeasure
@@ -1506,6 +1508,98 @@ Private Sub RemoveLingTeXStylesAndContent(doc As Document)
     Next i
     Err.Clear
 End Sub
+
+'-----------------------------------------------------------------------------
+' UNDO AND REDO, FOR REAL, BOTH WAYS (Seth, 2026-09-29): "undo/redo history as
+' single items that reliably work round trip both ways". In a VISIBLE
+' document, where Document.Undo works (it is inert in a hidden one): the
+' insert adds exactly ONE Undo entry; one Undo takes the tables AND the
+' styles back and restores the copied text; one Redo brings it all back,
+' numbered and styled, and it still re-wraps; after an Undo, a new insert
+' is styled and numbered again. UndoDepth counts the entries by undoing
+' them all and redoing them all, the snapshot Seth asked for.
+'-----------------------------------------------------------------------------
+Private Sub TestUndoRoundTrip()
+    Dim doc As Document, d0 As Long, d1 As Long
+    Dim savedQuiet As Boolean, savedText As String
+    Dim wentBack As Boolean, cameBack As Boolean
+
+    On Error Resume Next
+    Set doc = Documents.Add
+    On Error GoTo 0
+    If doc Is Nothing Then
+        Ok "round trip: could create a visible document", False
+        Exit Sub
+    End If
+    doc.Activate
+    savedQuiet = gQuiet
+    savedText = gQuietText
+    gQuiet = True
+    ClearCache
+
+    doc.Content.Text = TwoFlexExamples()
+    doc.UndoClear
+    d0 = UndoDepth(doc)
+    Ok "round trip: the Undo list starts empty", (d0 = 0)
+    doc.Content.Select
+    ReleaseScratch
+    RunCommandByName "LingTeXInsertInterlinear"
+    Ok "the insert draws two tables", (doc.Tables.Count = 2)
+    d1 = UndoDepth(doc)
+    Ok "  and adds exactly ONE Undo entry", (d1 = d0 + 1)
+    Emit "         Undo entries: " & CStr(d0) & " before, " & CStr(d1) & " after"
+    If d1 = 0 Then Emit "         (Undo did nothing: Document.Undo may be inert under ""run VB macro"" too)"
+
+    wentBack = doc.Undo(1)
+    Ok "ONE Undo takes the whole insert back", wentBack And (doc.Tables.Count = 0)
+    Ok "  styles and all", Not StyleExistsOfType(doc, STYLE_TABLE, wdStyleTypeTable)
+    Ok "  and the copied text is back", (InStr(doc.Content.Text, "Lex. Gloss") > 0)
+
+    cameBack = doc.Redo(1)
+    Ok "ONE Redo brings it all back", cameBack And (doc.Tables.Count = 2)
+    Ok "  styled", StyleExistsOfType(doc, STYLE_TABLE, wdStyleTypeTable)
+    If doc.Tables.Count = 2 Then
+        Ok "  numbered", HasNumberColumn(doc.Tables(1))
+        Eq "  (1) on the first", ExampleNumberString(doc.Tables(1)), "(1)"
+    End If
+    RewrapDocument doc, False
+    Ok "  and a re-wrap after the Redo keeps both, numbered", _
+        (doc.Tables.Count = 2) And HasNumberColumn(doc.Tables(1))
+
+    ' Back to before the insert, then insert again: styled and numbered.
+    doc.Undo 1
+    doc.Undo 1
+    Ok "after undoing it all, the copied text is there to insert again", (doc.Tables.Count = 0)
+    doc.Content.Select
+    ReleaseScratch
+    RunCommandByName "LingTeXInsertInterlinear"
+    Ok "a new insert after the Undo is styled", StyleExistsOfType(doc, STYLE_TABLE, wdStyleTypeTable)
+    If doc.Tables.Count >= 1 Then
+        Ok "  and numbered", HasNumberColumn(doc.Tables(1))
+        Eq "  its first line in its tier style", _
+            CStr(doc.Tables(1).Cell(1, NumberColumns(doc.Tables(1)) + 1).Range.Paragraphs(1).Style), _
+            ParaStyleName(ROLE_MORPHEMES)
+    End If
+
+    gQuiet = savedQuiet
+    gQuietText = savedText
+    doc.Saved = True
+    CloseNoSave doc
+End Sub
+
+' How many entries the document's Undo list holds: undo them all, counting,
+' then redo them all. Visible documents only.
+Private Function UndoDepth(doc As Document) As Long
+    Dim n As Long
+    On Error Resume Next
+    Do While n < 300
+        If Not doc.Undo(1) Then Exit Do
+        n = n + 1
+    Loop
+    If n > 0 Then doc.Redo n
+    Err.Clear
+    UndoDepth = n
+End Function
 
 Private Sub TestInsertSeveralExamples()
     Dim doc As Document

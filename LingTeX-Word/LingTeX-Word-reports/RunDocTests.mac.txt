@@ -315,6 +315,24 @@ Open documents at start: 1
   PASS     with nothing written before it opened
          StartPendingUndo "Insert interlinear": opened
 
+-- roundtripundo ---------------------------------------------
+  PASS   round trip: the Undo list starts empty
+  PASS   the insert draws two tables
+  PASS     and adds exactly ONE Undo entry
+         Undo entries: 0 before, 1 after
+  PASS   ONE Undo takes the whole insert back
+  PASS     styles and all
+  PASS     and the copied text is back
+  PASS   ONE Redo brings it all back
+  PASS     styled
+  PASS     numbered
+  PASS     (1) on the first
+  PASS     and a re-wrap after the Redo keeps both, numbered
+  PASS   after undoing it all, the copied text is there to insert again
+  PASS   a new insert after the Undo is styled
+  PASS     and numbered
+  PASS     its first line in its tier style
+
 -- insertspacing ---------------------------------------------
   PASS   the insert draws two tables
   PASS     in one undo record, the closing re-wrap inside it
@@ -634,5 +652,5 @@ Open documents at start: 1
   PASS   Detach twice does not raise
   PASS   no documents leaked
 
-ALL PASS -- 550 passed
+ALL PASS -- 565 passed
 
