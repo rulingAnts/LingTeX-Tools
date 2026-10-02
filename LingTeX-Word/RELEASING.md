@@ -100,6 +100,40 @@ which sets the test's install and its Normal aside and puts everything back.
 Don't drag the dev template out in Finder instead: on 2026-09-14 that made a
 copy, the original kept loading, and the test measured the dev rig.
 
+## 4. Site
+
+The site is `docs/`, served by GitHub Pages from the **`webProduction`**
+branch. Its LingTeX-Word links are written for one release, and
+`docs/assets/word-release.js` moves them, in the visitor's browser, to the
+newest release that carries the installer, the Windows zip and the Mac file.
+The written links are what everyone gets whom the script misses: JavaScript
+off, `api.github.com` blocked by a filter, GitHub's hourly API limit used up on
+a shared network, a click before the reply arrives. So after a release is
+published:
+
+1. In `docs/index.html` and `docs/word/index.html`, move every
+   `word-v0.1.0-<label>` in the download links, and the version beside
+   "LingTeX-Word" (`<span data-word="version">`), to the new tag. The asset
+   names are on the release page (`gh release view <tag> --json assets`).
+2. Check them:
+
+   ```bash
+   sh LingTeX-Word/tools/check-site-links.sh       # every release link on the site; must say ALL PASS
+   node LingTeX-Word/tools/word-release.test.mjs   # the script's choice, and one release per page
+   ```
+
+3. Commit, and deploy: the site changes only when `webProduction` has the
+   commit. That is Seth's step: bring the commit onto `webProduction` (a
+   fast-forward where it can be one, otherwise a cherry-pick) and push it.
+
+**If a release's files are ever withdrawn** (deleted, or the release emptied),
+do the same at once with a release that still has all of them, and deploy it:
+the script skips a release without its files, but nothing repairs the written
+links. beta.6's files were deleted after the links were written for it, and
+while beta.6 was the newest release the script of the day chose it too, so
+every download said "Not Found" (#7, 2026-09-21). `check-site-links.sh` lists
+any link that stopped answering 200, with the lines that use it.
+
 ## What the first run does
 
 `AutoExec` in `modLingTeX` books `LingTeXFirstRun` for three seconds after
